@@ -1,6 +1,5 @@
 #!/bin/bash
-# 这里请根据实际项目进行设置
-cd $GOPATH/src/github.com/ultramesh/crypto
+cd $GOPATH/src/github.com/ultramesh/flato-rbft
 
 st=0
 counter=0

@@ -1,0 +1,265 @@
+// Copyright 2016-2017 Hyperchain Corp.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+import "github.com/ultramesh/flato/core/types/transaction.proto";
+
+package rbftpb;
+
+enum Type {
+    NULL_REQUEST = 0;
+    PRE_PREPARE = 1;
+    PREPARE = 2;
+    COMMIT = 3;
+    CHECKPOINT = 4;
+    VIEW_CHANGE = 5;
+    NEW_VIEW = 6;
+    FETCH_REQUEST_BATCH = 7;
+    SEND_REQUEST_BATCH = 8;
+    RECOVERY_FETCH_QPC = 9;
+    RECOVERY_RETURN_QPC = 10;
+    READY_FOR_N = 11;
+    AGREE_UPDATE_N = 12;
+    UPDATE_N = 13;
+    FETCH_MISSING_REQUESTS = 14;
+    SEND_MISSING_REQUESTS = 15;
+    SYNC_STATE = 16;
+    SYNC_STATE_RESPONSE = 17;
+    NOTIFICATION = 18;
+    NOTIFICATION_RESPONSE = 19;
+    CONF_CHANGE = 20;
+    REQUEST_SET = 21;
+}
+
+message consensus_message {
+    Type type = 1;
+    uint64 from = 2;
+    uint64 to = 3;
+    bytes payload = 4;
+}
+
+message request_batch {
+    repeated string request_hash_list = 1;
+    repeated types.Transaction request_list = 2;
+    int64 timestamp = 3;
+    uint64 seq_no = 4;
+    repeated bool local_list = 5;
+    string batch_hash = 6;
+}
+
+message hash_batch {
+    repeated string request_hash_list = 1;
+    repeated string de_duplicate_request_hash_list = 2;
+    int64 timestamp = 3;
+}
+
+message send_request_batch {
+    uint64 replica_id = 1;
+    request_batch batch = 2;
+    string batch_digest = 3;
+}
+
+message fetch_missing_requests {
+    uint64 replica_id = 1;
+    uint64 view = 2;
+    uint64 sequence_number = 3;
+    string batch_digest = 4;
+    map<uint64, string> missing_request_hashes = 5;
+}
+
+message send_missing_requests {
+    uint64 replica_id = 1;
+    uint64 view = 2;
+    uint64 sequence_number = 3;
+    string batch_digest = 4;
+    map<uint64, string> missing_request_hashes = 5;
+    map<uint64, types.Transaction> missing_requests = 6;
+}
+
+message request_set {
+    repeated types.Transaction requests = 1;
+    bool local = 2;
+}
+
+message null_request {
+    uint64 replica_id = 1;
+}
+
+message pre_prepare {
+    uint64 replica_id = 1;
+    uint64 view = 2;
+    uint64 sequence_number = 3;
+    string batch_digest = 4;
+    hash_batch hash_batch = 5;
+}
+
+message prepare {
+    uint64 replica_id = 1;
+    uint64 view = 2;
+    uint64 sequence_number = 3;
+    string batch_digest = 4;
+}
+
+message commit {
+    uint64 replica_id = 1;
+    uint64 view = 2;
+    uint64 sequence_number = 3;
+    string batch_digest = 4;
+}
+
+message checkpoint {
+     uint64 replica_id = 1;
+     uint64 sequence_number = 2;
+     string digest = 3;
+}
+
+message vc_C {
+    uint64 sequence_number = 1;
+    string digest = 2;
+}
+
+message vc_PQ {
+    uint64 sequence_number = 1;
+    string batch_digest = 2;
+    uint64 view = 3;
+}
+
+message vc_basis {
+    uint64   replica_id = 1;
+    uint64   view = 2;
+    uint64   h = 3;
+    repeated vc_C cset = 4;
+    repeated vc_PQ pset = 5;
+    repeated vc_PQ qset = 6;
+    uint64   genesis = 7;
+}
+
+message view_change {
+    vc_basis basis = 1;
+    bytes    signature = 2;
+    int64    timestamp = 3;
+}
+
+message new_view {
+    uint64 replica_id = 1;
+    uint64 view = 2;
+    map<uint64, string> xset = 3;
+    repeated vc_basis bset = 4;
+}
+
+message fetch_request_batch {
+    uint64 replica_id = 1;
+    string batch_digest = 2;
+}
+
+message recovery_fetchPQC {
+    uint64 replica_id = 1;
+    uint64 h = 2;
+}
+
+message recovery_returnPQC {
+    uint64   replica_id = 1;
+    repeated pre_prepare prepre_set = 2;
+    repeated prepare pre_set = 3;
+    repeated commit cmt_set = 4;
+}
+
+message Pset {
+    repeated prepare set = 1;
+}
+
+message Cset {
+    repeated commit set = 1;
+}
+
+message ready_for_n {
+    string hash = 1;
+    uint64 expect_n = 2;
+}
+
+message agree_update_n {
+    vc_basis basis = 1;
+    bool     flag = 2;
+    string   hash = 3;
+    int64    n = 4;
+    uint64   expect_n = 5;
+}
+
+message update_n {
+    bool   flag = 1;
+    uint64 replica_id = 2;
+    string hash = 3;
+    int64  n = 4;
+    uint64 view = 5;
+    map<uint64, string> xset = 6;
+    repeated vc_basis bset = 7;
+}
+
+message sync_state {
+    uint64 replica_id = 1;
+}
+
+message sync_state_response {
+    uint64 replica_id = 1;
+    uint64 view = 2;
+    uint64 n = 3;
+    bytes  router_info = 4;
+    service_state current_state = 5;
+}
+
+// notification message
+message notification {
+    vc_basis basis = 1;
+    bytes    signature = 2;
+    int64    timestamp = 3;
+    string   replica_hash = 4;
+}
+
+message notification_response {
+    vc_basis basis = 1;
+    string replica_hash = 2;
+    uint64 n = 3;
+    bytes  router_info = 4;
+}
+
+enum ConfChangeType {
+    ConfChangeAddNode        = 0;
+    ConfChangeRemoveNode     = 1;
+    ConfChangeUpdateNode     = 2;
+}
+
+message conf_change {
+    uint64 NodeID = 1;
+    string node_hash = 2;
+    ConfChangeType Type = 3;
+}
+
+message ConfState {
+    repeated uint64 nodes    = 1;
+}
+
+message service_state {
+    uint64 applied = 1;
+    string digest = 2;
+    bytes extra = 3;
+}
+
+enum InformType {
+    FilterFinishRecovery = 0;
+    FilterFinishViewChange = 1;
+    FilterFinishUpdateN = 2;
+    FilterFinishStateUpdate = 3;
+    FilterPoolFull = 4;
+}
