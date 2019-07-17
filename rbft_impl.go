@@ -160,10 +160,23 @@ func newRBFT(cpChan chan *pb.ServiceState, c Config) (*rbftImpl, error) {
 		close:    make(chan bool),
 	}
 
-	// TODO(make these params configurable)
-	rbft.K = uint64(10)
-	rbft.logMultiplier = uint64(4)
+	rbft.N = len(c.Peers)
+	rbft.f = (rbft.N - 1) / 3
+	rbft.K = c.K
+	rbft.logMultiplier = c.LogMultiplier
 	rbft.L = rbft.logMultiplier * rbft.K
+
+	// if peers contains itself
+	found := false
+	for i, p := range c.Peers {
+		if p.ID == c.ID {
+			rbft.no = uint64(i + 1)
+			found = true
+		}
+	}
+	if !found {
+		return nil, fmt.Errorf("peers: %+v doesn't contain self ID: %d", c.Peers, c.ID)
+	}
 
 	// new timer manager
 	rbft.timerMgr = newTimerMgr(rbft.recvChan, c)
@@ -196,13 +209,12 @@ func newRBFT(cpChan chan *pb.ServiceState, c Config) (*rbftImpl, error) {
 	// restore state from consensus database
 	// TODO(move to node interface?)
 	rbft.exec.setLastExec(c.Applied)
-	if err := rbft.restoreState(); err != nil {
-		rbft.logger.Errorf("Replica restore state failed: %s", err)
-		return nil, err
-	}
 
 	// update viewChange seqNo after restore state which may update seqNo
 	rbft.updateViewChangeSeqNo(rbft.exec.lastExec, rbft.K)
+
+	// init message event converter
+	rbft.initMsgEventMap()
 
 	rbft.logger.Infof("RBFT Max number of validating peers (N) = %v", rbft.N)
 	rbft.logger.Infof("RBFT Max number of failing peers (f) = %v", rbft.f)
@@ -211,14 +223,11 @@ func newRBFT(cpChan chan *pb.ServiceState, c Config) (*rbftImpl, error) {
 	rbft.logger.Infof("RBFT Log multiplier = %v", rbft.logMultiplier)
 	rbft.logger.Infof("RBFT log size (L) = %v", rbft.L)
 	rbft.logger.Debugf("RBFT localHash: %s, localID: %d", rbft.peerPool.localHash, rbft.peerPool.localID)
-	rbft.logger.Noticef("======== RBFT finished start, node's No.: %d ========", rbft.no)
 
 	return rbft, nil
 }
 
 func (rbft *rbftImpl) resetComponents() {
-	rbft.initMsgEventMap()
-
 	rbft.status = new(statusManager)
 	rbft.timerMgr = new(timerManager)
 	rbft.exec = new(executor)
@@ -231,13 +240,20 @@ func (rbft *rbftImpl) resetComponents() {
 
 // start initializes and starts the consensus service
 func (rbft *rbftImpl) start() error {
+	// exit pending status after start rbft to avoid missing consensus messages from other nodes.
+	rbft.off(Pending)
+
 	rbft.logger.Noticef("--------RBFT starting, nodeID: %d--------", rbft.no)
+
+	if err := rbft.restoreState(); err != nil {
+		rbft.logger.Errorf("Replica restore state failed: %s", err)
+		return err
+	}
 
 	// start listen consensus event
 	go rbft.listenEvent()
 
-	// exit pending status after start rbft to avoid missing consensus messages from other nodes.
-	rbft.off(Pending)
+	rbft.sendNotification(true)
 
 	return nil
 }
@@ -419,6 +435,18 @@ func (rbft *rbftImpl) processEvent(ee consensusEvent) consensusEvent {
 		return rbft.dispatchLocalEvent(e)
 
 	case *pb.ConsensusMessage:
+		// REQUEST_SET event need to be parsed first any reset Local variable if any.
+		if e.Type == pb.Type_REQUEST_SET {
+			set := &pb.RequestSet{}
+			err := proto.Unmarshal(e.Payload, set)
+			if err != nil {
+				rbft.logger.Errorf("Unmarshal request set failed: %s", err)
+				return nil
+			}
+			set.Local = false
+			return rbft.processReqSetEvent(set)
+		}
+
 		next, _ := rbft.msgToEvent(e)
 		return rbft.dispatchConsensusMsg(next)
 

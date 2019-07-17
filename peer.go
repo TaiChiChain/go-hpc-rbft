@@ -55,7 +55,10 @@ func newPeerPool(c Config) *peerPool {
 		network:   c.External,
 		logger:    c.Logger,
 	}
-	pool.router.Peers = c.Peers
+	for i, p := range c.Peers {
+		pool.noMap[p.ID] = uint64(i + 1)
+		pool.router.Peers = append(pool.router.Peers, p)
+	}
 
 	return pool
 }

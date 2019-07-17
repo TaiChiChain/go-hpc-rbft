@@ -89,7 +89,6 @@ func (rbft *rbftImpl) initMsgEventMap() {
 	eventCreators[pb.Type_SYNC_STATE_RESPONSE] = func() interface{} { return &pb.SyncStateResponse{} }
 	eventCreators[pb.Type_NOTIFICATION] = func() interface{} { return &pb.Notification{} }
 	eventCreators[pb.Type_NOTIFICATION_RESPONSE] = func() interface{} { return &pb.NotificationResponse{} }
-	eventCreators[pb.Type_REQUEST_SET] = func() interface{} { return &pb.RequestSet{} }
 }
 
 // dispatchLocalEvent dispatches local Event to corresponding handles using its service type

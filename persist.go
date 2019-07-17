@@ -16,8 +16,8 @@ package rbft
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
-	"github.com/pkg/errors"
 	"strconv"
 	"strings"
 
@@ -615,17 +615,6 @@ func (rbft *rbftImpl) restoreState() error {
 	rbft.batchMgr.setSeqNo(rbft.exec.lastExec)
 	setView := rbft.restoreView()
 	rbft.restoreN()
-
-	// check consensus version:
-	// 1. for those data with no version info, we see those as version 1.2, so restore some
-	// related consensus data from blockChain DB
-	// 2. for those data whose version is lower than current version, we need to clean data
-	// to current version
-	version := rbft.restoreConsensusVersion()
-
-	if version != currentVersion {
-		// TODO(DH): move consensus data cleaner to external.
-	}
 
 	rbft.restoreCert()
 

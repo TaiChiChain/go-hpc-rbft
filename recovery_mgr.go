@@ -383,7 +383,7 @@ func (rbft *rbftImpl) fetchRecoveryPQC() consensusEvent {
 		return nil
 	}
 	conMsg := &pb.ConsensusMessage{
-		Type:    pb.Type_RECOVERY_RETURN_QPC,
+		Type:    pb.Type_RECOVERY_FETCH_QPC,
 		Payload: payload,
 	}
 

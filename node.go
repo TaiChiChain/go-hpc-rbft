@@ -55,6 +55,7 @@ type ServiceInbound interface {
 	// ReportExecuted reports to RBFT core that application service has finished applied one batch with
 	// current applied batch seqNo and state digest.
 	// Users can report any necessary extra field optionally.
+	// NOTE. Users should ReportExecuted directly after start node to help track the initial state.
 	ReportExecuted(state *pb.ServiceState)
 
 	// ReportStateUpdated reports to RBFT core that application service has finished one desired StateUpdate
@@ -97,6 +98,8 @@ func NewNode(conf Config) (Node, error) {
 		logger: conf.Logger,
 	}
 
+	rbft.node = n
+
 	return n, nil
 }
 
@@ -112,6 +115,9 @@ func (n *node) Start() error {
 
 // Start stops a Node instance.
 func (n *node) Stop() {
+	n.currentState = nil
+	n.cpChan = make(chan *pb.ServiceState)
+
 	n.rbft.stop()
 
 	return
@@ -158,14 +164,21 @@ func (n *node) ApplyConfChange(cc *pb.ConfChange) *pb.ConfState {
 func (n *node) ReportExecuted(state *pb.ServiceState) {
 	n.stateLock.Lock()
 	defer n.stateLock.Unlock()
+	if n.currentState == nil {
+		n.logger.Noticef("Init service state with: %+v", state)
+		n.currentState = state
+		return
+	}
 	if state.Applied != 0 && state.Applied <= n.currentState.Applied {
 		n.logger.Warningf("Receive invalid service state %+v, "+
 			"current state %+v", state, n.currentState)
 		return
 	}
+	n.logger.Debugf("Update service state: %+v", state)
 	n.currentState = state
 
 	if state.Applied%n.config.K == 0 {
+		n.logger.Debugf("Report checkpoint: %d to RBFT core", state.Applied)
 		n.cpChan <- state
 	}
 	return
