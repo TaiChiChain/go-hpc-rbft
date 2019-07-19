@@ -253,7 +253,6 @@ message ConfState {
 message service_state {
     uint64 applied = 1;
     string digest = 2;
-    bytes extra = 3;
 }
 
 enum InformType {

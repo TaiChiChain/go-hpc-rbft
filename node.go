@@ -115,6 +115,8 @@ func (n *node) Start() error {
 
 // Start stops a Node instance.
 func (n *node) Stop() {
+	n.stateLock.Lock()
+	defer n.stateLock.Unlock()
 	n.currentState = nil
 	n.cpChan = make(chan *pb.ServiceState)
 
