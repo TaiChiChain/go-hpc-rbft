@@ -679,6 +679,4 @@ func (rbft *rbftImpl) exitSyncState() {
 	rbft.off(NeedSyncState)
 	rbft.timerMgr.stopTimer(syncStateRspTimer)
 	rbft.timerMgr.stopTimer(syncStateRestartTimer)
-
-	return
 }

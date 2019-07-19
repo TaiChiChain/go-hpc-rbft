@@ -146,11 +146,6 @@ func (rbft *rbftImpl) oneCorrectQuorum() int {
 	return rbft.f + 1
 }
 
-// allCorrectQuorum returns number if all consensus nodes
-func (rbft *rbftImpl) allCorrectQuorum() int {
-	return rbft.N
-}
-
 // =============================================================================
 // pre-prepare/prepare/commit check helper
 // =============================================================================
@@ -509,39 +504,31 @@ func (rbft *rbftImpl) compareCheckpointWithWeakSet(chkpt *pb.Checkpoint) (bool, 
 //    in state update if found inconsistent blockChain state.
 func (rbft *rbftImpl) compareWholeStates(states wholeStates) consensusEvent {
 	// track all replica hash with same state used to update routing table if needed
-	sameRespCount := make(map[nodeStateWithoutGenesis][]uint64)
+	sameRespCount := make(map[nodeState][]uint64)
 	// track all replica info with same state used to state update if needed
-	replicaRecord := make(map[nodeStateWithoutGenesis][]replicaInfo)
+	replicaRecord := make(map[nodeState][]replicaInfo)
 
 	// check if we can find quorum nodeState who have the same n and view, routers, if we can find, which means
 	// quorum nodes agree to a N and view, save to quorumRsp, set canFind to true and update N, view if needed
-	var quorumResp nodeStateWithoutGenesis
+	var quorumResp nodeState
 	canFind := false
 
 	var quorumInfo []byte
 	// find the quorum nodeState
 	for key, state := range states {
-		s := nodeStateWithoutGenesis{
-			n:               state.n,
-			view:            state.view,
-			routersAndMaxID: state.routerInfo,
-			appliedIndex:    state.appliedIndex,
-			digest:          state.digest,
-		}
-		sameRespCount[s] = append(sameRespCount[s], key)
-		replicaRecord[s] = append(replicaRecord[s], replicaInfo{replicaID: key})
+		sameRespCount[state] = append(sameRespCount[state], key)
+		replicaRecord[state] = append(replicaRecord[state], replicaInfo{replicaID: key})
 
 		// if quorum agree with a same N,view,routers, check if we need to update routing table first.
-		if len(sameRespCount[s]) >= rbft.commonCaseQuorum() {
-			quorumResp = s
+		if len(sameRespCount[state]) >= rbft.commonCaseQuorum() {
+			quorumResp = state
 			canFind = true
 			// if add/delete node happened in downtime, we may find self's routing table is
 			// not the same as quorum nodes, we need to update routing table and optionally
 			// connect to other nodes.
 			quorumInfo = hex2Bytes(state.routerInfo)
 			selfInfo := rbft.peerPool.getRouterInfo()
-			if !rbft.in(isNewNode) && bytes.Compare(quorumInfo, selfInfo) != 0 {
-
+			if !rbft.in(isNewNode) && !bytes.Equal(quorumInfo, selfInfo) {
 				rbft.logger.Warningf("Replica %d finds quorum routing table which is different "+
 					"from self's, pending updating routing table", rbft.no)
 				rbft.peerPool.updateRouter(quorumInfo)
@@ -774,118 +761,6 @@ func (rbft *rbftImpl) gatherPQC() (cset []*pb.Vc_C, pset []*pb.Vc_PQ, qset []*pb
 
 	return
 }
-
-// parseXSet helps parse the start and end point of xSet.
-func (rbft *rbftImpl) parseXSet(xSet xset) (uint64, uint64) {
-	// Return if xSet is nil
-	if len(xSet) == 0 {
-		rbft.logger.Debug("Nil xSet")
-		return 0, 0
-	}
-
-	var (
-		min   uint64
-		max   uint64
-		first = true
-	)
-	for no := range xSet {
-		if first {
-			min, max = no, no
-			first = false
-			continue
-		}
-		if min > no {
-			min = no
-		}
-		if max < no {
-			max = no
-		}
-	}
-
-	return min, max
-}
-
-//// serializeRouters converts []Router to []byte
-//func serializeRouters(routers []Router) []byte {
-//	b, e := json.Marshal(routers)
-//	if e == nil {
-//		return b
-//	}
-//	return nil
-//}
-//
-//// unSerializeRouters converts []byte to []Router
-//func unSerializeRouters(bytes []byte) []Router {
-//	var data []Router
-//	e := json.Unmarshal(bytes, &data)
-//	if e == nil {
-//		return data
-//	}
-//	return nil
-//}
-//
-//// serializeRoutersAndMaxID converts RoutersAndMaxID to []byte,
-//// in order to reduce the size of the message, we don't add hash to it.
-//func serializeRoutersAndMaxID(routers []Router, maxID uint64) []byte {
-//	newRouters := make([]Router, len(routers))
-//	for i, router := range routers {
-//		newRouter := Router{Hash: "", Hostname: router.Hostname, ID: router.ID}
-//		newRouters[i] = newRouter
-//	}
-//
-//	info := RoutersAndMaxID{Routers: newRouters, MaxID: maxID}
-//	b, e := json.Marshal(info)
-//	if e == nil {
-//		return b
-//	}
-//	return nil
-//}
-//
-//// unSerializeRoutersAndMaxID converts []byte to RoutersAndMaxID
-//func unSerializeRoutersAndMaxID(bytes []byte, namespace string) (RoutersAndMaxID, error) {
-//	var infos RoutersAndMaxID
-//	infos.MaxID = uint64(0)
-//	e := json.Unmarshal(bytes, &infos)
-//
-//	for i, router := range infos.Routers {
-//		if router.Hash == "" {
-//			infos.Routers[i].Hash = byte2Hex(newKeccak256(namespace, router.Hostname))
-//		}
-//	}
-//	return infos, e
-//}
-//
-//// compareQuorumAndLocalRouters return needing updating, missing and extra routers.
-//func compareQuorumAndLocalRouters(a []Router, b []Router) ([]string, []Router, []Router) {
-//	var (
-//		mapA = make(map[string]Router)
-//		mapB = make(map[string]Router)
-//
-//		missing    []Router
-//		extra      []Router
-//		needUpdate []string
-//	)
-//
-//	for _, elemA := range a {
-//		mapA[elemA.Hash] = elemA
-//	}
-//
-//	for _, elemB := range b {
-//		mapB[elemB.Hash] = elemB
-//		if elemA, ok := mapA[elemB.Hash]; !ok {
-//			extra = append(extra, elemB)
-//		} else if elemB.ID != elemA.ID {
-//			needUpdate = append(needUpdate, elemB.Hash)
-//		}
-//	}
-//
-//	for _, elemA := range a {
-//		if _, ok := mapB[elemA.Hash]; !ok {
-//			missing = append(missing, elemA)
-//		}
-//	}
-//	return needUpdate, missing, extra
-//}
 
 // byte2Hex returns the hex encode result of data
 func byte2Hex(data []byte) string {

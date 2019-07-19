@@ -34,7 +34,7 @@ type Storage interface {
 	Destroy() error
 }
 
-// NetworkStack is used to send p2p messages between nodes.
+// Network is used to send p2p messages between nodes.
 type Network interface {
 	// Broadcast delivers messages to all other nodes.
 	Broadcast(msg []byte) error
@@ -56,7 +56,7 @@ type Crypto interface {
 	Verify(peerID uint64, signature []byte, msg []byte) error
 }
 
-// Service is the application service invoked by RBFT library which includes two core events:
+// ServiceOutbound is the application service invoked by RBFT library which includes two core events:
 // 1. Execute is invoked when RBFT core has achieved consensus on txs with batch number seqNo,
 //    which will be submitted to application service. After application submitted the given batch,
 //    application should call ServiceInbound.ReportExecuted to inform RBFT library the latest

@@ -297,8 +297,6 @@ func (rbft *rbftImpl) step(msg *pb.ConsensusMessage) {
 	} else {
 		go rbft.postMsg(msg)
 	}
-
-	return
 }
 
 // reportStateUpdated informs RBFT stateUpdated event.

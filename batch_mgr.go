@@ -29,8 +29,6 @@ type batchManager struct {
 	cacheBatch       []*pb.RequestBatch // cache batches wait for prePreparing
 	eventChan        chan<- interface{}
 	batchTimerActive bool // track the batch timer event, true means there exists an undergoing batch timer event
-	namespace        string
-	config           Config
 	requestPool      txpool.TxPool
 }
 

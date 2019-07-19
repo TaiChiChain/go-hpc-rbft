@@ -476,12 +476,6 @@ func (rbft *rbftImpl) persistView(view uint64) {
 	}
 }
 
-// persistDelView deletes the view entries from database
-func (rbft *rbftImpl) persistDelView() {
-	key := fmt.Sprint("view")
-	_ = rbft.storage.DelState(key)
-}
-
 // persistN persists current N to database
 func (rbft *rbftImpl) persistN(n int) {
 	key := fmt.Sprint("nodes")
@@ -583,24 +577,6 @@ func (rbft *rbftImpl) restoreBatchStore() {
 	} else {
 		rbft.logger.Warningf("Replica %d could not restore batch: %v", rbft.no, err)
 	}
-}
-
-// persistConsensusVersion persists consensus data version into consensus DB.
-func (rbft *rbftImpl) persistConsensusVersion() {
-	currentVersion := []byte(currentVersion)
-	err := rbft.storage.StoreState("version", currentVersion)
-	if err != nil {
-		rbft.logger.Errorf("Persist version failed with err: %s ", err)
-	}
-}
-
-// restoreConsensusVersion restores consensus data version from consensus DB.
-func (rbft *rbftImpl) restoreConsensusVersion() string {
-	version, err := rbft.storage.ReadState("version")
-	if err != nil {
-		return ""
-	}
-	return string(version)
 }
 
 // It is application's responsibility to ensure data compatibility, so RBFT core need only trust and restore

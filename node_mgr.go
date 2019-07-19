@@ -172,8 +172,6 @@ func (rbft *rbftImpl) sendReadyForN() {
 
 	// Broadcast to all VP nodes except itself
 	rbft.peerPool.broadcast(msg)
-
-	return
 }
 
 // recvReadyforNforAdd handles the ReadyForN message sent by new node.
@@ -506,7 +504,7 @@ func (rbft *rbftImpl) recvUpdateN(update *pb.UpdateN) consensusEvent {
 	}
 
 	// UpdateN can only be sent by primary
-	if !(update.View >= 0 && rbft.isPrimary(update.ReplicaId)) {
+	if !rbft.isPrimary(update.ReplicaId) {
 		rbft.logger.Warningf("Replica %d rejecting invalid updateN from %d, v:%d", rbft.no, sender, update.View)
 		return nil
 	}
@@ -542,7 +540,7 @@ func (rbft *rbftImpl) primaryCheckUpdateN(initialCp pb.Vc_C, replicas []replicaI
 	// Check if primary need fetch missing requests
 	newReqBatchMissing := rbft.feedMissingReqBatchIfNeeded(update.Xset)
 	if len(rbft.storeMgr.missingReqBatches) == 0 {
-		return rbft.resetStateForUpdate(update)
+		return rbft.resetStateForUpdate()
 	} else if newReqBatchMissing {
 		rbft.fetchRequestBatches(update.Xset)
 	}
@@ -616,7 +614,7 @@ func (rbft *rbftImpl) replicaCheckUpdateN() consensusEvent {
 	// replica checks if we have all request batch in xSet
 	newReqBatchMissing := rbft.feedMissingReqBatchIfNeeded(msgList)
 	if len(rbft.storeMgr.missingReqBatches) == 0 {
-		return rbft.resetStateForUpdate(update)
+		return rbft.resetStateForUpdate()
 	} else if newReqBatchMissing {
 		// if received all batches, jump into resetStateForNewView
 		rbft.fetchRequestBatches(msgList)
@@ -625,7 +623,7 @@ func (rbft *rbftImpl) replicaCheckUpdateN() consensusEvent {
 }
 
 // resetStateForUpdate resets all the variables that need to be updated after updating n
-func (rbft *rbftImpl) resetStateForUpdate(update *pb.UpdateN) consensusEvent {
+func (rbft *rbftImpl) resetStateForUpdate() consensusEvent {
 
 	update, ok := rbft.nodeMgr.updateStore[rbft.nodeMgr.updateTarget]
 	if !ok || update == nil {

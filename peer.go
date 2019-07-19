@@ -23,13 +23,13 @@ import (
 	"github.com/gogo/protobuf/proto"
 )
 
-// unique peer identity
+// Peer is the unique peer identity
 type Peer struct {
 	ID   uint64 `json:"id"`
 	Hash string `json:"hash"`
 }
 
-// peer list which we call consensus Router
+// Router is the peer list which we call consensus Router
 type Router struct {
 	Peers []Peer `json:"peers"`
 }

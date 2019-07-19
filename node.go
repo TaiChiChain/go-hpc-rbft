@@ -121,8 +121,6 @@ func (n *node) Stop() {
 	n.cpChan = make(chan *pb.ServiceState)
 
 	n.rbft.stop()
-
-	return
 }
 
 // Propose proposes requests to RBFT core, requests are ensured to be eventually
@@ -183,7 +181,6 @@ func (n *node) ReportExecuted(state *pb.ServiceState) {
 		n.logger.Debugf("Report checkpoint: %d to RBFT core", state.Applied)
 		n.cpChan <- state
 	}
-	return
 }
 
 // ReportStateUpdated reports to RBFT core that application service has finished one desired StateUpdate
@@ -200,7 +197,6 @@ func (n *node) ReportStateUpdated(state *pb.ServiceState) {
 	}
 	n.currentState = state
 	n.rbft.reportStateUpdated(state.Applied)
-	return
 }
 
 // Status returns the current node status of the RBFT state machine.

@@ -317,7 +317,7 @@ func (rbft *rbftImpl) recvNewView(nv *pb.NewView) consensusEvent {
 		return nil
 	}
 
-	if !(nv.View >= 0 && nv.View >= rbft.view && rbft.primaryID(nv.View) == nv.ReplicaId && rbft.vcMgr.newViewStore[nv.View] == nil) {
+	if !(nv.View >= rbft.view && rbft.primaryID(nv.View) == nv.ReplicaId && rbft.vcMgr.newViewStore[nv.View] == nil) {
 		rbft.logger.Warningf("Replica %d reject invalid newView from %d, v:%d", rbft.no, sender, nv.View)
 		return nil
 	}
@@ -559,12 +559,12 @@ func (rbft *rbftImpl) recvSendRequestBatch(batch *pb.SendRequestBatch) consensus
 			return rbft.resetStateForNewView()
 		}
 		if rbft.in(InUpdatingN) {
-			update, ok := rbft.nodeMgr.updateStore[rbft.nodeMgr.updateTarget]
+			_, ok := rbft.nodeMgr.updateStore[rbft.nodeMgr.updateTarget]
 			if !ok {
 				rbft.logger.Warningf("Replica %d ignore resetStateForUpdate as it could not find target %v in its updateStore", rbft.no, rbft.nodeMgr.updateTarget)
 				return nil
 			}
-			return rbft.resetStateForUpdate(update)
+			return rbft.resetStateForUpdate()
 		}
 	}
 	return nil

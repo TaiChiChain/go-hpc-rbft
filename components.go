@@ -22,11 +22,6 @@ import (
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
 )
 
-// record consensus version in database
-const (
-	currentVersion = "1.8"
-)
-
 // constant timer names
 const (
 	requestTimer          = "requestTimer"
@@ -132,17 +127,6 @@ type nodeState struct {
 	routerInfo   string
 	appliedIndex uint64
 	digest       string
-	genesis      uint64
-}
-
-// nodeStateWithoutGenesis tracks every node's consensus status and ledger
-// status without genesis to help compare whole status among nodes.
-type nodeStateWithoutGenesis struct {
-	n               uint64
-	view            uint64
-	routersAndMaxID string
-	appliedIndex    uint64
-	digest          string
 }
 
 // wholeStates maps node ID to nodeState
