@@ -160,9 +160,25 @@ func (rbft *rbftImpl) handleCoreRbftEvent(e *LocalEvent) consensusEvent {
 		currentStatus := rbft.getStatus()
 		statusChan <- currentStatus
 		return nil
+	case CoreUpdateConfStateEvent:
+		ev := e.Event.(*pb.ConfState)
+		found := false
+		for i, p := range ev.QuorumRouter.Peers {
+			if p.Id == rbft.peerPool.localID {
+				rbft.no = uint64(i + 1)
+				found = true
+			}
+		}
+		if !found {
+			rbft.logger.Criticalf("Replica %d cannot find self id in quorum routers: %+v", rbft.no, ev.QuorumRouter.Peers)
+			rbft.on(Pending)
+			return nil
+		}
+		rbft.peerPool.initPeers(ev.QuorumRouter.Peers)
+		return nil
 
 	default:
-		rbft.logger.Errorf("Invalid core rbft event: %v", e)
+		rbft.logger.Errorf("Invalid core RBFT event: %v", e)
 		return nil
 	}
 }
@@ -344,7 +360,7 @@ func (rbft *rbftImpl) handleViewChangeEvent(e *LocalEvent) consensusEvent {
 func (rbft *rbftImpl) handleNodeMgrEvent(e *LocalEvent) consensusEvent {
 	switch e.EventType {
 	case NodeMgrDelNodeEvent:
-		return rbft.recvLocalDelNode(e.Event.(string))
+		return rbft.recvLocalDelNode(e.Event.(uint64))
 	case NodeMgrAgreeUpdateQuorumEvent:
 		rbft.logger.Debugf("Replica %d received agreeUpdateN quorum, processing updateN", rbft.no)
 		if rbft.isPrimary(rbft.peerPool.localID) {
@@ -376,8 +392,8 @@ func (rbft *rbftImpl) handleNodeMgrEvent(e *LocalEvent) consensusEvent {
 		rbft.nodeMgr.updateHandled = false
 
 		// clean the AddNode/DelNode messages in this turn
-		rbft.nodeMgr.addNodeInfo = make(map[string]bool)
-		rbft.nodeMgr.delNodeInfo = make(map[string]bool)
+		rbft.nodeMgr.addNodeInfo = make(map[uint64]string)
+		rbft.nodeMgr.delNodeInfo = make(map[uint64]string)
 		rbft.nodeMgr.agreeUpdateStore = make(map[aidx]*pb.AgreeUpdateN)
 		rbft.nodeMgr.updateStore = make(map[uidx]*pb.UpdateN)
 
@@ -385,7 +401,7 @@ func (rbft *rbftImpl) handleNodeMgrEvent(e *LocalEvent) consensusEvent {
 		return rbft.restartRecovery()
 
 	default:
-		rbft.logger.Errorf("Invalid viewChange event: %v", e)
+		rbft.logger.Errorf("Invalid node manager event: %v", e)
 		return nil
 	}
 

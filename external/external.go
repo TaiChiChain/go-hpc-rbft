@@ -37,15 +37,15 @@ type Storage interface {
 // Network is used to send p2p messages between nodes.
 type Network interface {
 	// Broadcast delivers messages to all other nodes.
-	Broadcast(msg []byte) error
+	Broadcast(msg *pb.ConsensusMessage) error
 	// Unicast delivers messages to given node with specified id.
-	Unicast(msg []byte, to uint64) error
+	Unicast(msg *pb.ConsensusMessage, to uint64) error
 	// UpdateTable updates routing table according to given confChangeType, which includes:
 	// 1. ConfChangeType_ConfChangeAddNode, append one node to routing table
 	// 2. ConfChangeType_ConfChangeRemoveNode, remove one node with given id from routing table
 	// 3. ConfChangeType_ConfChangeUpdateNode, update routing table with given meta info
 	// It's application's responsibility to ensure update routing table synchronously.
-	UpdateTable(payload []byte, typ pb.ConfChangeType)
+	UpdateTable(change *pb.ConfChange)
 }
 
 // Crypto is used to access the sign/verify methods from the crypto package

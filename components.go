@@ -49,6 +49,7 @@ const (
 	CoreResendMissingTxsEvent
 	CoreResendFetchMissingEvent
 	CoreRetrieveStatusEvent
+	CoreUpdateConfStateEvent
 
 	// 2.view change
 	ViewChangeTimerEvent
@@ -115,8 +116,8 @@ type msgCert struct {
 
 // -----------recovery related structs-----------------
 type ntfIdx struct {
-	v        uint64
-	nodeHash string
+	v      uint64
+	nodeID uint64
 }
 
 // nodeState records every node's consensus status(n, view, routers) and
@@ -158,7 +159,7 @@ type uidx struct {
 	v    uint64
 	n    int64
 	flag bool   // add or delete
-	hash string // target node's hash
+	id   uint64 // target node's id
 }
 
 // -----------state update related structs-----------------

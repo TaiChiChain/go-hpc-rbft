@@ -498,32 +498,6 @@ func (rbft *rbftImpl) restoreN() {
 	rbft.logger.Noticef("========= restore N=%d, f=%d =======", rbft.N, rbft.f)
 }
 
-// persistNewNodeHash persists hash of new node to database
-func (rbft *rbftImpl) persistNewNodeHash(hash []byte) {
-	key := fmt.Sprint("newNodeHash")
-	err := rbft.storage.StoreState(key, hash)
-	if err != nil {
-		rbft.logger.Errorf("Persist new node hash failed with err: %s ", err)
-	}
-}
-
-// restoreNewNodeHash restores hash of new node
-func (rbft *rbftImpl) restoreNewNodeHash() {
-	newNodeHash, err := rbft.storage.ReadState("newNodeHash")
-	if err == nil {
-		rbft.nodeMgr.newNodeHash = string(newNodeHash)
-	} else {
-		rbft.logger.Debugf("Replica %d could not restore newNodeHash: %s, set to nil", rbft.no, err)
-		rbft.nodeMgr.newNodeHash = ""
-	}
-}
-
-// persistDelNewNodeHash deletes new node hash info from database
-func (rbft *rbftImpl) persistDelNewNodeHash() {
-	key := fmt.Sprint("newNodeHash")
-	_ = rbft.storage.DelState(key)
-}
-
 // restoreView restores current view from database and then re-construct certStore
 func (rbft *rbftImpl) restoreView() bool {
 	setView, err := rbft.storage.ReadState("setView")
@@ -586,8 +560,6 @@ func (rbft *rbftImpl) restoreBatchStore() {
 func (rbft *rbftImpl) restoreState() error {
 
 	// TODO(DH): move router restore to external.
-
-	rbft.restoreNewNodeHash()
 	rbft.batchMgr.setSeqNo(rbft.exec.lastExec)
 	setView := rbft.restoreView()
 	rbft.restoreN()

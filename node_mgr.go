@@ -28,9 +28,8 @@ Node control issues
 
 // nodeManager is the state manager of in configuration.
 type nodeManager struct {
-	newNodeHash      string                    // track new node's local hash
-	addNodeInfo      map[string]bool           // track tha add node hash
-	delNodeInfo      map[string]bool           // track the delete node hash
+	addNodeInfo      map[uint64]string         // track tha add node hash
+	delNodeInfo      map[uint64]string         // track the delete node hash
 	agreeUpdateStore map[aidx]*pb.AgreeUpdateN // track agree-update-n message
 	updateStore      map[uidx]*pb.UpdateN      // track last update-n we received or sent
 	updateTarget     uidx                      // track the new view after update
@@ -40,8 +39,8 @@ type nodeManager struct {
 // newNodeMgr creates a new nodeManager with the specified startup parameters.
 func newNodeMgr() *nodeManager {
 	nm := &nodeManager{
-		addNodeInfo:      make(map[string]bool),
-		delNodeInfo:      make(map[string]bool),
+		addNodeInfo:      make(map[uint64]string),
+		delNodeInfo:      make(map[uint64]string),
 		agreeUpdateStore: make(map[aidx]*pb.AgreeUpdateN),
 		updateStore:      make(map[uidx]*pb.UpdateN),
 	}
@@ -54,7 +53,7 @@ func newNodeMgr() *nodeManager {
 func (rbft *rbftImpl) dispatchNodeMgrMsg(e consensusEvent) consensusEvent {
 	switch et := e.(type) {
 	case *pb.ReadyForN:
-		return rbft.recvReadyforNforAdd(et)
+		return rbft.recvReadyForNForAdd(et)
 	case *pb.UpdateN:
 		return rbft.recvUpdateN(et)
 	case *pb.AgreeUpdateN:
@@ -63,44 +62,20 @@ func (rbft *rbftImpl) dispatchNodeMgrMsg(e consensusEvent) consensusEvent {
 	return nil
 }
 
-// New node itself set newNode flag and send new node message to other nodes.
-func (rbft *rbftImpl) recvLocalNewNode(newHash string) consensusEvent {
-
-	rbft.logger.Debugf("New replica %d received local newNode message", rbft.no)
-
-	if rbft.in(isNewNode) {
-		rbft.logger.Warningf("New replica %d received duplicate local newNode message", rbft.no)
-		return nil
-	}
-
-	// the key about new node cannot be nil, it will results failure of updateN
-	if len(newHash) == 0 {
-		rbft.logger.Warningf("New replica %d received nil local newNode message", rbft.no)
-		return nil
-	}
-
-	rbft.on(isNewNode)
-
-	// the key of new node should be stored, since it will be use in
-	rbft.nodeMgr.newNodeHash = newHash
-	rbft.persistNewNodeHash([]byte(newHash))
-
-	return nil
-}
-
 // recvLocalAddNode handles the local consensusEvent about DelNode, which announces the
 // consentor that a VP node wants to leave the consensus. If there only exists less than
 // 5 VP nodes, we don't allow delete node.
 // Notice: the node that wants to leave away from consensus should also handle this message.
-func (rbft *rbftImpl) recvLocalDelNode(delHash string) consensusEvent {
+func (rbft *rbftImpl) recvLocalDelNode(delID uint64) consensusEvent {
 
-	if !rbft.peerPool.isInRoutingTable(delHash) {
-		rbft.logger.Warningf("Replica %d received delNode message, del node hash: %s, "+
-			"but this node does't in routing table", rbft.no, delHash)
+	peer := rbft.peerPool.getPeerByID(delID)
+	if peer == nil {
+		rbft.logger.Warningf("Replica %d received delNode message, del node id: %d, "+
+			"but this node does't in routing table", rbft.no, delID)
 		return nil
 	}
 
-	rbft.logger.Debugf("Replica %d received local delNode message, del node hash: %s", rbft.no, delHash)
+	rbft.logger.Debugf("Replica %d received local delNode message, del node id: %d", rbft.no, delID)
 
 	if rbft.in(InViewChange) {
 		rbft.logger.Warningf("Replica %d is in viewChange, reject process delete node", rbft.no)
@@ -118,7 +93,14 @@ func (rbft *rbftImpl) recvLocalDelNode(delHash string) consensusEvent {
 		return nil
 	}
 
-	return rbft.sendAgreeUpdateNforDel(delHash)
+	delNodeInfo, err := proto.Marshal(peer)
+	if err != nil {
+		rbft.logger.Warningf("Replica %d marshal peer info failed: %s", rbft.no, err)
+		return nil
+	}
+	info := byte2Hex(delNodeInfo)
+
+	return rbft.sendAgreeUpdateNForDel(info)
 }
 
 // sendReadyForN broadcasts the ReadyForN message to others.
@@ -128,12 +110,6 @@ func (rbft *rbftImpl) sendReadyForN() {
 
 	if !rbft.in(isNewNode) {
 		rbft.logger.Errorf("Replica %d isn't a new replica, but try to send readyForN", rbft.no)
-		return
-	}
-
-	// If new node loses the local key, there may be something wrong
-	if rbft.nodeMgr.newNodeHash == "" {
-		rbft.logger.Errorf("New replica %d doesn't have local key for readyForN", rbft.no)
 		return
 	}
 
@@ -152,13 +128,18 @@ func (rbft *rbftImpl) sendReadyForN() {
 	rbft.startUpdateTimer()
 	rbft.setAbNormal()
 
+	self := rbft.peerPool.getSelfInfo()
+	info := byte2Hex(self)
+
 	ready := &pb.ReadyForN{
-		Hash:    rbft.nodeMgr.newNodeHash,
-		ExpectN: uint64(rbft.N),
+		ReplicaId:   rbft.peerPool.localID,
+		NewNodeInfo: info,
+		// ExpectN should be new nodes number after node node joint.
+		ExpectN: rbft.peerPool.localID,
 	}
 
-	rbft.logger.Infof("Replica %d sending readyForN, node hash: %s, expectN: %d",
-		rbft.no, rbft.nodeMgr.newNodeHash, ready.ExpectN)
+	rbft.logger.Infof("Replica %d sending readyForN, node id: %d, expectN: %d",
+		rbft.no, rbft.peerPool.localID, ready.ExpectN)
 
 	payload, err := proto.Marshal(ready)
 	if err != nil {
@@ -174,11 +155,11 @@ func (rbft *rbftImpl) sendReadyForN() {
 	rbft.peerPool.broadcast(msg)
 }
 
-// recvReadyforNforAdd handles the ReadyForN message sent by new node.
-func (rbft *rbftImpl) recvReadyforNforAdd(ready *pb.ReadyForN) consensusEvent {
+// recvReadyForNForAdd handles the ReadyForN message sent by new node.
+func (rbft *rbftImpl) recvReadyForNForAdd(ready *pb.ReadyForN) consensusEvent {
 
-	rbft.logger.Debugf("Replica %d received readyForN from new node %s, expectN: %d",
-		rbft.no, ready.Hash, ready.ExpectN)
+	rbft.logger.Debugf("Replica %d received readyForN from new node %d, expectN: %d",
+		rbft.no, ready.ReplicaId, ready.ExpectN)
 
 	if rbft.in(InViewChange) {
 		rbft.logger.Warningf("Replica %d is in viewChange, reject the readyForN message", rbft.no)
@@ -190,18 +171,34 @@ func (rbft *rbftImpl) recvReadyforNforAdd(ready *pb.ReadyForN) consensusEvent {
 		return nil
 	}
 
-	if rbft.peerPool.isInRoutingTable(ready.Hash) {
-		rbft.logger.Debugf("Replica %d has %s in its routing table, ignore it...", rbft.no, ready.Hash)
+	if rbft.peerPool.isInRoutingTable(ready.ReplicaId) {
+		rbft.logger.Debugf("Replica %d has node %d in its routing table, ignore it...", rbft.no, ready.ReplicaId)
 		return nil
 	}
 
-	return rbft.sendAgreeUpdateNForAdd(ready.Hash, ready.ExpectN)
+	info := hex2Bytes(ready.NewNodeInfo)
+	peer := &pb.Peer{}
+	err := proto.Unmarshal(info, peer)
+	if err != nil {
+		rbft.logger.Warningf("Replica %d failed to parse new node info", rbft.no)
+		return nil
+	}
+
+	return rbft.sendAgreeUpdateNForAdd(ready.NewNodeInfo, ready.ExpectN)
 }
 
 // sendAgreeUpdateNForAdd broadcasts the AgreeUpdateN message to others.
 // This will be only called after receiving the ReadyForN message sent by new node or
 // received f+1 others' AgreeUpdateNForAdd.
-func (rbft *rbftImpl) sendAgreeUpdateNForAdd(newNodeHash string, expectN uint64) consensusEvent {
+func (rbft *rbftImpl) sendAgreeUpdateNForAdd(newNodeInfo string, expectN uint64) consensusEvent {
+
+	info := hex2Bytes(newNodeInfo)
+	peer := &pb.Peer{}
+	err := proto.Unmarshal(info, peer)
+	if err != nil {
+		rbft.logger.Warningf("Replica %d failed to parse new node info", rbft.no)
+		return nil
+	}
 
 	rbft.logger.Debugf("Replica %d try to send agree updateN for add", rbft.no)
 
@@ -222,14 +219,11 @@ func (rbft *rbftImpl) sendAgreeUpdateNForAdd(newNodeHash string, expectN uint64)
 		return nil
 	}
 
-	if _, ok := rbft.nodeMgr.addNodeInfo[newNodeHash]; ok {
-		rbft.logger.Debugf("Replica %d has sent agree updateN for add node %s, ignore it...", rbft.no, newNodeHash)
+	if _, ok := rbft.nodeMgr.addNodeInfo[peer.Id]; ok {
+		rbft.logger.Debugf("Replica %d has sent agree updateN for add node %d, ignore it...", rbft.no, peer.Id)
 		return nil
 	}
-	rbft.nodeMgr.addNodeInfo[newNodeHash] = true
-
-	// record new node hash in peerPool temporarily until finish updateN.
-	rbft.peerPool.tempNewNodeHash = newNodeHash
+	rbft.nodeMgr.addNodeInfo[peer.Id] = newNodeInfo
 
 	rbft.nodeMgr.updateHandled = false
 	rbft.nodeMgr.updateStore = make(map[uidx]*pb.UpdateN)
@@ -251,7 +245,8 @@ func (rbft *rbftImpl) sendAgreeUpdateNForAdd(newNodeHash string, expectN uint64)
 	agree := &pb.AgreeUpdateN{
 		Basis:   basis,
 		Flag:    true,
-		Hash:    newNodeHash,
+		Id:      peer.Id,
+		Info:    newNodeInfo,
 		N:       n,
 		ExpectN: expectN,
 	}
@@ -289,22 +284,30 @@ func (rbft *rbftImpl) sendAgreeUpdateNForAdd(newNodeHash string, expectN uint64)
 	return rbft.recvAgreeUpdateN(agree)
 }
 
-// sendAgreeUpdateNforDel broadcasts the AgreeUpdateN message to other notify
+// sendAgreeUpdateNForDel broadcasts the AgreeUpdateN message to other notify
 // that it agree update the View & N as deleting a node.
-func (rbft *rbftImpl) sendAgreeUpdateNforDel(delHash string) consensusEvent {
-	delIndex := rbft.peerPool.findRouterIndexByHash(delHash)
-	rbft.logger.Debugf("Replica %d try to send agree updateN for delete node %d", rbft.no, delIndex)
+func (rbft *rbftImpl) sendAgreeUpdateNForDel(delNodeInfo string) consensusEvent {
+
+	info := hex2Bytes(delNodeInfo)
+	peer := &pb.Peer{}
+	err := proto.Unmarshal(info, peer)
+	if err != nil {
+		rbft.logger.Warningf("Replica %d failed to parse delete node info", rbft.no)
+		return nil
+	}
+
+	rbft.logger.Debugf("Replica %d try to send agree updateN for delete node %d", rbft.no, peer.Id)
 
 	if rbft.in(InUpdatingN) {
 		rbft.logger.Debugf("Replica %d already in updatingN, don't send agreeUpdateN again")
 		return nil
 	}
 
-	if _, ok := rbft.nodeMgr.delNodeInfo[delHash]; ok {
-		rbft.logger.Debugf("Replica %d has sent agree updateN for delete node %s, ignore it...", rbft.no, delHash)
+	if _, ok := rbft.nodeMgr.delNodeInfo[peer.Id]; ok {
+		rbft.logger.Debugf("Replica %d has sent agree updateN for delete node %d, ignore it...", rbft.no, peer.Id)
 		return nil
 	}
-	rbft.nodeMgr.delNodeInfo[delHash] = true
+	rbft.nodeMgr.delNodeInfo[peer.Id] = delNodeInfo
 
 	delete(rbft.nodeMgr.updateStore, rbft.nodeMgr.updateTarget)
 	rbft.stopNewViewTimer()
@@ -315,7 +318,7 @@ func (rbft *rbftImpl) sendAgreeUpdateNforDel(delHash string) consensusEvent {
 	rbft.setAbNormal()
 
 	// Calculate the new N and view
-	n, view := rbft.getDelNV(delIndex)
+	n, view := rbft.getDelNV(peer.Id)
 	basis := rbft.getVcBasis()
 	// In add/delete node, view in vcBasis shouldn't be the current view because after
 	// UpdateN, view will always be changed.
@@ -323,7 +326,8 @@ func (rbft *rbftImpl) sendAgreeUpdateNforDel(delHash string) consensusEvent {
 	agree := &pb.AgreeUpdateN{
 		Basis: basis,
 		Flag:  false,
-		Hash:  delHash,
+		Id:    peer.Id,
+		Info:  delNodeInfo,
 		N:     n,
 	}
 
@@ -362,7 +366,11 @@ func (rbft *rbftImpl) recvAgreeUpdateN(agree *pb.AgreeUpdateN) consensusEvent {
 		return nil
 	}
 
-	rbft.checkAgreeUpdateN(agree)
+	correct := rbft.checkAgreeUpdateN(agree)
+	if !correct {
+		rbft.logger.Debugf("Replica %d reject incorrect agree-update-n request", rbft.no)
+		return nil
+	}
 
 	key := aidx{
 		v:    agree.Basis.View,
@@ -394,15 +402,15 @@ func (rbft *rbftImpl) recvAgreeUpdateN(agree *pb.AgreeUpdateN) consensusEvent {
 		rbft.logger.Debugf("Replica %d received f+1 agreeUpdateN messages, triggering sendAgreeUpdateNForAdd",
 			rbft.no)
 		rbft.timerMgr.stopTimer(firstRequestTimer)
-		return rbft.sendAgreeUpdateNForAdd(agree.Hash, agree.ExpectN)
+		return rbft.sendAgreeUpdateNForAdd(agree.Info, agree.ExpectN)
 	}
 
 	// We only enter this if there are enough agree-update-n messages but locally not inUpdateN
 	if !agree.Flag && quorum >= rbft.oneCorrectQuorum() && !rbft.in(InUpdatingN) {
-		rbft.logger.Debugf("Replica %d received f+1agreeUpdateN messages, triggering sendAgreeUpdateNForDel",
+		rbft.logger.Debugf("Replica %d received f+1 agreeUpdateN messages, triggering sendAgreeUpdateNForDel",
 			rbft.no)
 		rbft.timerMgr.stopTimer(firstRequestTimer)
-		return rbft.sendAgreeUpdateNforDel(agree.Hash)
+		return rbft.sendAgreeUpdateNForDel(agree.Info)
 	}
 
 	rbft.logger.Debugf("Replica %d now has %d agreeUpdate requests for view=%d/n=%d, need %d", rbft.no, quorum, agree.Basis.View, agree.N, rbft.allCorrectReplicasQuorum())
@@ -410,7 +418,7 @@ func (rbft *rbftImpl) recvAgreeUpdateN(agree *pb.AgreeUpdateN) consensusEvent {
 	// Quorum of AgreeUpdateN reach the N, replica can jump to NODE_MGR_AGREE_UPDATEN_QUORUM_consensusEvent,
 	// which mean all nodes agree in updating N
 	if quorum >= rbft.allCorrectReplicasQuorum() {
-		rbft.nodeMgr.updateTarget = uidx{v: agree.Basis.View, n: agree.N, flag: agree.Flag, hash: agree.Hash}
+		rbft.nodeMgr.updateTarget = uidx{v: agree.Basis.View, n: agree.N, flag: agree.Flag, id: agree.Id}
 		return &LocalEvent{
 			Service:   NodeMgrService,
 			EventType: NodeMgrAgreeUpdateQuorumEvent,
@@ -450,7 +458,7 @@ func (rbft *rbftImpl) sendUpdateN() consensusEvent {
 		Flag:      rbft.nodeMgr.updateTarget.flag,
 		N:         rbft.nodeMgr.updateTarget.n,
 		View:      rbft.nodeMgr.updateTarget.v,
-		Hash:      rbft.nodeMgr.updateTarget.hash,
+		Id:        rbft.nodeMgr.updateTarget.id,
 		Xset:      msgList,
 		ReplicaId: rbft.peerPool.localID,
 		Bset:      basis,
@@ -511,7 +519,7 @@ func (rbft *rbftImpl) recvUpdateN(update *pb.UpdateN) consensusEvent {
 
 	key := uidx{
 		flag: update.Flag,
-		hash: update.Hash,
+		id:   update.Id,
 		n:    update.N,
 		v:    update.View,
 	}
@@ -520,7 +528,7 @@ func (rbft *rbftImpl) recvUpdateN(update *pb.UpdateN) consensusEvent {
 	// Count of the amount of AgreeUpdateN message for the same key
 	quorum := 0
 	for idx, agree := range rbft.nodeMgr.agreeUpdateStore {
-		if idx.v == update.View && idx.n == update.N && idx.flag == update.Flag && agree.Hash == update.Hash {
+		if idx.v == update.View && idx.n == update.N && idx.flag == update.Flag && agree.Id == update.Id {
 			quorum++
 		}
 	}
@@ -656,29 +664,31 @@ func (rbft *rbftImpl) resetStateForUpdate() consensusEvent {
 		// when adding node, new node itself need only append itself to routing table, other origin nodes need append
 		// new node to routing table
 		if rbft.in(isNewNode) {
-			rbft.logger.Debugf("New node %d itself update routingTable for %s in adding node", rbft.no, update.Hash)
-			rbft.peerPool.updateAddNode(update.Hash)
+			rbft.logger.Debugf("New node %d itself update routingTable for %d in adding node", rbft.no, update.Id)
+			rbft.peerPool.updateAddNode(update.Id, rbft.peerPool.getSelfInfo())
 		} else {
-			if _, ok := rbft.nodeMgr.addNodeInfo[update.Hash]; !ok {
-				rbft.logger.Debugf("Replica %d try to reset state when add node %s but cannot find add node info", rbft.no, update.Hash)
+			newNodeInfo, ok := rbft.nodeMgr.addNodeInfo[update.Id]
+			if !ok {
+				rbft.logger.Debugf("Replica %d try to reset state when add node %d but cannot find add node info", rbft.no, update.Id)
 				return nil
 			}
 
 			// in adding node, wait until N and view have been confirmed, then update routing
 			// table.
-			rbft.logger.Debugf("Replica %d update routingTable for %s in adding node", rbft.no, update.Hash)
-			rbft.peerPool.updateAddNode(update.Hash)
+			rbft.logger.Debugf("Replica %d update routingTable for %d in adding node", rbft.no, update.Id)
+			rbft.peerPool.updateAddNode(update.Id, hex2Bytes(newNodeInfo))
 		}
 	} else {
-		if ok := rbft.nodeMgr.delNodeInfo[update.Hash]; !ok {
-			rbft.logger.Debugf("Replica %d try to reset state when delete node %s but cannot find delete node info", rbft.no, update.Hash)
+		delNodeInfo, ok := rbft.nodeMgr.delNodeInfo[update.Id]
+		if !ok {
+			rbft.logger.Debugf("Replica %d try to reset state when delete node %d but cannot find delete node info", rbft.no, update.Id)
 			return nil
 		}
 
 		// in deleting node, wait until N and view have been confirmed, then update routing
 		// table.
-		rbft.logger.Debugf("Replica %d update routingTable for %s in deleting node", rbft.no, update.Hash)
-		rbft.peerPool.updateDelNode(update.Hash)
+		rbft.logger.Debugf("Replica %d update routingTable for %d in deleting node", rbft.no, update.Id)
+		rbft.peerPool.updateDelNode(update.Id, hex2Bytes(delNodeInfo))
 	}
 
 	// Clean the AgreeUpdateN messages in this turn
@@ -689,8 +699,8 @@ func (rbft *rbftImpl) resetStateForUpdate() consensusEvent {
 	}
 
 	// Clean the AddNode/DelNode messages in this turn
-	rbft.nodeMgr.addNodeInfo = make(map[string]bool)
-	rbft.nodeMgr.delNodeInfo = make(map[string]bool)
+	rbft.nodeMgr.addNodeInfo = make(map[uint64]string)
+	rbft.nodeMgr.delNodeInfo = make(map[uint64]string)
 
 	// empty the outstandingReqBatch, it is useless since new primary will resend pre-prepare
 	rbft.cleanOutstandingAndCert()
@@ -788,7 +798,7 @@ func (rbft *rbftImpl) checkAgreeUpdateN(agree *pb.AgreeUpdateN) bool {
 
 	} else {
 		// Check the N and view after updating
-		delIndex := rbft.peerPool.findRouterIndexByHash(agree.Hash)
+		delIndex := agree.Id
 		n, view := rbft.getDelNV(delIndex)
 		if n != agree.N || view != agree.Basis.View {
 			rbft.logger.Debugf("Replica %d received incorrect agreeUpdateN: "+
@@ -873,11 +883,4 @@ func (rbft *rbftImpl) startUpdateTimer() {
 func (rbft *rbftImpl) stopUpdateTimer() {
 	rbft.timerMgr.stopTimer(updateTimer)
 	rbft.logger.Debugf("Replica %d stopped the update timer", rbft.no)
-}
-
-func (rbft *rbftImpl) newNodeFinishUpdateNInRecovery() {
-
-	//rbft.peerPool.setLocalID()
-	rbft.persistDelNewNodeHash()
-
 }

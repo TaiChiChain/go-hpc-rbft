@@ -124,8 +124,8 @@ func (rbft *rbftImpl) sendNotification(keepCurrentVote bool) consensusEvent {
 	rbft.recoveryMgr.outOfElection = make(map[ntfIdx]*pb.NotificationResponse)
 
 	n := &pb.Notification{
-		Basis:       rbft.getVcBasis(),
-		ReplicaHash: rbft.peerPool.localHash,
+		Basis:     rbft.getVcBasis(),
+		ReplicaId: rbft.peerPool.localID,
 	}
 
 	rbft.logger.Infof("Replica %d sending notification", rbft.no)
@@ -166,10 +166,8 @@ func (rbft *rbftImpl) sendNotification(keepCurrentVote bool) consensusEvent {
 // 3. while current node is in normal, directly return NotificationResponse.
 func (rbft *rbftImpl) recvNotification(n *pb.Notification) consensusEvent {
 
-	sender := rbft.peerPool.findRouterIndexByHash(n.ReplicaHash)
-
 	rbft.logger.Debugf("Replica %d received notification from replica %d, v:%d, h:%d, |C|:%d, |P|:%d, |Q|:%d",
-		rbft.no, sender, n.Basis.View, n.Basis.H, len(n.Basis.Cset), len(n.Basis.Pset), len(n.Basis.Qset))
+		rbft.no, n.ReplicaId, n.Basis.View, n.Basis.H, len(n.Basis.Cset), len(n.Basis.Pset), len(n.Basis.Qset))
 
 	// new node cannot process notification as new node is not in a consistent
 	// view/N with other nodes.
@@ -181,7 +179,7 @@ func (rbft *rbftImpl) recvNotification(n *pb.Notification) consensusEvent {
 	if n.Basis.View < rbft.view {
 		if rbft.isNormal() {
 			// directly return notification response as we are in normal.
-			return rbft.sendNotificationResponse(sender, n.ReplicaHash)
+			return rbft.sendNotificationResponse(n.ReplicaId)
 		}
 		// ignore notification with lower view as we are in abnormal.
 		rbft.logger.Debugf("Replica %d ignore notification with a lower view %d than self "+
@@ -189,9 +187,9 @@ func (rbft *rbftImpl) recvNotification(n *pb.Notification) consensusEvent {
 		return nil
 	}
 
-	rbft.recoveryMgr.notificationStore[ntfIdx{v: n.Basis.View, nodeHash: n.ReplicaHash}] = n
+	rbft.recoveryMgr.notificationStore[ntfIdx{v: n.Basis.View, nodeID: n.ReplicaId}] = n
 	// find if there exists more than f same vote for view larger than current view.
-	replicas := make(map[string]bool)
+	replicas := make(map[uint64]bool)
 	minView := uint64(0)
 	quorum := 0
 	for idx := range rbft.recoveryMgr.notificationStore {
@@ -202,7 +200,7 @@ func (rbft *rbftImpl) recvNotification(n *pb.Notification) consensusEvent {
 		if idx.v <= rbft.view {
 			continue
 		}
-		replicas[idx.nodeHash] = true
+		replicas[idx.nodeID] = true
 		if minView == 0 || idx.v < minView {
 			minView = idx.v
 		}
@@ -233,30 +231,30 @@ func (rbft *rbftImpl) recvNotification(n *pb.Notification) consensusEvent {
 
 	// if we are in normal status, we should send back our info to the recovering node.
 	if rbft.isNormal() {
-		if rbft.isPrimary(sender) {
-			rbft.logger.Infof("Replica %d received notification from old primary %d, trigger recovery.", rbft.no, sender)
+		if rbft.isPrimary(n.ReplicaId) {
+			rbft.logger.Infof("Replica %d received notification from old primary %d, trigger recovery.", rbft.no, n.ReplicaId)
 			return rbft.initRecovery()
 		}
 
-		return rbft.sendNotificationResponse(sender, n.ReplicaHash)
+		return rbft.sendNotificationResponse(n.ReplicaId)
 	}
 
 	return nil
 }
 
 // sendNotificationResponse helps send notification response to the given sender.
-func (rbft *rbftImpl) sendNotificationResponse(sendID uint64, senderHash string) consensusEvent {
+func (rbft *rbftImpl) sendNotificationResponse(destID uint64) consensusEvent {
 
-	routerInfo := rbft.peerPool.getRouterInfo()
+	routerInfo := rbft.peerPool.serializeRouterInfo()
 	nr := &pb.NotificationResponse{
-		Basis:       rbft.getVcBasis(),
-		N:           uint64(rbft.N),
-		RouterInfo:  routerInfo,
-		ReplicaHash: rbft.peerPool.localHash,
+		Basis:      rbft.getVcBasis(),
+		N:          uint64(rbft.N),
+		RouterInfo: routerInfo,
+		ReplicaId:  rbft.peerPool.localID,
 	}
 
 	rbft.logger.Debugf("Replica %d send NotificationResponse to replica %d, v:%d, h:%d, |C|:%d, |P|:%d, |Q|:%d",
-		rbft.no, sendID, nr.Basis.View, nr.Basis.H, len(nr.Basis.Cset), len(nr.Basis.Pset), len(nr.Basis.Qset))
+		rbft.no, destID, nr.Basis.View, nr.Basis.H, len(nr.Basis.Cset), len(nr.Basis.Pset), len(nr.Basis.Qset))
 
 	rspMsg, err := proto.Marshal(nr)
 	if err != nil {
@@ -268,7 +266,7 @@ func (rbft *rbftImpl) sendNotificationResponse(sendID uint64, senderHash string)
 		Type:    pb.Type_NOTIFICATION_RESPONSE,
 		Payload: rspMsg,
 	}
-	rbft.peerPool.unicast(consensusMsg, sendID)
+	rbft.peerPool.unicast(consensusMsg, destID)
 	return nil
 }
 
@@ -276,10 +274,8 @@ func (rbft *rbftImpl) sendNotificationResponse(sendID uint64, senderHash string)
 // collect quorum same responses to process new view.
 func (rbft *rbftImpl) recvNotificationResponse(nr *pb.NotificationResponse) consensusEvent {
 
-	sender := rbft.peerPool.findRouterIndexByHash(nr.ReplicaHash)
-
 	rbft.logger.Debugf("Replica %d received notificationResponse from replica %d, v:%d, h:%d, |C|:%d, |P|:%d, |Q|:%d",
-		rbft.no, sender, nr.Basis.View, nr.Basis.H, len(nr.Basis.Cset), len(nr.Basis.Pset), len(nr.Basis.Qset))
+		rbft.no, nr.ReplicaId, nr.Basis.View, nr.Basis.H, len(nr.Basis.Cset), len(nr.Basis.Pset), len(nr.Basis.Qset))
 
 	if !rbft.in(InRecovery) {
 		rbft.logger.Debugf("Replica %d is not in recovery, ignore notificationResponse", rbft.no)
@@ -288,7 +284,7 @@ func (rbft *rbftImpl) recvNotificationResponse(nr *pb.NotificationResponse) cons
 
 	// current is pending, sender is not pending, record to outOfElection and check
 	// quorum same notifications in outOfElection.
-	rbft.recoveryMgr.outOfElection[ntfIdx{v: nr.Basis.View, nodeHash: nr.ReplicaHash}] = nr
+	rbft.recoveryMgr.outOfElection[ntfIdx{v: nr.Basis.View, nodeID: nr.ReplicaId}] = nr
 	quorum := 0
 	for idx := range rbft.recoveryMgr.outOfElection {
 		if idx.v == nr.Basis.View {
@@ -458,7 +454,7 @@ func (rbft *rbftImpl) returnRecoveryPQC(fetch *pb.RecoveryFetchPQC) consensusEve
 	}
 	rbft.peerPool.unicast(consensusMsg, fetch.ReplicaId)
 
-	rbft.logger.Debugf("Replica %d send recoveryReturnPQC %v", rbft.no, rcReturn)
+	rbft.logger.Debugf("Replica %d send recoveryReturnPQC to %d, detailed: %+v", rbft.no, fetch.ReplicaId, rcReturn)
 
 	return nil
 }
@@ -570,7 +566,7 @@ func (rbft *rbftImpl) initSyncState() consensusEvent {
 	// TODO(DH): add extra field?
 	state := rbft.node.getCurrentState()
 	// post the sync state response message event to myself
-	routerInfo := rbft.peerPool.getRouterInfo()
+	routerInfo := rbft.peerPool.serializeRouterInfo()
 	syncStateRsp := &pb.SyncStateResponse{
 		ReplicaId:    rbft.peerPool.localID,
 		View:         rbft.view,
@@ -594,7 +590,7 @@ func (rbft *rbftImpl) recvSyncState(sync *pb.SyncState) consensusEvent {
 	//genesis := rbft.getGenesisInfo()
 	state := rbft.node.getCurrentState()
 
-	routerInfo := rbft.peerPool.getRouterInfo()
+	routerInfo := rbft.peerPool.serializeRouterInfo()
 	syncStateRsp := &pb.SyncStateResponse{
 		ReplicaId:    rbft.peerPool.localID,
 		View:         rbft.view,

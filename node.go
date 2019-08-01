@@ -34,7 +34,7 @@ type Node interface {
 	// Step advances the state machine using the given message.
 	Step(msg *pb.ConsensusMessage)
 	// ApplyConfChange applies config change to the local node.
-	ApplyConfChange(cc *pb.ConfChange) *pb.ConfState
+	ApplyConfChange(cc *pb.ConfState)
 	// Status returns the current node status of the RBFT state machine.
 	Status() NodeStatus
 
@@ -138,7 +138,7 @@ func (n *node) ProposeConfChange(cc *pb.ConfChange) error {
 	case pb.ConfChangeType_ConfChangeAddNode:
 
 	case pb.ConfChangeType_ConfChangeRemoveNode:
-		n.rbft.removeNode(cc.NodeHash)
+		n.rbft.removeNode(cc.NodeID)
 	case pb.ConfChangeType_ConfChangeUpdateNode:
 
 	default:
@@ -153,9 +153,9 @@ func (n *node) Step(msg *pb.ConsensusMessage) {
 }
 
 // ApplyConfChange applies config change to the local node.
-func (n *node) ApplyConfChange(cc *pb.ConfChange) *pb.ConfState {
-
-	return nil
+func (n *node) ApplyConfChange(cc *pb.ConfState) {
+	n.rbft.postConfState(cc)
+	return
 }
 
 // ReportExecuted reports to RBFT core that application service has finished applied one batch with

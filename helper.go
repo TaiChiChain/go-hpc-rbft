@@ -60,13 +60,13 @@ func (rbft *rbftImpl) primaryID(v uint64) uint64 {
 		return 0
 	}
 	router := rbft.peerPool.router.Peers[index]
-	return router.ID
+	return router.Id
 }
 
 // isPrimary returns if current node is primary or not
 func (rbft *rbftImpl) isPrimary(id uint64) bool {
 	// for node with no id in routers(such as a new node), directly return false.
-	if id == 0 {
+	if id > uint64(len(rbft.peerPool.router.Peers)) {
 		return false
 	}
 	return rbft.primaryID(rbft.view) == id
@@ -527,7 +527,7 @@ func (rbft *rbftImpl) compareWholeStates(states wholeStates) consensusEvent {
 			// not the same as quorum nodes, we need to update routing table and optionally
 			// connect to other nodes.
 			quorumInfo = hex2Bytes(state.routerInfo)
-			selfInfo := rbft.peerPool.getRouterInfo()
+			selfInfo := rbft.peerPool.serializeRouterInfo()
 			if !rbft.in(isNewNode) && !bytes.Equal(quorumInfo, selfInfo) {
 				rbft.logger.Warningf("Replica %d finds quorum routing table which is different "+
 					"from self's, pending updating routing table", rbft.no)
@@ -597,17 +597,25 @@ func (rbft *rbftImpl) compareWholeStates(states wholeStates) consensusEvent {
 
 		if rbft.in(InRecovery) {
 			if rbft.in(isNewNode) {
-				// TODO(DH): ensure new node sync to quorum router
-				rbft.peerPool.updateRouter(quorumInfo)
+				quorumRouter := rbft.peerPool.unSerializeRouterInfo(quorumInfo)
+				// find if current node has been included into quorum node's routers.
+				included := false
+				for _, peer := range quorumRouter.Peers {
+					if peer.Id == rbft.peerPool.localID {
+						included = true
+					}
+				}
+
 				// If new node find itself needs to updateN which must be caused by timeout
 				// event in adding node, check if quorum nodes have agree admittance of myself,
 				// if not, resend readyForN request after recovery.
-				if rbft.peerPool.isInRoutingTable(rbft.peerPool.localHash) {
+				if included {
 					rbft.logger.Noticef("New node %d finds itself has been accepted by quorum nodes with "+
 						"N=%d/view=%d, start normal consensus process.", rbft.no, rbft.N, rbft.view)
 
-					rbft.newNodeFinishUpdateNInRecovery()
 					rbft.off(isNewNode)
+					// TODO(DH): ensure new node sync to quorum router externally.
+					rbft.peerPool.updateRouter(quorumInfo)
 
 					rbft.logger.Noticef("======== Replica %d finished updateN, primary=%d, n=%d/f=%d/view=%d/h=%d",
 						rbft.no, rbft.primaryIndex(rbft.view), rbft.N, rbft.f, rbft.view, rbft.h)

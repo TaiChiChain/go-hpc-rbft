@@ -112,13 +112,13 @@ func (rbft *rbftImpl) startCheckPoolTimer() {
 	}
 
 	rbft.timerMgr.startTimer(checkPoolTimer, localEvent)
-	rbft.logger.Debugf("Primary %d started the check pool timer", rbft.no)
+	rbft.logger.Debugf("Replica %d started the check pool timer", rbft.no)
 }
 
 // stopCheckPoolTimer stops the check pool timer when node enter abnormal status.
 func (rbft *rbftImpl) stopCheckPoolTimer() {
 	rbft.timerMgr.stopTimer(checkPoolTimer)
-	rbft.logger.Debugf("Primary %d stopped the check pool timer", rbft.no)
+	rbft.logger.Debugf("Replica %d stopped the check pool timer", rbft.no)
 }
 
 // restartCheckPoolTimer restarts the check pool timer.
@@ -131,7 +131,7 @@ func (rbft *rbftImpl) restartCheckPoolTimer() {
 	}
 
 	rbft.timerMgr.startTimer(checkPoolTimer, localEvent)
-	rbft.logger.Debugf("Primary %d restarted the check pool timer", rbft.no)
+	rbft.logger.Debugf("Replica %d restarted the check pool timer", rbft.no)
 }
 
 // maybeSendPrePrepare used by primary helps primary stores this batch and send prePrepare,
