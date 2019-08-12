@@ -15,8 +15,8 @@
 package external
 
 import (
+	"github.com/ultramesh/flato-event/inner/protos"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
-	"github.com/ultramesh/flato/core/types"
 )
 
 // Storage is an interface that should be implemented by the application using non-volatile
@@ -68,7 +68,7 @@ type Crypto interface {
 type ServiceOutbound interface {
 	// Execute informs application layer to apply one batch with given request list and batch seqNo.
 	// Users can apply different batches asynchronously but ensure the order by seqNo.
-	Execute(txs []*types.Transaction, localList []bool, seqNo uint64, timestamp int64)
+	Execute(txs []*protos.Transaction, localList []bool, seqNo uint64, timestamp int64)
 	// StateUpdate informs application layer to catch up to given seqNo with specified state digest.
 	StateUpdate(seqNo uint64, digest string, peers []uint64)
 	// SendFilterEvent posts some impotent events to application layer.

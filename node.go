@@ -17,8 +17,8 @@ package rbft
 import (
 	"sync"
 
+	"github.com/ultramesh/flato-event/inner/protos"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
-	"github.com/ultramesh/flato/core/types"
 )
 
 // Node represents a node in a RBFT cluster.
@@ -27,7 +27,7 @@ type Node interface {
 	Start() error
 	// Propose proposes requests to RBFT core, requests are ensured to be eventually
 	// submitted to all non-fault nodes unless current node crash down.
-	Propose(requests []*types.Transaction) error
+	Propose(requests []*protos.Transaction) error
 	// ProposeConfChange proposes config change.
 	// Application needs to call ApplyConfChange when applying EntryConfChange type entry.
 	ProposeConfChange(cc *pb.ConfChange) error
@@ -125,7 +125,7 @@ func (n *node) Stop() {
 
 // Propose proposes requests to RBFT core, requests are ensured to be eventually
 // submitted to all non-fault nodes unless current node crash down.
-func (n *node) Propose(requests []*types.Transaction) error {
+func (n *node) Propose(requests []*protos.Transaction) error {
 	n.rbft.postRequests(requests)
 
 	return nil

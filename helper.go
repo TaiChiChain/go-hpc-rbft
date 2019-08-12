@@ -22,8 +22,8 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/ultramesh/flato-event/inner/protos"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
-	"github.com/ultramesh/flato/core/types"
 
 	"github.com/gogo/protobuf/proto"
 )
@@ -785,8 +785,8 @@ func hex2Bytes(str string) []byte {
 	return h
 }
 
-func requestHash(tx *types.Transaction) string {
-	return tx.GetHash().Hex()
+func requestHash(tx *protos.Transaction) string {
+	return protos.GetHash(tx).Hex()
 }
 
 // calculateMD5Hash calculate hash by MD5

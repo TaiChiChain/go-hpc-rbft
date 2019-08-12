@@ -19,10 +19,10 @@ import (
 	"sort"
 	"time"
 
+	"github.com/ultramesh/flato-event/inner/protos"
 	"github.com/ultramesh/flato-rbft/external"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
 	txpool "github.com/ultramesh/flato-txpool"
-	"github.com/ultramesh/flato/core/types"
 
 	"github.com/gogo/protobuf/proto"
 )
@@ -324,7 +324,7 @@ func (rbft *rbftImpl) removeNode(delID uint64) {
 }
 
 // postRequests informs RBFT requests event which is posted from application layer.
-func (rbft *rbftImpl) postRequests(requests []*types.Transaction) {
+func (rbft *rbftImpl) postRequests(requests []*protos.Transaction) {
 	rSet := &pb.RequestSet{
 		Requests: requests,
 		Local:    true,
@@ -993,7 +993,7 @@ func (rbft *rbftImpl) recvFetchMissingTxs(fetch *pb.FetchMissingRequests) error 
 	rbft.logger.Debugf("Primary %d received fetchMissingTxs request for view=%d/seqNo=%d/digest=%s from replica %d",
 		rbft.no, fetch.View, fetch.SequenceNumber, fetch.BatchDigest, sender)
 
-	requests := make(map[uint64]*types.Transaction)
+	requests := make(map[uint64]*protos.Transaction)
 	var err error
 
 	if batch := rbft.storeMgr.batchStore[fetch.BatchDigest]; batch != nil {
@@ -1006,7 +1006,7 @@ func (rbft *rbftImpl) recvFetchMissingTxs(fetch *pb.FetchMissingRequests) error 
 			requests[i] = batch.RequestList[i]
 		}
 	} else {
-		var missingTxs map[uint64]*types.Transaction
+		var missingTxs map[uint64]*protos.Transaction
 		missingTxs, err = rbft.batchMgr.requestPool.SendMissingRequests(fetch.BatchDigest, fetch.MissingRequestHashes)
 		if err != nil {
 			rbft.logger.Warningf("Primary %d cannot find the digest %s, missing tx hashes: %+v, err: %s",
@@ -1125,7 +1125,7 @@ func (rbft *rbftImpl) commitPendingBlocks() {
 			}
 			if idx.d == "" {
 				rbft.logger.Noticef("Replica %d try to execute a no-op", rbft.no)
-				txList := make([]*types.Transaction, 0)
+				txList := make([]*protos.Transaction, 0)
 				localList := make([]bool, 0)
 				rbft.external.Execute(txList, localList, idx.n, 0)
 			} else {
@@ -1146,9 +1146,9 @@ func (rbft *rbftImpl) commitPendingBlocks() {
 }
 
 // flattenArray flatten txs into txs and kick out duplicate txs with hash included in deDuplicateTxHashes.
-func (rbft *rbftImpl) filterExecutableTxs(digest string, deDuplicateRequestHashes []string) ([]*types.Transaction, []bool) {
+func (rbft *rbftImpl) filterExecutableTxs(digest string, deDuplicateRequestHashes []string) ([]*protos.Transaction, []bool) {
 	var (
-		txList, executableTxs          []*types.Transaction
+		txList, executableTxs          []*protos.Transaction
 		localList, executableLocalList []bool
 	)
 	txList = rbft.storeMgr.batchStore[digest].RequestList

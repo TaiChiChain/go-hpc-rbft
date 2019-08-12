@@ -14,7 +14,7 @@
 
 syntax = "proto3";
 
-import "github.com/ultramesh/flato/core/types/transaction.proto";
+import "github.com/ultramesh/flato-event/inner/protos/transaction.proto";
 
 package rbftpb;
 
@@ -52,7 +52,7 @@ message consensus_message {
 
 message request_batch {
     repeated string request_hash_list = 1;
-    repeated types.Transaction request_list = 2;
+    repeated protos.Transaction request_list = 2;
     int64 timestamp = 3;
     uint64 seq_no = 4;
     repeated bool local_list = 5;
@@ -85,11 +85,11 @@ message send_missing_requests {
     uint64 sequence_number = 3;
     string batch_digest = 4;
     map<uint64, string> missing_request_hashes = 5;
-    map<uint64, types.Transaction> missing_requests = 6;
+    map<uint64, protos.Transaction> missing_requests = 6;
 }
 
 message request_set {
-    repeated types.Transaction requests = 1;
+    repeated protos.Transaction requests = 1;
     bool local = 2;
 }
 
