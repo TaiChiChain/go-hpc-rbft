@@ -272,4 +272,5 @@ enum inform_type {
     FilterFinishUpdateN = 2;
     FilterFinishStateUpdate = 3;
     FilterPoolFull = 4;
+    FilterStableCheckpoint = 5;
 }

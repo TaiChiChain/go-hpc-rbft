@@ -1512,6 +1512,7 @@ func (rbft *rbftImpl) moveWatermarks(n uint64) {
 	rbft.persistH(h)
 
 	rbft.logger.Infof("Replica %d updated low water mark to %d", rbft.no, rbft.h)
+	rbft.external.SendFilterEvent(pb.InformType_FilterStableCheckpoint, rbft.h)
 }
 
 // updateHighStateTarget updates high state target
