@@ -1,0 +1,277 @@
+// Copyright 2016-2017 Hyperchain Corp.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package rbft
+
+import (
+	"strconv"
+	"sync"
+	"time"
+)
+
+// titleTimer manages timer with the same timer name, which, we allow different timer with the same timer name, such as:
+// we allow several request timers at the same time, each timer started after received a new request batch
+type titleTimer struct {
+	timerName string        // the unique timer name
+	timeout   time.Duration // default timeout of this timer
+	isActive  sync.Map      // track all the timers with this timerName if it is active now
+}
+
+func (tt *titleTimer) store(key, value interface{}) {
+	tt.isActive.Store(key, value)
+}
+
+func (tt *titleTimer) delete(key interface{}) {
+	tt.isActive.Delete(key)
+}
+
+func (tt *titleTimer) has(key string) bool {
+	_, ok := tt.isActive.Load(key)
+	return ok
+}
+
+func (tt *titleTimer) count() int {
+	length := 0
+	tt.isActive.Range(func(_, _ interface{}) bool {
+		length++
+		return true
+	})
+	return length
+}
+
+func (tt *titleTimer) clear() {
+	tt.isActive.Range(func(key, _ interface{}) bool {
+		tt.isActive.Delete(key)
+		return true
+	})
+}
+
+// timerManager manages common used timers.
+type timerManager struct {
+	tTimers   map[string]*titleTimer
+	eventChan chan<- interface{}
+	logger    Logger
+}
+
+// newTimerMgr news an instance of timerManager.
+func newTimerMgr(eventC chan interface{}, c Config) *timerManager {
+	tm := &timerManager{
+		tTimers:   make(map[string]*titleTimer),
+		eventChan: eventC,
+		logger:    c.Logger,
+	}
+
+	return tm
+}
+
+// newTimer news a titleTimer with the given name and default timeout, then add this timer to timerManager
+func (tm *timerManager) newTimer(name string, d time.Duration) {
+	tm.tTimers[name] = &titleTimer{
+		timerName: name,
+		timeout:   d,
+	}
+}
+
+// Stop stops all timers managed by timerManager
+func (tm *timerManager) Stop() {
+	for timerName := range tm.tTimers {
+		tm.stopTimer(timerName)
+	}
+}
+
+// startTimer starts the timer with the given name and default timeout, then sets the event which will be triggered
+// after this timeout
+func (tm *timerManager) startTimer(name string, event *LocalEvent) string {
+	tm.stopTimer(name)
+
+	timestamp := time.Now().UnixNano()
+	key := strconv.FormatInt(timestamp, 10)
+	tm.tTimers[name].store(key, true)
+
+	send := func() {
+		if tm.tTimers[name].has(key) {
+			tm.eventChan <- event
+		}
+	}
+	time.AfterFunc(tm.tTimers[name].timeout, send)
+	return key
+}
+
+// startTimerWithNewTT starts the timer with the given name and timeout, then sets the event which will be triggered
+// after this timeout
+func (tm *timerManager) startTimerWithNewTT(name string, d time.Duration, event *LocalEvent) string {
+	tm.stopTimer(name)
+
+	timestamp := time.Now().UnixNano()
+	key := strconv.FormatInt(timestamp, 10)
+	tm.tTimers[name].store(key, true)
+
+	send := func() {
+		if tm.tTimers[name].has(key) {
+			tm.eventChan <- event
+		}
+	}
+	time.AfterFunc(d, send)
+	return key
+}
+
+// softStartTimerWithNewTT first checks if there exists some running timer with
+// the given name, if existed, not start, else start a new timer with the given
+// timeout.
+func (tm *timerManager) softStartTimerWithNewTT(name string, d time.Duration, event *LocalEvent) (bool, string) {
+	if tm.tTimers[name].count() != 0 {
+		return true, ""
+	}
+
+	timestamp := time.Now().UnixNano()
+	key := strconv.FormatInt(timestamp, 10)
+	tm.tTimers[name].store(key, true)
+
+	send := func() {
+		if tm.tTimers[name].has(key) {
+			tm.eventChan <- event
+		}
+	}
+	time.AfterFunc(d, send)
+	return false, key
+}
+
+// stopTimer stops all timers with the same timerName.
+func (tm *timerManager) stopTimer(name string) {
+	if !tm.containsTimer(name) {
+		tm.logger.Errorf("Stop timer failed, timer %s not created yet!", name)
+		return
+	}
+
+	tm.tTimers[name].clear()
+}
+
+// stopOneTimer stops one timer by the timerName and index.
+func (tm *timerManager) stopOneTimer(tname string, key string) {
+	if !tm.containsTimer(tname) {
+		tm.logger.Errorf("Stop timer failed!, timer %s not created yet!", tname)
+		return
+	}
+	tm.tTimers[tname].delete(key)
+}
+
+// containsTimer returns true if there exists a timer named timerName
+func (tm *timerManager) containsTimer(timerName string) bool {
+	_, ok := tm.tTimers[timerName]
+	return ok
+}
+
+// getTimeoutValue gets the default timeout of the given timer
+func (tm *timerManager) getTimeoutValue(timerName string) time.Duration {
+	if !tm.containsTimer(timerName) {
+		tm.logger.Warningf("Get timeout failed!, timer %s not created yet!", timerName)
+		return 0 * time.Second
+	}
+	return tm.tTimers[timerName].timeout
+}
+
+// setTimeoutValue sets the default timeout of the given timer with a new timeout
+func (tm *timerManager) setTimeoutValue(timerName string, d time.Duration) {
+	if !tm.containsTimer(timerName) {
+		tm.logger.Warningf("Set timeout failed!, timer %s not created yet!", timerName)
+		return
+	}
+	tm.tTimers[timerName].timeout = d
+}
+
+// initTimers creates timers when start up
+func (rbft *rbftImpl) initTimers() {
+	rbft.timerMgr.newTimer(vcResendTimer, rbft.config.VcResendTimeout)
+	rbft.timerMgr.newTimer(nullRequestTimer, rbft.config.NullRequestTimeout)
+	rbft.timerMgr.newTimer(newViewTimer, rbft.config.NewViewTimeout)
+	rbft.timerMgr.newTimer(firstRequestTimer, rbft.config.FirstRequestTimeout)
+	rbft.timerMgr.newTimer(syncStateRspTimer, rbft.config.SyncStateTimeout)
+	rbft.timerMgr.newTimer(syncStateRestartTimer, rbft.config.SyncStateRestartTimeout)
+	rbft.timerMgr.newTimer(recoveryRestartTimer, rbft.config.RecoveryTimeout)
+	rbft.timerMgr.newTimer(batchTimer, rbft.config.BatchTimeout)
+	rbft.timerMgr.newTimer(requestTimer, rbft.config.RequestTimeout)
+	rbft.timerMgr.newTimer(cleanViewChangeTimer, rbft.config.CleanVCTimeout)
+	rbft.timerMgr.newTimer(updateTimer, rbft.config.UpdateTimeout)
+	rbft.timerMgr.newTimer(checkPoolTimer, rbft.config.CheckPoolTimeout)
+
+	rbft.timerMgr.makeNullRequestTimeoutLegal()
+	rbft.timerMgr.makeRequestTimeoutLegal()
+	rbft.timerMgr.makeCleanVcTimeoutLegal()
+	rbft.timerMgr.makeSyncStateTimeoutLegal()
+}
+
+// makeNullRequestTimeoutLegal checks if nullrequestTimeout is legal or not, if not, make it
+// legal, which, nullRequest timeout must be larger than requestTimeout
+func (tm *timerManager) makeNullRequestTimeoutLegal() {
+	nullRequestTimeout := tm.getTimeoutValue(nullRequestTimer)
+	requestTimeout := tm.getTimeoutValue(requestTimer)
+
+	if requestTimeout >= nullRequestTimeout && nullRequestTimeout != 0 {
+		tm.setTimeoutValue(nullRequestTimer, 3*requestTimeout/2)
+		tm.logger.Infof("Configured null request timeout must be greater "+
+			"than request timeout, set to %v", tm.getTimeoutValue(nullRequestTimer))
+	}
+
+	if tm.getTimeoutValue(nullRequestTimer) > 0 {
+		tm.logger.Infof("RBFT null request timeout = %v", tm.getTimeoutValue(nullRequestTimer))
+	} else {
+		tm.logger.Infof("RBFT null request disabled")
+	}
+}
+
+// makeCleanVcTimeoutLegal checks if requestTimeout is legal or not, if not, make it
+// legal, which, request timeout must be lager than batch timeout
+func (tm *timerManager) makeRequestTimeoutLegal() {
+	requestTimeout := tm.getTimeoutValue(requestTimer)
+	batchTimeout := tm.getTimeoutValue(batchTimer)
+	tm.logger.Infof("RBFT Batch timeout = %v", batchTimeout)
+
+	if batchTimeout >= requestTimeout {
+		tm.setTimeoutValue(requestTimer, 3*batchTimeout/2)
+		tm.logger.Infof("Configured request timeout must be greater than batch timeout, set to %v", tm.getTimeoutValue(requestTimer))
+	}
+	tm.logger.Infof("RBFT request timeout = %v", tm.getTimeoutValue(requestTimer))
+}
+
+// makeCleanVcTimeoutLegal checks if clean vc timeout is legal or not, if not, make it
+// legal, which, cleanVcTimeout should more then 6* viewChange time
+func (tm *timerManager) makeCleanVcTimeoutLegal() {
+	cleanVcTimeout := tm.getTimeoutValue(cleanViewChangeTimer)
+	nvTimeout := tm.getTimeoutValue(newViewTimer)
+
+	if cleanVcTimeout < 6*nvTimeout {
+		cleanVcTimeout = 6 * nvTimeout
+		tm.setTimeoutValue(cleanViewChangeTimer, cleanVcTimeout)
+		tm.logger.Infof("Configured clean viewChange timeout is too short, set to %v", cleanVcTimeout)
+	}
+
+	tm.logger.Infof("RBFT null clean vc timeout = %v", tm.getTimeoutValue(cleanViewChangeTimer))
+	tm.logger.Infof("RBFT new view timeout = %v", tm.getTimeoutValue(newViewTimer))
+}
+
+// makeSyncStateTimeoutLegal checks if syncStateRspTimeout is legal or not, if not, make it
+// legal, which, syncStateRestartTimeout should more then 10 * syncStateRspTimeout
+func (tm *timerManager) makeSyncStateTimeoutLegal() {
+	rspTimeout := tm.getTimeoutValue(syncStateRspTimer)
+	restartTimeout := tm.getTimeoutValue(syncStateRestartTimer)
+
+	if restartTimeout < 10*rspTimeout {
+		restartTimeout = 10 * rspTimeout
+		tm.setTimeoutValue(syncStateRestartTimer, restartTimeout)
+		tm.logger.Infof("Configured sync state restart timeout is too short, set to %v", restartTimeout)
+	}
+
+	tm.logger.Infof("RBFT sync state response timeout = %v", tm.getTimeoutValue(syncStateRspTimer))
+	tm.logger.Infof("RBFT sync state restart timeout = %v", tm.getTimeoutValue(syncStateRestartTimer))
+}

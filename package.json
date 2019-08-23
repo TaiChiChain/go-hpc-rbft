@@ -1,7 +1,7 @@
 {
-  "name": "crypto",
+  "name": "flato-rbft",
   "version": "1.0.0",
-  "description": "Flato is a high performance blockchain platform",
+  "description": "Flato-RBFT is a high performance blockchain platform",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -9,7 +9,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git.hyperchain.cn/ultramesh/crypto"
+    "url": "git.hyperchain.cn/ultramesh/flato-rbft"
   },
   "keywords": [
     "blockchain",

@@ -1,8 +1,7 @@
-Common
+Flato-RBFT
 ======
 
-> Common util function in go.
-
+> RBFT service for flato in go.
 
 ## Table of Contents
 
