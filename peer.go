@@ -99,9 +99,9 @@ func (pool *peerPool) getPeerByID(id uint64) *pb.Peer {
 	return nil
 }
 
-func (pool *peerPool) updateAddNode(newNodeId uint64, newNodeInfo []byte) {
+func (pool *peerPool) updateAddNode(newNodeID uint64, newNodeInfo []byte) {
 	cc := &pb.ConfChange{
-		NodeID:  newNodeId,
+		NodeID:  newNodeID,
 		Type:    pb.ConfChangeType_ConfChangeAddNode,
 		Context: newNodeInfo,
 	}
