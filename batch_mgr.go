@@ -244,8 +244,8 @@ func (rbft *rbftImpl) findNextCommitBatch(digest string, v uint64, n uint64) err
 	}
 
 	// store batch to outstandingReqBatches until execute this batch
-	rbft.storeMgr.outstandingReqBatches[prePrep.BatchDigest] = batch
-	rbft.storeMgr.batchStore[prePrep.BatchDigest] = batch
+	rbft.storeMgr.outstandingReqBatches[digest] = batch
+	rbft.storeMgr.batchStore[digest] = batch
 	rbft.persistBatch(digest)
 
 	rbft.logger.Debugf("Replica %d commit batch for view=%d/seqNo=%d, batch size: %d", rbft.no, v, n, len(txList))
