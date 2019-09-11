@@ -6,7 +6,7 @@ require (
 	github.com/gogo/protobuf v1.2.1
 	github.com/golang/mock v1.3.1
 	github.com/ultramesh/flato-event v0.1.0
-	github.com/ultramesh/flato-txpool v0.1.0
+	github.com/ultramesh/flato-txpool v0.1.1
 )
 
 replace github.com/ultramesh/crypto v0.1.0 => git.hyperchain.cn/ultramesh/crypto.git v0.1.0
@@ -25,4 +25,4 @@ replace github.com/ultramesh/flato-db-multicache v0.1.0 => git.hyperchain.cn/ult
 
 replace github.com/ultramesh/flato-event v0.1.0 => git.hyperchain.cn/ultramesh/flato-event.git v0.1.0
 
-replace github.com/ultramesh/flato-txpool v0.1.0 => git.hyperchain.cn/ultramesh/flato-txpool.git v0.1.0
+replace github.com/ultramesh/flato-txpool v0.1.1 => git.hyperchain.cn/ultramesh/flato-txpool.git v0.1.1
