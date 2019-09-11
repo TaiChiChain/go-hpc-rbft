@@ -1202,6 +1202,14 @@ func (rbft *rbftImpl) findNextCommitTx() (find bool, idx msgID, cert *msgCert) {
 			continue
 		}
 
+		if idx.d != "" {
+			_, ok := rbft.storeMgr.batchStore[idx.d]
+			if !ok {
+				rbft.logger.Warningf("Replica %d cannot find corresponding batch %s in batchStore", rbft.no, idx.d)
+				continue
+			}
+		}
+
 		currentExec := idx.n
 		rbft.exec.setCurrentExec(&currentExec)
 
