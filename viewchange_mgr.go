@@ -527,13 +527,13 @@ func (rbft *rbftImpl) recvFetchRequestBatch(fr *pb.FetchRequestBatch) error {
 // or processReqInUpdate
 func (rbft *rbftImpl) recvSendRequestBatch(batch *pb.SendRequestBatch) consensusEvent {
 
-	sender := rbft.peerPool.noMap[batch.ReplicaId]
-	rbft.logger.Debugf("Replica %d received missing request batch from replica %d with digest: %s", rbft.no, sender, batch.BatchDigest)
-
 	if batch == nil {
 		rbft.logger.Errorf("Replica %d received return request batch with a nil batch", rbft.no)
 		return nil
 	}
+
+	sender := rbft.peerPool.noMap[batch.ReplicaId]
+	rbft.logger.Debugf("Replica %d received missing request batch from replica %d with digest: %s", rbft.no, sender, batch.BatchDigest)
 
 	digest := batch.BatchDigest
 	if _, ok := rbft.storeMgr.missingReqBatches[digest]; !ok {

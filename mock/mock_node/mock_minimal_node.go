@@ -1,4 +1,4 @@
-package rbftmock
+package mockrbft
 
 import "github.com/golang/mock/gomock"
 
