@@ -15,6 +15,7 @@
 package rbft
 
 import (
+	"errors"
 	"sync"
 
 	"github.com/ultramesh/flato-event/inner/protos"
@@ -84,6 +85,11 @@ type node struct {
 
 // NewNode initializes a Node service.
 func NewNode(conf Config) (Node, error) {
+	return newNode(conf)
+}
+
+// newNode help to initializes a Node service.
+func newNode(conf Config) (*node, error) {
 	cpChan := make(chan *pb.ServiceState)
 
 	rbft, err := newRBFT(cpChan, conf)
@@ -135,13 +141,13 @@ func (n *node) Propose(requests []*protos.Transaction) error {
 // Application needs to call ApplyConfChange when applying EntryConfChange type entry.
 func (n *node) ProposeConfChange(cc *pb.ConfChange) error {
 	switch cc.Type {
-	case pb.ConfChangeType_ConfChangeAddNode:
-
 	case pb.ConfChangeType_ConfChangeRemoveNode:
 		n.rbft.removeNode(cc.NodeID)
-	case pb.ConfChangeType_ConfChangeUpdateNode:
 
 	default:
+		n.logger.Errorf("Invalid Config Change Propose")
+		err := errors.New("invalid confChange propose")
+		return err
 	}
 
 	return nil
