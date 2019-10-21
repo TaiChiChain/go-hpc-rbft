@@ -177,10 +177,6 @@ func (rbft *rbftImpl) prepared(digest string, v uint64, n uint64) bool {
 
 	cert := rbft.storeMgr.certStore[msgID{v, n, digest}]
 
-	if cert == nil {
-		return false
-	}
-
 	prepCount := len(cert.prepare)
 
 	rbft.logger.Debugf("Replica %d prepare count for view=%d/seqNo=%d is %d",
@@ -198,10 +194,6 @@ func (rbft *rbftImpl) committed(digest string, v uint64, n uint64) bool {
 	}
 
 	cert := rbft.storeMgr.certStore[msgID{v, n, digest}]
-
-	if cert == nil {
-		return false
-	}
 
 	cmtCount := len(cert.commit)
 
