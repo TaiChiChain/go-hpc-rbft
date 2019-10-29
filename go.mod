@@ -8,7 +8,7 @@ require (
 	github.com/stretchr/testify v1.4.0
 	github.com/ultramesh/fancylogger v0.1.0
 	github.com/ultramesh/flato-event v0.1.1
-	github.com/ultramesh/flato-txpool v0.1.2
+	github.com/ultramesh/flato-txpool v0.1.3
 )
 
 replace github.com/ultramesh/crypto v0.1.0 => git.hyperchain.cn/ultramesh/crypto.git v0.1.0
@@ -23,6 +23,6 @@ replace github.com/ultramesh/flato-db-interface v0.1.1 => git.hyperchain.cn/ultr
 
 replace github.com/ultramesh/flato-event v0.1.1 => git.hyperchain.cn/ultramesh/flato-event.git v0.1.1
 
-replace github.com/ultramesh/flato-txpool v0.1.2 => git.hyperchain.cn/ultramesh/flato-txpool.git v0.1.2
+replace github.com/ultramesh/flato-txpool v0.1.3 => git.hyperchain.cn/ultramesh/flato-txpool.git v0.1.3
 
 replace github.com/ultramesh/fancylogger => git.hyperchain.cn/ultramesh/fancylogger.git v0.1.0

@@ -12,6 +12,75 @@ Flato-RBFT
 - [Contribute](#contribute)
 - [License](#license)
 
+## Usage
+flato-rbft provides RBFT service for flato.
+
+You can initialize a RBFT service by: 
+```
+Node, err := NewNode(conf)
+```
+Here, conf is a important structure which contains the config information of RBFT service.
+
+Then you can interact with RBFT core using the methods as below: 
+
+To start the RBFT service by `_ := Node.Start()`.
+
+To stop the RBFT service by `Node.Stop()`.
+
+To propose requests to RBFT core by `_ := Node.Propose(requests)`.
+
+To get the current node status of the RBFT state machine by `ns := Node.Status()`.
+
+To receive and produce consensus messages, you can use `Node.Step(msg)`, which `msg` is the consensus message you will deal with.
+
+To propose the changes of config, you can use `_ := Node.ProposeConfChange(cc)`. Here, `cc` contains the information of the changes of config.
+Then application needs to use `Node.ApplyConfChange(cc)` to apply these changes to the local node.
+
+In addition, `Node.ReportExecuted(state)` is invoked after application service has actually applied a batch.
+`Node.ReportStateUpdated(State)` is invoked after application service finished stateUpdate which must be triggered by RBFT core before.
+
+Note: To use RBFT core, one should implement several service except txPool. Here list the service that need to be provided:
+1. Storage service: to store and restore consensus log.
+2. Network service: to send p2p messages between nodes.
+3. Crypto service: to access the sign/verify methods from the crypto package.
+4. ServiceOutbound service: an application service invoked by RBFT library.
+
+For more information about the service above, you can catch them from file `external.go`.
+
+## API
+### Node
+import pb "github.com/ultramesh/rbft/rbftpb"
+
+Instantiate Node
+```func NewNode(conf Config) (Node, error)```
+
+Start Node Instance
+```func (n *node) Start() error```
+
+Stop Node Instance
+```func (n *node) Stop()```
+
+Propose Requests
+```func (n *node) Propose(requests []*protos.Transaction) error```
+
+Propose Config Change
+```func (n *node) ProposeConfChange(cc *pb.ConfChange) error```
+
+Receive and Process Consensus Messages
+```func (n *node) Step(msg *pb.ConsensusMessage)```
+
+RBFT Core Apply Config Change
+```func (n *node) ApplyConfChange(cc *pb.ConfState)```
+
+Report Batch Executed to RBFT Core
+```func (n *node) ReportExecuted(state *pb.ServiceState)```
+
+Report State Updated to RBFT Core
+```func (n *node) ReportStateUpdated(state *pb.ServiceState)```
+
+Get Current RBFT Core State
+```func (n *node) Status() NodeStatus```
+
 ## Mockgen
 
 Install **mockgen** : `go get github.com/golang/mock/mockgen`
