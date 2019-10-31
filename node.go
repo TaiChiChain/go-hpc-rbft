@@ -199,7 +199,6 @@ func (n *node) ReportStateUpdated(state *pb.ServiceState) {
 	if state.Applied != 0 && state.Applied <= n.currentState.Applied {
 		n.logger.Criticalf("Receive invalid service state %+v, "+
 			"current state %+v", state, n.currentState)
-		return
 	}
 	n.currentState = state
 	n.rbft.reportStateUpdated(state.Applied)
