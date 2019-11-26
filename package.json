@@ -1,6 +1,6 @@
 {
   "name": "flato-rbft",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Flato-RBFT is a high performance blockchain platform",
   "main": "index.js",
   "scripts": {

@@ -379,14 +379,14 @@ func (rbft *rbftImpl) handleNodeMgrEvent(e *LocalEvent) consensusEvent {
 		rbft.stopUpdateTimer()
 		rbft.maybeSetNormal()
 
-		if rbft.no==0 {
+		if rbft.no == 0 {
 			rbft.logger.Noticef("======== New Replica finished updateN, primary=%d, n=%d/f=%d/view=%d/h=%d", rbft.primaryIndex(rbft.view), rbft.N, rbft.f, rbft.view, rbft.h)
 		} else {
 			rbft.logger.Noticef("======== Replica %d finished updateN, primary=%d, n=%d/f=%d/view=%d/h=%d", rbft.no, rbft.primaryIndex(rbft.view), rbft.N, rbft.f, rbft.view, rbft.h)
 		}
 
 		var finishMsg interface{}
-		if rbft.no==0 {
+		if rbft.no == 0 {
 			finishMsg = fmt.Sprintf("======== New Replica finished updateN, primary=%d, n=%d/f=%d/view=%d/h=%d", rbft.primaryIndex(rbft.view), rbft.N, rbft.f, rbft.view, rbft.h)
 		} else {
 			finishMsg = fmt.Sprintf("======== Replica %d finished updateN, primary=%d, n=%d/f=%d/view=%d/h=%d", rbft.no, rbft.primaryIndex(rbft.view), rbft.N, rbft.f, rbft.view, rbft.h)
