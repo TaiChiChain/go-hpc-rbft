@@ -193,16 +193,14 @@ func (rbft *rbftImpl) handleRecoveryEvent(e *LocalEvent) consensusEvent {
 		rbft.recoveryMgr.outOfElection = make(map[ntfIdx]*pb.NotificationResponse)
 		rbft.maybeSetNormal()
 		rbft.timerMgr.stopTimer(recoveryRestartTimer)
-		rbft.logger.Noticef("======== Replica %d finished recovery, view=%d/height=%d", rbft.no, rbft.view, rbft.exec.lastExec)
+		rbft.logger.Noticef("======== Replica %d finished recovery, view=%d/height=%d.", rbft.no, rbft.view, rbft.exec.lastExec)
 		rbft.logger.Notice(`
 
-  +=====================================================+
-  |                                                     |
-  |              Welcome to Hyperchain                  | 
-  |                                                     |
-  |  2016-2019 (c) Hangzhou Qulian Technology Co.,Ltd.  |
-  |                                                     |
-  +=====================================================+
+  +==============================================+
+  |                                              |
+  |            RBFT Recovery Finished            |
+  |                                              |
+  +==============================================+
 
 `)
 
@@ -380,9 +378,19 @@ func (rbft *rbftImpl) handleNodeMgrEvent(e *LocalEvent) consensusEvent {
 		rbft.off(InUpdatingN)
 		rbft.stopUpdateTimer()
 		rbft.maybeSetNormal()
-		rbft.logger.Noticef("======== Replica %d finished updateN, primary=%d, n=%d/f=%d/view=%d/h=%d", rbft.no, rbft.primaryIndex(rbft.view), rbft.N, rbft.f, rbft.view, rbft.h)
-		finishMsg := fmt.Sprintf("======== Replica %d finished updateN, primary=%d, n=%d/f=%d/view=%d/h=%d", rbft.no, rbft.primaryIndex(rbft.view), rbft.N, rbft.f, rbft.view, rbft.h)
 
+		if rbft.no==0 {
+			rbft.logger.Noticef("======== New Replica finished updateN, primary=%d, n=%d/f=%d/view=%d/h=%d", rbft.primaryIndex(rbft.view), rbft.N, rbft.f, rbft.view, rbft.h)
+		} else {
+			rbft.logger.Noticef("======== Replica %d finished updateN, primary=%d, n=%d/f=%d/view=%d/h=%d", rbft.no, rbft.primaryIndex(rbft.view), rbft.N, rbft.f, rbft.view, rbft.h)
+		}
+
+		var finishMsg interface{}
+		if rbft.no==0 {
+			finishMsg = fmt.Sprintf("======== New Replica finished updateN, primary=%d, n=%d/f=%d/view=%d/h=%d", rbft.primaryIndex(rbft.view), rbft.N, rbft.f, rbft.view, rbft.h)
+		} else {
+			finishMsg = fmt.Sprintf("======== Replica %d finished updateN, primary=%d, n=%d/f=%d/view=%d/h=%d", rbft.no, rbft.primaryIndex(rbft.view), rbft.N, rbft.f, rbft.view, rbft.h)
+		}
 		rbft.external.SendFilterEvent(pb.InformType_FilterFinishUpdateN, finishMsg)
 		rbft.primaryResubmitTransactions()
 		delete(rbft.nodeMgr.updateStore, rbft.nodeMgr.updateTarget)

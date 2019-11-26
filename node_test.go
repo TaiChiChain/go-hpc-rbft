@@ -450,24 +450,24 @@ func TestNode_ReportStateUpdated(t *testing.T) {
 
 	state := &pb.ServiceState{
 		Applied: 2,
-		Digest:  "msg",
+		Digest:  "state1",
 	}
 
 	state2 := &pb.ServiceState{
 		Applied: 2,
-		Digest:  "test",
+		Digest:  "state2",
 	}
 
 	n.currentState = state
 	n.ReportStateUpdated(state2)
-	assert.Equal(t, "msg", n.currentState.Digest)
+	assert.Equal(t, "state2", n.currentState.Digest)
 
 	state3 := &pb.ServiceState{
 		Applied: 4,
-		Digest:  "test",
+		Digest:  "state3",
 	}
 	n.ReportStateUpdated(state3)
-	assert.Equal(t, "test", n.currentState.Digest)
+	assert.Equal(t, "state3", n.currentState.Digest)
 }
 
 func TestNode_Status(t *testing.T) {
