@@ -1406,9 +1406,9 @@ func (rbft *rbftImpl) weakCheckpointSetOutOfRange(chkpt *pb.Checkpoint) bool {
 				rbft.cleanOutstandingAndCert()
 				rbft.moveWatermarks(m)
 				rbft.on(SkipInProgress)
-				// If we are in viewChange, but received f+1 checkpoint higher than our H, don't
+				// If we are in viewChange/recovery, but received f+1 checkpoint higher than our H, don't
 				// stop new view timer here, else we may in infinite viewChange status.
-				if !rbft.in(InViewChange) {
+				if !rbft.in(InViewChange) && !rbft.in(InRecovery) {
 					rbft.stopNewViewTimer()
 				}
 				return true
