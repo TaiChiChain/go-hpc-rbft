@@ -383,22 +383,22 @@ func TestRBFT_postConfState(t *testing.T) {
 	assert.Equal(t, confState, obj)
 }
 
-func TestRBFT_postStatusRequest(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
-
-	go func() {
-		rbft.close <- true
-	}()
-
-	var state NodeStatus
-	go func() {
-		state = rbft.postStatusRequest()
-		exp := NodeStatus{Status: Pending}
-		assert.Equal(t, exp.Status, state.Status)
-	}()
-}
+//func TestRBFT_postStatusRequest(t *testing.T) {
+//	ctrl := gomock.NewController(t)
+//	defer ctrl.Finish()
+//	rbft, _ := newTestRBFT(ctrl)
+//
+//	go func() {
+//		rbft.close <- true
+//	}()
+//
+//	var state NodeStatus
+//	go func() {
+//		state = rbft.postStatusRequest()
+//		exp := NodeStatus{Status: Pending}
+//		assert.Equal(t, exp.Status, state.Status)
+//	}()
+//}
 
 func TestRBFT_postMsg(t *testing.T) {
 	ctrl := gomock.NewController(t)

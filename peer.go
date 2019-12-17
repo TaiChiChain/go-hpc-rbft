@@ -17,6 +17,7 @@ package rbft
 import (
 	"github.com/ultramesh/flato-rbft/external"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
+	"sync"
 
 	"github.com/gogo/protobuf/proto"
 )
@@ -29,7 +30,8 @@ type peerPool struct {
 	self    *pb.Peer
 	router  *pb.Router        // track the vp replicas' routers
 	noMap   map[uint64]uint64 // map node's actual id to rbft.no
-	network external.Network  // network helper to broadcast/unicast messages.
+	lock    sync.RWMutex
+	network external.Network // network helper to broadcast/unicast messages.
 	logger  Logger
 }
 
@@ -51,6 +53,8 @@ func newPeerPool(c Config) *peerPool {
 func (pool *peerPool) initPeers(peers []*pb.Peer) {
 	pool.logger.Infof("Local ID: %d, update routers:", pool.localID)
 	pool.self = nil
+	pool.lock.Lock()
+	defer pool.lock.Unlock()
 	pool.noMap = make(map[uint64]uint64)
 	pool.router = &pb.Router{
 		Peers: make([]*pb.Peer, 0),

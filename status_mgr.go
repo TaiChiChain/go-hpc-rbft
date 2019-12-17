@@ -14,6 +14,8 @@
 
 package rbft
 
+import "sync/atomic"
+
 // StatusType defines the RBFT internal status.
 type StatusType int
 
@@ -42,7 +44,7 @@ type NodeStatus struct {
 }
 
 type statusManager struct {
-	status int // consensus status
+	status uint32 // consensus status
 }
 
 func newStatusMgr() *statusManager {
@@ -51,22 +53,34 @@ func newStatusMgr() *statusManager {
 
 // reset only resets consensus status to 0.
 func (st *statusManager) reset() {
-	st.status = 0
+	atomic.StoreUint32(&st.status, 0)
 }
 
 // setBit sets the bit at position in integer n.
 func (st *statusManager) setBit(position uint64) {
-	st.status |= 1 << position
+	// try CompareAndSwapUint64 until success
+	for {
+		oldStatus := atomic.LoadUint32(&st.status)
+		if atomic.CompareAndSwapUint32(&st.status, oldStatus, oldStatus|(1<<position)) {
+			break
+		}
+	}
 }
 
 // clearBit clears the bit at position in integer n.
 func (st *statusManager) clearBit(position uint64) {
-	st.status &= ^(1 << position)
+	// try CompareAndSwapUint64 until success
+	for {
+		oldStatus := atomic.LoadUint32(&st.status)
+		if atomic.CompareAndSwapUint32(&st.status, oldStatus, oldStatus&^(1<<position)) {
+			break
+		}
+	}
 }
 
 // hasBit checks whether a bit position is set.
 func (st *statusManager) hasBit(position uint64) bool {
-	val := st.status & (1 << position)
+	val := atomic.LoadUint32(&st.status) & (1 << position)
 	return val > 0
 }
 

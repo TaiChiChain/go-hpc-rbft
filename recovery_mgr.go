@@ -585,7 +585,6 @@ func (rbft *rbftImpl) recvSyncState(sync *pb.SyncState) consensusEvent {
 		return nil
 	}
 
-	//genesis := rbft.getGenesisInfo()
 	state := rbft.node.getCurrentState()
 
 	routerInfo := rbft.peerPool.serializeRouterInfo()

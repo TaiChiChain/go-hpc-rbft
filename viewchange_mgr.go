@@ -80,9 +80,16 @@ func newVcManager(c Config) *vcManager {
 	return vcm
 }
 
+// setView sets the view with the viewLock.
+func (rbft *rbftImpl) setView(view uint64) {
+	rbft.viewLock.Lock()
+	rbft.view = view
+	rbft.viewLock.Unlock()
+}
+
 // sendViewChange sends view change message to other peers using broadcast.
 // Then it sends view change message to itself and jump to recvViewChange.
-func (rbft *rbftImpl) sendViewChange(start ...bool) consensusEvent {
+func (rbft *rbftImpl) sendViewChange() consensusEvent {
 
 	//Do some check and do some preparation
 	//such as stop nullRequest timer, clean vcMgr.viewChangeStore and so on.
