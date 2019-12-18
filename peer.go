@@ -42,9 +42,6 @@ func newPeerPool(c Config) *peerPool {
 		network: c.External,
 		logger:  c.Logger,
 	}
-	pool.router = &pb.Router{
-		Peers: make([]*pb.Peer, 0),
-	}
 	pool.initPeers(c.Peers)
 
 	return pool

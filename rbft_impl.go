@@ -183,6 +183,7 @@ func newRBFT(cpChan chan *pb.ServiceState, c Config) (*rbftImpl, error) {
 		for i, p := range c.Peers {
 			if p.Id == c.ID {
 				rbft.no = uint64(i + 1)
+				rbft.logger.Criticalf("Replica set no to %d", rbft.no)
 				found = true
 			}
 		}
