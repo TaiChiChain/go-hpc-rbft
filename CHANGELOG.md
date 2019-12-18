@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.1.5"></a>
+## [0.1.5](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.1.4...v0.1.5) (2019-12-18)
+
+
+### Bug Fixes
+
+* fix bug when adding several nodes at the same time ([0c7a94b](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/0c7a94b)), closes [#flato-921](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-921)
+* remove status request channel to avoid blocking status request with normal consensus message ([69e4cd5](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/69e4cd5))
+* **node.go:** modify the log level when received an unexpected ServiceState ([5a4619d](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/5a4619d))
+* **rbft_impl.go/recovery_mgr.go:** don't stop recoveryRestartTimer when resetStateForRecovery ([0a20424](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/0a20424))
+
+
+
 <a name="0.1.4"></a>
 ## [0.1.4](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.1.3...v0.1.4) (2019-11-26)
 
