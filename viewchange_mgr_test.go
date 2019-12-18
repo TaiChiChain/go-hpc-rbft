@@ -315,7 +315,6 @@ func TestVC_replicaCheckNewView(t *testing.T) {
 		Cset:      CSet,
 		Pset:      PSet,
 		Qset:      QSet,
-		Genesis:   0,
 	}
 
 	set := []*pb.VcBasis{Basis, Basis, Basis}
@@ -459,7 +458,6 @@ func TestVC_assignSequenceNumbers(t *testing.T) {
 		Cset      []*Vc_C  `protobuf:"bytes,4,rep,name=cset,proto3" json:"cset,omitempty"`
 		Pset      []*Vc_PQ `protobuf:"bytes,5,rep,name=pset,proto3" json:"pset,omitempty"`
 		Qset      []*Vc_PQ `protobuf:"bytes,6,rep,name=qset,proto3" json:"qset,omitempty"`
-		Genesis   uint64   `protobuf:"varint,7,opt,name=genesis,proto3" json:"genesis,omitempty"`
 	}
 	type Vc_PQ struct {
 		SequenceNumber uint64 `protobuf:"varint,1,opt,name=sequence_number,json=sequenceNumber,proto3" json:"sequence_number,omitempty"`
@@ -508,7 +506,6 @@ func TestVC_assignSequenceNumbers(t *testing.T) {
 		Cset:      CSet,
 		Pset:      PSet,
 		Qset:      QSet,
-		Genesis:   0,
 	}
 	BasisHighH := &pb.VcBasis{
 		ReplicaId: 1,
@@ -517,7 +514,6 @@ func TestVC_assignSequenceNumbers(t *testing.T) {
 		Cset:      CSet,
 		Pset:      PSet,
 		Qset:      QSet,
-		Genesis:   0,
 	}
 	set := []*pb.VcBasis{BasisHighH, Basis, Basis, Basis}
 

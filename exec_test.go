@@ -302,16 +302,6 @@ func TestExec_handleCoreRbftEvent(t *testing.T) {
 	// Default
 	e.EventType = ViewChangeTimerEvent
 	assert.Nil(t, rbft.handleCoreRbftEvent(e))
-
-	go func() {
-		rbft.on(InViewChange)
-		e.EventType = CoreRetrieveStatusEvent
-		stateChan := make(chan NodeStatus)
-		e.Event = stateChan
-		assert.Nil(t, rbft.handleCoreRbftEvent(e))
-		obj := <-stateChan
-		assert.Equal(t, InViewChange, obj)
-	}()
 }
 
 func TestExec_handleRecoveryEvent(t *testing.T) {

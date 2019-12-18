@@ -143,7 +143,6 @@ message vc_basis {
     repeated vc_C cset = 4;
     repeated vc_PQ pset = 5;
     repeated vc_PQ qset = 6;
-    uint64   genesis = 7;
 }
 
 message view_change {

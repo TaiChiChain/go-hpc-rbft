@@ -155,11 +155,6 @@ func (rbft *rbftImpl) handleCoreRbftEvent(e *LocalEvent) consensusEvent {
 		rbft.executeAfterStateUpdate()
 		return nil
 
-	case CoreRetrieveStatusEvent:
-		statusChan := e.Event.(chan NodeStatus)
-		currentStatus := rbft.getStatus()
-		statusChan <- currentStatus
-		return nil
 	case CoreUpdateConfStateEvent:
 		ev := e.Event.(*pb.ConfState)
 		found := false

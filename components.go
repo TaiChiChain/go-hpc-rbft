@@ -48,7 +48,6 @@ const (
 	CoreStateUpdatedEvent
 	CoreResendMissingTxsEvent
 	CoreResendFetchMissingEvent
-	CoreRetrieveStatusEvent
 	CoreUpdateConfStateEvent
 
 	// 2.view change
@@ -121,7 +120,7 @@ type ntfIdx struct {
 }
 
 // nodeState records every node's consensus status(n, view, routers) and
-// ledger status(block number, hash and genesis seqNo)
+// ledger status(block number, hash and seqNo)
 type nodeState struct {
 	n            uint64
 	view         uint64

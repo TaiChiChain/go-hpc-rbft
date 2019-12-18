@@ -206,7 +206,7 @@ func (n *node) ReportStateUpdated(state *pb.ServiceState) {
 
 // Status returns the current node status of the RBFT state machine.
 func (n *node) Status() NodeStatus {
-	return n.rbft.postStatusRequest()
+	return n.rbft.getStatus()
 }
 
 // getCurrentState retrieves the current application state.
