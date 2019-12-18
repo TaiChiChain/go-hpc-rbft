@@ -544,7 +544,7 @@ func (rbft *rbftImpl) recvSendRequestBatch(batch *pb.SendRequestBatch) consensus
 
 	digest := batch.BatchDigest
 	if _, ok := rbft.storeMgr.missingReqBatches[digest]; !ok {
-		rbft.logger.Debugf("Primary %d received missing request: %s, but we don't miss this request, ignore it", rbft.no, digest)
+		rbft.logger.Debugf("Replica %d received missing request: %s, but we don't miss this request, ignore it", rbft.no, digest)
 		return nil // either the wrong digest, or we got it already from someone else
 	}
 	// store into batchStore only，and store into requestPool by order when processNewView.
