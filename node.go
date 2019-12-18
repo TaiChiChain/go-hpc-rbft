@@ -197,8 +197,8 @@ func (n *node) ReportStateUpdated(state *pb.ServiceState) {
 	n.stateLock.Lock()
 	defer n.stateLock.Unlock()
 	if state.Applied != 0 && state.Applied <= n.currentState.Applied {
-		n.logger.Criticalf("Receive invalid service state %+v, "+
-			"current state %+v", state, n.currentState)
+		n.logger.Infof("Receive a service state with applied ID which is not "+
+			"larger than current state, received: %+v, current state: %+v", state, n.currentState)
 	}
 	n.currentState = state
 	n.rbft.reportStateUpdated(state.Applied)
