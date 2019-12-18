@@ -17,6 +17,7 @@ package rbft
 import (
 	"fmt"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/ultramesh/flato-event/inner/protos"
@@ -141,7 +142,8 @@ type rbftImpl struct {
 
 	recvChan chan interface{}      // channel to receive ordered consensus messages and local events
 	cpChan   chan *pb.ServiceState // channel to wait for local checkpoint event
-	close    chan bool             // channel to close this event process
+	viewLock sync.RWMutex
+	close    chan bool // channel to close this event process
 
 	config Config // get configuration info
 	logger Logger // write logger to record some info
@@ -181,6 +183,7 @@ func newRBFT(cpChan chan *pb.ServiceState, c Config) (*rbftImpl, error) {
 		for i, p := range c.Peers {
 			if p.Id == c.ID {
 				rbft.no = uint64(i + 1)
+				rbft.logger.Criticalf("Replica set no to %d", rbft.no)
 				found = true
 			}
 		}
@@ -350,37 +353,25 @@ func (rbft *rbftImpl) postConfState(cc *pb.ConfState) {
 	go rbft.postMsg(confState)
 }
 
-// postRequests retrieves RBFT internal status.
-func (rbft *rbftImpl) postStatusRequest() NodeStatus {
-	statusChan := make(chan NodeStatus)
-
-	statusEvent := &LocalEvent{
-		Service:   CoreRbftService,
-		EventType: CoreRetrieveStatusEvent,
-		Event:     statusChan,
-	}
-
-	go rbft.postMsg(statusEvent)
-
-	select {
-	case s := <-statusChan:
-		return s
-	case <-rbft.close:
-		return NodeStatus{Status: Pending}
-	}
-
-}
-
 // postMsg posts messages to main loop.
 func (rbft *rbftImpl) postMsg(msg interface{}) {
 	rbft.recvChan <- msg
 }
 
 // getStatus returns the current consensus status.
+// NOTE. This function may be invoked by application in another go-routine
+// rather than the main event loop go-routine, so we need to protect
+// safety of `rbft.peerPool.noMap`, `rbft.view` and `rbft.Status`
 func (rbft *rbftImpl) getStatus() (status NodeStatus) {
 
-	status.View = rbft.view
+	rbft.peerPool.lock.RLock()
 	selfIndex := rbft.peerPool.noMap[rbft.peerPool.localID]
+	rbft.peerPool.lock.RUnlock()
+
+	rbft.viewLock.RLock()
+	status.View = rbft.view
+	rbft.viewLock.RUnlock()
+
 	status.ID = selfIndex
 	switch {
 	case rbft.in(InViewChange):
@@ -1406,9 +1397,9 @@ func (rbft *rbftImpl) weakCheckpointSetOutOfRange(chkpt *pb.Checkpoint) bool {
 				rbft.cleanOutstandingAndCert()
 				rbft.moveWatermarks(m)
 				rbft.on(SkipInProgress)
-				// If we are in viewChange, but received f+1 checkpoint higher than our H, don't
+				// If we are in viewChange/recovery, but received f+1 checkpoint higher than our H, don't
 				// stop new view timer here, else we may in infinite viewChange status.
-				if !rbft.in(InViewChange) {
+				if !rbft.in(InViewChange) && !rbft.in(InRecovery) {
 					rbft.stopNewViewTimer()
 				}
 				return true

@@ -492,8 +492,6 @@ func (rbft *rbftImpl) compareCheckpointWithWeakSet(chkpt *pb.Checkpoint) (bool, 
 // 3. routerHash: current consensus network's router info which contains all nodes' hostname et al...
 // 4. appliedIndex(only compared in sync state): current latest blockChain height
 // 5. digest(only compared in sync state): current latest blockChain hash
-// 6. genesis(only used in sync state but not compared): current genesis height of each node which may be used
-//    in state update if found inconsistent blockChain state.
 func (rbft *rbftImpl) compareWholeStates(states wholeStates) consensusEvent {
 	// track all replica hash with same state used to update routing table if needed
 	sameRespCount := make(map[nodeState][]uint64)
@@ -598,6 +596,7 @@ func (rbft *rbftImpl) compareWholeStates(states wholeStates) consensusEvent {
 					}
 				}
 
+				rbft.peerPool.updateRouter(quorumInfo)
 				// If new node find itself needs to updateN which must be caused by timeout
 				// event in adding node, check if quorum nodes have agree admittance of myself,
 				// if not, resend readyForN request after recovery.
@@ -606,9 +605,6 @@ func (rbft *rbftImpl) compareWholeStates(states wholeStates) consensusEvent {
 						"N=%d/view=%d, start normal consensus process.", rbft.no, rbft.N, rbft.view)
 
 					rbft.off(isNewNode)
-					// TODO(DH): ensure new node sync to quorum router externally.
-					rbft.peerPool.updateRouter(quorumInfo)
-
 					rbft.logger.Noticef("======== Replica %d finished updateN, primary=%d, n=%d/f=%d/view=%d/h=%d",
 						rbft.no, rbft.primaryIndex(rbft.view), rbft.N, rbft.f, rbft.view, rbft.h)
 				}
@@ -698,11 +694,9 @@ func (rbft *rbftImpl) calcPSet() map[uint64]*pb.Vc_PQ {
 // getVcBasis helps re-calculate the plist and qlist then construct a vcBasis
 // at teh same time, useless cert with lower .
 func (rbft *rbftImpl) getVcBasis() *pb.VcBasis {
-	//genesis := rbft.getGenesisInfo()
 	basis := &pb.VcBasis{
-		View: rbft.view,
-		H:    rbft.h,
-		//Genesis:   genesis,
+		View:      rbft.view,
+		H:         rbft.h,
 		ReplicaId: rbft.peerPool.localID,
 	}
 

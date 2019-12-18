@@ -176,14 +176,6 @@ func (rbft *rbftImpl) recvReadyForNForAdd(ready *pb.ReadyForN) consensusEvent {
 		return nil
 	}
 
-	info := hex2Bytes(ready.NewNodeInfo)
-	peer := &pb.Peer{}
-	err := proto.Unmarshal(info, peer)
-	if err != nil {
-		rbft.logger.Warningf("Replica %d failed to parse new node info", rbft.no)
-		return nil
-	}
-
 	return rbft.sendAgreeUpdateNForAdd(ready.NewNodeInfo, ready.ExpectN)
 }
 
@@ -365,6 +357,11 @@ func (rbft *rbftImpl) recvAgreeUpdateN(agree *pb.AgreeUpdateN) consensusEvent {
 		rbft.logger.Infof("Replica %d try to receive AgreeUpdateN, but it's in recovery", rbft.no)
 		return nil
 	}
+	// Reject response to updating N as this AgreeUpdateN is not vote for agree current new node
+	if rbft.in(isNewNode) && agree.Id != rbft.peerPool.localID {
+		rbft.logger.Infof("New node reject AgreeUpdateN which is not vote for current new node")
+		return nil
+	}
 
 	correct := rbft.checkAgreeUpdateN(agree)
 	if !correct {
@@ -487,7 +484,7 @@ func (rbft *rbftImpl) sendUpdateN() consensusEvent {
 	}
 	rbft.peerPool.broadcast(consensusMsg)
 	rbft.nodeMgr.updateStore[rbft.nodeMgr.updateTarget] = update
-	return rbft.primaryCheckUpdateN(cp, replicas, update)
+	return rbft.primaryCheckUpdateN(update)
 }
 
 // recvUpdateN handles the UpdateN message sent by primary.
@@ -508,6 +505,12 @@ func (rbft *rbftImpl) recvUpdateN(update *pb.UpdateN) consensusEvent {
 
 	if !rbft.in(InUpdatingN) {
 		rbft.logger.Debugf("Replica %d reject recvUpdateN as we are not in updatingN", rbft.no)
+		return nil
+	}
+
+	// Reject response to updating N as this UpdateN is not vote for agree current new node
+	if rbft.in(isNewNode) && update.Id != rbft.peerPool.localID {
+		rbft.logger.Infof("New node reject UpdateN which is not vote for current new node")
 		return nil
 	}
 
@@ -543,7 +546,7 @@ func (rbft *rbftImpl) recvUpdateN(update *pb.UpdateN) consensusEvent {
 
 // primaryProcessUpdateN processes the UpdateN message after it has already reached
 // updateN-quorum.
-func (rbft *rbftImpl) primaryCheckUpdateN(initialCp pb.Vc_C, replicas []replicaInfo, update *pb.UpdateN) consensusEvent {
+func (rbft *rbftImpl) primaryCheckUpdateN(update *pb.UpdateN) consensusEvent {
 
 	// Check if primary need fetch missing requests
 	newReqBatchMissing := rbft.feedMissingReqBatchIfNeeded(update.Xset)

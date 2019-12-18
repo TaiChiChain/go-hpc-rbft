@@ -328,8 +328,6 @@ func (rbft *rbftImpl) resetStateForRecovery() consensusEvent {
 		// if we are behind by checkpoint, move watermark and state transfer to the target
 		rbft.logger.Debugf("Replica %d in recovery find itself fall behind, "+
 			"move watermark to %d and state transfer.", rbft.no, cp.SequenceNumber)
-		// stop recoveryRestartTimer as state update may take so long time.
-		rbft.timerMgr.stopTimer(recoveryRestartTimer)
 
 		// clear useless outstanding batch to avoid viewChange caused by outstanding batches after recovery.
 		rbft.cleanOutstandingAndCert()
@@ -587,7 +585,6 @@ func (rbft *rbftImpl) recvSyncState(sync *pb.SyncState) consensusEvent {
 		return nil
 	}
 
-	//genesis := rbft.getGenesisInfo()
 	state := rbft.node.getCurrentState()
 
 	routerInfo := rbft.peerPool.serializeRouterInfo()

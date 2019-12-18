@@ -467,7 +467,6 @@ func TestNodeMgr_recvAgreeUpdateN(t *testing.T) {
 		Cset:      nil,
 		Pset:      nil,
 		Qset:      nil,
-		Genesis:   0,
 	}
 	agree := &pb.AgreeUpdateN{
 		Basis:   basisTmp,
@@ -612,7 +611,6 @@ func TestNodeMgr_sendUpdateN(t *testing.T) {
 		Cset:      CSet,
 		Pset:      PSet,
 		Qset:      QSet,
-		Genesis:   0,
 	}
 
 	// Only test for sending process

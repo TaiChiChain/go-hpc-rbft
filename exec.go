@@ -155,24 +155,22 @@ func (rbft *rbftImpl) handleCoreRbftEvent(e *LocalEvent) consensusEvent {
 		rbft.executeAfterStateUpdate()
 		return nil
 
-	case CoreRetrieveStatusEvent:
-		statusChan := e.Event.(chan NodeStatus)
-		currentStatus := rbft.getStatus()
-		statusChan <- currentStatus
-		return nil
 	case CoreUpdateConfStateEvent:
 		ev := e.Event.(*pb.ConfState)
-		found := false
-		for i, p := range ev.QuorumRouter.Peers {
-			if p.Id == rbft.peerPool.localID {
-				rbft.no = uint64(i + 1)
-				found = true
+		if !rbft.in(isNewNode) {
+			found := false
+			for i, p := range ev.QuorumRouter.Peers {
+				if p.Id == rbft.peerPool.localID {
+					rbft.no = uint64(i + 1)
+					rbft.logger.Criticalf("Replica set no to %d", rbft.no)
+					found = true
+				}
 			}
-		}
-		if !found {
-			rbft.logger.Criticalf("Replica %d cannot find self id in quorum routers: %+v", rbft.no, ev.QuorumRouter.Peers)
-			rbft.on(Pending)
-			return nil
+			if !found {
+				rbft.logger.Criticalf("Replica %d cannot find self id in quorum routers: %+v", rbft.no, ev.QuorumRouter.Peers)
+				rbft.on(Pending)
+				return nil
+			}
 		}
 		rbft.peerPool.initPeers(ev.QuorumRouter.Peers)
 		return nil
