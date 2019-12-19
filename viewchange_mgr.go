@@ -1067,11 +1067,4 @@ func (rbft *rbftImpl) processNewView(msgList xset) {
 			rbft.peerPool.broadcast(consensusMsg)
 		}
 	}
-
-	// clear qList and pList from DB as we have finished re-construct PQCSet.
-	// Note. before vc/recovery/updateN, we need to persist QPList to ensure we can restore committed entries
-	// after above abnormal situations as we will delete all PQCSet when we enter abnormal, after finish
-	// vc/recovery/updateN we will re-broadcast and persist PQCSet which is enough to ensure continuity of
-	// committed entries in next vc/recovery/updateN.
-	rbft.persistDelQPList()
 }
