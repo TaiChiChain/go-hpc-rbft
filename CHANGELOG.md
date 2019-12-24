@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.1.6"></a>
+## [0.1.6](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.1.5...v0.1.6) (2019-12-24)
+
+
+### Bug Fixes
+
+* **consensus:** Clear QPList before persist new QPList in prepare phase of abnormal status ([b71c124](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/b71c124))
+* **consensus:** the view will increase by one when the node restarts to clear the expired ([5d97620](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/5d97620))
+* **go.mod:** upgrade fancylogger to v0.1.2 ([9a82f0f](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/9a82f0f))
+
+
+
 <a name="0.1.5"></a>
 ## [0.1.5](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.1.4...v0.1.5) (2019-12-18)
 
