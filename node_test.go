@@ -511,7 +511,7 @@ func TestNode_Status(t *testing.T) {
 		ret := n.Status()
 		expStatus := NodeStatus{
 			ID:     2,
-			View:   0,
+			View:   1,
 			Status: InRecovery,
 		}
 		assert.Equal(t, expStatus, ret)

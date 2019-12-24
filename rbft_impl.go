@@ -261,7 +261,7 @@ func (rbft *rbftImpl) start() error {
 	// start listen consensus event
 	go rbft.listenEvent()
 
-	rbft.sendNotification(true)
+	rbft.initRecovery()
 
 	return nil
 }
