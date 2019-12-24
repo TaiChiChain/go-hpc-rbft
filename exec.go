@@ -243,7 +243,7 @@ func (rbft *rbftImpl) handleRecoveryEvent(e *LocalEvent) consensusEvent {
 		}
 		rbft.off(InSyncState)
 		rbft.exitSyncState()
-		rbft.restartRecovery()
+		rbft.initRecovery()
 		return nil
 	case RecoverySyncStateRestartTimerEvent:
 		rbft.logger.Debugf("Replica %d sync state restart timer expired", rbft.no)

@@ -700,9 +700,21 @@ func (rbft *rbftImpl) getVcBasis() *pb.VcBasis {
 		ReplicaId: rbft.peerPool.localID,
 	}
 
+	// clear qList and pList from DB as we will construct new QPList next.
+	rbft.persistDelQPList()
+
 	rbft.vcMgr.plist = rbft.calcPSet()
 	rbft.vcMgr.qlist = rbft.calcQSet()
 
+	// Note. before vc/recovery/updateN, we need to persist QPList to ensure we can restore committed entries
+	// after above abnormal situations as we will delete all PQCSet when we enter abnormal, after finish
+	// vc/recovery/updateN we will re-broadcast and persist PQCSet which is enough to ensure continuity of
+	// committed entries in next vc/recovery/updateN. However, QPList cannot be deleted immediately after
+	// finish vc/recovery/updateN as we may loss some committed entries after crash down in normal status.
+	// So:
+	// 1. during normal status, we have: QPSet with pre-prepare certs and prepare certs and QPList generated in
+	// previous abnormal status which is used to catch some useful committed entries after system crash down.
+	// 2. during abnormal status, we have no QPSet but we have QPList generated in current abnormal status.
 	rbft.persistPList(rbft.vcMgr.plist)
 	rbft.persistQList(rbft.vcMgr.qlist)
 
