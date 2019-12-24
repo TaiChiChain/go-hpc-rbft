@@ -6,7 +6,7 @@ require (
 	github.com/gogo/protobuf v1.2.1
 	github.com/golang/mock v1.3.1
 	github.com/stretchr/testify v1.4.0
-	github.com/ultramesh/fancylogger v0.1.0
+	github.com/ultramesh/fancylogger v0.1.2
 	github.com/ultramesh/flato-event v0.1.1
 	github.com/ultramesh/flato-txpool v0.1.3
 )
@@ -25,4 +25,4 @@ replace github.com/ultramesh/flato-event v0.1.1 => git.hyperchain.cn/ultramesh/f
 
 replace github.com/ultramesh/flato-txpool v0.1.3 => git.hyperchain.cn/ultramesh/flato-txpool.git v0.1.3
 
-replace github.com/ultramesh/fancylogger => git.hyperchain.cn/ultramesh/fancylogger.git v0.1.0
+replace github.com/ultramesh/fancylogger => git.hyperchain.cn/ultramesh/fancylogger.git v0.1.2
