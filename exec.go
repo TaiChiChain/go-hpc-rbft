@@ -173,7 +173,12 @@ func (rbft *rbftImpl) handleCoreRbftEvent(e *LocalEvent) consensusEvent {
 			}
 		}
 		rbft.peerPool.initPeers(ev.QuorumRouter.Peers)
-		return nil
+
+		// be sure config change about add or del has been applied
+		return &LocalEvent{
+			Service:   NodeMgrService,
+			EventType: NodeMgrUpdatedEvent,
+		}
 
 	default:
 		rbft.logger.Errorf("Invalid core RBFT event: %v", e)

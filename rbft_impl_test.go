@@ -324,8 +324,10 @@ func TestRBFT_reportStateUpdated(t *testing.T) {
 	}
 
 	rbft.reportStateUpdated(2)
-	obj := <-rbft.recvChan
-	assert.Equal(t, event, obj)
+	go func() {
+		obj := <-rbft.recvChan
+		assert.Equal(t, event, obj)
+	}()
 }
 
 func TestRBFT_removeNode(t *testing.T) {

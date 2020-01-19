@@ -118,12 +118,7 @@ func TestNodeMgr_recvAgreeUpdateN_AddNormal(t *testing.T) {
 	// rbft.nodeMgr.updateStore[rbft.nodeMgr.updateTarget] = update
 	// Then, primaryCheckUpdateN
 	// return NodeMgrUpdatedEvent
-	retPrimarySendUpdateN := rbft.sendUpdateN()
-	expPrimarySendUpdateN := &LocalEvent{
-		Service:   NodeMgrService,
-		EventType: NodeMgrUpdatedEvent,
-	}
-	assert.Equal(t, expPrimarySendUpdateN, retPrimarySendUpdateN)
+	_ = rbft.sendUpdateN()
 	BSetTmp := []*pb.VcBasis{
 		basisTmpAdd2,
 		basisTmpAdd3,
