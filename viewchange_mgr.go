@@ -212,9 +212,18 @@ func (rbft *rbftImpl) recvViewChange(vc *pb.ViewChange) consensusEvent {
 	rbft.logger.Debugf("Replica %d now has %d viewChange requests for view %d",
 		rbft.no, quorum, rbft.view)
 
-	// if in viewchange and vc.view = rbft.view and quorum > allCorrectReplicasQuorum
+	// if in viewChange/recovery and vc.view = rbft.view and quorum > allCorrectReplicasQuorum
 	// rbft find new view success and jump into ViewChangeQuorumEvent
-	if rbft.in(InViewChange) && vc.Basis.View == rbft.view && quorum >= rbft.allCorrectReplicasQuorum() {
+	if rbft.inOne(InViewChange, InRecovery) && vc.Basis.View == rbft.view && quorum >= rbft.allCorrectReplicasQuorum() {
+		// as viewChange and recovery are mutually exclusive, we need to ensure
+		// we have totally exit recovery before we jump into ViewChangeQuorumEvent
+		if rbft.in(InRecovery) {
+			rbft.logger.Infof("Replica %d in recovery changes to viewChange status", rbft.no)
+			rbft.off(InRecovery)
+			rbft.on(InViewChange)
+			rbft.timerMgr.stopTimer(recoveryRestartTimer)
+		}
+
 		// close vcResendTimer
 		rbft.timerMgr.stopTimer(vcResendTimer)
 
