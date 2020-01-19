@@ -1351,6 +1351,9 @@ func (rbft *rbftImpl) recvCheckpoint(chkpt *pb.Checkpoint) consensusEvent {
 		rbft.no, chkpt.SequenceNumber, chkpt.Digest)
 
 	rbft.moveWatermarks(chkpt.SequenceNumber)
+	rbft.logger.Infof("Replica %d post stable checkpoint event for seqNo %d after "+
+		"executed to the height with the same digest", rbft.no, rbft.h)
+	rbft.external.SendFilterEvent(pb.InformType_FilterStableCheckpoint, rbft.h)
 
 	return nil
 }
@@ -1511,7 +1514,6 @@ func (rbft *rbftImpl) moveWatermarks(n uint64) {
 	rbft.persistH(h)
 
 	rbft.logger.Infof("Replica %d updated low water mark to %d", rbft.no, rbft.h)
-	rbft.external.SendFilterEvent(pb.InformType_FilterStableCheckpoint, rbft.h)
 }
 
 // updateHighStateTarget updates high state target
@@ -1578,6 +1580,10 @@ func (rbft *rbftImpl) tryStateTransfer(target *stateUpdateTarget) {
 
 // recvStateUpdatedEvent processes StateUpdatedMessage.
 func (rbft *rbftImpl) recvStateUpdatedEvent(seqNo uint64) consensusEvent {
+	rbft.logger.Infof("Replica %d post stable checkpoint event for seqNo %d after "+
+		"state update to the height", rbft.no, seqNo)
+	rbft.external.SendFilterEvent(pb.InformType_FilterStableCheckpoint, seqNo)
+
 	// If state transfer did not complete successfully, or if it did not reach our low watermark, do it again
 	// When this node moves watermark before this node receives StateUpdatedMessage, this would happen.
 	if seqNo < rbft.h {
