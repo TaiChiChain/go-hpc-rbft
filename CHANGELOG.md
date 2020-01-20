@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.1.7"></a>
+## [0.1.7](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.1.6...v0.1.7) (2020-01-20)
+
+
+### Bug Fixes
+
+* synchronously modify routers after add/delete node ([f1bed3a](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/f1bed3a)), closes [#flato-1060](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-1060)
+* **rbft:** fix flato-1041,input delIndex instead of delID when calling func getDelNV ([a8cc180](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/a8cc180)), closes [#1041](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/1041)
+* **rbft_impl.go:** post StableCheckpoint event after normal movewatermark and stateupdated ([17d55d6](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/17d55d6))
+* **rbft_impl.go:** remove judgement of newNode when postConfState ([74a2585](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/74a2585))
+* **updateN:** change the place where NodeMgrUpdatedEvent return when updateN ([e23de24](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/e23de24)), closes [#flato-1060](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-1060)
+* **viewchange_mgr.go:** node in recovery can jump into viewChange if it find newView ([3ad2909](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/3ad2909))
+
+
+
 <a name="0.1.6"></a>
 ## [0.1.6](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.1.5...v0.1.6) (2019-12-24)
 
