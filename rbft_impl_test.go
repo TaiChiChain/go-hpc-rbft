@@ -259,7 +259,6 @@ func TestRBFT_start(t *testing.T) {
 	// Start the process
 	_ = rbft.start()
 
-	assert.Equal(t, true, rbft.in(InRecovery))
 	assert.Equal(t, false, rbft.in(Pending))
 }
 
@@ -296,13 +295,6 @@ func TestRBFT_step(t *testing.T) {
 		rbft.step(e)
 		ret1 := <-rbft.recvChan
 		assert.Equal(t, e, ret1)
-	}()
-
-	go func() {
-		e.Type = pb.Type_NOTIFICATION_RESPONSE
-		rbft.step(e)
-		ret2 := <-rbft.recvChan
-		assert.Equal(t, e, ret2)
 	}()
 }
 
@@ -480,7 +472,7 @@ func TestRBFT_handleNullRequestTimerEvent(t *testing.T) {
 	rbft.handleNullRequestTimerEvent()
 	assert.Equal(t, uint64(0), rbft.view)
 
-	rbft.view = 1
+	rbft.setView(1)
 	rbft.off(InViewChange)
 	rbft.handleNullRequestTimerEvent()
 	assert.Equal(t, uint64(2), rbft.view)
@@ -515,7 +507,7 @@ func TestRBFT_processReqSetEvent(t *testing.T) {
 	rbft.off(PoolFull)
 	assert.Nil(t, rbft.processReqSetEvent(req))
 
-	rbft.view = 1
+	rbft.setView(1)
 	assert.Nil(t, rbft.processReqSetEvent(req))
 }
 

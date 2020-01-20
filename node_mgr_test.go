@@ -393,7 +393,7 @@ func TestNodeMgr_sendAgreeUpdateNForAdd(t *testing.T) {
 	// delete old message: rbft.nodeMgr.agreeUpdateStore[idx.v<view],
 	// which is in old view
 	rbft.on(Normal)
-	rbft.view = 1
+	rbft.setView(1)
 	delete(rbft.nodeMgr.addNodeInfo, uint64(5))
 	IDTmp := aidx{
 		v:    0,
@@ -718,7 +718,7 @@ func TestNodeMgr_replicaCheckUpdateN(t *testing.T) {
 	assert.Nil(t, rbft.replicaCheckUpdateN())
 	assert.Equal(t, uint64(1), rbft.view)
 
-	rbft.view = 0
+	rbft.setView(0)
 	rbft.off(InViewChange)
 	rbft.nodeMgr.updateStore[rbft.nodeMgr.updateTarget].Bset = []*pb.VcBasis{rbft.getVcBasis()}
 	assert.Nil(t, rbft.replicaCheckUpdateN())

@@ -49,7 +49,7 @@ func TestPersist_restoreView(t *testing.T) {
 	}
 
 	node, _ := newNode(conf)
-	node.rbft.view = 2
+	node.rbft.setView(2)
 
 	var ret []byte
 
@@ -567,7 +567,7 @@ func TestPersist_parseCertStore(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	rbft, _ := newTestRBFT(ctrl)
-	rbft.view = 3
+	rbft.setView(3)
 
 	msgID1 := msgID{
 		v: 3,

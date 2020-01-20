@@ -461,54 +461,6 @@ func TestNode_ReportStateUpdated(t *testing.T) {
 	assert.Equal(t, "state3", n.currentState.Digest)
 }
 
-func TestNode_Status(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	log := NewRawLogger()
-	external := mockexternal.NewMockMinimalExternal(ctrl)
-	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
-
-	conf := Config{
-		ID:                      2,
-		IsNew:                   false,
-		Peers:                   peerSet,
-		K:                       10,
-		LogMultiplier:           4,
-		SetSize:                 25,
-		SetTimeout:              100 * time.Millisecond,
-		BatchTimeout:            500 * time.Millisecond,
-		RequestTimeout:          6 * time.Second,
-		NullRequestTimeout:      9 * time.Second,
-		VcResendTimeout:         10 * time.Second,
-		CleanVCTimeout:          60 * time.Second,
-		NewViewTimeout:          8 * time.Second,
-		FirstRequestTimeout:     30 * time.Second,
-		SyncStateTimeout:        1 * time.Second,
-		SyncStateRestartTimeout: 10 * time.Second,
-		RecoveryTimeout:         10 * time.Second,
-		UpdateTimeout:           4 * time.Second,
-		CheckPoolTimeout:        3 * time.Minute,
-
-		Logger:      log,
-		External:    external,
-		RequestPool: pool,
-	}
-	n, _ := NewNode(conf)
-	_ = n.Start()
-
-	// When started, the node need recovery process
-	// So that here is a InRecovery Status
-	go func() {
-		ret := n.Status()
-		expStatus := NodeStatus{
-			ID:     2,
-			View:   1,
-			Status: InRecovery,
-		}
-		assert.Equal(t, expStatus, ret)
-	}()
-}
-
 func TestNode_getCurrentState(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()

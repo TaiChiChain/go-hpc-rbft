@@ -141,3 +141,13 @@ func (pool *peerPool) unicast(msg *pb.ConsensusMessage, to uint64) {
 		return
 	}
 }
+
+func (pool *peerPool) findRouterIndexByID(id uint64) (uint64, bool) {
+	for i, peer := range pool.router.Peers {
+		if peer.Id == id {
+			return uint64(i), true
+		}
+	}
+	pool.logger.Warningf("Can not find replica with id:%d", id)
+	return 0, false
+}
