@@ -262,8 +262,6 @@ func TestExec_handleCoreRbftEvent(t *testing.T) {
 	// as for update conf msg
 	// found localId, initPeers to refresh the peerPool
 	rbft.off(InViewChange)
-	e.Event = nil
-	e.EventType = CoreUpdateConfStateEvent
 	peerTmp := []*pb.Peer{
 		{
 			Id:      1,
@@ -278,14 +276,14 @@ func TestExec_handleCoreRbftEvent(t *testing.T) {
 			Context: []byte("Test6"),
 		},
 	}
-	e.Event = &pb.ConfState{QuorumRouter: &pb.Router{Peers: peerTmp}}
+	confState := &pb.ConfState{QuorumRouter: &pb.Router{Peers: peerTmp}}
 	rbft.off(Pending)
-	rbft.handleCoreRbftEvent(e)
+	rbft.postConfState(confState)
 	assert.Equal(t, false, rbft.in(Pending))
 	assert.Equal(t, peerTmp, rbft.peerPool.router.Peers)
 
 	// Not found localId, Pending the peer
-	e.Event = &pb.ConfState{
+	confState = &pb.ConfState{
 		QuorumRouter: &pb.Router{
 			Peers: []*pb.Peer{
 				{
@@ -296,7 +294,7 @@ func TestExec_handleCoreRbftEvent(t *testing.T) {
 		},
 	}
 	rbft.off(Pending)
-	rbft.handleCoreRbftEvent(e)
+	rbft.postConfState(confState)
 	assert.Equal(t, true, rbft.in(Pending))
 
 	// Default

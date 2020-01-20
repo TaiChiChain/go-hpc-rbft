@@ -723,7 +723,10 @@ func (rbft *rbftImpl) resetStateForUpdate() consensusEvent {
 	rbft.persistView(rbft.view)
 	rbft.logger.Infof("Replica %d persist view=%d/N=%d after updateN", rbft.no, rbft.view, rbft.N)
 
-	return nil
+	return &LocalEvent{
+		Service:   NodeMgrService,
+		EventType: NodeMgrUpdatedEvent,
+	}
 }
 
 //##########################################################################

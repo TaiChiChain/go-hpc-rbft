@@ -155,31 +155,6 @@ func (rbft *rbftImpl) handleCoreRbftEvent(e *LocalEvent) consensusEvent {
 		rbft.executeAfterStateUpdate()
 		return nil
 
-	case CoreUpdateConfStateEvent:
-		ev := e.Event.(*pb.ConfState)
-		if !rbft.in(isNewNode) {
-			found := false
-			for i, p := range ev.QuorumRouter.Peers {
-				if p.Id == rbft.peerPool.localID {
-					rbft.no = uint64(i + 1)
-					rbft.logger.Criticalf("Replica set no to %d", rbft.no)
-					found = true
-				}
-			}
-			if !found {
-				rbft.logger.Criticalf("Replica %d cannot find self id in quorum routers: %+v", rbft.no, ev.QuorumRouter.Peers)
-				rbft.on(Pending)
-				return nil
-			}
-		}
-		rbft.peerPool.initPeers(ev.QuorumRouter.Peers)
-
-		// be sure config change about add or del has been applied
-		return &LocalEvent{
-			Service:   NodeMgrService,
-			EventType: NodeMgrUpdatedEvent,
-		}
-
 	default:
 		rbft.logger.Errorf("Invalid core RBFT event: %v", e)
 		return nil
