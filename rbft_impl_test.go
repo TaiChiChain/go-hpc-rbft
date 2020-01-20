@@ -259,7 +259,6 @@ func TestRBFT_start(t *testing.T) {
 	// Start the process
 	_ = rbft.start()
 
-	assert.Equal(t, true, rbft.in(InRecovery))
 	assert.Equal(t, false, rbft.in(Pending))
 }
 
@@ -297,13 +296,6 @@ func TestRBFT_step(t *testing.T) {
 		ret1 := <-rbft.recvChan
 		assert.Equal(t, e, ret1)
 	}()
-
-	go func() {
-		e.Type = pb.Type_NOTIFICATION_RESPONSE
-		rbft.step(e)
-		ret2 := <-rbft.recvChan
-		assert.Equal(t, e, ret2)
-	}()
 }
 
 //============================================
@@ -324,8 +316,10 @@ func TestRBFT_reportStateUpdated(t *testing.T) {
 	}
 
 	rbft.reportStateUpdated(2)
-	obj := <-rbft.recvChan
-	assert.Equal(t, event, obj)
+	go func() {
+		obj := <-rbft.recvChan
+		assert.Equal(t, event, obj)
+	}()
 }
 
 func TestRBFT_removeNode(t *testing.T) {
@@ -362,43 +356,6 @@ func TestRBFT_postRequests(t *testing.T) {
 
 	assert.Equal(t, rSet, obj)
 }
-
-func TestRBFT_postConfState(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	rt := &pb.Router{Peers: peerSet}
-	cc := &pb.ConfState{QuorumRouter: rt}
-	confState := &LocalEvent{
-		Service:   CoreRbftService,
-		EventType: CoreUpdateConfStateEvent,
-		Event:     cc,
-	}
-
-	rbft, _ := newTestRBFT(ctrl)
-
-	rbft.postConfState(cc)
-	obj := <-rbft.recvChan
-
-	assert.Equal(t, confState, obj)
-}
-
-//func TestRBFT_postStatusRequest(t *testing.T) {
-//	ctrl := gomock.NewController(t)
-//	defer ctrl.Finish()
-//	rbft, _ := newTestRBFT(ctrl)
-//
-//	go func() {
-//		rbft.close <- true
-//	}()
-//
-//	var state NodeStatus
-//	go func() {
-//		state = rbft.postStatusRequest()
-//		exp := NodeStatus{Status: Pending}
-//		assert.Equal(t, exp.Status, state.Status)
-//	}()
-//}
 
 func TestRBFT_postMsg(t *testing.T) {
 	ctrl := gomock.NewController(t)
@@ -515,7 +472,7 @@ func TestRBFT_handleNullRequestTimerEvent(t *testing.T) {
 	rbft.handleNullRequestTimerEvent()
 	assert.Equal(t, uint64(0), rbft.view)
 
-	rbft.view = 1
+	rbft.setView(1)
 	rbft.off(InViewChange)
 	rbft.handleNullRequestTimerEvent()
 	assert.Equal(t, uint64(2), rbft.view)
@@ -550,7 +507,7 @@ func TestRBFT_processReqSetEvent(t *testing.T) {
 	rbft.off(PoolFull)
 	assert.Nil(t, rbft.processReqSetEvent(req))
 
-	rbft.view = 1
+	rbft.setView(1)
 	assert.Nil(t, rbft.processReqSetEvent(req))
 }
 

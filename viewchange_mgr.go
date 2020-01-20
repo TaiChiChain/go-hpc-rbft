@@ -199,7 +199,8 @@ func (rbft *rbftImpl) recvViewChange(vc *pb.ViewChange) consensusEvent {
 		rbft.logger.Infof("Replica %d received f+1 viewChange messages whose view is greater than "+
 			"current view %d, detailed: %v, triggering viewChange to view %d", rbft.no, rbft.view, replicas, minView)
 		// subtract one, because sendViewChange() increments
-		rbft.view = minView - 1
+		newView := minView - uint64(1)
+		rbft.setView(newView)
 		return rbft.sendViewChange()
 	}
 	//calculate how many peers has view = rbft.view
@@ -212,9 +213,18 @@ func (rbft *rbftImpl) recvViewChange(vc *pb.ViewChange) consensusEvent {
 	rbft.logger.Debugf("Replica %d now has %d viewChange requests for view %d",
 		rbft.no, quorum, rbft.view)
 
-	// if in viewchange and vc.view = rbft.view and quorum > allCorrectReplicasQuorum
+	// if in viewChange/recovery and vc.view = rbft.view and quorum > allCorrectReplicasQuorum
 	// rbft find new view success and jump into ViewChangeQuorumEvent
-	if rbft.in(InViewChange) && vc.Basis.View == rbft.view && quorum >= rbft.allCorrectReplicasQuorum() {
+	if rbft.inOne(InViewChange, InRecovery) && vc.Basis.View == rbft.view && quorum >= rbft.allCorrectReplicasQuorum() {
+		// as viewChange and recovery are mutually exclusive, we need to ensure
+		// we have totally exit recovery before we jump into ViewChangeQuorumEvent
+		if rbft.in(InRecovery) {
+			rbft.logger.Infof("Replica %d in recovery changes to viewChange status", rbft.no)
+			rbft.off(InRecovery)
+			rbft.on(InViewChange)
+			rbft.timerMgr.stopTimer(recoveryRestartTimer)
+		}
+
 		// close vcResendTimer
 		rbft.timerMgr.stopTimer(vcResendTimer)
 
@@ -639,7 +649,8 @@ func (rbft *rbftImpl) beforeSendVC() error {
 	rbft.setAbNormal()
 	rbft.vcMgr.vcHandled = false
 
-	rbft.view++
+	newView := rbft.view + uint64(1)
+	rbft.setView(newView)
 	delete(rbft.vcMgr.newViewStore, rbft.view)
 
 	// clear old messages

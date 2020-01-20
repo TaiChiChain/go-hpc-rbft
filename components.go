@@ -48,7 +48,6 @@ const (
 	CoreStateUpdatedEvent
 	CoreResendMissingTxsEvent
 	CoreResendFetchMissingEvent
-	CoreUpdateConfStateEvent
 
 	// 2.view change
 	ViewChangeTimerEvent
@@ -57,6 +56,7 @@ const (
 	ViewChangedEvent
 
 	// 3.recovery
+	RecoveryInitEvent
 	RecoveryRestartTimerEvent
 	RecoveryDoneEvent
 	RecoverySyncStateRspTimerEvent

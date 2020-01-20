@@ -333,17 +333,8 @@ func TestNode_ApplyConfChange(t *testing.T) {
 
 	r := &pb.Router{Peers: peerSet}
 	cc := &pb.ConfState{QuorumRouter: r}
-	expMsg := &LocalEvent{
-		Service:   CoreRbftService,
-		EventType: CoreUpdateConfStateEvent,
-		Event:     cc,
-	}
-
-	go func() {
-		n.ApplyConfChange(cc)
-		obj := <-n.rbft.recvChan
-		assert.Equal(t, expMsg, obj)
-	}()
+	n.ApplyConfChange(cc)
+	assert.Equal(t, len(peerSet), len(n.rbft.peerPool.router.Peers))
 }
 
 func TestNode_ReportExecuted(t *testing.T) {
@@ -468,54 +459,6 @@ func TestNode_ReportStateUpdated(t *testing.T) {
 	}
 	n.ReportStateUpdated(state3)
 	assert.Equal(t, "state3", n.currentState.Digest)
-}
-
-func TestNode_Status(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	log := NewRawLogger()
-	external := mockexternal.NewMockMinimalExternal(ctrl)
-	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
-
-	conf := Config{
-		ID:                      2,
-		IsNew:                   false,
-		Peers:                   peerSet,
-		K:                       10,
-		LogMultiplier:           4,
-		SetSize:                 25,
-		SetTimeout:              100 * time.Millisecond,
-		BatchTimeout:            500 * time.Millisecond,
-		RequestTimeout:          6 * time.Second,
-		NullRequestTimeout:      9 * time.Second,
-		VcResendTimeout:         10 * time.Second,
-		CleanVCTimeout:          60 * time.Second,
-		NewViewTimeout:          8 * time.Second,
-		FirstRequestTimeout:     30 * time.Second,
-		SyncStateTimeout:        1 * time.Second,
-		SyncStateRestartTimeout: 10 * time.Second,
-		RecoveryTimeout:         10 * time.Second,
-		UpdateTimeout:           4 * time.Second,
-		CheckPoolTimeout:        3 * time.Minute,
-
-		Logger:      log,
-		External:    external,
-		RequestPool: pool,
-	}
-	n, _ := NewNode(conf)
-	_ = n.Start()
-
-	// When started, the node need recovery process
-	// So that here is a InRecovery Status
-	go func() {
-		ret := n.Status()
-		expStatus := NodeStatus{
-			ID:     2,
-			View:   1,
-			Status: InRecovery,
-		}
-		assert.Equal(t, expStatus, ret)
-	}()
 }
 
 func TestNode_getCurrentState(t *testing.T) {

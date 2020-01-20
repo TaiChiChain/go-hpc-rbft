@@ -58,9 +58,6 @@ func TestHelper_RBFT(t *testing.T) {
 	defer ctrl.Finish()
 	rbft, _ := newTestRBFT(ctrl)
 
-	// primaryIndex
-	assert.Equal(t, uint64(1), rbft.primaryIndex(uint64(4)))
-
 	// primaryID
 	assert.Equal(t, uint64(3), rbft.primaryID(uint64(14)))
 	// Test for Warningf
@@ -94,24 +91,32 @@ func TestHelper_RBFT(t *testing.T) {
 	n, v = rbft.getAddNV()
 	assert.Equal(t, int64(5), n)
 	assert.Equal(t, uint64(5), v)
-	rbft.view = 5
+
+	rbft.setView(5)
 	_, v = rbft.getAddNV()
 	assert.Equal(t, uint64(6), v)
-	rbft.view = 0
 
 	// getDelNV
+	rbft.setView(0)
 	n, v = rbft.getDelNV(uint64(2))
 	assert.Equal(t, int64(3), n)
 	assert.Equal(t, uint64(3), v)
-	rbft.view = 3
+
+	rbft.setView(3)
 	_, v = rbft.getDelNV(uint64(2))
-	assert.Equal(t, uint64(8), v)
-	rbft.view = 0
+	assert.Equal(t, uint64(5), v)
+
+	rbft.setView(uint64(11))
+	rbft.N = 5
+	n, v = rbft.getDelNV(uint64(0))
+	assert.Equal(t, uint64(12), v)
+	assert.Equal(t, int64(4), n)
 
 	// cleanOutstandingAndCert
 	rbft.cleanOutstandingAndCert()
 
 	// commonCaseQuorum
+	rbft.N = 4
 	assert.Equal(t, 3, rbft.commonCaseQuorum())
 
 	// allCorrectReplicasQuorum
@@ -256,7 +261,7 @@ func TestHelper_isPrePrepareLegal(t *testing.T) {
 	assert.Equal(t, false, rbft.isPrePrepareLegal(preprep))
 
 	preprep.View = 0
-	rbft.view = 0
+	rbft.setView(0)
 	rbft.exec.setLastExec(uint64(30))
 	assert.Equal(t, false, rbft.isPrePrepareLegal(preprep))
 
