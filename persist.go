@@ -510,7 +510,7 @@ func (rbft *rbftImpl) restoreView() bool {
 		if err != nil {
 			rbft.logger.Warningf("Replica %d could not restore setView %s to a integer", rbft.no, string(setView))
 		} else {
-			rbft.view = uint64(nv)
+			rbft.setView(uint64(nv))
 			rbft.logger.Noticef("========= restore set view %d =======", rbft.view)
 			return true
 		}
@@ -519,11 +519,11 @@ func (rbft *rbftImpl) restoreView() bool {
 	v, err := rbft.storage.ReadState("view")
 	if err == nil {
 		view := binary.LittleEndian.Uint64(v)
-		rbft.view = view
+		rbft.setView(view)
 		rbft.logger.Noticef("========= restore view %d =======", rbft.view)
 	} else {
 		rbft.logger.Warningf("Replica %d could not restore view: %s, set to 0", rbft.no, err)
-		rbft.view = 0
+		rbft.setView(uint64(0))
 	}
 	return false
 }

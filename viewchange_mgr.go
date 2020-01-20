@@ -199,7 +199,8 @@ func (rbft *rbftImpl) recvViewChange(vc *pb.ViewChange) consensusEvent {
 		rbft.logger.Infof("Replica %d received f+1 viewChange messages whose view is greater than "+
 			"current view %d, detailed: %v, triggering viewChange to view %d", rbft.no, rbft.view, replicas, minView)
 		// subtract one, because sendViewChange() increments
-		rbft.view = minView - 1
+		newView := minView - uint64(1)
+		rbft.setView(newView)
 		return rbft.sendViewChange()
 	}
 	//calculate how many peers has view = rbft.view
@@ -648,7 +649,8 @@ func (rbft *rbftImpl) beforeSendVC() error {
 	rbft.setAbNormal()
 	rbft.vcMgr.vcHandled = false
 
-	rbft.view++
+	newView := rbft.view + uint64(1)
+	rbft.setView(newView)
 	delete(rbft.vcMgr.newViewStore, rbft.view)
 
 	// clear old messages

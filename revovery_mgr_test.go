@@ -257,7 +257,7 @@ func TestRecovery_returnRecoveryPQC(t *testing.T) {
 	fetchTmp.H = 20
 
 	rbft.h = 10
-	rbft.view = 0
+	rbft.setView(0)
 	// If return is nil, it runs normally
 	hashBatch := &pb.HashBatch{
 		RequestHashList:            []string{"Hash11", "Hash12"},

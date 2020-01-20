@@ -56,6 +56,7 @@ const (
 	ViewChangedEvent
 
 	// 3.recovery
+	RecoveryInitEvent
 	RecoveryRestartTimerEvent
 	RecoveryDoneEvent
 	RecoverySyncStateRspTimerEvent

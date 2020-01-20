@@ -261,7 +261,13 @@ func (rbft *rbftImpl) start() error {
 	// start listen consensus event
 	go rbft.listenEvent()
 
-	rbft.initRecovery()
+	// NOTE!!! must use goroutine to post the event
+	// to avoid blocking the rbft service.
+	initRecoveryEvent := &LocalEvent{
+		Service:   RecoveryService,
+		EventType: RecoveryInitEvent,
+	}
+	go rbft.postMsg(initRecoveryEvent)
 
 	return nil
 }

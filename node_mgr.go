@@ -279,7 +279,6 @@ func (rbft *rbftImpl) sendAgreeUpdateNForAdd(newNodeInfo string, expectN uint64)
 // sendAgreeUpdateNForDel broadcasts the AgreeUpdateN message to other notify
 // that it agree update the View & N as deleting a node.
 func (rbft *rbftImpl) sendAgreeUpdateNForDel(delNodeInfo string) consensusEvent {
-
 	info := hex2Bytes(delNodeInfo)
 	peer := &pb.Peer{}
 	err := proto.Unmarshal(info, peer)
@@ -289,6 +288,12 @@ func (rbft *rbftImpl) sendAgreeUpdateNForDel(delNodeInfo string) consensusEvent 
 	}
 
 	rbft.logger.Debugf("Replica %d try to send agree updateN for delete node %d", rbft.no, peer.Id)
+
+	peerIndex, ok := rbft.peerPool.findRouterIndexByID(peer.Id)
+	if !ok {
+		rbft.logger.Debugf("Node %d is not in routing table, can't sent agree updateN", peer.Id)
+		return nil
+	}
 
 	if rbft.in(InUpdatingN) {
 		rbft.logger.Debugf("Replica %d already in updatingN, don't send agreeUpdateN again")
@@ -310,7 +315,7 @@ func (rbft *rbftImpl) sendAgreeUpdateNForDel(delNodeInfo string) consensusEvent 
 	rbft.setAbNormal()
 
 	// Calculate the new N and view
-	n, view := rbft.getDelNV(peer.Id)
+	n, view := rbft.getDelNV(peerIndex)
 	basis := rbft.getVcBasis()
 	// In add/delete node, view in vcBasis shouldn't be the current view because after
 	// UpdateN, view will always be changed.
@@ -659,7 +664,7 @@ func (rbft *rbftImpl) resetStateForUpdate() consensusEvent {
 	rbft.timerMgr.stopTimer(nullRequestTimer)
 
 	// Update the view, N and f
-	rbft.view = update.View
+	rbft.setView(update.View)
 	rbft.N = int(update.N)
 	rbft.f = (rbft.N - 1) / 3
 
@@ -801,7 +806,11 @@ func (rbft *rbftImpl) checkAgreeUpdateN(agree *pb.AgreeUpdateN) bool {
 
 	} else {
 		// Check the N and view after updating
-		delIndex := agree.Id
+		delIndex, ok := rbft.peerPool.findRouterIndexByID(agree.Id)
+		if !ok {
+			rbft.logger.Debugf("Node %d is not in routing table, can't sent agree updateN", agree.Id)
+			return false
+		}
 		n, view := rbft.getDelNV(delIndex)
 		if n != agree.N || view != agree.Basis.View {
 			rbft.logger.Debugf("Replica %d received incorrect agreeUpdateN: "+

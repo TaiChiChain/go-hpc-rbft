@@ -47,11 +47,6 @@ func (a sortableUint64List) Less(i, j int) bool {
 // helper functions for RBFT
 // =============================================================================
 
-// primaryIndex returns the expected primary index in routing table with the given view v
-func (rbft *rbftImpl) primaryIndex(v uint64) uint64 {
-	return (v % uint64(rbft.N)) + 1
-}
-
 // primaryID returns the expected primary id with the given view v
 func (rbft *rbftImpl) primaryID(v uint64) uint64 {
 	index := v % uint64(rbft.N)
@@ -106,20 +101,28 @@ func (rbft *rbftImpl) getAddNV() (n int64, v uint64) {
 }
 
 // getDelNV calculates the new N and view after delete a new node
-func (rbft *rbftImpl) getDelNV(del uint64) (n int64, v uint64) {
+func (rbft *rbftImpl) getDelNV(delIndex uint64) (n int64, v uint64) {
 	n = int64(rbft.N) - 1
 
-	rbft.logger.Debugf("Before update, N: %d, view: %d, delID: %d", rbft.N, rbft.view, del)
+	rbft.logger.Debugf("Before update, N: %d, view: %d, delIndex: %d", rbft.N, rbft.view, delIndex)
 
-	// guarantee seed larger than view
+	// guarantee seed is multiple of rbft.N-1 and larger than rbft.view
 	seed := uint64(rbft.N-1) * (rbft.view/uint64(rbft.N-1) + uint64(1))
-	if rbft.primaryIndex(rbft.view) > del {
+	primaryIndex := rbft.view % uint64(rbft.N)
+	// to ensure that the primary node does not change
+	if primaryIndex > delIndex {
 		v = rbft.view%uint64(rbft.N) - 1 + seed
 	} else {
 		v = rbft.view%uint64(rbft.N) + seed
 	}
-	rbft.logger.Debugf("After update, N: %d, view: %d", n, v)
 
+	// calculate the lowest view higher than rbft.view and keep the primary node does not change
+	newV := v - uint64(n)
+	for newV > rbft.view {
+		v = newV
+		newV = v - uint64(n)
+	}
+	rbft.logger.Debugf("After update, N: %d, view: %d", n, v)
 	return
 }
 
@@ -298,8 +301,10 @@ func (rbft *rbftImpl) isPrePrepareLegal(preprep *pb.PrePrepare) bool {
 	// replica rejects prePrepare sent from non-primary.
 	if !rbft.isPrimary(preprep.ReplicaId) {
 		from := rbft.peerPool.noMap[preprep.ReplicaId]
+		primaryID := rbft.primaryID(rbft.view)
+		primaryNo := rbft.peerPool.noMap[primaryID]
 		rbft.logger.Warningf("Replica %d received prePrepare from non-primary: got %d, should be %d",
-			rbft.no, from, rbft.primaryIndex(rbft.view))
+			rbft.no, from, primaryNo)
 		return false
 	}
 
@@ -605,8 +610,10 @@ func (rbft *rbftImpl) compareWholeStates(states wholeStates) consensusEvent {
 						"N=%d/view=%d, start normal consensus process.", rbft.no, rbft.N, rbft.view)
 
 					rbft.off(isNewNode)
+					primaryID := rbft.primaryID(rbft.view)
+					primaryNo := rbft.peerPool.noMap[primaryID]
 					rbft.logger.Noticef("======== Replica %d finished updateN, primary=%d, n=%d/f=%d/view=%d/h=%d",
-						rbft.no, rbft.primaryIndex(rbft.view), rbft.N, rbft.f, rbft.view, rbft.h)
+						rbft.no, primaryNo, rbft.N, rbft.f, rbft.view, rbft.h)
 				}
 			} else {
 				// if current node finds itself become primary, but quorum other replicas

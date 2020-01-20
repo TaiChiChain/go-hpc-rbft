@@ -123,9 +123,9 @@ func TestBatchMgr_findNextCommitBatch(t *testing.T) {
 	rbft.storeMgr.certStore[msgIDTmp] = certTmp
 
 	// When view is incorrect, exit with nil, without any change
-	rbft.view = 1
+	rbft.setView(1)
 	assert.Nil(t, rbft.findNextCommitBatch("msg", 0, 20))
-	rbft.view = 0
+	rbft.setView(0)
 
 	// When prePrepare is nil, exit with nil, without any change
 	assert.Nil(t, rbft.findNextCommitBatch("msg", 0, 20))
@@ -185,7 +185,7 @@ func TestBatchMgr_findNextCommitBatch(t *testing.T) {
 		commit:      map[pb.Commit]bool{commitTmpNil: true},
 		sentExecute: false,
 	}
-	rbft.view = 0
+	rbft.setView(0)
 	rbft.storeMgr.certStore[msgIDTmpNil] = certTmpNil
 	rbft.storeMgr.certStore[msgIDTmpNil].sentCommit = false
 	_ = rbft.findNextCommitBatch("", 0, 30)

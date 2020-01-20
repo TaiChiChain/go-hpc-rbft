@@ -111,7 +111,8 @@ func (rbft *rbftImpl) sendNotification(keepCurrentVote bool) consensusEvent {
 
 	// increase view according to what we predicate as next primary.
 	if !keepCurrentVote {
-		rbft.view++
+		newView := rbft.view + uint64(1)
+		rbft.setView(newView)
 	}
 	delete(rbft.vcMgr.newViewStore, rbft.view)
 
@@ -208,7 +209,8 @@ func (rbft *rbftImpl) recvNotification(n *pb.Notification) consensusEvent {
 	if len(replicas) >= rbft.oneCorrectQuorum() {
 		rbft.logger.Infof("Replica %d received f+1 notification messages whose view is greater than "+
 			"current view %d, detailed: %v, sending notification for view %d", rbft.no, rbft.view, replicas, minView)
-		rbft.view = minView - 1
+		newView := minView - uint64(1)
+		rbft.setView(newView)
 		return rbft.initRecovery()
 	}
 

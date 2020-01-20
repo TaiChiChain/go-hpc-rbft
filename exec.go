@@ -164,6 +164,9 @@ func (rbft *rbftImpl) handleCoreRbftEvent(e *LocalEvent) consensusEvent {
 // handleRecoveryEvent handles recovery services related events.
 func (rbft *rbftImpl) handleRecoveryEvent(e *LocalEvent) consensusEvent {
 	switch e.EventType {
+	case RecoveryInitEvent:
+		rbft.initRecovery()
+		return nil
 	case RecoveryDoneEvent:
 		rbft.off(InRecovery)
 		rbft.recoveryMgr.recoveryHandled = false
@@ -276,13 +279,14 @@ func (rbft *rbftImpl) handleViewChangeEvent(e *LocalEvent) consensusEvent {
 
 		rbft.startTimerIfOutstandingRequests()
 		rbft.storeMgr.missingReqBatches = make(map[string]bool)
-		primary := rbft.primaryIndex(rbft.view)
+		primaryID := rbft.primaryID(rbft.view)
+		primaryNo := rbft.peerPool.noMap[primaryID]
 
 		// set normal to 1 which indicates system comes into normal status after viewchange
 		rbft.off(InViewChange)
 		rbft.maybeSetNormal()
-		rbft.logger.Noticef("======== Replica %d finished viewChange, primary=%d, view=%d/height=%d", rbft.no, primary, rbft.view, rbft.exec.lastExec)
-		finishMsg := fmt.Sprintf("Replica %d finished viewChange, primary=%d, view=%d/height=%d", rbft.no, primary, rbft.view, rbft.exec.lastExec)
+		rbft.logger.Noticef("======== Replica %d finished viewChange, primary=%d, view=%d/height=%d", rbft.no, primaryNo, rbft.view, rbft.exec.lastExec)
+		finishMsg := fmt.Sprintf("Replica %d finished viewChange, primary=%d, view=%d/height=%d", rbft.no, primaryNo, rbft.view, rbft.exec.lastExec)
 
 		// send viewchange result to web socket API
 		rbft.external.SendFilterEvent(pb.InformType_FilterFinishViewChange, finishMsg)
@@ -305,7 +309,8 @@ func (rbft *rbftImpl) handleViewChangeEvent(e *LocalEvent) consensusEvent {
 
 		// if viewChange resend timer expired, directly enter recovery status,
 		// decrease view first as we may increase view when send notification.
-		rbft.view--
+		newView := rbft.view - uint64(1)
+		rbft.setView(newView)
 
 		return rbft.initRecovery()
 
@@ -357,17 +362,19 @@ func (rbft *rbftImpl) handleNodeMgrEvent(e *LocalEvent) consensusEvent {
 		rbft.stopUpdateTimer()
 		rbft.maybeSetNormal()
 
+		primaryID := rbft.primaryID(rbft.view)
+		primaryNo := rbft.peerPool.noMap[primaryID]
 		if rbft.no == 0 {
-			rbft.logger.Noticef("======== New Replica finished updateN, primary=%d, n=%d/f=%d/view=%d/h=%d", rbft.primaryIndex(rbft.view), rbft.N, rbft.f, rbft.view, rbft.h)
+			rbft.logger.Noticef("======== New Replica finished updateN, primary=%d, n=%d/f=%d/view=%d/h=%d", primaryNo, rbft.N, rbft.f, rbft.view, rbft.h)
 		} else {
-			rbft.logger.Noticef("======== Replica %d finished updateN, primary=%d, n=%d/f=%d/view=%d/h=%d", rbft.no, rbft.primaryIndex(rbft.view), rbft.N, rbft.f, rbft.view, rbft.h)
+			rbft.logger.Noticef("======== Replica %d finished updateN, primary=%d, n=%d/f=%d/view=%d/h=%d", rbft.no, primaryNo, rbft.N, rbft.f, rbft.view, rbft.h)
 		}
 
 		var finishMsg interface{}
 		if rbft.no == 0 {
-			finishMsg = fmt.Sprintf("======== New Replica finished updateN, primary=%d, n=%d/f=%d/view=%d/h=%d", rbft.primaryIndex(rbft.view), rbft.N, rbft.f, rbft.view, rbft.h)
+			finishMsg = fmt.Sprintf("======== New Replica finished updateN, primary=%d, n=%d/f=%d/view=%d/h=%d", primaryNo, rbft.N, rbft.f, rbft.view, rbft.h)
 		} else {
-			finishMsg = fmt.Sprintf("======== Replica %d finished updateN, primary=%d, n=%d/f=%d/view=%d/h=%d", rbft.no, rbft.primaryIndex(rbft.view), rbft.N, rbft.f, rbft.view, rbft.h)
+			finishMsg = fmt.Sprintf("======== Replica %d finished updateN, primary=%d, n=%d/f=%d/view=%d/h=%d", rbft.no, primaryNo, rbft.N, rbft.f, rbft.view, rbft.h)
 		}
 		rbft.external.SendFilterEvent(pb.InformType_FilterFinishUpdateN, finishMsg)
 		rbft.primaryResubmitTransactions()

@@ -97,7 +97,8 @@ func TestExec_dispatchConsensusMsg(t *testing.T) {
 	assert.Nil(t, rbft.dispatchConsensusMsg(e))
 	assert.Equal(t, uint64(1), rbft.view)
 	rbft.off(InViewChange)
-	rbft.view--
+	newView := rbft.view - uint64(1)
+	rbft.setView(newView)
 
 	// Test for NodeMgrMsg of recv - change rbft.nodeMgr.agreeUpdateStore
 	rbft.off(InRecovery)
@@ -158,7 +159,8 @@ func TestExec_dispatchLocalEvent(t *testing.T) {
 	assert.Equal(t, uint64(0), rbft.view)
 	assert.Nil(t, rbft.dispatchLocalEvent(e))
 	assert.Equal(t, uint64(1), rbft.view)
-	rbft.view--
+	newView := rbft.view - uint64(1)
+	rbft.setView(newView)
 
 	// Send NodeMgr Msg - rbft.nodeMgr.updateHandled from true to false
 	e.Service = NodeMgrService
@@ -221,7 +223,8 @@ func TestExec_handleCoreRbftEvent(t *testing.T) {
 	assert.Equal(t, uint64(0), rbft.view)
 	assert.Nil(t, rbft.handleCoreRbftEvent(e))
 	assert.Equal(t, uint64(1), rbft.view)
-	rbft.view--
+	newView := rbft.view - uint64(1)
+	rbft.setView(newView)
 
 	// First Req to a ViewChange
 	rbft.peerPool.localID = uint64(1)
@@ -229,7 +232,8 @@ func TestExec_handleCoreRbftEvent(t *testing.T) {
 	assert.Equal(t, uint64(0), rbft.view)
 	assert.Nil(t, rbft.handleCoreRbftEvent(e))
 	assert.Equal(t, uint64(1), rbft.view)
-	rbft.view--
+	newView = rbft.view - uint64(1)
+	rbft.setView(newView)
 
 	// Trigger processOutOfDateReqs
 	// Check the pool is not full
@@ -370,20 +374,21 @@ func TestExec_handleViewChangeEvent(t *testing.T) {
 	e.Event = nextDemandNewView(uint64(1))
 	rbft.handleViewChangeEvent(e)
 	assert.Equal(t, uint64(1), rbft.view)
-	rbft.view--
+	newView := rbft.view - uint64(1)
+	rbft.setView(newView)
 
-	rbft.view = 10
+	rbft.setView(10)
 	rbft.handleViewChangeEvent(e)
 	assert.Equal(t, uint64(10), rbft.view)
 
-	rbft.view = 0
+	rbft.setView(0)
 	rbft.on(InRecovery)
 	rbft.on(InViewChange)
 	rbft.handleViewChangeEvent(e)
 	assert.Equal(t, false, rbft.in(InViewChange))
 
 	e.EventType = ViewChangedEvent
-	rbft.view = 0
+	rbft.setView(0)
 	rbft.off(InRecovery)
 	rbft.on(InViewChange)
 	rbft.handleViewChangeEvent(e)
