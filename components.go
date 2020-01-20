@@ -48,7 +48,6 @@ const (
 	CoreStateUpdatedEvent
 	CoreResendMissingTxsEvent
 	CoreResendFetchMissingEvent
-	CoreUpdateConfStateEvent
 
 	// 2.view change
 	ViewChangeTimerEvent

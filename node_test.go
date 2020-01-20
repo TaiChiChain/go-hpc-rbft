@@ -333,17 +333,8 @@ func TestNode_ApplyConfChange(t *testing.T) {
 
 	r := &pb.Router{Peers: peerSet}
 	cc := &pb.ConfState{QuorumRouter: r}
-	expMsg := &LocalEvent{
-		Service:   CoreRbftService,
-		EventType: CoreUpdateConfStateEvent,
-		Event:     cc,
-	}
-
-	go func() {
-		n.ApplyConfChange(cc)
-		obj := <-n.rbft.recvChan
-		assert.Equal(t, expMsg, obj)
-	}()
+	n.ApplyConfChange(cc)
+	assert.Equal(t, len(peerSet), len(n.rbft.peerPool.router.Peers))
 }
 
 func TestNode_ReportExecuted(t *testing.T) {
