@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.1.8"></a>
+## [0.1.8](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.1.7...v0.1.8) (2020-02-04)
+
+
+### Bug Fixes
+
+* **helper.go:** fix the function to check if current node is primary or not ([b780c21](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/b780c21)), closes [#flato-1060](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-1060)
+
+
+
 <a name="0.1.7"></a>
 ## [0.1.7](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.1.6...v0.1.7) (2020-01-20)
 
