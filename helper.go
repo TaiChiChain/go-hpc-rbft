@@ -60,8 +60,10 @@ func (rbft *rbftImpl) primaryID(v uint64) uint64 {
 
 // isPrimary returns if current node is primary or not
 func (rbft *rbftImpl) isPrimary(id uint64) bool {
-	// for node with no id in routers(such as a new node), directly return false.
-	if id > uint64(len(rbft.peerPool.router.Peers)) {
+	// new node cannot become a primary node, directly return false.
+	if rbft.in(isNewNode) && id == rbft.peerPool.localID {
+		rbft.logger.Debugf("New node cannot become a primary node, no=%d/view=%d/ID=%d",
+			rbft.no, rbft.view, rbft.peerPool.localID)
 		return false
 	}
 	return rbft.primaryID(rbft.view) == id
