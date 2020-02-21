@@ -118,10 +118,16 @@ func (pool *peerPool) updateDelNode(delNodeID uint64, delNodeInfo []byte) {
 	pool.network.UpdateTable(cc)
 }
 
-func (pool *peerPool) updateRouter(quorumRouter []byte) {
+func (pool *peerPool) updateRouter(quorumRouter []byte, quorumSameReplicas []uint64) {
+	verifiedReplica := make(map[uint64]bool)
+	for _, id := range quorumSameReplicas {
+		verifiedReplica[id] = true
+	}
+
 	cc := &pb.ConfChange{
-		Type:    pb.ConfChangeType_ConfChangeUpdateNode,
-		Context: quorumRouter,
+		VerifiedReplica: verifiedReplica,
+		Type:            pb.ConfChangeType_ConfChangeUpdateNode,
+		Context:         quorumRouter,
 	}
 	pool.network.UpdateTable(cc)
 }

@@ -254,6 +254,7 @@ message conf_change {
     uint64 NodeID = 1;
     conf_change_type type = 2;
     bytes context = 3;
+    map<uint64,bool> verified_replica = 4;
 }
 
 message conf_state {
