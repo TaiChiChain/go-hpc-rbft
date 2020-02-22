@@ -195,7 +195,7 @@ func (rbft *rbftImpl) sendAgreeUpdateNForAdd(newNodeInfo string, expectN uint64)
 	rbft.logger.Debugf("Replica %d try to send agree updateN for add", rbft.no)
 
 	if rbft.in(InUpdatingN) {
-		rbft.logger.Debugf("Replica %d already in updatingN, don't send agreeUpdateN again")
+		rbft.logger.Debugf("Replica %d already in updatingN, don't send agreeUpdateN again", rbft.no)
 		return nil
 	}
 

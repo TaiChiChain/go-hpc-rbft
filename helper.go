@@ -528,7 +528,7 @@ func (rbft *rbftImpl) compareWholeStates(states wholeStates) consensusEvent {
 			if !rbft.in(isNewNode) && !bytes.Equal(quorumInfo, selfInfo) {
 				rbft.logger.Warningf("Replica %d finds quorum routing table which is different "+
 					"from self's, pending updating routing table", rbft.no)
-				rbft.peerPool.updateRouter(quorumInfo)
+				rbft.peerPool.updateRouter(quorumInfo, sameRespCount[quorumResp])
 			}
 			break
 		}
@@ -603,7 +603,7 @@ func (rbft *rbftImpl) compareWholeStates(states wholeStates) consensusEvent {
 					}
 				}
 
-				rbft.peerPool.updateRouter(quorumInfo)
+				rbft.peerPool.updateRouter(quorumInfo, sameRespCount[quorumResp])
 				// If new node find itself needs to updateN which must be caused by timeout
 				// event in adding node, check if quorum nodes have agree admittance of myself,
 				// if not, resend readyForN request after recovery.
