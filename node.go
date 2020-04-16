@@ -64,6 +64,10 @@ type ServiceInbound interface {
 	// Users must ReportStateUpdated after RBFT core invoked StateUpdate request no matter this request was
 	// finished successfully or not, otherwise, RBFT core will enter abnormal status infinitely.
 	ReportStateUpdated(state *pb.ServiceState)
+
+	// ReportRouterUpdated report router updated:
+	// If validator set was changed after reload, service reports the latest router info to RBFT by ReportRouterUpdated
+	ReportRouterUpdated(router *pb.Router)
 }
 
 // node implements the Node interface and track application service synchronously to help RBFT core
@@ -78,6 +82,12 @@ type node struct {
 	cpChan chan *pb.ServiceState
 	// stateLock is used to ensure mutually exclusive access of currentState.
 	stateLock sync.Mutex
+	// confChan is used to check ctx was executed
+	confChan chan bool
+	// reloadRouter is used to store router info send from reload temporarily
+	reloadRouter *pb.Router
+	// mutex to set value of reloadRouter
+	reloadRouterLock sync.RWMutex
 
 	config Config
 	logger Logger
@@ -91,17 +101,20 @@ func NewNode(conf Config) (Node, error) {
 // newNode help to initializes a Node service.
 func newNode(conf Config) (*node, error) {
 	cpChan := make(chan *pb.ServiceState)
+	confC := make(chan bool)
 
-	rbft, err := newRBFT(cpChan, conf)
+	rbft, err := newRBFT(cpChan, confC, conf)
 	if err != nil {
 		return nil, err
 	}
 
 	n := &node{
-		rbft:   rbft,
-		cpChan: cpChan,
-		config: conf,
-		logger: conf.Logger,
+		rbft:         rbft,
+		cpChan:       cpChan,
+		confChan:     confC,
+		config:       conf,
+		logger:       conf.Logger,
+		reloadRouter: nil,
 	}
 
 	rbft.node = n
@@ -141,16 +154,11 @@ func (n *node) Propose(requests []*protos.Transaction) error {
 // Application needs to call ApplyConfChange when applying EntryConfChange type entry.
 func (n *node) ProposeConfChange(cc *pb.ConfChange) error {
 	switch cc.Type {
-	case pb.ConfChangeType_ConfChangeRemoveNode:
-		n.rbft.removeNode(cc.NodeID)
-
 	default:
 		n.logger.Errorf("Invalid Config Change Propose")
 		err := errors.New("invalid confChange propose")
 		return err
 	}
-
-	return nil
 }
 
 // Step advances the state machine using the given message.
@@ -183,8 +191,17 @@ func (n *node) ReportExecuted(state *pb.ServiceState) {
 	n.logger.Debugf("Update service state: %+v", state)
 	n.currentState = state
 
+	// when there is a config transaction is waiting executed:
+	// 1. not in checkpoint: send executed message by confChan
+	// 2. else in checkpoint: send executed message by cpChan
+	if n.rbft.readConfigTransactionToExecute() == state.Applied && state.Applied%n.config.K != 0 {
+		n.logger.Debugf("Report config tx executed: {%d, %s} to RBFT core", state.Applied, state.Digest)
+		n.confChan <- true
+		return
+	}
+
 	if state.Applied%n.config.K == 0 {
-		n.logger.Debugf("Report checkpoint: %d to RBFT core", state.Applied)
+		n.logger.Debugf("Report checkpoint: {%d, %s} to RBFT core", state.Applied, state.Digest)
 		n.cpChan <- state
 	}
 }
@@ -201,7 +218,12 @@ func (n *node) ReportStateUpdated(state *pb.ServiceState) {
 			"larger than current state, received: %+v, current state: %+v", state, n.currentState)
 	}
 	n.currentState = state
-	n.rbft.reportStateUpdated(state.Applied)
+	n.rbft.reportStateUpdated(state)
+}
+
+// ReportRouterUpdated report router updated
+func (n *node) ReportRouterUpdated(router *pb.Router) {
+	n.setReloadRouter(router)
 }
 
 // Status returns the current node status of the RBFT state machine.
@@ -214,4 +236,16 @@ func (n *node) getCurrentState() *pb.ServiceState {
 	n.stateLock.Lock()
 	defer n.stateLock.Unlock()
 	return n.currentState
+}
+
+func (n *node) setReloadRouter(router *pb.Router) {
+	n.reloadRouterLock.Lock()
+	defer n.reloadRouterLock.Unlock()
+	n.reloadRouter = router
+}
+
+func (n *node) readReloadRouter() *pb.Router {
+	n.reloadRouterLock.RLock()
+	defer n.reloadRouterLock.RUnlock()
+	return n.reloadRouter
 }

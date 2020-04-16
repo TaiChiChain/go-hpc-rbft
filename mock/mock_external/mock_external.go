@@ -157,6 +157,20 @@ func (mr *MockNetworkMockRecorder) Unicast(msg, to interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Unicast", reflect.TypeOf((*MockNetwork)(nil).Unicast), msg, to)
 }
 
+// UnicastByHash mocks base method
+func (m *MockNetwork) UnicastByHash(msg *rbftpb.ConsensusMessage, to string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UnicastByHash", msg, to)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UnicastByHash indicates an expected call of UnicastByHash
+func (mr *MockNetworkMockRecorder) UnicastByHash(msg, to interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UnicastByHash", reflect.TypeOf((*MockNetwork)(nil).UnicastByHash), msg, to)
+}
+
 // UpdateTable mocks base method
 func (m *MockNetwork) UpdateTable(change *rbftpb.ConfChange) {
 	m.ctrl.T.Helper()
@@ -406,6 +420,20 @@ func (m *MockExternalStack) Unicast(msg *rbftpb.ConsensusMessage, to uint64) err
 func (mr *MockExternalStackMockRecorder) Unicast(msg, to interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Unicast", reflect.TypeOf((*MockExternalStack)(nil).Unicast), msg, to)
+}
+
+// UnicastByHash mocks base method
+func (m *MockExternalStack) UnicastByHash(msg *rbftpb.ConsensusMessage, to string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UnicastByHash", msg, to)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UnicastByHash indicates an expected call of UnicastByHash
+func (mr *MockExternalStackMockRecorder) UnicastByHash(msg, to interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UnicastByHash", reflect.TypeOf((*MockExternalStack)(nil).UnicastByHash), msg, to)
 }
 
 // UpdateTable mocks base method

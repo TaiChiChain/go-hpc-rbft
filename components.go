@@ -34,8 +34,8 @@ const (
 	syncStateRestartTimer = "syncStateRestartTimer" // timer track timeout for restart sync-state
 	recoveryRestartTimer  = "recoveryRestartTimer"  // timer track how long a recovery is finished and fires if needed
 	cleanViewChangeTimer  = "cleanViewChangeTimer"  // timer track how long a viewchange msg will store in memory
-	updateTimer           = "updateTimer"           // timer track how long a add/delete node process will take
 	checkPoolTimer        = "checkPoolTimer"        // timer track timeout for check pool interval
+	epochCheckRspTimer    = "epochCheckTimer"       // timer track how long a check epoch process will take
 )
 
 // event type
@@ -63,11 +63,11 @@ const (
 	RecoverySyncStateRestartTimerEvent
 	NotificationQuorumEvent
 
-	// 4.node mgr service
-	NodeMgrDelNodeEvent
-	NodeMgrAgreeUpdateQuorumEvent
-	NodeMgrUpdatedEvent
-	NodeMgrUpdateTimerEvent
+	// 4.epoch mgr service
+	EpochCheckTimerEvent
+	EpochCheckDoneEvent
+	EpochSyncFinishedEvent
+	EpochSyncDoneEvent
 )
 
 // service type
@@ -75,8 +75,8 @@ const (
 	CoreRbftService = iota
 	ViewChangeService
 	RecoveryService
-	NodeMgrService
 	NotSupportService
+	EpochMgrService
 )
 
 // LocalEvent represents event sent by local modules
@@ -124,13 +124,14 @@ type ntfIdx struct {
 type nodeState struct {
 	n            uint64
 	view         uint64
-	routerInfo   string
+	epoch        uint64
 	appliedIndex uint64
 	digest       string
+	routerInfo   string
 }
 
 // wholeStates maps node ID to nodeState
-type wholeStates map[uint64]nodeState
+type wholeStates map[*pb.NodeInfo]nodeState
 
 // -----------viewchange related structs-----------------
 // viewchange index
@@ -142,24 +143,6 @@ type vcIdx struct {
 type xset map[uint64]string
 
 type nextDemandNewView uint64
-
-// -----------node add/deletion related structs-----------------
-
-// agreeUpdateStore index
-type aidx struct {
-	v    uint64
-	n    int64
-	flag bool   // add or delete
-	id   uint64 // replica id
-}
-
-// track the new view after update
-type uidx struct {
-	v    uint64
-	n    int64
-	flag bool   // add or delete
-	id   uint64 // target node's id
-}
 
 // -----------state update related structs-----------------
 type targetMessage struct {

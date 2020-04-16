@@ -21,6 +21,7 @@ func TestStoreMgr_newStoreMgr(t *testing.T) {
 
 	conf := Config{
 		ID:                      2,
+		Hash:                    "node2",
 		IsNew:                   false,
 		Peers:                   peerSet,
 		K:                       10,
@@ -63,6 +64,7 @@ func TestStoreMgr_moveWatermarks(t *testing.T) {
 
 	conf := Config{
 		ID:                      2,
+		Hash:                    "node2",
 		IsNew:                   false,
 		Peers:                   peerSet,
 		K:                       10,
@@ -89,7 +91,8 @@ func TestStoreMgr_moveWatermarks(t *testing.T) {
 
 	s := newStoreMgr(conf)
 	cpChan := make(chan *pb.ServiceState)
-	rbft, _ := newRBFT(cpChan, conf)
+	confC := make(chan bool)
+	rbft, _ := newRBFT(cpChan, confC, conf)
 
 	QID := qidx{
 		d: "useless",
@@ -120,6 +123,7 @@ func TestStoreMgr_saveCheckpoint(t *testing.T) {
 
 	conf := Config{
 		ID:                      2,
+		Hash:                    "node2",
 		IsNew:                   false,
 		Peers:                   peerSet,
 		K:                       10,
@@ -159,6 +163,7 @@ func TestStoreMgr_getCert(t *testing.T) {
 
 	conf := Config{
 		ID:                      2,
+		Hash:                    "node2",
 		IsNew:                   false,
 		Peers:                   peerSet,
 		K:                       10,
@@ -226,6 +231,7 @@ func TestStoreMgr_existedDigest(t *testing.T) {
 
 	conf := Config{
 		ID:                      2,
+		Hash:                    "node2",
 		IsNew:                   false,
 		Peers:                   peerSet,
 		K:                       10,

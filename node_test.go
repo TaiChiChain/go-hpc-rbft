@@ -23,6 +23,7 @@ func TestNode_NewNode(t *testing.T) {
 
 	conf := Config{
 		ID:                      2,
+		Hash:                    "node2",
 		IsNew:                   false,
 		Peers:                   peerSet,
 		K:                       10,
@@ -72,6 +73,7 @@ func TestNode_Start(t *testing.T) {
 
 	conf := Config{
 		ID:                      2,
+		Hash:                    "node2",
 		IsNew:                   false,
 		Peers:                   peerSet,
 		K:                       10,
@@ -98,6 +100,11 @@ func TestNode_Start(t *testing.T) {
 	n, _ := newNode(conf)
 	n.rbft.on(Pending)
 
+	n.currentState = &pb.ServiceState{
+		Applied: uint64(0),
+		Digest:  "GENESIS XXX",
+		VSet:    nil,
+	}
 	// Test Normal Case
 	_ = n.Start()
 	assert.Equal(t, false, n.rbft.in(Pending))
@@ -112,6 +119,7 @@ func TestNode_Stop(t *testing.T) {
 
 	conf := Config{
 		ID:                      2,
+		Hash:                    "node2",
 		IsNew:                   false,
 		Peers:                   peerSet,
 		K:                       10,
@@ -151,6 +159,7 @@ func TestNode_Propose(t *testing.T) {
 
 	conf := Config{
 		ID:                      2,
+		Hash:                    "node2",
 		IsNew:                   false,
 		Peers:                   peerSet,
 		K:                       10,
@@ -188,64 +197,6 @@ func TestNode_Propose(t *testing.T) {
 	}()
 }
 
-func TestNode_ProposeConfChange(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	log := NewRawLogger()
-	external := mockexternal.NewMockMinimalExternal(ctrl)
-	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
-
-	conf := Config{
-		ID:                      2,
-		IsNew:                   false,
-		Peers:                   peerSet,
-		K:                       10,
-		LogMultiplier:           4,
-		SetSize:                 25,
-		SetTimeout:              100 * time.Millisecond,
-		BatchTimeout:            500 * time.Millisecond,
-		RequestTimeout:          6 * time.Second,
-		NullRequestTimeout:      9 * time.Second,
-		VcResendTimeout:         10 * time.Second,
-		CleanVCTimeout:          60 * time.Second,
-		NewViewTimeout:          8 * time.Second,
-		FirstRequestTimeout:     30 * time.Second,
-		SyncStateTimeout:        1 * time.Second,
-		SyncStateRestartTimeout: 10 * time.Second,
-		RecoveryTimeout:         10 * time.Second,
-		UpdateTimeout:           4 * time.Second,
-		CheckPoolTimeout:        3 * time.Minute,
-
-		Logger:      log,
-		External:    external,
-		RequestPool: pool,
-	}
-	n, _ := newNode(conf)
-
-	go func() {
-		ccRemove := &pb.ConfChange{
-			NodeID:  3,
-			Type:    pb.ConfChangeType_ConfChangeRemoveNode,
-			Context: []byte("blank"),
-		}
-		deleteEvent := &LocalEvent{
-			Service:   NodeMgrService,
-			EventType: NodeMgrDelNodeEvent,
-			Event:     uint64(3),
-		}
-		_ = n.ProposeConfChange(ccRemove)
-		obj := <-n.rbft.recvChan
-		assert.Equal(t, deleteEvent, obj)
-	}()
-
-	ccDefault := &pb.ConfChange{
-		NodeID:  3,
-		Type:    pb.ConfChangeType_ConfChangeAddNode,
-		Context: []byte("blank"),
-	}
-	assert.Equal(t, errors.New("invalid confChange propose"), n.ProposeConfChange(ccDefault))
-}
-
 func TestNode_Step(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -255,6 +206,7 @@ func TestNode_Step(t *testing.T) {
 
 	conf := Config{
 		ID:                      2,
+		Hash:                    "node2",
 		IsNew:                   false,
 		Peers:                   peerSet,
 		K:                       10,
@@ -306,6 +258,7 @@ func TestNode_ApplyConfChange(t *testing.T) {
 
 	conf := Config{
 		ID:                      2,
+		Hash:                    "node2",
 		IsNew:                   false,
 		Peers:                   peerSet,
 		K:                       10,
@@ -346,6 +299,7 @@ func TestNode_ReportExecuted(t *testing.T) {
 
 	conf := Config{
 		ID:                      2,
+		Hash:                    "node2",
 		IsNew:                   false,
 		Peers:                   peerSet,
 		K:                       10,
@@ -414,6 +368,7 @@ func TestNode_ReportStateUpdated(t *testing.T) {
 
 	conf := Config{
 		ID:                      2,
+		Hash:                    "node2",
 		IsNew:                   false,
 		Peers:                   peerSet,
 		K:                       10,
@@ -470,6 +425,7 @@ func TestNode_getCurrentState(t *testing.T) {
 
 	conf := Config{
 		ID:                      2,
+		Hash:                    "node2",
 		IsNew:                   false,
 		Peers:                   peerSet,
 		K:                       10,

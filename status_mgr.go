@@ -30,8 +30,12 @@ const (
 	StateTransferring
 	NeedSyncState
 	InSyncState
+	InConfChange
+	InEpochCheck
+	InEpochSync
 	PoolFull
 
+	oneRoundOfEpochSync
 	isNewNode
 	byzantine
 )
@@ -40,6 +44,7 @@ const (
 type NodeStatus struct {
 	ID     uint64
 	View   uint64
+	H      uint64
 	Status StatusType
 }
 
@@ -119,11 +124,11 @@ func (rbft *rbftImpl) setNormal() {
 
 // maybeSetNormal checks if system is in normal or not, if in normal, set status to normal.
 func (rbft *rbftImpl) maybeSetNormal() {
-	if !rbft.inOne(InRecovery, InUpdatingN, InViewChange, StateTransferring, Pending) {
+	if !rbft.inOne(InRecovery, InViewChange, InEpochSync, SkipInProgress, Pending) {
 		rbft.setNormal()
 		rbft.startCheckPoolTimer()
 	} else {
-		rbft.logger.Debugf("Replica %d not set normal as it's still in abnormal now.", rbft.no)
+		rbft.logger.Debugf("Replica %d not set normal as it's still in abnormal now.", rbft.peerPool.localID)
 	}
 }
 
