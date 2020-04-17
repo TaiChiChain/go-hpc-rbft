@@ -1,4 +1,4 @@
-package mockrbft
+package mocknode
 
 import "github.com/golang/mock/gomock"
 
@@ -18,5 +18,6 @@ func NewMockMinimalNode(ctrl *gomock.Controller) *MockNode {
 	mock.EXPECT().Stop().Return().AnyTimes()
 	mock.EXPECT().ReportExecuted(gomock.Any()).Return().AnyTimes()
 	mock.EXPECT().ReportStateUpdated(gomock.Any()).Return().AnyTimes()
+	mock.EXPECT().ReportRouterUpdated(gomock.Any()).Return().AnyTimes()
 	return mock
 }

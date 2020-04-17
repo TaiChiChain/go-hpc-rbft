@@ -17,7 +17,6 @@ package rbft
 import (
 	"github.com/ultramesh/flato-rbft/external"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
-	"sync"
 
 	"github.com/gogo/protobuf/proto"
 )
@@ -26,21 +25,19 @@ import (
 // router is the consensus network routing table which will be compared in syncState to ensure
 // every node has the latest peer list.
 type peerPool struct {
-	localID uint64 // track local node's ID
-	self    *pb.Peer
-	router  *pb.Router        // track the vp replicas' routers
-	noMap   map[uint64]uint64 // map node's actual id to rbft.no
-	lock    sync.RWMutex
-	network external.Network // network helper to broadcast/unicast messages.
-	logger  Logger
+	localID   uint64           // track local node's ID
+	localHash string           // track local node's Hash
+	router    *pb.Router       // track the vp replicas' routers
+	network   external.Network // network helper to broadcast/unicast messages.
+	logger    Logger
 }
 
 func newPeerPool(c Config) *peerPool {
 	pool := &peerPool{
-		localID: c.ID,
-		noMap:   make(map[uint64]uint64),
-		network: c.External,
-		logger:  c.Logger,
+		localID:   c.ID,
+		localHash: c.Hash,
+		network:   c.External,
+		logger:    c.Logger,
 	}
 	pool.initPeers(c.Peers)
 
@@ -49,20 +46,24 @@ func newPeerPool(c Config) *peerPool {
 
 func (pool *peerPool) initPeers(peers []*pb.Peer) {
 	pool.logger.Infof("Local ID: %d, update routers:", pool.localID)
-	pool.self = nil
-	pool.lock.Lock()
-	defer pool.lock.Unlock()
-	pool.noMap = make(map[uint64]uint64)
+	length := len(peers)
 	pool.router = &pb.Router{
-		Peers: make([]*pb.Peer, 0),
+		Peers: make([]*pb.Peer, length),
 	}
-	for i, p := range peers {
-		if p.Id == pool.localID {
-			pool.self = p
+	preID := pool.localID
+	for index, p := range peers {
+		if index >= length {
+			pool.logger.Errorf("Wrong length of peers, out of range: len=%d", length)
+			return
 		}
-		pool.noMap[p.Id] = uint64(i + 1)
-		pool.logger.Infof("ID: %d ===> no: %d, context: %s", p.Id, i+1, p.Context)
-		pool.router.Peers = append(pool.router.Peers, p)
+		if p.Hash == pool.localHash {
+			pool.localID = p.Id
+		}
+		pool.logger.Infof("ID: %d, Hash: %s, Hostname: %s", p.Id, p.Hash, p.Hostname)
+		pool.router.Peers[index] = p
+	}
+	if preID != pool.localID {
+		pool.logger.Infof("Update Local ID: %d ===> %d", preID, pool.localID)
 	}
 }
 
@@ -71,63 +72,10 @@ func (pool *peerPool) serializeRouterInfo() []byte {
 	return info
 }
 
-func (pool *peerPool) unSerializeRouterInfo(info []byte) *pb.Router {
-	router := &pb.Router{}
-	_ = proto.Unmarshal(info, router)
-	return router
-}
-
-func (pool *peerPool) getSelfInfo() []byte {
-	info, _ := proto.Marshal(pool.self)
-	return info
-}
-
-func (pool *peerPool) isInRoutingTable(id uint64) bool {
-	for _, peer := range pool.router.Peers {
-		if peer.Id == id {
-			return true
-		}
-	}
-	return false
-}
-
-func (pool *peerPool) getPeerByID(id uint64) *pb.Peer {
-	for _, peer := range pool.router.Peers {
-		if peer.Id == id {
-			return peer
-		}
-	}
-	return nil
-}
-
-func (pool *peerPool) updateAddNode(newNodeID uint64, newNodeInfo []byte) {
+func (pool *peerPool) updateRouter(quorumRouter []byte) {
 	cc := &pb.ConfChange{
-		NodeID:  newNodeID,
-		Type:    pb.ConfChangeType_ConfChangeAddNode,
-		Context: newNodeInfo,
-	}
-	pool.network.UpdateTable(cc)
-}
-
-func (pool *peerPool) updateDelNode(delNodeID uint64, delNodeInfo []byte) {
-	cc := &pb.ConfChange{
-		NodeID:  delNodeID,
-		Type:    pb.ConfChangeType_ConfChangeRemoveNode,
-		Context: delNodeInfo,
-	}
-	pool.network.UpdateTable(cc)
-}
-
-func (pool *peerPool) updateRouter(quorumRouter []byte, quorumSameReplicas []uint64) {
-	verifiedReplica := make(map[uint64]bool)
-	for _, id := range quorumSameReplicas {
-		verifiedReplica[id] = true
-	}
-
-	cc := &pb.ConfChange{
-		VerifiedReplica: verifiedReplica,
-		Type:            pb.ConfChangeType_ConfChangeUpdateNode,
-		Context:         quorumRouter,
+		Type:    pb.ConfChangeType_ConfChangeUpdateNode,
+		Context: quorumRouter,
 	}
 	pool.network.UpdateTable(cc)
 }
@@ -148,12 +96,10 @@ func (pool *peerPool) unicast(msg *pb.ConsensusMessage, to uint64) {
 	}
 }
 
-func (pool *peerPool) findRouterIndexByID(id uint64) (uint64, bool) {
-	for i, peer := range pool.router.Peers {
-		if peer.Id == id {
-			return uint64(i), true
-		}
+func (pool *peerPool) unicastByHash(msg *pb.ConsensusMessage, to string) {
+	err := pool.network.UnicastByHash(msg, to)
+	if err != nil {
+		pool.logger.Errorf("Unicast to %d failed: %v", to, err)
+		return
 	}
-	pool.logger.Warningf("Can not find replica with id:%d", id)
-	return 0, false
 }

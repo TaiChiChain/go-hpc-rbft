@@ -24,6 +24,7 @@ func TestPersist_restoreView(t *testing.T) {
 
 	conf := Config{
 		ID:                      2,
+		Hash:                    "node2",
 		IsNew:                   false,
 		Peers:                   peerSet,
 		K:                       10,
@@ -90,6 +91,7 @@ func TestPersist_restoreQList(t *testing.T) {
 
 	conf := Config{
 		ID:                      2,
+		Hash:                    "node2",
 		IsNew:                   false,
 		Peers:                   peerSet,
 		K:                       10,
@@ -154,6 +156,7 @@ func TestPersist_restorePList(t *testing.T) {
 
 	conf := Config{
 		ID:                      2,
+		Hash:                    "node2",
 		IsNew:                   false,
 		Peers:                   peerSet,
 		K:                       10,
@@ -213,6 +216,7 @@ func TestPersist_restoreBatchStore(t *testing.T) {
 
 	conf := Config{
 		ID:                      2,
+		Hash:                    "node2",
 		IsNew:                   false,
 		Peers:                   peerSet,
 		K:                       10,
@@ -255,6 +259,7 @@ func TestPersist_restoreQSet(t *testing.T) {
 
 	conf := Config{
 		ID:                      2,
+		Hash:                    "node2",
 		IsNew:                   false,
 		Peers:                   peerSet,
 		K:                       10,
@@ -308,6 +313,7 @@ func TestPersist_restorePSet(t *testing.T) {
 
 	conf := Config{
 		ID:                      2,
+		Hash:                    "node2",
 		IsNew:                   false,
 		Peers:                   peerSet,
 		K:                       10,
@@ -361,6 +367,7 @@ func TestPersist_restoreCSet(t *testing.T) {
 
 	conf := Config{
 		ID:                      2,
+		Hash:                    "node2",
 		IsNew:                   false,
 		Peers:                   peerSet,
 		K:                       10,
@@ -414,6 +421,7 @@ func TestPersist_restoreCert(t *testing.T) {
 
 	conf := Config{
 		ID:                      2,
+		Hash:                    "node2",
 		IsNew:                   false,
 		Peers:                   peerSet,
 		K:                       10,
@@ -505,6 +513,7 @@ func TestPersist_restoreState(t *testing.T) {
 
 	conf := Config{
 		ID:                      2,
+		Hash:                    "node2",
 		IsNew:                   false,
 		Peers:                   peerSet,
 		K:                       10,
@@ -547,6 +556,7 @@ func TestPersist_restoreState(t *testing.T) {
 	external.EXPECT().ReadState("nodes").Return(buff, nil)
 	external.EXPECT().ReadState("cleanCert").Return([]byte("true"), nil)
 	external.EXPECT().ReadState("rbft.h").Return([]byte("10"), nil)
+	external.EXPECT().ReadState("epoch").Return(buff, nil)
 
 	external.EXPECT().StoreState(gomock.Any(), gomock.Any())
 

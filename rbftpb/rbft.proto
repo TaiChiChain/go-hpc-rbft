@@ -41,13 +41,22 @@ enum Type {
     NOTIFICATION_RESPONSE = 19;
     CONF_CHANGE = 20;
     REQUEST_SET = 21;
+    EPOCH_CHECK = 22;
+    EPOCH_CHECK_RESPONSE = 23;
+    EPOCH_SYNC = 24;
+    UPDATE_ADD_OFFER = 25;
+}
+
+message nvp_state_update_request{
+    bytes node_hash = 1;
 }
 
 message consensus_message {
     Type type = 1;
     uint64 from = 2;
     uint64 to = 3;
-    bytes payload = 4;
+    uint64 epoch = 4;
+    bytes payload = 5;
 }
 
 message request_batch {
@@ -117,6 +126,7 @@ message commit {
     uint64 view = 2;
     uint64 sequence_number = 3;
     string batch_digest = 4;
+    uint64 epoch = 5;
 }
 
 message checkpoint {
@@ -183,41 +193,28 @@ message Cset {
     repeated commit set = 1;
 }
 
-message ready_for_n {
+message epoch_start_state {
+    uint64 applied = 1;
+    string digest = 2;
+}
+
+message node_info {
     uint64 replica_id = 1;
-    string new_node_info = 2;
-    uint64 expect_n = 3;
-}
-
-message agree_update_n {
-    vc_basis basis = 1;
-    bool     flag = 2;
-    uint64   id = 3;
-    string   info = 4;
-    int64    n = 5;
-    uint64   expect_n = 6;
-}
-
-message update_n {
-    bool   flag = 1;
-    uint64 replica_id = 2;
-    uint64 id = 3;
-    int64  n = 4;
-    uint64 view = 5;
-    map<uint64, string> xset = 6;
-    repeated vc_basis bset = 7;
+    string replica_hash = 2;
 }
 
 message sync_state {
-    uint64 replica_id = 1;
+    node_info node_info = 1;
+    uint64 epoch = 2;
 }
 
 message sync_state_response {
-    uint64 replica_id = 1;
-    uint64 view = 2;
-    uint64 n = 3;
-    bytes  router_info = 4;
-    service_state current_state = 5;
+    node_info node_info = 1;
+    uint64 epoch = 2;
+    uint64 view = 3;
+    uint64 applied = 4;
+    string digest = 5;
+    string routerInfo = 6;
 }
 
 // notification message
@@ -229,15 +226,16 @@ message notification {
 }
 
 message notification_response {
-    vc_basis basis = 1;
-    uint64 n = 2;
-    bytes  router_info = 3;
-    uint64 replica_id = 4;
+    vc_basis  basis = 1;
+    uint64    n = 2;
+    uint64    epoch = 3;
+    node_info node_info = 4;
 }
 
 message peer {
     uint64 id = 1;
-    bytes context = 2;
+    string hash = 2;
+    string hostname = 3;
 }
 
 message router {
@@ -245,9 +243,7 @@ message router {
 }
 
 enum conf_change_type {
-    ConfChangeAddNode        = 0;
-    ConfChangeRemoveNode     = 1;
-    ConfChangeUpdateNode     = 2;
+    ConfChangeUpdateNode = 0;
 }
 
 message conf_change {
@@ -264,6 +260,17 @@ message conf_state {
 message service_state {
     uint64 applied = 1;
     string digest = 2;
+    map<uint64, string> v_set = 3;
+}
+
+message epoch_check {
+    uint64 replica_id = 1;
+    string replica_hash = 2;
+}
+
+message epoch_check_response {
+    string replica_hash = 1;
+    uint64 epoch = 2;
 }
 
 enum inform_type {

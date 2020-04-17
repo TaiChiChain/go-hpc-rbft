@@ -22,20 +22,20 @@ import (
 
 var peerSet = []*pb.Peer{
 	{
-		Id:      1,
-		Context: []byte("Peer1"),
+		Id:   uint64(1),
+		Hash: "node1",
 	},
 	{
-		Id:      2,
-		Context: []byte("Peer2"),
+		Id:   uint64(2),
+		Hash: "node2",
 	},
 	{
-		Id:      3,
-		Context: []byte("Peer3"),
+		Id:   uint64(3),
+		Hash: "node3",
 	},
 	{
-		Id:      4,
-		Context: []byte("Peer4"),
+		Id:   uint64(4),
+		Hash: "node4",
 	},
 }
 
@@ -102,12 +102,14 @@ func newTestRBFT(ctrl *gomock.Controller) (*rbftImpl, Config) {
 	mockTxpool.EXPECT().RestorePool().Return().AnyTimes()
 	mockTxpool.EXPECT().ReConstructBatchByOrder(gomock.Any()).Return(nil, nil).AnyTimes()
 	mockTxpool.EXPECT().Reset().Return().AnyTimes()
+	mockTxpool.EXPECT().IsConfigBatch(gomock.Any()).Return(false).AnyTimes()
 	pool := mockTxpool
 	log := NewRawLogger()
 	external := mockexternal.NewMockMinimalExternal(ctrl)
 
 	conf := Config{
 		ID:                      1,
+		Hash:                    "node1",
 		IsNew:                   false,
 		Peers:                   peerSet,
 		K:                       10,
@@ -177,12 +179,14 @@ func newTestRBFTReplica(ctrl *gomock.Controller) (*rbftImpl, Config) {
 	mockTxpool.EXPECT().RestorePool().Return().AnyTimes()
 	mockTxpool.EXPECT().ReConstructBatchByOrder(gomock.Any()).Return(nil, nil).AnyTimes()
 	mockTxpool.EXPECT().Reset().Return().AnyTimes()
+	mockTxpool.EXPECT().IsConfigBatch(gomock.Any()).Return(false).AnyTimes()
 	pool := mockTxpool
 	log := NewRawLogger()
 	external := mockexternal.NewMockMinimalExternal(ctrl)
 
 	conf := Config{
 		ID:                      2,
+		Hash:                    "node2",
 		IsNew:                   false,
 		Peers:                   peerSet,
 		K:                       10,

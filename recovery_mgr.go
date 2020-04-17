@@ -26,7 +26,7 @@ This file contains recovery related issues
 
 // recoveryManager manages recovery related events
 type recoveryManager struct {
-	syncRspStore      map[uint64]*pb.SyncStateResponse    // store sync state response
+	syncRspStore      map[string]*pb.SyncStateResponse    // store sync state response
 	notificationStore map[ntfIdx]*pb.Notification         // track notification messages
 	outOfElection     map[ntfIdx]*pb.NotificationResponse // track out-of-election notification messages
 	recoveryHandled   bool                                // if we have process new view or not
@@ -37,7 +37,7 @@ type recoveryManager struct {
 // newRecoveryMgr news an instance of recoveryManager
 func newRecoveryMgr(c Config) *recoveryManager {
 	rm := &recoveryManager{
-		syncRspStore:      make(map[uint64]*pb.SyncStateResponse),
+		syncRspStore:      make(map[string]*pb.SyncStateResponse),
 		notificationStore: make(map[ntfIdx]*pb.Notification),
 		outOfElection:     make(map[ntfIdx]*pb.NotificationResponse),
 		logger:            c.Logger,
@@ -67,7 +67,7 @@ func (rbft *rbftImpl) dispatchRecoveryMsg(e consensusEvent) consensusEvent {
 // initRecovery init recovery with a larger view in which we vote for next primary.
 func (rbft *rbftImpl) initRecovery() consensusEvent {
 
-	rbft.logger.Infof("Replica %d now initRecovery", rbft.no)
+	rbft.logger.Infof("Replica %d now initRecovery", rbft.peerPool.localID)
 
 	return rbft.sendNotification(false)
 }
@@ -76,7 +76,7 @@ func (rbft *rbftImpl) initRecovery() consensusEvent {
 // current primary.
 func (rbft *rbftImpl) restartRecovery() consensusEvent {
 
-	rbft.logger.Infof("Replica %d now restartRecovery", rbft.no)
+	rbft.logger.Infof("Replica %d now restartRecovery", rbft.peerPool.localID)
 
 	return rbft.sendNotification(true)
 }
@@ -96,7 +96,7 @@ func (rbft *rbftImpl) sendNotification(keepCurrentVote bool) consensusEvent {
 	// as viewChange and recovery are mutually exclusive, we need to ensure
 	// we have totally exit viewChange before send notification.
 	if rbft.in(InViewChange) {
-		rbft.logger.Infof("Replica %d in viewChange changes to recovery status", rbft.no)
+		rbft.logger.Infof("Replica %d in viewChange changes to recovery status", rbft.peerPool.localID)
 		rbft.off(InViewChange)
 		rbft.timerMgr.stopTimer(vcResendTimer)
 	}
@@ -129,10 +129,10 @@ func (rbft *rbftImpl) sendNotification(keepCurrentVote bool) consensusEvent {
 		ReplicaId: rbft.peerPool.localID,
 	}
 
-	rbft.logger.Infof("Replica %d sending notification", rbft.no)
+	rbft.logger.Infof("Replica %d sending notification", rbft.peerPool.localID)
 
 	rbft.logger.Infof("Replica %d sending notification, v:%d, h:%d, |C|:%d, |P|:%d, |Q|:%d",
-		rbft.no, n.Basis.View, n.Basis.H, len(n.Basis.Cset), len(n.Basis.Pset), len(n.Basis.Qset))
+		rbft.peerPool.localID, n.Basis.View, n.Basis.H, len(n.Basis.Cset), len(n.Basis.Pset), len(n.Basis.Qset))
 
 	payload, err := proto.Marshal(n)
 	if err != nil {
@@ -141,6 +141,8 @@ func (rbft *rbftImpl) sendNotification(keepCurrentVote bool) consensusEvent {
 	}
 	consensusMsg := &pb.ConsensusMessage{
 		Type:    pb.Type_NOTIFICATION,
+		From:    rbft.peerPool.localID,
+		Epoch:   rbft.epoch,
 		Payload: payload,
 	}
 	rbft.peerPool.broadcast(consensusMsg)
@@ -152,8 +154,10 @@ func (rbft *rbftImpl) sendNotification(keepCurrentVote bool) consensusEvent {
 	// use recoveryRestartTimer to track resend of notification.
 	rbft.timerMgr.startTimer(recoveryRestartTimer, event)
 
+	// use epoch sync when fetch the latest epoch
+
 	if rbft.in(isNewNode) {
-		rbft.logger.Debugf("New node %d doesn't send notification to itself", rbft.no)
+		rbft.logger.Debugf("New node %d doesn't send notification to itself", rbft.peerPool.localID)
 		return nil
 	}
 
@@ -168,12 +172,12 @@ func (rbft *rbftImpl) sendNotification(keepCurrentVote bool) consensusEvent {
 func (rbft *rbftImpl) recvNotification(n *pb.Notification) consensusEvent {
 
 	rbft.logger.Debugf("Replica %d received notification from replica %d, v:%d, h:%d, |C|:%d, |P|:%d, |Q|:%d",
-		rbft.no, n.ReplicaId, n.Basis.View, n.Basis.H, len(n.Basis.Cset), len(n.Basis.Pset), len(n.Basis.Qset))
+		rbft.peerPool.localID, n.ReplicaId, n.Basis.View, n.Basis.H, len(n.Basis.Cset), len(n.Basis.Pset), len(n.Basis.Qset))
 
 	// new node cannot process notification as new node is not in a consistent
 	// view/N with other nodes.
 	if rbft.in(isNewNode) {
-		rbft.logger.Debugf("New node %d ignore notification", rbft.no)
+		rbft.logger.Debugf("New node %d ignore notification", rbft.peerPool.localID)
 		return nil
 	}
 
@@ -184,7 +188,7 @@ func (rbft *rbftImpl) recvNotification(n *pb.Notification) consensusEvent {
 		}
 		// ignore notification with lower view as we are in abnormal.
 		rbft.logger.Debugf("Replica %d ignore notification with a lower view %d than self "+
-			"view %d because we are in abnormal.", rbft.no, n.Basis.View, rbft.view)
+			"view %d because we are in abnormal.", rbft.peerPool.localID, n.Basis.View, rbft.view)
 		return nil
 	}
 
@@ -208,14 +212,14 @@ func (rbft *rbftImpl) recvNotification(n *pb.Notification) consensusEvent {
 	}
 	if len(replicas) >= rbft.oneCorrectQuorum() {
 		rbft.logger.Infof("Replica %d received f+1 notification messages whose view is greater than "+
-			"current view %d, detailed: %v, sending notification for view %d", rbft.no, rbft.view, replicas, minView)
+			"current view %d, detailed: %v, sending notification for view %d", rbft.peerPool.localID, rbft.view, replicas, minView)
 		newView := minView - uint64(1)
 		rbft.setView(newView)
 		return rbft.initRecovery()
 	}
 
 	rbft.logger.Debugf("Replica %d now has %d notification in notificationStore for view %d",
-		rbft.no, quorum, n.Basis.View)
+		rbft.peerPool.localID, quorum, n.Basis.View)
 
 	if rbft.in(InRecovery) && n.Basis.View == rbft.view && quorum >= rbft.allCorrectReplicasQuorum() {
 		rbft.timerMgr.stopTimer(recoveryRestartTimer)
@@ -234,7 +238,7 @@ func (rbft *rbftImpl) recvNotification(n *pb.Notification) consensusEvent {
 	// if we are in normal status, we should send back our info to the recovering node.
 	if rbft.isNormal() {
 		if rbft.isPrimary(n.ReplicaId) {
-			rbft.logger.Infof("Replica %d received notification from old primary %d, trigger recovery.", rbft.no, n.ReplicaId)
+			rbft.logger.Infof("Replica %d received notification from old primary %d, trigger recovery.", rbft.peerPool.localID, n.ReplicaId)
 			return rbft.initRecovery()
 		}
 
@@ -247,16 +251,15 @@ func (rbft *rbftImpl) recvNotification(n *pb.Notification) consensusEvent {
 // sendNotificationResponse helps send notification response to the given sender.
 func (rbft *rbftImpl) sendNotificationResponse(destID uint64) consensusEvent {
 
-	routerInfo := rbft.peerPool.serializeRouterInfo()
 	nr := &pb.NotificationResponse{
-		Basis:      rbft.getVcBasis(),
-		N:          uint64(rbft.N),
-		RouterInfo: routerInfo,
-		ReplicaId:  rbft.peerPool.localID,
+		Basis:    rbft.getVcBasis(),
+		N:        uint64(rbft.N),
+		Epoch:    rbft.epoch,
+		NodeInfo: rbft.getNodeInfo(),
 	}
 
 	rbft.logger.Debugf("Replica %d send NotificationResponse to replica %d, v:%d, h:%d, |C|:%d, |P|:%d, |Q|:%d",
-		rbft.no, destID, nr.Basis.View, nr.Basis.H, len(nr.Basis.Cset), len(nr.Basis.Pset), len(nr.Basis.Qset))
+		rbft.peerPool.localID, destID, nr.Basis.View, nr.Basis.H, len(nr.Basis.Cset), len(nr.Basis.Pset), len(nr.Basis.Qset))
 
 	rspMsg, err := proto.Marshal(nr)
 	if err != nil {
@@ -266,6 +269,8 @@ func (rbft *rbftImpl) sendNotificationResponse(destID uint64) consensusEvent {
 
 	consensusMsg := &pb.ConsensusMessage{
 		Type:    pb.Type_NOTIFICATION_RESPONSE,
+		From:    rbft.peerPool.localID,
+		Epoch:   rbft.epoch,
 		Payload: rspMsg,
 	}
 	rbft.peerPool.unicast(consensusMsg, destID)
@@ -277,16 +282,16 @@ func (rbft *rbftImpl) sendNotificationResponse(destID uint64) consensusEvent {
 func (rbft *rbftImpl) recvNotificationResponse(nr *pb.NotificationResponse) consensusEvent {
 
 	rbft.logger.Debugf("Replica %d received notificationResponse from replica %d, v:%d, h:%d, |C|:%d, |P|:%d, |Q|:%d",
-		rbft.no, nr.ReplicaId, nr.Basis.View, nr.Basis.H, len(nr.Basis.Cset), len(nr.Basis.Pset), len(nr.Basis.Qset))
+		rbft.peerPool.localID, nr.NodeInfo.ReplicaId, nr.Basis.View, nr.Basis.H, len(nr.Basis.Cset), len(nr.Basis.Pset), len(nr.Basis.Qset))
 
 	if !rbft.in(InRecovery) {
-		rbft.logger.Debugf("Replica %d is not in recovery, ignore notificationResponse", rbft.no)
+		rbft.logger.Debugf("Replica %d is not in recovery, ignore notificationResponse", rbft.peerPool.localID)
 		return nil
 	}
 
 	// current is pending, sender is not pending, record to outOfElection and check
 	// quorum same notifications in outOfElection.
-	rbft.recoveryMgr.outOfElection[ntfIdx{v: nr.Basis.View, nodeID: nr.ReplicaId}] = nr
+	rbft.recoveryMgr.outOfElection[ntfIdx{v: nr.Basis.View, nodeID: nr.NodeInfo.ReplicaId}] = nr
 	quorum := 0
 	for idx := range rbft.recoveryMgr.outOfElection {
 		if idx.v == nr.Basis.View {
@@ -294,14 +299,14 @@ func (rbft *rbftImpl) recvNotificationResponse(nr *pb.NotificationResponse) cons
 		}
 	}
 	rbft.logger.Debugf("Replica %d now has %d notification response in outOfElection for "+
-		"view %d, current view %d", rbft.no, quorum, nr.Basis.View, rbft.view)
+		"view %d, current view %d, need %d", rbft.peerPool.localID, quorum, nr.Basis.View, rbft.view, rbft.commonCaseQuorum())
 	if quorum >= rbft.commonCaseQuorum() {
 		states := make(wholeStates)
 		for _, nrs := range rbft.recoveryMgr.outOfElection {
-			states[nrs.Basis.ReplicaId] = nodeState{
-				n:          nrs.N,
-				view:       nrs.Basis.View,
-				routerInfo: byte2Hex(nrs.RouterInfo),
+			states[nrs.NodeInfo] = nodeState{
+				n:     nrs.N,
+				view:  nrs.Basis.View,
+				epoch: nrs.Epoch,
 			}
 		}
 		return rbft.compareWholeStates(states)
@@ -313,12 +318,12 @@ func (rbft *rbftImpl) recvNotificationResponse(nr *pb.NotificationResponse) cons
 // resetStateForRecovery only used by unusual nodes while quorum others nodes are in
 // normal status.
 func (rbft *rbftImpl) resetStateForRecovery() consensusEvent {
-	rbft.logger.Debugf("Replica %d reset state in recovery for view=%d", rbft.no, rbft.view)
+	rbft.logger.Debugf("Replica %d reset state in recovery for view=%d", rbft.peerPool.localID, rbft.view)
 
 	basis := rbft.getOutOfElectionBasis()
 	cp, ok, replicas := rbft.selectInitialCheckpoint(basis)
 	if !ok {
-		rbft.logger.Infof("Replica %d could not find consistent checkpoint.", rbft.no)
+		rbft.logger.Infof("Replica %d could not find consistent checkpoint.", rbft.peerPool.localID)
 		return nil
 	}
 	// check if need state update
@@ -329,7 +334,7 @@ func (rbft *rbftImpl) resetStateForRecovery() consensusEvent {
 	if need {
 		// if we are behind by checkpoint, move watermark and state transfer to the target
 		rbft.logger.Debugf("Replica %d in recovery find itself fall behind, "+
-			"move watermark to %d and state transfer.", rbft.no, cp.SequenceNumber)
+			"move watermark to %d and state transfer.", rbft.peerPool.localID, cp.SequenceNumber)
 
 		// clear useless outstanding batch to avoid viewChange caused by outstanding batches after recovery.
 		rbft.cleanOutstandingAndCert()
@@ -339,7 +344,7 @@ func (rbft *rbftImpl) resetStateForRecovery() consensusEvent {
 	// if recoveryHandled active, return nil, else set recoveryHandled active to avoid enter
 	// RecoveryDoneEvent again.
 	if rbft.recoveryMgr.recoveryHandled {
-		rbft.logger.Debugf("Replica %d enter resetStateForRecovery again, ignore it", rbft.no)
+		rbft.logger.Debugf("Replica %d enter resetStateForRecovery again, ignore it", rbft.peerPool.localID)
 		return nil
 	}
 	rbft.recoveryMgr.recoveryHandled = true
@@ -352,7 +357,7 @@ func (rbft *rbftImpl) resetStateForRecovery() consensusEvent {
 	for idx := range rbft.storeMgr.certStore {
 		if idx.v != rbft.view {
 			rbft.logger.Debugf("Replica %d clear cert with view=%d/seqNo=%d/digest=%s when reset state for recovery",
-				rbft.no, idx.v, idx.n, idx.d)
+				rbft.peerPool.localID, idx.v, idx.n, idx.d)
 			delete(rbft.storeMgr.certStore, idx)
 			rbft.persistDelQPCSet(idx.v, idx.n, idx.d)
 		}
@@ -367,7 +372,7 @@ func (rbft *rbftImpl) resetStateForRecovery() consensusEvent {
 // fetchRecoveryPQC always fetches PQC info after recovery done to fetch PQC info after target checkpoint
 func (rbft *rbftImpl) fetchRecoveryPQC() consensusEvent {
 
-	rbft.logger.Debugf("Replica %d fetchRecoveryPQC", rbft.no)
+	rbft.logger.Debugf("Replica %d fetchRecoveryPQC", rbft.peerPool.localID)
 
 	fetch := &pb.RecoveryFetchPQC{
 		H:         rbft.h,
@@ -380,6 +385,8 @@ func (rbft *rbftImpl) fetchRecoveryPQC() consensusEvent {
 	}
 	conMsg := &pb.ConsensusMessage{
 		Type:    pb.Type_RECOVERY_FETCH_QPC,
+		From:    rbft.peerPool.localID,
+		Epoch:   rbft.epoch,
 		Payload: payload,
 	}
 
@@ -391,11 +398,11 @@ func (rbft *rbftImpl) fetchRecoveryPQC() consensusEvent {
 // returnRecoveryPQC returns all PQC info we have sent before to the sender
 func (rbft *rbftImpl) returnRecoveryPQC(fetch *pb.RecoveryFetchPQC) consensusEvent {
 
-	rbft.logger.Debugf("Replica %d returnRecoveryPQC to replica %d", rbft.no, fetch.ReplicaId)
+	rbft.logger.Debugf("Replica %d returnRecoveryPQC to replica %d", rbft.peerPool.localID, fetch.ReplicaId)
 
 	h := fetch.H
 	if h >= rbft.h+rbft.L {
-		rbft.logger.Warningf("Replica %d receives recoveryFetchPQC request, but its rbft.h ≥ highwatermark", rbft.no)
+		rbft.logger.Warningf("Replica %d receives recoveryFetchPQC request, but its rbft.h ≥ highwatermark", rbft.peerPool.localID)
 		return nil
 	}
 
@@ -410,7 +417,7 @@ func (rbft *rbftImpl) returnRecoveryPQC(fetch *pb.RecoveryFetchPQC) consensusEve
 			// only response with messages we have sent.
 			if cert.prePrepare == nil {
 				rbft.logger.Warningf("Replica %d in returnRecoveryPQC finds nil prePrepare for view=%d/seqNo=%d",
-					rbft.no, idx.v, idx.n)
+					rbft.peerPool.localID, idx.v, idx.n)
 			} else if cert.prePrepare.ReplicaId == rbft.peerPool.localID {
 				prePres = append(prePres, cert.prePrepare)
 			}
@@ -450,19 +457,21 @@ func (rbft *rbftImpl) returnRecoveryPQC(fetch *pb.RecoveryFetchPQC) consensusEve
 	}
 	consensusMsg := &pb.ConsensusMessage{
 		Type:    pb.Type_RECOVERY_RETURN_QPC,
+		From:    rbft.peerPool.localID,
+		Epoch:   rbft.epoch,
 		Payload: payload,
 	}
 	rbft.peerPool.unicast(consensusMsg, fetch.ReplicaId)
 
-	rbft.logger.Debugf("Replica %d send recoveryReturnPQC to %d, detailed: %+v", rbft.no, fetch.ReplicaId, rcReturn)
+	rbft.logger.Debugf("Replica %d send recoveryReturnPQC to %d, detailed: %+v", rbft.peerPool.localID, fetch.ReplicaId, rcReturn)
 
 	return nil
 }
 
 // recvRecoveryReturnPQC re-processes all the PQC received from others
 func (rbft *rbftImpl) recvRecoveryReturnPQC(PQCInfo *pb.RecoveryReturnPQC) consensusEvent {
-	sender := rbft.peerPool.noMap[PQCInfo.ReplicaId]
-	rbft.logger.Debugf("Replica %d received recoveryReturnPQC from replica %d, return_pqc %v", rbft.no, sender, PQCInfo)
+	rbft.logger.Debugf("Replica %d received recoveryReturnPQC from replica %d, return_pqc %v",
+		rbft.peerPool.localID, PQCInfo.ReplicaId, PQCInfo)
 
 	// post all the PQC
 	if !rbft.isPrimary(rbft.peerPool.localID) {
@@ -503,10 +512,10 @@ func (rbft *rbftImpl) trySyncState() {
 
 	if !rbft.in(NeedSyncState) {
 		if !rbft.isNormal() {
-			rbft.logger.Debugf("Replica %d not try to sync state as we are in abnormal now", rbft.no)
+			rbft.logger.Debugf("Replica %d not try to sync state as we are in abnormal now", rbft.peerPool.localID)
 			return
 		}
-		rbft.logger.Infof("Replica %d need to start sync state progress after %v", rbft.no, rbft.timerMgr.getTimeoutValue(syncStateRestartTimer))
+		rbft.logger.Infof("Replica %d need to start sync state progress after %v", rbft.peerPool.localID, rbft.timerMgr.getTimeoutValue(syncStateRestartTimer))
 		rbft.on(NeedSyncState)
 
 		event := &LocalEvent{
@@ -527,13 +536,13 @@ func (rbft *rbftImpl) trySyncState() {
 func (rbft *rbftImpl) initSyncState() consensusEvent {
 
 	if rbft.in(InSyncState) {
-		rbft.logger.Warningf("Replica %d try to send syncState, but it's already in sync state", rbft.no)
+		rbft.logger.Warningf("Replica %d try to send syncState, but it's already in sync state", rbft.peerPool.localID)
 		return nil
 	}
 
 	rbft.on(InSyncState)
 
-	rbft.logger.Debugf("Replica %d now init sync state", rbft.no)
+	rbft.logger.Debugf("Replica %d now init sync state", rbft.peerPool.localID)
 
 	event := &LocalEvent{
 		Service:   RecoveryService,
@@ -545,59 +554,93 @@ func (rbft *rbftImpl) initSyncState() consensusEvent {
 	// sync state after syncStateRestartTimer expired.
 	rbft.timerMgr.startTimer(syncStateRspTimer, event)
 
-	rbft.recoveryMgr.syncRspStore = make(map[uint64]*pb.SyncStateResponse)
+	rbft.recoveryMgr.syncRspStore = make(map[string]*pb.SyncStateResponse)
 
-	// broadcast the sync state message to other replicas
+	// broadcast sync state message to others when it's not out of epoch
 	syncStateMsg := &pb.SyncState{
-		ReplicaId: rbft.peerPool.localID,
+		NodeInfo: rbft.getNodeInfo(),
+		Epoch:    rbft.epoch,
 	}
-
 	payload, err := proto.Marshal(syncStateMsg)
 	if err != nil {
 		rbft.logger.Errorf("ConsensusMessage_SYNC_STATE marshal error: %v", err)
 		return nil
 	}
 	msg := &pb.ConsensusMessage{
+		From:    rbft.peerPool.localID,
+		Epoch:   rbft.epoch,
 		Type:    pb.Type_SYNC_STATE,
 		Payload: payload,
 	}
 	rbft.peerPool.broadcast(msg)
 
-	// TODO(DH): add extra field?
-	state := rbft.node.getCurrentState()
-	// post the sync state response message event to myself
-	routerInfo := rbft.peerPool.serializeRouterInfo()
-	syncStateRsp := &pb.SyncStateResponse{
-		ReplicaId:    rbft.peerPool.localID,
-		View:         rbft.view,
-		N:            uint64(rbft.N),
-		RouterInfo:   routerInfo,
-		CurrentState: state,
+	if !rbft.in(InEpochSync) {
+		// post the sync state response message event to myself
+		state := rbft.node.getCurrentState()
+		syncStateRsp := &pb.SyncStateResponse{
+			NodeInfo:   rbft.getNodeInfo(),
+			Epoch:      rbft.epoch,
+			View:       rbft.view,
+			Applied:    state.Applied,
+			Digest:     state.Digest,
+			RouterInfo: byte2Hex(rbft.peerPool.serializeRouterInfo()),
+		}
+		rbft.recvSyncStateRsp(syncStateRsp)
 	}
-	rbft.recvSyncStateRsp(syncStateRsp)
 	return nil
 }
 
 func (rbft *rbftImpl) recvSyncState(sync *pb.SyncState) consensusEvent {
-	sender := rbft.peerPool.noMap[sync.ReplicaId]
-	rbft.logger.Debugf("Replica %d received sync state from replica %d", rbft.no, sender)
+	rbft.logger.Debugf("Replica %d received sync state from Hash{%s}", rbft.peerPool.localID, sync.NodeInfo.ReplicaHash)
 
-	if !rbft.isNormal() {
-		rbft.logger.Debugf("Replica %d is in abnormal, not send sync state response", rbft.no)
+	if rbft.in(isNewNode) {
+		rbft.logger.Debugf("Replica %d is in a new node, don't send sync state response", rbft.peerPool.localID)
 		return nil
 	}
 
-	state := rbft.node.getCurrentState()
-
-	routerInfo := rbft.peerPool.serializeRouterInfo()
-	syncStateRsp := &pb.SyncStateResponse{
-		ReplicaId:    rbft.peerPool.localID,
-		View:         rbft.view,
-		N:            uint64(rbft.N),
-		RouterInfo:   routerInfo,
-		CurrentState: state,
+	if !rbft.isNormal() {
+		rbft.logger.Debugf("Replica %d is in abnormal, don't send sync state response", rbft.peerPool.localID)
+		return nil
 	}
 
+	if sync.Epoch < rbft.epoch {
+		// if node send request in a lower epoch, such sync state response will help it to sync epoch
+		return rbft.sendSyncStateRsp(sync.NodeInfo.ReplicaHash, true)
+	} else if sync.Epoch == rbft.epoch {
+		// normal case sync state
+		return rbft.sendSyncStateRsp(sync.NodeInfo.ReplicaHash, false)
+	} else {
+		// received a message from larger epoch, current node might be out of epoch
+		rbft.logger.Warningf("Replica %d might be out of epoch", rbft.peerPool.localID)
+		return nil
+	}
+}
+
+func (rbft *rbftImpl) sendSyncStateRsp(to string, isEpochSync bool) consensusEvent {
+	var syncStateRsp *pb.SyncStateResponse
+
+	if isEpochSync {
+		// if request node is in lower epoch, send the state when current epoch started
+		syncStateRsp = &pb.SyncStateResponse{
+			NodeInfo:   rbft.getNodeInfo(),
+			Epoch:      rbft.epoch,
+			View:       rbft.view,
+			Applied:    rbft.epochMgr.epochStartState.Applied,
+			Digest:     rbft.epochMgr.epochStartState.Digest,
+			RouterInfo: byte2Hex(rbft.peerPool.serializeRouterInfo()),
+		}
+	} else {
+		// normal sync state process
+		state := rbft.node.getCurrentState()
+		syncStateRsp = &pb.SyncStateResponse{
+			NodeInfo:   rbft.getNodeInfo(),
+			Epoch:      rbft.epoch,
+			View:       rbft.view,
+			Applied:    state.Applied,
+			Digest:     state.Digest,
+			RouterInfo: byte2Hex(rbft.peerPool.serializeRouterInfo()),
+		}
+	}
 	payload, err := proto.Marshal(syncStateRsp)
 	if err != nil {
 		rbft.logger.Errorf("Marshal SyncStateResponse Error!")
@@ -605,44 +648,50 @@ func (rbft *rbftImpl) recvSyncState(sync *pb.SyncState) consensusEvent {
 	}
 	consensusMsg := &pb.ConsensusMessage{
 		Type:    pb.Type_SYNC_STATE_RESPONSE,
+		From:    rbft.peerPool.localID,
+		Epoch:   rbft.epoch,
 		Payload: payload,
 	}
-	rbft.peerPool.unicast(consensusMsg, sync.ReplicaId)
-	rbft.logger.Debugf("Replica %d sending syncStateResponse to replica %d, for view=%d/N=%d", rbft.no, sender, rbft.view, rbft.N)
-
+	rbft.peerPool.unicastByHash(consensusMsg, to)
+	rbft.logger.Debugf("Replica %d send sync state response to Hash{%s}: epoch=%d, view=%d, applied=%d, digest=%s",
+		rbft.peerPool.localID, to, syncStateRsp.Epoch, syncStateRsp.View, syncStateRsp.Applied, syncStateRsp.Digest)
 	return nil
 }
 
 func (rbft *rbftImpl) recvSyncStateRsp(rsp *pb.SyncStateResponse) consensusEvent {
-	sender := rbft.peerPool.noMap[rsp.ReplicaId]
-	rbft.logger.Debugf("Replica %d now received sync state response from replica %d", rbft.no, sender)
+	rbft.logger.Debugf("Replica %d now received sync state response from Hash{%s}: epoch=%d, applied=%d, digest=%d",
+		rbft.peerPool.localID, rsp.NodeInfo.ReplicaHash, rsp.Epoch, rsp.Applied, rsp.Digest)
 
 	if !rbft.in(InSyncState) {
-		rbft.logger.Debugf("Replica %d received sync state response, but it's not in sync state, ignore it...", rbft.no)
+		rbft.logger.Debugf("Replica %d is not in sync state, ignore it...", rbft.peerPool.localID)
 		return nil
 	}
-	if oldRsp, ok := rbft.recoveryMgr.syncRspStore[rsp.ReplicaId]; ok {
-		rbft.logger.Warningf("Replica %d received duplicate syncState response from replica %d, "+
-			"for view=%d, replace it", rbft.no, sender, oldRsp.View)
+
+	if rsp.Epoch > rsp.Applied {
+		rbft.logger.Debugf("Replica %d in epoch %d reject a illegal response", rbft.peerPool.localID, rbft.epoch)
+		return nil
 	}
-
-	rbft.recoveryMgr.syncRspStore[rsp.ReplicaId] = rsp
-
+	if oldRsp, ok := rbft.recoveryMgr.syncRspStore[rsp.NodeInfo.ReplicaHash]; ok {
+		if oldRsp.Applied > rsp.Applied {
+			rbft.logger.Debugf("Duplicate sync state response, new applied=%d is lower than old applied=%d, reject it",
+				rsp.Applied, oldRsp.Applied)
+			return nil
+		}
+	}
+	rbft.recoveryMgr.syncRspStore[rsp.NodeInfo.ReplicaHash] = rsp
 	if len(rbft.recoveryMgr.syncRspStore) >= rbft.commonCaseQuorum() {
 		states := make(wholeStates)
 		for _, rs := range rbft.recoveryMgr.syncRspStore {
-			states[rs.ReplicaId] = nodeState{
-				n:            rs.N,
+			states[rs.NodeInfo] = nodeState{
+				epoch:        rs.Epoch,
 				view:         rs.View,
-				routerInfo:   byte2Hex(rs.RouterInfo),
-				appliedIndex: rs.CurrentState.Applied,
-				digest:       rs.CurrentState.Digest,
+				appliedIndex: rs.Applied,
+				digest:       rs.Digest,
+				routerInfo:   rs.RouterInfo,
 			}
 		}
-
 		return rbft.compareWholeStates(states)
 	}
-
 	return nil
 }
 
@@ -650,9 +699,9 @@ func (rbft *rbftImpl) recvSyncStateRsp(rsp *pb.SyncStateResponse) consensusEvent
 // restart timer expired.
 func (rbft *rbftImpl) restartSyncState() consensusEvent {
 
-	rbft.logger.Debugf("Replica %d now restart sync state", rbft.no)
+	rbft.logger.Debugf("Replica %d now restart sync state", rbft.peerPool.localID)
 
-	rbft.recoveryMgr.syncRspStore = make(map[uint64]*pb.SyncStateResponse)
+	rbft.recoveryMgr.syncRspStore = make(map[string]*pb.SyncStateResponse)
 	rbft.initSyncState()
 
 	event := &LocalEvent{
@@ -669,7 +718,7 @@ func (rbft *rbftImpl) restartSyncState() consensusEvent {
 // exitSyncState exit syncState immediately.
 func (rbft *rbftImpl) exitSyncState() {
 
-	rbft.logger.Debugf("Replica %d now exit sync state", rbft.no)
+	rbft.logger.Debugf("Replica %d now exit sync state", rbft.peerPool.localID)
 	rbft.off(InSyncState)
 	rbft.off(NeedSyncState)
 	rbft.timerMgr.stopTimer(syncStateRspTimer)

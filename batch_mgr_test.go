@@ -44,8 +44,6 @@ func TestBatchMgr_newBatchManager(t *testing.T) {
 
 	rbft.restartBatchTimer()
 	assert.Equal(t, true, rbft.batchMgr.batchTimerActive)
-
-	// softRestartBatchTimer skip test
 }
 
 // Test for only this function

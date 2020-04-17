@@ -82,6 +82,7 @@ func TestRBFT_processEvent_NormalConsensusP(t *testing.T) {
 	payloadReq, _ := proto.Marshal(e)
 	eventReq := &pb.ConsensusMessage{
 		Type:    pb.Type_REQUEST_SET,
+		Epoch:   uint64(0),
 		Payload: payloadReq,
 	}
 	rbft.processEvent(eventReq)
@@ -108,9 +109,9 @@ func TestRBFT_processEvent_NormalConsensusP(t *testing.T) {
 	payload, _ := proto.Marshal(preprep)
 	event := &pb.ConsensusMessage{
 		Type:    pb.Type_PRE_PREPARE,
+		Epoch:   uint64(0),
 		Payload: payload,
 	}
-	rbft.peerPool.self = rbft.peerPool.getPeerByID(uint64(2))
 	rbft.peerPool.localID = uint64(2)
 	// Node2 receive prePrepare, then sendPrepare
 	rbft.processEvent(event)
@@ -141,6 +142,7 @@ func TestRBFT_processEvent_NormalConsensusP(t *testing.T) {
 	payload, _ = proto.Marshal(prepNode1)
 	event = &pb.ConsensusMessage{
 		Type:    pb.Type_PREPARE,
+		Epoch:   uint64(0),
 		Payload: payload,
 	}
 	rbft.processEvent(event)
@@ -148,6 +150,7 @@ func TestRBFT_processEvent_NormalConsensusP(t *testing.T) {
 	payload, _ = proto.Marshal(prepNode3)
 	event = &pb.ConsensusMessage{
 		Type:    pb.Type_PREPARE,
+		Epoch:   uint64(0),
 		Payload: payload,
 	}
 	rbft.processEvent(event)
@@ -155,12 +158,6 @@ func TestRBFT_processEvent_NormalConsensusP(t *testing.T) {
 	// Send commit from rbft.storeMgr.batchStore(needn't recovery)
 	assert.Equal(t, true, cert.sentCommit)
 
-	commitNode2 := &pb.Commit{
-		ReplicaId:      2,
-		View:           preprep.View,
-		SequenceNumber: preprep.SequenceNumber,
-		BatchDigest:    preprep.BatchDigest,
-	}
 	commitNode1 := &pb.Commit{
 		ReplicaId:      1,
 		View:           preprep.View,
@@ -176,10 +173,10 @@ func TestRBFT_processEvent_NormalConsensusP(t *testing.T) {
 
 	// Node2 received commit from itself, after receive quorum commits
 	// it could commitPendingBlocks
-	assert.Equal(t, true, cert.commit[*commitNode2])
 	payload, _ = proto.Marshal(commitNode1)
 	event = &pb.ConsensusMessage{
 		Type:    pb.Type_COMMIT,
+		Epoch:   uint64(0),
 		Payload: payload,
 	}
 	rbft.processEvent(event)
@@ -190,6 +187,7 @@ func TestRBFT_processEvent_NormalConsensusP(t *testing.T) {
 	payload, _ = proto.Marshal(commitNode3)
 	event = &pb.ConsensusMessage{
 		Type:    pb.Type_COMMIT,
+		Epoch:   uint64(0),
 		Payload: payload,
 	}
 
@@ -233,69 +231,19 @@ func TestRBFT_newRBFT(t *testing.T) {
 	}
 
 	cpChan := make(chan *pb.ServiceState)
+	confC := make(chan bool)
 	// Nil Peers
 	conf.Peers = nil
-	rbft, err = newRBFT(cpChan, conf)
+	rbft, err = newRBFT(cpChan, confC, conf)
 	assert.Equal(t, errors.New("nil peers"), err)
 
 	// Is a New Node
 	conf.Peers = peerSet
 	conf.ID = 4
 	conf.IsNew = true
-	rbft, _ = newRBFT(cpChan, conf)
+	rbft, _ = newRBFT(cpChan, confC, conf)
 	assert.Equal(t, 3, rbft.N)
 	assert.Equal(t, true, rbft.in(isNewNode))
-}
-
-func TestRBFT_start(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
-
-	// Open Pending Status Close Recovery
-	rbft.on(Pending)
-	rbft.off(InRecovery)
-
-	// Start the process
-	_ = rbft.start()
-
-	assert.Equal(t, false, rbft.in(Pending))
-}
-
-func TestRBFT_stop(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
-
-	// Start First and Add a Key
-	_ = rbft.start()
-	rbft.timerMgr.tTimers[batchTimer].isActive.Store("key", []byte("1"))
-
-	// Stop
-	rbft.stop()
-	_, flag := rbft.timerMgr.tTimers[batchTimer].isActive.Load("key")
-	assert.Equal(t, false, flag)
-}
-
-func TestRBFT_step(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
-	_ = rbft.start()
-
-	payload, _ := proto.Marshal(&pb.RequestSet{})
-	e := &pb.ConsensusMessage{
-		Type:    pb.Type_REQUEST_SET,
-		From:    uint64(1),
-		To:      uint64(2),
-		Payload: payload,
-	}
-
-	go func() {
-		rbft.step(e)
-		ret1 := <-rbft.recvChan
-		assert.Equal(t, e, ret1)
-	}()
 }
 
 //============================================
@@ -309,35 +257,20 @@ func TestRBFT_reportStateUpdated(t *testing.T) {
 	rbft, _ := newTestRBFT(ctrl)
 	rbft.h = 200
 
+	state2 := &pb.ServiceState{
+		Applied: 2,
+		Digest:  "test",
+	}
+
 	event := &LocalEvent{
 		Service:   CoreRbftService,
 		EventType: CoreStateUpdatedEvent,
-		Event:     uint64(2),
+		Event:     state2,
 	}
 
-	rbft.reportStateUpdated(2)
-	go func() {
-		obj := <-rbft.recvChan
-		assert.Equal(t, event, obj)
-	}()
-}
-
-func TestRBFT_removeNode(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	deleteEvent := &LocalEvent{
-		Service:   NodeMgrService,
-		EventType: NodeMgrDelNodeEvent,
-		Event:     uint64(3),
-	}
-
-	rbft, _ := newTestRBFT(ctrl)
-
-	rbft.removeNode(3)
+	rbft.reportStateUpdated(state2)
 	obj := <-rbft.recvChan
-
-	assert.Equal(t, deleteEvent, obj)
+	assert.Equal(t, event, obj)
 }
 
 func TestRBFT_postRequests(t *testing.T) {
@@ -372,7 +305,7 @@ func TestRBFT_postMsg(t *testing.T) {
 // Get Status
 //============================================
 
-func TestRBFT_getStatus_InViewChange(t *testing.T) {
+func TestRBFT_getStatus(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	rbft, _ := newTestRBFT(ctrl)
@@ -394,11 +327,6 @@ func TestRBFT_getStatus_InViewChange(t *testing.T) {
 	assert.Equal(t, StateTransferring, int(status.Status))
 	rbft.off(StateTransferring)
 
-	rbft.on(InUpdatingN)
-	status = rbft.getStatus()
-	assert.Equal(t, InUpdatingN, int(status.Status))
-	rbft.off(InUpdatingN)
-
 	rbft.on(PoolFull)
 	status = rbft.getStatus()
 	assert.Equal(t, PoolFull, int(status.Status))
@@ -408,6 +336,11 @@ func TestRBFT_getStatus_InViewChange(t *testing.T) {
 	status = rbft.getStatus()
 	assert.Equal(t, Pending, int(status.Status))
 	rbft.off(Pending)
+
+	rbft.on(InConfChange)
+	status = rbft.getStatus()
+	assert.Equal(t, InConfChange, int(status.Status))
+	rbft.off(InConfChange)
 
 	rbft.on(Normal)
 	status = rbft.getStatus()
@@ -423,34 +356,38 @@ func TestRBFT_processNullRequset(t *testing.T) {
 	defer ctrl.Finish()
 	rbft, _ := newTestRBFT(ctrl)
 
-	msg := &pb.NullRequest{ReplicaId: uint64(3)}
+	msg := &pb.NullRequest{ReplicaId: uint64(1)}
 
 	// If success process it, mode NeedSyncState will on
 	rbft.on(Normal)
-	rbft.off(NeedSyncState)
 
 	rbft.on(InRecovery)
+	rbft.off(NeedSyncState)
 	rbft.processNullRequest(msg)
 	assert.Equal(t, false, rbft.in(NeedSyncState))
 	rbft.off(InRecovery)
 
 	rbft.on(InViewChange)
+	rbft.off(NeedSyncState)
 	rbft.processNullRequest(msg)
 	assert.Equal(t, false, rbft.in(NeedSyncState))
 	rbft.off(InViewChange)
 
-	// not primary
+	rbft.on(InEpochSync)
+	rbft.off(NeedSyncState)
 	rbft.processNullRequest(msg)
 	assert.Equal(t, false, rbft.in(NeedSyncState))
+	rbft.off(InEpochSync)
+
+	// not primary
+	rbft.setView(uint64(3))
+	rbft.processNullRequest(msg)
+	assert.Equal(t, false, rbft.in(NeedSyncState))
+	rbft.setView(uint64(0))
 
 	// Call trySyncState, set NeedSyncState true
-	msg.ReplicaId = 1
-	payload, _ := proto.Marshal(msg)
-	event := &pb.ConsensusMessage{
-		Type:    pb.Type_NULL_REQUEST,
-		Payload: payload,
-	}
-	rbft.processEvent(event)
+	msg.ReplicaId = uint64(1)
+	rbft.processNullRequest(msg)
 	assert.Equal(t, true, rbft.in(NeedSyncState))
 }
 
@@ -462,24 +399,22 @@ func TestRBFT_handleNullRequestTimerEvent(t *testing.T) {
 	rbft.on(InRecovery)
 	rbft.handleNullRequestTimerEvent()
 	assert.Equal(t, uint64(0), rbft.view)
-
 	rbft.off(InRecovery)
+
 	rbft.on(InViewChange)
 	rbft.handleNullRequestTimerEvent()
 	assert.Equal(t, uint64(0), rbft.view)
-
 	rbft.off(InViewChange)
+
+	rbft.on(InEpochSync)
 	rbft.handleNullRequestTimerEvent()
 	assert.Equal(t, uint64(0), rbft.view)
+	rbft.off(InEpochSync)
 
-	rbft.setView(1)
-	rbft.off(InViewChange)
+	rbft.setView(uint64(3))
 	rbft.handleNullRequestTimerEvent()
-	assert.Equal(t, uint64(2), rbft.view)
+	assert.Equal(t, uint64(4), rbft.view)
 }
-
-//func TestRBFT_sendNullRequest(t *testing.T) {
-//}
 
 //=============================================================================
 // process request set and batch methods
@@ -526,14 +461,7 @@ func TestRBFT_processOutOfDateReqs(t *testing.T) {
 	rbft.on(Normal)
 	rbft.processOutOfDateReqs()
 	assert.Equal(t, false, rbft.in(PoolFull))
-
-	// Test for remaining part:
-	// Cannot detect state changes
 }
-
-// Have test it in Normal consensus case
-//func TestRBFT_recvRequestBatch(t *testing.T) {
-//}
 
 //============================================
 // Execute Transactions
@@ -761,21 +689,6 @@ func TestRBFT_findNextCommitReq(t *testing.T) {
 	assert.Equal(t, certTmp, cer)
 }
 
-func TestRBFT_afterCommitBlock(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
-
-	ID := msgID{
-		v: 1,
-		n: 20,
-		d: "msg",
-	}
-	rbft.exec.currentExec = nil
-	rbft.afterCommitBlock(ID)
-	assert.Equal(t, true, rbft.in(SkipInProgress))
-}
-
 //============================================
 // Checkpoint issues
 //============================================
@@ -811,9 +724,11 @@ func TestRBFT_witnessCheckpointWeakCert(t *testing.T) {
 	rbft.storeMgr.checkpointStore[*chkptSelf] = true
 	rbft.storeMgr.checkpointStore[*chkptReplica] = true
 
+	rbft.on(SkipInProgress)
+	rbft.off(StateTransferring)
 	rbft.witnessCheckpointWeakCert(chkptSelf)
 	assert.Equal(t, chkptSelf.Digest, rbft.storeMgr.highStateTarget.targetMessage.digest)
-	assert.Equal(t, uint64(2), rbft.storeMgr.highStateTarget.replicas[0].replicaID+rbft.storeMgr.highStateTarget.replicas[1].replicaID)
+	assert.Equal(t, true, rbft.in(StateTransferring))
 }
 
 func TestRBFT_moveWatermarks(t *testing.T) {
@@ -929,7 +844,7 @@ func TestRBFT_tryStateTransfer(t *testing.T) {
 		digest: "msg",
 	}
 	target := &stateUpdateTarget{targetMessage: targetMsg}
-	rbft.on(SkipInProgress)
+	rbft.off(SkipInProgress)
 	rbft.off(StateTransferring)
 	prePrepareTmp := &pb.PrePrepare{
 		ReplicaId:      1,
@@ -991,92 +906,101 @@ func TestRBFT_recvStateUpdatedEvent(t *testing.T) {
 	defer ctrl.Finish()
 	rbft, _ := newTestRBFT(ctrl)
 
+	// normal
 	rbft.h = 20
-
-	// some nil return
-	assert.Nil(t, rbft.recvStateUpdatedEvent(5))
-	rbft.storeMgr.highStateTarget = &stateUpdateTarget{
-		targetMessage: targetMessage{height: 10},
-		replicas:      nil,
+	ss0 := &pb.ServiceState{
+		Applied: uint64(30),
+		Digest:  "block-number-30",
+		VSet:    nil,
 	}
-	rbft.off(StateTransferring)
-	assert.Nil(t, rbft.recvStateUpdatedEvent(5))
-	assert.Equal(t, true, rbft.in(StateTransferring))
-	assert.Nil(t, rbft.recvStateUpdatedEvent(10))
-	assert.Equal(t, false, rbft.in(StateTransferring))
+	rbft.node.currentState = ss0
+	ret0 := rbft.recvStateUpdatedEvent(ss0)
+	assert.Equal(t, nil, ret0)
 
-	// Node moves watermark before message
-	// Close the mode for mark change
-	// save checkpoint
-	rbft.on(SkipInProgress)
-	rbft.on(StateTransferring)
-	rbft.node.currentState = &pb.ServiceState{
-		Applied: 30,
-		Digest:  "test",
+	// in recovery
+	rbft.h = uint64(20)
+	rbft.view = uint64(3)
+	ss1 := &pb.ServiceState{
+		Applied: uint64(30),
+		Digest:  "block-number-30",
+		VSet:    nil,
 	}
-	rbft.recvStateUpdatedEvent(30)
-	assert.Equal(t, false, rbft.in(SkipInProgress))
-	assert.Equal(t, false, rbft.in(StateTransferring))
-	assert.Equal(t, "test", rbft.storeMgr.chkpts[uint64(30)])
-
-	// If in recovery mode
+	rbft.node.currentState = ss1
 	rbft.on(InRecovery)
-	rbft.node.currentState = &pb.ServiceState{
-		Applied: 20,
-		Digest:  "test",
-	}
-	// Primary init recovery
-	rbft.recvStateUpdatedEvent(30)
-	n := &pb.Notification{
-		Basis:     rbft.getVcBasis(),
-		ReplicaId: rbft.peerPool.localID,
-	}
-	assert.Equal(t, n.ReplicaId, rbft.recoveryMgr.notificationStore[ntfIdx{v: n.Basis.View, nodeID: n.ReplicaId}].ReplicaId)
-
-	// Replicas return recovery done event
-	rbft.peerPool.localID = uint64(4)
-	retEvent := rbft.recvStateUpdatedEvent(30)
-	expEvent := &LocalEvent{
+	ret1 := rbft.recvStateUpdatedEvent(ss1)
+	expRet1 := &LocalEvent{
 		Service:   RecoveryService,
 		EventType: RecoveryDoneEvent,
 	}
-	assert.Equal(t, expEvent, retEvent)
-}
+	rbft.off(InRecovery)
+	assert.Equal(t, expRet1, ret1)
 
-func TestRBFT_recvCheckpoint1(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
+	// epoch sync in process
+	rbft.h = 20
+	ss2 := &pb.ServiceState{
+		Applied: uint64(30),
+		Digest:  "block-number-30",
+		VSet:    nil,
+	}
+	rbft.node.currentState = ss2
+	rbft.on(InEpochSync)
+	rbft.epochMgr.epochStartState.Digest = ss2.Digest
+	rbft.epochMgr.epochStartState.Applied = ss2.Applied
+	ret2 := rbft.recvStateUpdatedEvent(ss1)
+	expRet2 := &LocalEvent{
+		Service:   EpochMgrService,
+		EventType: EpochSyncFinishedEvent,
+	}
+	assert.Equal(t, expRet2, ret2)
+	rbft.off(InEpochSync)
 
-	chkptSeqNo := uint64(10)
-	chkptDigest := ""
-	checkpoint1 := &pb.Checkpoint{
-		ReplicaId:      1,
-		SequenceNumber: chkptSeqNo,
-		Digest:         chkptDigest,
+	// state update target < h
+	rbft.h = 50
+	rbft.storeMgr.highStateTarget = &stateUpdateTarget{
+		targetMessage: targetMessage{
+			height: uint64(45),
+			digest: "block-number-45",
+		},
+		replicas: nil,
 	}
-	checkpoint3 := &pb.Checkpoint{
-		ReplicaId:      3,
-		SequenceNumber: chkptSeqNo,
-		Digest:         chkptDigest,
+	ss3 := &pb.ServiceState{
+		Applied: uint64(42),
+		Digest:  "block-number-42",
+		VSet:    nil,
 	}
-	checkpoint4 := &pb.Checkpoint{
-		ReplicaId:      4,
-		SequenceNumber: chkptSeqNo,
-		Digest:         chkptDigest,
-	}
-	payload, _ := proto.Marshal(checkpoint1)
-	event := &pb.ConsensusMessage{
-		Type:    pb.Type_CHECKPOINT,
-		Payload: payload,
-	}
+	rbft.on(StateTransferring)
+	rbft.recvStateUpdatedEvent(ss3)
+	assert.Equal(t, uint64(42), rbft.exec.lastExec)
+	assert.Equal(t, true, rbft.in(StateTransferring))
 
-	// Case: recv quorum chkpts, move rbft.h to n
-	rbft.storeMgr.chkpts[chkptSeqNo] = ""
-	rbft.processEvent(event)
-	rbft.recvCheckpoint(checkpoint3)
-	rbft.recvCheckpoint(checkpoint4)
-	assert.Equal(t, uint64(10), rbft.h)
+	ss4 := &pb.ServiceState{
+		Applied: uint64(45),
+		Digest:  "block-number-45",
+		VSet:    nil,
+	}
+	rbft.on(StateTransferring)
+	rbft.recvStateUpdatedEvent(ss4)
+	assert.Equal(t, uint64(45), rbft.exec.lastExec)
+	assert.Equal(t, false, rbft.in(StateTransferring))
+
+	// errors
+	ss5 := &pb.ServiceState{
+		Applied: uint64(46),
+		Digest:  "block-number-46",
+		VSet:    nil,
+	}
+	rbft.on(StateTransferring)
+	rbft.exec.setLastExec(uint64(0))
+	rbft.recvStateUpdatedEvent(ss5)
+	assert.Equal(t, uint64(0), rbft.exec.lastExec)
+	assert.Equal(t, true, rbft.in(StateTransferring))
+
+	rbft.on(StateTransferring)
+	rbft.storeMgr.highStateTarget = nil
+	rbft.exec.setLastExec(uint64(0))
+	rbft.recvStateUpdatedEvent(ss5)
+	assert.Equal(t, uint64(0), rbft.exec.lastExec)
+	assert.Equal(t, true, rbft.in(StateTransferring))
 }
 
 func TestRBFT_recvCheckpoint2(t *testing.T) {
