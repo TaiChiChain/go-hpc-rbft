@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.2.0"></a>
+# [0.2.0](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.1.9...v0.2.0) (2020-04-17)
+
+
+### Bug Fixes
+
+* remove useless files about gitlab ci ([918f23c](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/918f23c))
+
+
+### Features
+
+* config transaction feature in rbft ([d754c92](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/d754c92)), closes [#flato-899](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-899)
+
+
+
 <a name="0.1.9"></a>
 ## [0.1.9](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.1.8...v0.1.9) (2020-02-22)
 
