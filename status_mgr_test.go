@@ -20,6 +20,7 @@ func TestStatusMgr_inOne(t *testing.T) {
 
 	conf := Config{
 		ID:          1,
+		Hash:        "node1",
 		IsNew:       false,
 		Peers:       peerSet,
 		Logger:      log,
@@ -28,7 +29,8 @@ func TestStatusMgr_inOne(t *testing.T) {
 	}
 
 	cpChan := make(chan *pb.ServiceState)
-	rbft, _ := newRBFT(cpChan, conf)
+	confC := make(chan bool)
+	rbft, _ := newRBFT(cpChan, confC, conf)
 
 	rbft.on(InViewChange)
 	assert.Equal(t, true, rbft.inOne(InViewChange, InRecovery, InUpdatingN))
@@ -43,6 +45,7 @@ func TestStatusMgr_setState(t *testing.T) {
 
 	conf := Config{
 		ID:          1,
+		Hash:        "node1",
 		IsNew:       false,
 		Peers:       peerSet,
 		Logger:      log,
@@ -51,7 +54,8 @@ func TestStatusMgr_setState(t *testing.T) {
 	}
 
 	cpChan := make(chan *pb.ServiceState)
-	rbft, _ := newRBFT(cpChan, conf)
+	confC := make(chan bool)
+	rbft, _ := newRBFT(cpChan, confC, conf)
 
 	rbft.setNormal()
 	assert.Equal(t, true, rbft.in(Normal))
@@ -69,6 +73,7 @@ func TestStatusMgr_maybeSetNormal(t *testing.T) {
 
 	conf := Config{
 		ID:          1,
+		Hash:        "node1",
 		IsNew:       false,
 		Peers:       peerSet,
 		Logger:      log,
@@ -77,7 +82,8 @@ func TestStatusMgr_maybeSetNormal(t *testing.T) {
 	}
 
 	cpChan := make(chan *pb.ServiceState)
-	rbft, _ := newRBFT(cpChan, conf)
+	confC := make(chan bool)
+	rbft, _ := newRBFT(cpChan, confC, conf)
 
 	rbft.off(InRecovery)
 	rbft.off(InUpdatingN)

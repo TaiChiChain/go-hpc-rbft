@@ -389,32 +389,6 @@ func TestHelper_compareCheckpointWithWeakSet(t *testing.T) {
 	assert.Equal(t, true, rbft.in(Normal))
 }
 
-func TestRBFT_compareWholeStates(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
-
-	NS := nodeState{
-		n:            2,
-		view:         0,
-		routerInfo:   "peer1",
-		appliedIndex: 0,
-		digest:       "msg1",
-	}
-	state := map[uint64]nodeState{
-		uint64(1): NS,
-		uint64(2): NS,
-		uint64(3): NS,
-	}
-	rbft.on(InSyncState)
-	assert.Equal(t, nil, rbft.compareWholeStates(state))
-
-	rbft.off(InSyncState)
-	rbft.on(InRecovery)
-	rbft.on(isNewNode)
-	assert.Equal(t, nil, rbft.compareWholeStates(state))
-}
-
 func TestRBFT_startTimerIfOutstandingRequests(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()

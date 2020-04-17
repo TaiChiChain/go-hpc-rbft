@@ -166,3 +166,5 @@ core/vm/jcee/java/hyperjvm
 target
 
 go.sum
+
+testLogger

@@ -10,30 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// newRecoveryMgr has been tested with newRBFT
-// Test for iniRecovery and sendNotification(false)
-func TestRecovery_initRecovery_and_sendNotification(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	rbft, _ := newTestRBFTReplica(ctrl)
-
-	rbft.off(InRecovery)
-	rbft.recoveryMgr.notificationStore[ntfIdx{v: uint64(0), nodeID: uint64(1)}] = &pb.Notification{}
-	rbft.initRecovery()
-
-	// Open InRecovery mode
-	assert.Equal(t, true, rbft.in(InRecovery))
-
-	// sendNotification false, to increase view, so that view++
-	assert.Equal(t, uint64(1), rbft.view)
-
-	// clear messages in low view
-	assert.Nil(t, rbft.recoveryMgr.notificationStore[ntfIdx{v: uint64(0), nodeID: uint64(1)}])
-
-	// call recv notification
-	assert.Equal(t, uint64(2), rbft.recoveryMgr.notificationStore[ntfIdx{v: uint64(1), nodeID: uint64(2)}].ReplicaId)
-}
-
 func TestRecovery_restartRecovery(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -88,22 +64,17 @@ func TestRecovery_recvNotification(t *testing.T) {
 	payload, _ := proto.Marshal(notificationNode2)
 	event := &pb.ConsensusMessage{
 		Type:    pb.Type_NOTIFICATION,
+		Epoch:   uint64(0),
 		Payload: payload,
 	}
 	rbft.processEvent(event)
 	rbft.recvNotification(notificationNode3)
 
-	// off recovery set in normal, will not reach Recovery Service Event
-	rbft.off(InRecovery)
-	rbft.on(Normal)
-	retNil := rbft.recvNotification(notificationNode4)
-	assert.Nil(t, retNil)
-
 	// NewNode will not recv
 	rbft.on(InRecovery)
 	rbft.off(Normal)
 	rbft.on(isNewNode)
-	retNil = rbft.recvNotification(notificationNode4)
+	retNil := rbft.recvNotification(notificationNode4)
 	assert.Nil(t, retNil)
 	rbft.off(isNewNode)
 
@@ -113,66 +84,6 @@ func TestRecovery_recvNotification(t *testing.T) {
 		Service:   RecoveryService,
 		EventType: NotificationQuorumEvent,
 	}
-	assert.Equal(t, expEvent, retEvent)
-}
-
-// recvNotificationResponse and resetStateForRecovery Normal Case
-func TestRecovery_recvNotificationResponse_and_resetStateForRecovery(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
-
-	routerInfo := rbft.peerPool.serializeRouterInfo()
-	nrNode2 := &pb.NotificationResponse{
-		Basis:      rbft.getVcBasis(),
-		N:          uint64(rbft.N),
-		RouterInfo: routerInfo,
-		ReplicaId:  uint64(2),
-	}
-	nrNode2.Basis.ReplicaId = uint64(2)
-	nrNode2.Basis.View = uint64(1)
-	nrNode3 := &pb.NotificationResponse{
-		Basis:      rbft.getVcBasis(),
-		N:          uint64(rbft.N),
-		RouterInfo: routerInfo,
-		ReplicaId:  uint64(3),
-	}
-	nrNode3.Basis.ReplicaId = uint64(3)
-	nrNode3.Basis.View = uint64(1)
-	nrNode4 := &pb.NotificationResponse{
-		Basis:      rbft.getVcBasis(),
-		N:          uint64(rbft.N),
-		RouterInfo: routerInfo,
-		ReplicaId:  uint64(4),
-	}
-	nrNode4.Basis.ReplicaId = uint64(4)
-	nrNode4.Basis.View = uint64(1)
-
-	payload, _ := proto.Marshal(nrNode2)
-	event := &pb.ConsensusMessage{
-		Type:    pb.Type_NOTIFICATION_RESPONSE,
-		Payload: payload,
-	}
-	rbft.on(InRecovery)
-	rbft.processEvent(event)
-
-	rbft.recvNotificationResponse(nrNode3)
-	// if not in recovery, will not recv
-	rbft.off(InRecovery)
-	retNil := rbft.recvNotificationResponse(nrNode4)
-	assert.Nil(t, retNil)
-
-	// as replica node in recovery, call resetStateForRecovery
-	// finish the process and send recovery done event
-	rbft.on(InRecovery)
-	rbft.storeMgr.certStore[msgID{v: 0, n: 20, d: "msg"}] = &msgCert{sentPrepare: true}
-	retEvent := rbft.recvNotificationResponse(nrNode4)
-	expEvent := &LocalEvent{
-		Service:   RecoveryService,
-		EventType: RecoveryDoneEvent,
-	}
-	// cert in storeMgr with lower view is cleared
-	assert.Nil(t, rbft.storeMgr.certStore[msgID{v: 0, n: 20, d: "msg"}])
 	assert.Equal(t, expEvent, retEvent)
 }
 
@@ -186,32 +97,38 @@ func TestRecovery_resetStateForRecovery(t *testing.T) {
 		SequenceNumber: 20,
 		Digest:         "cp",
 	}
-	routerInfo := rbft.peerPool.serializeRouterInfo()
+
 	nrNode2 := &pb.NotificationResponse{
-		Basis:      rbft.getVcBasis(),
-		N:          uint64(rbft.N),
-		RouterInfo: routerInfo,
-		ReplicaId:  uint64(2),
+		Basis: rbft.getVcBasis(),
+		N:     uint64(rbft.N),
+		NodeInfo: &pb.NodeInfo{
+			ReplicaId:   uint64(2),
+			ReplicaHash: "node2",
+		},
 	}
 	nrNode2.Basis.ReplicaId = uint64(2)
 	nrNode2.Basis.View = uint64(1)
 	nrNode2.Basis.Cset = []*pb.Vc_C{C}
 
 	nrNode3 := &pb.NotificationResponse{
-		Basis:      rbft.getVcBasis(),
-		N:          uint64(rbft.N),
-		RouterInfo: routerInfo,
-		ReplicaId:  uint64(3),
+		Basis: rbft.getVcBasis(),
+		N:     uint64(rbft.N),
+		NodeInfo: &pb.NodeInfo{
+			ReplicaId:   uint64(3),
+			ReplicaHash: "node3",
+		},
 	}
 	nrNode3.Basis.ReplicaId = uint64(3)
 	nrNode3.Basis.View = uint64(1)
 	nrNode3.Basis.Cset = []*pb.Vc_C{C}
 
 	nrNode4 := &pb.NotificationResponse{
-		Basis:      rbft.getVcBasis(),
-		N:          uint64(rbft.N),
-		RouterInfo: routerInfo,
-		ReplicaId:  uint64(4),
+		Basis: rbft.getVcBasis(),
+		N:     uint64(rbft.N),
+		NodeInfo: &pb.NodeInfo{
+			ReplicaId:   uint64(4),
+			ReplicaHash: "node4",
+		},
 	}
 	nrNode4.Basis.ReplicaId = uint64(4)
 	nrNode4.Basis.View = uint64(1)
@@ -394,6 +311,7 @@ func TestRecovery_recvRecoveryReturnPQC(t *testing.T) {
 	payload, _ := proto.Marshal(PQCInfo)
 	event := &pb.ConsensusMessage{
 		Type:    pb.Type_RECOVERY_RETURN_QPC,
+		Epoch:   uint64(0),
 		Payload: payload,
 	}
 	rbft.processEvent(event)
@@ -439,111 +357,28 @@ func TestRecovery_initSyncState(t *testing.T) {
 	assert.Nil(t, ret)
 
 	// call recv sync state rsp
-	state := rbft.node.getCurrentState()
-	routerInfo := rbft.peerPool.serializeRouterInfo()
+	rbft.node.currentState = &pb.ServiceState{
+		Applied: uint64(10),
+		Digest:  "block-number-10",
+		VSet:    nil,
+	}
+	info := &pb.NodeInfo{
+		ReplicaId:   rbft.peerPool.localID,
+		ReplicaHash: rbft.peerPool.localHash,
+	}
+
+	s := rbft.node.getCurrentState()
+
+	// post the sync state response message event to myself
 	syncStateRsp := &pb.SyncStateResponse{
-		ReplicaId:    rbft.peerPool.localID,
-		View:         rbft.view,
-		N:            uint64(rbft.N),
-		RouterInfo:   routerInfo,
-		CurrentState: state,
+		NodeInfo:   info,
+		Epoch:      rbft.epoch,
+		View:       rbft.view,
+		Applied:    s.Applied,
+		Digest:     s.Digest,
+		RouterInfo: byte2Hex(rbft.peerPool.serializeRouterInfo()),
 	}
 	rbft.off(InSyncState)
 	rbft.initSyncState()
-	assert.Equal(t, syncStateRsp, rbft.recoveryMgr.syncRspStore[syncStateRsp.ReplicaId])
-}
-
-func TestRecovery_recvSyncState(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
-
-	sync := &pb.SyncState{ReplicaId: uint64(1)}
-
-	// abnormal return nil
-	rbft.off(Normal)
-	ret := rbft.recvSyncState(sync)
-	assert.Nil(t, ret)
-
-	// normal mode
-	// run without errors, return nil
-	rbft.on(Normal)
-	payload, _ := proto.Marshal(sync)
-	event := &pb.ConsensusMessage{
-		Type:    pb.Type_SYNC_STATE,
-		Payload: payload,
-	}
-	ret = rbft.processEvent(event)
-	assert.Nil(t, ret)
-}
-
-func TestRecovery_recvSyncStateRsp(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
-
-	rspNode1 := &pb.SyncStateResponse{
-		ReplicaId:    1,
-		View:         0,
-		N:            4,
-		RouterInfo:   rbft.peerPool.serializeRouterInfo(),
-		CurrentState: &pb.ServiceState{Applied: 20, Digest: "wrong"},
-	}
-	rspNode2 := &pb.SyncStateResponse{
-		ReplicaId:    2,
-		View:         0,
-		N:            4,
-		RouterInfo:   rbft.peerPool.serializeRouterInfo(),
-		CurrentState: &pb.ServiceState{Applied: 20, Digest: "msg"},
-	}
-	rspNode3 := &pb.SyncStateResponse{
-		ReplicaId:    3,
-		View:         0,
-		N:            4,
-		RouterInfo:   rbft.peerPool.serializeRouterInfo(),
-		CurrentState: &pb.ServiceState{Applied: 20, Digest: "msg"},
-	}
-	rspNode4 := &pb.SyncStateResponse{
-		ReplicaId:    4,
-		View:         0,
-		N:            4,
-		RouterInfo:   rbft.peerPool.serializeRouterInfo(),
-		CurrentState: &pb.ServiceState{Applied: 20, Digest: "msg"},
-	}
-	// will return before store the msg
-	rbft.off(InSyncState)
-	rbft.recvSyncStateRsp(rspNode1)
-	assert.Nil(t, rbft.recoveryMgr.syncRspStore[rspNode1.ReplicaId])
-
-	// already stored
-	// change it to a new one
-	rbft.on(InSyncState)
-	rbft.off(StateTransferring)
-	rbft.recvSyncStateRsp(rspNode1)
-	assert.Equal(t, rspNode1, rbft.recoveryMgr.syncRspStore[rspNode1.ReplicaId])
-
-	// Finally, open StateTransferring to change node1 digest same as others
-	rbft.recvSyncStateRsp(rspNode2)
-	rbft.recvSyncStateRsp(rspNode3)
-	rbft.recvSyncStateRsp(rspNode4)
-	assert.Equal(t, true, rbft.in(StateTransferring))
-
-	// If selfHeight != quorumHeight
-	// Primary send view change
-	rbft.on(InSyncState)
-	rspNode1.CurrentState.Applied = 10
-	rbft.recvSyncStateRsp(rspNode1)
-	assert.Equal(t, uint64(1), rbft.view)
-}
-
-func TestRecovery_restartSyncState(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
-
-	rbft.initSyncState()
-	assert.Equal(t, 1, len(rbft.recoveryMgr.syncRspStore))
-
-	rbft.restartSyncState()
-	assert.Equal(t, 0, len(rbft.recoveryMgr.syncRspStore))
+	assert.Equal(t, syncStateRsp, rbft.recoveryMgr.syncRspStore[syncStateRsp.NodeInfo.ReplicaHash])
 }

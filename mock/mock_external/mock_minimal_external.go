@@ -21,6 +21,7 @@ func NewMockMinimalExternal(ctrl *gomock.Controller) *MockExternalStack {
 
 	mock.EXPECT().Broadcast(gomock.Any()).Return(nil).AnyTimes()
 	mock.EXPECT().Unicast(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	mock.EXPECT().UnicastByHash(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	mock.EXPECT().UpdateTable(gomock.Any()).Return().AnyTimes()
 
 	mock.EXPECT().Sign(gomock.Any()).Return(nil, nil).AnyTimes()

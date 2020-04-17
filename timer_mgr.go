@@ -202,8 +202,8 @@ func (rbft *rbftImpl) initTimers() {
 	rbft.timerMgr.newTimer(batchTimer, rbft.config.BatchTimeout)
 	rbft.timerMgr.newTimer(requestTimer, rbft.config.RequestTimeout)
 	rbft.timerMgr.newTimer(cleanViewChangeTimer, rbft.config.CleanVCTimeout)
-	rbft.timerMgr.newTimer(updateTimer, rbft.config.UpdateTimeout)
 	rbft.timerMgr.newTimer(checkPoolTimer, rbft.config.CheckPoolTimeout)
+	rbft.timerMgr.newTimer(epochCheckRspTimer, rbft.config.UpdateTimeout)
 
 	rbft.timerMgr.makeNullRequestTimeoutLegal()
 	rbft.timerMgr.makeRequestTimeoutLegal()

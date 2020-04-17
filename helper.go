@@ -15,7 +15,6 @@
 package rbft
 
 import (
-	"bytes"
 	"crypto/md5"
 	"encoding/binary"
 	"encoding/hex"
@@ -63,7 +62,7 @@ func (rbft *rbftImpl) isPrimary(id uint64) bool {
 	// new node cannot become a primary node, directly return false.
 	if rbft.in(isNewNode) && id == rbft.peerPool.localID {
 		rbft.logger.Debugf("New node cannot become a primary node, no=%d/view=%d/ID=%d",
-			rbft.no, rbft.view, rbft.peerPool.localID)
+			rbft.peerPool.localID, rbft.view, rbft.peerPool.localID)
 		return false
 	}
 	return rbft.primaryID(rbft.view) == id
@@ -167,7 +166,7 @@ func (rbft *rbftImpl) prePrepared(digest string, v uint64, n uint64) bool {
 		}
 	}
 
-	rbft.logger.Debugf("Replica %d does not have view=%d/seqNo=%d prePrepared", rbft.no, v, n)
+	rbft.logger.Debugf("Replica %d does not have view=%d/seqNo=%d prePrepared", rbft.peerPool.localID, v, n)
 
 	return false
 }
@@ -185,7 +184,7 @@ func (rbft *rbftImpl) prepared(digest string, v uint64, n uint64) bool {
 	prepCount := len(cert.prepare)
 
 	rbft.logger.Debugf("Replica %d prepare count for view=%d/seqNo=%d is %d",
-		rbft.no, v, n, prepCount)
+		rbft.peerPool.localID, v, n, prepCount)
 
 	return prepCount >= rbft.commonCaseQuorum()-1
 }
@@ -203,7 +202,7 @@ func (rbft *rbftImpl) committed(digest string, v uint64, n uint64) bool {
 	cmtCount := len(cert.commit)
 
 	rbft.logger.Debugf("Replica %d commit count for view=%d/seqNo=%d is %d",
-		rbft.no, v, n, cmtCount)
+		rbft.peerPool.localID, v, n, cmtCount)
 
 	return cmtCount >= rbft.commonCaseQuorum()
 }
@@ -221,6 +220,8 @@ func (rbft *rbftImpl) broadcastReqSet(set *pb.RequestSet) {
 	}
 	consensusMsg := &pb.ConsensusMessage{
 		Type:    pb.Type_REQUEST_SET,
+		From:    rbft.peerPool.localID,
+		Epoch:   rbft.epoch,
 		Payload: payload,
 	}
 	rbft.peerPool.broadcast(consensusMsg)
@@ -286,33 +287,31 @@ func (rbft *rbftImpl) stopFirstRequestTimer() {
 // itself is legal or not
 func (rbft *rbftImpl) isPrePrepareLegal(preprep *pb.PrePrepare) bool {
 	if rbft.in(InRecovery) {
-		rbft.logger.Debugf("Replica %d try to receive prePrepare, but it's in recovery", rbft.no)
+		rbft.logger.Debugf("Replica %d try to receive prePrepare, but it's in recovery", rbft.peerPool.localID)
 		return false
 	}
 
 	if rbft.in(InViewChange) {
-		rbft.logger.Debugf("Replica %d try to receive prePrepare, but it's in viewChange", rbft.no)
+		rbft.logger.Debugf("Replica %d try to receive prePrepare, but it's in viewChange", rbft.peerPool.localID)
 		return false
 	}
 
 	if rbft.in(InUpdatingN) {
-		rbft.logger.Debugf("Replica %d try to receive prePrepare, but it's in updatingN", rbft.no)
+		rbft.logger.Debugf("Replica %d try to receive prePrepare, but it's in updatingN", rbft.peerPool.localID)
 		return false
 	}
 
 	// replica rejects prePrepare sent from non-primary.
 	if !rbft.isPrimary(preprep.ReplicaId) {
-		from := rbft.peerPool.noMap[preprep.ReplicaId]
 		primaryID := rbft.primaryID(rbft.view)
-		primaryNo := rbft.peerPool.noMap[primaryID]
 		rbft.logger.Warningf("Replica %d received prePrepare from non-primary: got %d, should be %d",
-			rbft.no, from, primaryNo)
+			rbft.peerPool.localID, preprep.ReplicaId, primaryID)
 		return false
 	}
 
 	// primary reject prePrepare sent from itself.
 	if rbft.isPrimary(rbft.peerPool.localID) {
-		rbft.logger.Warningf("Primary %d reject prePrepare sent from itself", rbft.no)
+		rbft.logger.Warningf("Primary %d reject prePrepare sent from itself", rbft.peerPool.localID)
 		return false
 	}
 
@@ -320,18 +319,18 @@ func (rbft *rbftImpl) isPrePrepareLegal(preprep *pb.PrePrepare) bool {
 		if preprep.SequenceNumber != rbft.h && !rbft.in(SkipInProgress) {
 			rbft.logger.Warningf("Replica %d received prePrepare with a different view or sequence "+
 				"number outside watermarks: prePrep.View %d, expected.View %d, seqNo %d, low water mark %d",
-				rbft.no, preprep.View, rbft.view, preprep.SequenceNumber, rbft.h)
+				rbft.peerPool.localID, preprep.View, rbft.view, preprep.SequenceNumber, rbft.h)
 		} else {
 			// This is perfectly normal
 			rbft.logger.Debugf("Replica %d received prePrepare with a different view or sequence "+
 				"number outside watermarks: preprep.View %d, expected.View %d, seqNo %d, low water mark %d",
-				rbft.no, preprep.View, rbft.view, preprep.SequenceNumber, rbft.h)
+				rbft.peerPool.localID, preprep.View, rbft.view, preprep.SequenceNumber, rbft.h)
 		}
 		return false
 	}
 
 	if preprep.SequenceNumber <= rbft.exec.lastExec {
-		rbft.logger.Debugf("Replica %d received a prePrepare with seqNo %d lower than lastExec %d, ignore it...", rbft.no, preprep.SequenceNumber, rbft.exec.lastExec)
+		rbft.logger.Debugf("Replica %d received a prePrepare with seqNo %d lower than lastExec %d, ignore it...", rbft.peerPool.localID, preprep.SequenceNumber, rbft.exec.lastExec)
 		return false
 	}
 
@@ -345,19 +344,18 @@ func (rbft *rbftImpl) isPrepareLegal(prep *pb.Prepare) bool {
 	// if we are not in recovery, but receive prepare from primary, which means primary behavior as a byzantine,
 	// we don't send viewchange here, because in this case, replicas will eventually find primary abnormal in other cases.
 	if rbft.isPrimary(prep.ReplicaId) {
-		rbft.logger.Warningf("Replica %d received prepare from primary, ignore it", rbft.no)
+		rbft.logger.Warningf("Replica %d received prepare from primary, ignore it", rbft.peerPool.localID)
 		return false
 	}
 
 	if !rbft.inWV(prep.View, prep.SequenceNumber) {
-		from := rbft.peerPool.noMap[prep.ReplicaId]
 		if prep.SequenceNumber != rbft.h && !rbft.in(SkipInProgress) {
 			rbft.logger.Warningf("Replica %d ignore prepare from replica %d for view=%d/seqNo=%d: not inWv, in view: %d, h: %d",
-				rbft.no, from, prep.View, prep.SequenceNumber, rbft.view, rbft.h)
+				rbft.peerPool.localID, prep.ReplicaId, prep.View, prep.SequenceNumber, rbft.view, rbft.h)
 		} else {
 			// This is perfectly normal
 			rbft.logger.Debugf("Replica %d ignore prepare from replica %d for view=%d/seqNo=%d: not inWv, in view: %d, h: %d",
-				rbft.no, from, prep.View, prep.SequenceNumber, rbft.view, rbft.h)
+				rbft.peerPool.localID, prep.ReplicaId, prep.View, prep.SequenceNumber, rbft.view, rbft.h)
 		}
 
 		return false
@@ -370,12 +368,13 @@ func (rbft *rbftImpl) isPrepareLegal(prep *pb.Prepare) bool {
 func (rbft *rbftImpl) isCommitLegal(commit *pb.Commit) bool {
 
 	if !rbft.inWV(commit.View, commit.SequenceNumber) {
-		sender := rbft.peerPool.noMap[commit.ReplicaId]
 		if commit.SequenceNumber != rbft.h && !rbft.in(SkipInProgress) {
-			rbft.logger.Warningf("Replica %d ignore commit from replica %d for view=%d/seqNo=%d: not inWv, in view: %d, h: %d", rbft.no, sender, commit.View, commit.SequenceNumber, rbft.view, rbft.h)
+			rbft.logger.Warningf("Replica %d ignore commit from replica %d for view=%d/seqNo=%d: not inWv, in view: %d, h: %d",
+				rbft.peerPool.localID, commit.ReplicaId, commit.View, commit.SequenceNumber, rbft.view, rbft.h)
 		} else {
 			// This is perfectly normal
-			rbft.logger.Debugf("Replica %d ignore commit from replica %d for view=%d/seqNo=%d: not inWv, in view: %d, h: %d", rbft.no, sender, commit.View, commit.SequenceNumber, rbft.view, rbft.h)
+			rbft.logger.Debugf("Replica %d ignore commit from replica %d for view=%d/seqNo=%d: not inWv, in view: %d, h: %d",
+				rbft.peerPool.localID, commit.ReplicaId, commit.View, commit.SequenceNumber, rbft.view, rbft.h)
 		}
 		return false
 	}
@@ -402,7 +401,7 @@ func (rbft *rbftImpl) compareCheckpointWithWeakSet(chkpt *pb.Checkpoint) (bool, 
 	}
 
 	if rbft.storeMgr.checkpointStore[*chkpt] {
-		rbft.logger.Warningf("Replica %d ignore duplicate checkpoint from replica %d, seqNo=%d", rbft.no, chkpt.ReplicaId, chkpt.SequenceNumber)
+		rbft.logger.Warningf("Replica %d ignore duplicate checkpoint from replica %d, seqNo=%d", rbft.peerPool.localID, chkpt.ReplicaId, chkpt.SequenceNumber)
 		return false, 0
 	}
 	rbft.storeMgr.checkpointStore[*chkpt] = true
@@ -441,7 +440,7 @@ func (rbft *rbftImpl) compareCheckpointWithWeakSet(chkpt *pb.Checkpoint) (bool, 
 		// but different ID, we'll never be able to get a stable cert for this seqNo.
 		if len(diffValues) > rbft.f+1 {
 			rbft.logger.Criticalf("Replica %d cannot find stable checkpoint with seqNo %d"+
-				"(%d different values observed already).", rbft.no, chkpt.SequenceNumber, len(diffValues))
+				"(%d different values observed already).", rbft.peerPool.localID, chkpt.SequenceNumber, len(diffValues))
 			rbft.on(Pending)
 			rbft.setAbNormal()
 			return false, 0
@@ -454,14 +453,14 @@ func (rbft *rbftImpl) compareCheckpointWithWeakSet(chkpt *pb.Checkpoint) (bool, 
 	}
 
 	if len(correctValues) == 0 {
-		rbft.logger.Debugf("Replica %d hasn't got a weak cert for checkpoint %d", rbft.no, chkpt.SequenceNumber)
+		rbft.logger.Debugf("Replica %d hasn't got a weak cert for checkpoint %d", rbft.peerPool.localID, chkpt.SequenceNumber)
 		return true, matching
 	}
 
 	// if we encounter more than one correct weak set, we will never recover to a stable
 	// consensus state.
 	if len(correctValues) > 1 {
-		rbft.logger.Criticalf("Replica %d finds several weak certs for checkpoint %d, values: %v", rbft.no, chkpt.SequenceNumber, correctValues)
+		rbft.logger.Criticalf("Replica %d finds several weak certs for checkpoint %d, values: %v", rbft.peerPool.localID, chkpt.SequenceNumber, correctValues)
 		rbft.on(Pending)
 		rbft.setAbNormal()
 		return false, 0
@@ -475,7 +474,7 @@ func (rbft *rbftImpl) compareCheckpointWithWeakSet(chkpt *pb.Checkpoint) (bool, 
 	// checkpoint ID, we should trigger state update right now to recover self block state.
 	if ok && selfID != correctID {
 		rbft.logger.Criticalf("Replica %d generated a checkpoint of %s, but a weak set of the network agrees on %s.",
-			rbft.no, selfID, correctID)
+			rbft.peerPool.localID, selfID, correctID)
 
 		target := &stateUpdateTarget{
 			targetMessage: targetMessage{
@@ -501,7 +500,7 @@ func (rbft *rbftImpl) compareCheckpointWithWeakSet(chkpt *pb.Checkpoint) (bool, 
 // 5. digest(only compared in sync state): current latest blockChain hash
 func (rbft *rbftImpl) compareWholeStates(states wholeStates) consensusEvent {
 	// track all replica hash with same state used to update routing table if needed
-	sameRespCount := make(map[nodeState][]uint64)
+	sameRespCount := make(map[nodeState][]string)
 	// track all replica info with same state used to state update if needed
 	replicaRecord := make(map[nodeState][]replicaInfo)
 
@@ -510,25 +509,37 @@ func (rbft *rbftImpl) compareWholeStates(states wholeStates) consensusEvent {
 	var quorumResp nodeState
 	canFind := false
 
-	var quorumInfo []byte
 	// find the quorum nodeState
 	for key, state := range states {
-		sameRespCount[state] = append(sameRespCount[state], key)
-		replicaRecord[state] = append(replicaRecord[state], replicaInfo{replicaID: key})
-
-		// if quorum agree with a same N,view,routers, check if we need to update routing table first.
+		sameRespCount[state] = append(sameRespCount[state], key.ReplicaHash)
+		replicaRecord[state] = append(replicaRecord[state], replicaInfo{replicaID: key.ReplicaId})
+		// If quorum agree with a same N,view,epoch, check if we need to update routing table first.
+		// As for quorum will be changed according to validator set, and we cannot be sure that router info of
+		// the node is correct, we should calculate the commonCaseQuorum with the N of state.
 		if len(sameRespCount[state]) >= rbft.commonCaseQuorum() {
 			quorumResp = state
 			canFind = true
-			// if add/delete node happened in downtime, we may find self's routing table is
-			// not the same as quorum nodes, we need to update routing table and optionally
-			// connect to other nodes.
-			quorumInfo = hex2Bytes(state.routerInfo)
-			selfInfo := rbft.peerPool.serializeRouterInfo()
-			if !rbft.in(isNewNode) && !bytes.Equal(quorumInfo, selfInfo) {
-				rbft.logger.Warningf("Replica %d finds quorum routing table which is different "+
-					"from self's, pending updating routing table", rbft.no)
-				rbft.peerPool.updateRouter(quorumInfo, sameRespCount[quorumResp])
+			// If there are some changes about configuration, such as validator set, we could find epoch is different,
+			// so that, we should prepare to update the epoch and configuration.
+			if rbft.epoch < quorumResp.epoch {
+				rbft.logger.Debugf("Replica %d has found quorum epoch info different from self, try to update", rbft.peerPool.localID)
+				router := &pb.Router{}
+				qRouterInfo := hex2Bytes(quorumResp.routerInfo)
+				_ = proto.Unmarshal(qRouterInfo, router)
+				include := false
+				for _, peer := range router.Peers {
+					if peer.Hash == rbft.peerPool.localHash {
+						include = true
+						rbft.peerPool.updateRouter(qRouterInfo)
+						rbft.recordEpochStartState(quorumResp.appliedIndex, quorumResp.digest)
+						rbft.turnIntoEpoch(quorumResp.epoch)
+						break
+					}
+				}
+				if !include {
+					rbft.logger.Debugf("Replica %d cannot find self hash in such router, reject it", rbft.peerPool.localID)
+					return nil
+				}
 			}
 			break
 		}
@@ -542,92 +553,67 @@ func (rbft *rbftImpl) compareWholeStates(states wholeStates) consensusEvent {
 			rbft.view = quorumResp.view
 		}
 
-		// update N and f if needed
-		if rbft.N != int(quorumResp.n) {
-			rbft.N = int(quorumResp.n)
-			rbft.f = (rbft.N - 1) / 3
-		}
-
-		rbft.logger.Infof("Replica %d persist view=%d/N=%d after found quorum same response.", rbft.no, rbft.view, rbft.N)
+		rbft.logger.Infof("Replica %d persist view=%d/N=%d after found quorum same response.", rbft.peerPool.localID, rbft.view, rbft.N)
 		// always persist view and N to consensus database no matter we need to update view or not.
 		rbft.persistView(rbft.view)
 		rbft.persistN(rbft.N)
 
 		if rbft.in(InSyncState) {
+			state := rbft.node.getCurrentState()
+
 			rbft.timerMgr.stopTimer(syncStateRspTimer)
 			rbft.off(InSyncState)
-			selfState, ok := states[rbft.peerPool.localID]
-			if !ok {
-				rbft.logger.Warningf("Replica %d cannot find self state in wholeStates", rbft.no)
-				return nil
-			}
-			selfHeight := selfState.appliedIndex
-			quorumHeight := quorumResp.appliedIndex
-			selfHash := selfState.digest
-			quorumDigest := quorumResp.digest
-			if selfHeight == quorumHeight && selfHash != quorumDigest {
-				rbft.logger.Errorf("Replica %d finds quorum same block state whose hash is different from self,"+
-					"in height: %d, selfHash: %s, quorumDigest: %s, need to state update", rbft.no, quorumHeight, selfHash, quorumDigest)
-
+			if rbft.in(InEpochSync) {
+				rbft.logger.Noticef("Replica %d try to sync epoch, target state applied=%d/digest=%s",
+					rbft.peerPool.localID, quorumResp.appliedIndex, quorumResp.digest)
 				target := &stateUpdateTarget{
-					targetMessage: targetMessage{height: quorumHeight, digest: quorumDigest},
+					targetMessage: targetMessage{height: quorumResp.appliedIndex, digest: quorumResp.digest},
 					replicas:      replicaRecord[quorumResp],
 				}
 				rbft.updateHighStateTarget(target)
 				rbft.tryStateTransfer(target)
 				return nil
 			}
-			if selfHeight != quorumHeight {
+			if state.Applied == quorumResp.appliedIndex && state.Digest != quorumResp.digest {
+				rbft.logger.Errorf("Replica %d finds quorum same block state whose hash is different from self,"+
+					"in height: %d, selfHash: %s, quorumDigest: %s, need to state update",
+					rbft.peerPool.localID, quorumResp.appliedIndex, state.Digest, quorumResp.digest)
+
+				target := &stateUpdateTarget{
+					targetMessage: targetMessage{height: quorumResp.appliedIndex, digest: quorumResp.digest},
+					replicas:      replicaRecord[quorumResp],
+				}
+				rbft.updateHighStateTarget(target)
+				rbft.tryStateTransfer(target)
+				return nil
+			}
+			if state.Applied != quorumResp.appliedIndex {
 				rbft.logger.Noticef("Replica %d finds quorum same block state which is different from self,"+
-					"self height: %d, quorum height: %d, selfHash: %s, quorumDigest: %s", rbft.no, selfHeight, quorumHeight, selfHash, quorumDigest)
+					"self height: %d, quorum height: %d, selfHash: %s, quorumDigest: %s",
+					rbft.peerPool.localID, state.Applied, quorumResp.appliedIndex, state.Digest, quorumResp.digest)
 
 				if rbft.isPrimary(rbft.peerPool.localID) {
-					rbft.logger.Warningf("Primary %d finds itself not sync with quorum replicas, sending viewChange", rbft.no)
+					rbft.logger.Warningf("Primary %d finds itself not sync with quorum replicas, sending viewChange", rbft.peerPool.localID)
 					return rbft.sendViewChange()
 				}
-				rbft.logger.Infof("Replica %d finds itself not sync with quorum replicas, try to recovery", rbft.no)
+				rbft.logger.Infof("Replica %d finds itself not sync with quorum replicas, try to recovery", rbft.peerPool.localID)
 				return rbft.initRecovery()
 			}
-			rbft.logger.Infof("======== Replica %d finished sync state for height: %d, hash: %s", rbft.no, selfHeight, selfHash)
+			rbft.logger.Infof("======== Replica %d finished sync state for height: %d, hash: %s",
+				rbft.peerPool.localID, state.Applied, state.Digest)
 			return nil
 		}
 
 		if rbft.in(InRecovery) {
-			if rbft.in(isNewNode) {
-				quorumRouter := rbft.peerPool.unSerializeRouterInfo(quorumInfo)
-				// find if current node has been included into quorum node's routers.
-				included := false
-				for _, peer := range quorumRouter.Peers {
-					if peer.Id == rbft.peerPool.localID {
-						included = true
-					}
-				}
-
-				rbft.peerPool.updateRouter(quorumInfo, sameRespCount[quorumResp])
-				// If new node find itself needs to updateN which must be caused by timeout
-				// event in adding node, check if quorum nodes have agree admittance of myself,
-				// if not, resend readyForN request after recovery.
-				if included {
-					rbft.logger.Noticef("New node %d finds itself has been accepted by quorum nodes with "+
-						"N=%d/view=%d, start normal consensus process.", rbft.no, rbft.N, rbft.view)
-
-					rbft.off(isNewNode)
-					primaryID := rbft.primaryID(rbft.view)
-					primaryNo := rbft.peerPool.noMap[primaryID]
-					rbft.logger.Noticef("======== Replica %d finished updateN, primary=%d, n=%d/f=%d/view=%d/h=%d",
-						rbft.no, primaryNo, rbft.N, rbft.f, rbft.view, rbft.h)
-				}
-			} else {
-				// if current node finds itself become primary, but quorum other replicas
-				// are in normal status, directly send viewChange as we don't want to
-				// resend prePrepares after sync view.
-				if rbft.isPrimary(rbft.peerPool.localID) {
-					rbft.logger.Warningf("Replica %d become primary after sync view, sending viewChange", rbft.no)
-					rbft.timerMgr.stopTimer(recoveryRestartTimer)
-					rbft.off(InRecovery)
-					rbft.sendViewChange()
-					return nil
-				}
+			// if current node finds itself become primary, but quorum other replicas
+			// are in normal status, directly send viewChange as we don't want to
+			// resend prePrepares after sync view.
+			if rbft.isPrimary(rbft.peerPool.localID) {
+				rbft.logger.Warningf("Replica %d become primary after sync view, sending viewChange", rbft.peerPool.localID)
+				rbft.timerMgr.stopTimer(recoveryRestartTimer)
+				rbft.off(InRecovery)
+				rbft.sendViewChange()
+				return nil
 			}
 
 			return rbft.resetStateForRecovery()
@@ -730,7 +716,7 @@ func (rbft *rbftImpl) getVcBasis() *pb.VcBasis {
 	for idx := range rbft.storeMgr.certStore {
 		if idx.v < rbft.view {
 			rbft.logger.Debugf("Replica %d clear cert with view=%d/seqNo=%d/digest=%s when construct VcBasis",
-				rbft.no, idx.v, idx.n, idx.d)
+				rbft.peerPool.localID, idx.v, idx.n, idx.d)
 			delete(rbft.storeMgr.certStore, idx)
 			rbft.persistDelQPCSet(idx.v, idx.n, idx.d)
 		}
@@ -744,7 +730,7 @@ func (rbft *rbftImpl) getVcBasis() *pb.VcBasis {
 // gatherPQC just gather all checkpoints, p entries and q entries.
 func (rbft *rbftImpl) gatherPQC() (cset []*pb.Vc_C, pset []*pb.Vc_PQ, qset []*pb.Vc_PQ) {
 	// Gather all the checkpoints
-	rbft.logger.Debugf("Replica %d gather CSet:", rbft.no)
+	rbft.logger.Debugf("Replica %d gather CSet:", rbft.peerPool.localID)
 	for n, id := range rbft.storeMgr.chkpts {
 		cset = append(cset, &pb.Vc_C{
 			SequenceNumber: n,
@@ -753,10 +739,10 @@ func (rbft *rbftImpl) gatherPQC() (cset []*pb.Vc_C, pset []*pb.Vc_PQ, qset []*pb
 		rbft.logger.Debugf("seqNo: %d, ID: %s", n, id)
 	}
 	// Gather all the p entries
-	rbft.logger.Debugf("Replica %d gather PSet:", rbft.no)
+	rbft.logger.Debugf("Replica %d gather PSet:", rbft.peerPool.localID)
 	for _, p := range rbft.vcMgr.plist {
 		if p.SequenceNumber < rbft.h {
-			rbft.logger.Errorf("Replica %d should not have anything in our pset less than h, found %+v", rbft.no, p)
+			rbft.logger.Errorf("Replica %d should not have anything in our pset less than h, found %+v", rbft.peerPool.localID, p)
 			continue
 		}
 		pset = append(pset, p)
@@ -764,10 +750,10 @@ func (rbft *rbftImpl) gatherPQC() (cset []*pb.Vc_C, pset []*pb.Vc_PQ, qset []*pb
 	}
 
 	// Gather all the q entries
-	rbft.logger.Debugf("Replica %d gather QSet:", rbft.no)
+	rbft.logger.Debugf("Replica %d gather QSet:", rbft.peerPool.localID)
 	for _, q := range rbft.vcMgr.qlist {
 		if q.SequenceNumber < rbft.h {
-			rbft.logger.Errorf("Replica %d should not have anything in our qset less than h, found %+v", rbft.no, q)
+			rbft.logger.Errorf("Replica %d should not have anything in our qset less than h, found %+v", rbft.peerPool.localID, q)
 			continue
 		}
 		qset = append(qset, q)
@@ -775,6 +761,18 @@ func (rbft *rbftImpl) gatherPQC() (cset []*pb.Vc_C, pset []*pb.Vc_PQ, qset []*pb
 	}
 
 	return
+}
+
+func (rbft *rbftImpl) getNodeInfo() *pb.NodeInfo {
+	return &pb.NodeInfo{
+		ReplicaId:   rbft.peerPool.localID,
+		ReplicaHash: rbft.peerPool.localHash,
+	}
+}
+
+func (rbft *rbftImpl) recordEpochStartState(applied uint64, digest string) {
+	rbft.epochMgr.epochStartState.Applied = applied
+	rbft.epochMgr.epochStartState.Digest = digest
 }
 
 // byte2Hex returns the hex encode result of data
