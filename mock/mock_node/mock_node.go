@@ -139,16 +139,16 @@ func (mr *MockNodeMockRecorder) ReportStateUpdated(state interface{}) *gomock.Ca
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReportStateUpdated", reflect.TypeOf((*MockNode)(nil).ReportStateUpdated), state)
 }
 
-// ReportRouterUpdated mocks base method
-func (m *MockNode) ReportRouterUpdated(router *rbftpb.Router) {
+// ReportReloadFinished mocks base method
+func (m *MockNode) ReportReloadFinished(reload *rbftpb.ReloadMessage) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "ReportRouterUpdated", router)
+	m.ctrl.Call(m, "ReportReloadFinished", reload)
 }
 
-// ReportRouterUpdated indicates an expected call of ReportRouterUpdated
-func (mr *MockNodeMockRecorder) ReportRouterUpdated(router interface{}) *gomock.Call {
+// ReportReloadFinished indicates an expected call of ReportReloadFinished
+func (mr *MockNodeMockRecorder) ReportReloadFinished(reload interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReportRouterUpdated", reflect.TypeOf((*MockNode)(nil).ReportRouterUpdated), router)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReportReloadFinished", reflect.TypeOf((*MockNode)(nil).ReportReloadFinished), reload)
 }
 
 // Stop mocks base method
@@ -210,14 +210,14 @@ func (mr *MockServiceInboundMockRecorder) ReportStateUpdated(state interface{}) 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReportStateUpdated", reflect.TypeOf((*MockServiceInbound)(nil).ReportStateUpdated), state)
 }
 
-// ReportRouterUpdated mocks base method
-func (m *MockServiceInbound) ReportRouterUpdated(router *rbftpb.Router) {
+// ReportReloadFinished mocks base method
+func (m *MockServiceInbound) ReportReloadFinished(reload *rbftpb.ReloadMessage) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "ReportRouterUpdated", router)
+	m.ctrl.Call(m, "ReportReloadFinished", reload)
 }
 
-// ReportRouterUpdated indicates an expected call of ReportRouterUpdated
-func (mr *MockServiceInboundMockRecorder) ReportRouterUpdated(router interface{}) *gomock.Call {
+// ReportReloadFinished indicates an expected call of ReportReloadFinished
+func (mr *MockServiceInboundMockRecorder) ReportReloadFinished(reload interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReportRouterUpdated", reflect.TypeOf((*MockServiceInbound)(nil).ReportRouterUpdated), router)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReportReloadFinished", reflect.TypeOf((*MockServiceInbound)(nil).ReportReloadFinished), reload)
 }

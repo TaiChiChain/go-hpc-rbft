@@ -12,9 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestStoreMgr_newStoreMgr(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+func testNewStorage(ctrl *gomock.Controller) (*storeManager, Config) {
 	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
 	log := NewRawLogger()
 	external := mockexternal.NewMockMinimalExternal(ctrl)
@@ -38,15 +36,25 @@ func TestStoreMgr_newStoreMgr(t *testing.T) {
 		SyncStateTimeout:        1 * time.Second,
 		SyncStateRestartTimeout: 10 * time.Second,
 		RecoveryTimeout:         10 * time.Second,
-		UpdateTimeout:           4 * time.Second,
+		EpochCheckTimeout:       4 * time.Second,
 		CheckPoolTimeout:        3 * time.Minute,
 
 		Logger:      log,
 		External:    external,
 		RequestPool: pool,
+
+		EpochInit:       uint64(0),
+		EpochInitDigest: "XXX GENESIS",
 	}
 
-	s := newStoreMgr(conf)
+	return newStoreMgr(conf), conf
+}
+
+func TestStoreMgr_newStoreMgr(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	s, _ := testNewStorage(ctrl)
+
 	structName, nilElems, err := checkNilElems(s)
 	if err == nil {
 		assert.Equal(t, "storeManager", structName)
@@ -58,40 +66,10 @@ func TestStoreMgr_newStoreMgr(t *testing.T) {
 func TestStoreMgr_moveWatermarks(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
-	log := NewRawLogger()
-	external := mockexternal.NewMockMinimalExternal(ctrl)
 
-	conf := Config{
-		ID:                      2,
-		Hash:                    "node2",
-		IsNew:                   false,
-		Peers:                   peerSet,
-		K:                       10,
-		LogMultiplier:           4,
-		SetSize:                 25,
-		SetTimeout:              100 * time.Millisecond,
-		BatchTimeout:            500 * time.Millisecond,
-		RequestTimeout:          6 * time.Second,
-		NullRequestTimeout:      9 * time.Second,
-		VcResendTimeout:         10 * time.Second,
-		CleanVCTimeout:          60 * time.Second,
-		NewViewTimeout:          8 * time.Second,
-		FirstRequestTimeout:     30 * time.Second,
-		SyncStateTimeout:        1 * time.Second,
-		SyncStateRestartTimeout: 10 * time.Second,
-		RecoveryTimeout:         10 * time.Second,
-		UpdateTimeout:           4 * time.Second,
-		CheckPoolTimeout:        3 * time.Minute,
-
-		Logger:      log,
-		External:    external,
-		RequestPool: pool,
-	}
-
-	s := newStoreMgr(conf)
+	s, conf := testNewStorage(ctrl)
 	cpChan := make(chan *pb.ServiceState)
-	confC := make(chan bool)
+	confC := make(chan *pb.ReloadFinished)
 	rbft, _ := newRBFT(cpChan, confC, conf)
 
 	QID := qidx{
@@ -117,38 +95,7 @@ func TestStoreMgr_moveWatermarks(t *testing.T) {
 func TestStoreMgr_saveCheckpoint(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
-	log := NewRawLogger()
-	external := mockexternal.NewMockMinimalExternal(ctrl)
-
-	conf := Config{
-		ID:                      2,
-		Hash:                    "node2",
-		IsNew:                   false,
-		Peers:                   peerSet,
-		K:                       10,
-		LogMultiplier:           4,
-		SetSize:                 25,
-		SetTimeout:              100 * time.Millisecond,
-		BatchTimeout:            500 * time.Millisecond,
-		RequestTimeout:          6 * time.Second,
-		NullRequestTimeout:      9 * time.Second,
-		VcResendTimeout:         10 * time.Second,
-		CleanVCTimeout:          60 * time.Second,
-		NewViewTimeout:          8 * time.Second,
-		FirstRequestTimeout:     30 * time.Second,
-		SyncStateTimeout:        1 * time.Second,
-		SyncStateRestartTimeout: 10 * time.Second,
-		RecoveryTimeout:         10 * time.Second,
-		UpdateTimeout:           4 * time.Second,
-		CheckPoolTimeout:        3 * time.Minute,
-
-		Logger:      log,
-		External:    external,
-		RequestPool: pool,
-	}
-
-	s := newStoreMgr(conf)
+	s, _ := testNewStorage(ctrl)
 	s.saveCheckpoint(uint64(10), "base64")
 
 	assert.Equal(t, "base64", s.chkpts[uint64(10)])
@@ -157,38 +104,8 @@ func TestStoreMgr_saveCheckpoint(t *testing.T) {
 func TestStoreMgr_getCert(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
-	log := NewRawLogger()
-	external := mockexternal.NewMockMinimalExternal(ctrl)
 
-	conf := Config{
-		ID:                      2,
-		Hash:                    "node2",
-		IsNew:                   false,
-		Peers:                   peerSet,
-		K:                       10,
-		LogMultiplier:           4,
-		SetSize:                 25,
-		SetTimeout:              100 * time.Millisecond,
-		BatchTimeout:            500 * time.Millisecond,
-		RequestTimeout:          6 * time.Second,
-		NullRequestTimeout:      9 * time.Second,
-		VcResendTimeout:         10 * time.Second,
-		CleanVCTimeout:          60 * time.Second,
-		NewViewTimeout:          8 * time.Second,
-		FirstRequestTimeout:     30 * time.Second,
-		SyncStateTimeout:        1 * time.Second,
-		SyncStateRestartTimeout: 10 * time.Second,
-		RecoveryTimeout:         10 * time.Second,
-		UpdateTimeout:           4 * time.Second,
-		CheckPoolTimeout:        3 * time.Minute,
-
-		Logger:      log,
-		External:    external,
-		RequestPool: pool,
-	}
-
-	s := newStoreMgr(conf)
+	s, _ := testNewStorage(ctrl)
 
 	var retCert *msgCert
 	// get default cert
@@ -225,38 +142,8 @@ func TestStoreMgr_getCert(t *testing.T) {
 func TestStoreMgr_existedDigest(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
-	log := NewRawLogger()
-	external := mockexternal.NewMockMinimalExternal(ctrl)
 
-	conf := Config{
-		ID:                      2,
-		Hash:                    "node2",
-		IsNew:                   false,
-		Peers:                   peerSet,
-		K:                       10,
-		LogMultiplier:           4,
-		SetSize:                 25,
-		SetTimeout:              100 * time.Millisecond,
-		BatchTimeout:            500 * time.Millisecond,
-		RequestTimeout:          6 * time.Second,
-		NullRequestTimeout:      9 * time.Second,
-		VcResendTimeout:         10 * time.Second,
-		CleanVCTimeout:          60 * time.Second,
-		NewViewTimeout:          8 * time.Second,
-		FirstRequestTimeout:     30 * time.Second,
-		SyncStateTimeout:        1 * time.Second,
-		SyncStateRestartTimeout: 10 * time.Second,
-		RecoveryTimeout:         10 * time.Second,
-		UpdateTimeout:           4 * time.Second,
-		CheckPoolTimeout:        3 * time.Minute,
-
-		Logger:      log,
-		External:    external,
-		RequestPool: pool,
-	}
-
-	s := newStoreMgr(conf)
+	s, _ := testNewStorage(ctrl)
 
 	msgIDTmp := msgID{
 		v: 1,

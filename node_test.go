@@ -3,11 +3,8 @@ package rbft
 import (
 	"errors"
 	"testing"
-	"time"
 
-	mockexternal "github.com/ultramesh/flato-rbft/mock/mock_external"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
-	txpoolmock "github.com/ultramesh/flato-txpool/mock"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/golang/mock/gomock"
@@ -17,39 +14,10 @@ import (
 func TestNode_NewNode(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
-	log := NewRawLogger()
-	external := mockexternal.NewMockMinimalExternal(ctrl)
+	rbft, conf := newTestRBFTReplica(ctrl)
+	n := rbft.node
 
-	conf := Config{
-		ID:                      2,
-		Hash:                    "node2",
-		IsNew:                   false,
-		Peers:                   peerSet,
-		K:                       10,
-		LogMultiplier:           4,
-		SetSize:                 25,
-		SetTimeout:              100 * time.Millisecond,
-		BatchTimeout:            500 * time.Millisecond,
-		RequestTimeout:          6 * time.Second,
-		NullRequestTimeout:      9 * time.Second,
-		VcResendTimeout:         10 * time.Second,
-		CleanVCTimeout:          60 * time.Second,
-		NewViewTimeout:          8 * time.Second,
-		FirstRequestTimeout:     30 * time.Second,
-		SyncStateTimeout:        1 * time.Second,
-		SyncStateRestartTimeout: 10 * time.Second,
-		RecoveryTimeout:         10 * time.Second,
-		UpdateTimeout:           4 * time.Second,
-		CheckPoolTimeout:        3 * time.Minute,
-
-		Logger:      log,
-		External:    external,
-		RequestPool: pool,
-	}
-	node, _ := NewNode(conf)
-
-	structName, nilElems, err := checkNilElems(node)
+	structName, nilElems, err := checkNilElems(n)
 	if err == nil {
 		assert.Equal(t, "node", structName)
 		assert.Nil(t, nilElems)
@@ -67,84 +35,34 @@ func TestNode_NewNode(t *testing.T) {
 func TestNode_Start(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	log := NewRawLogger()
-	external := mockexternal.NewMockMinimalExternal(ctrl)
-	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
-
-	conf := Config{
-		ID:                      2,
-		Hash:                    "node2",
-		IsNew:                   false,
-		Peers:                   peerSet,
-		K:                       10,
-		LogMultiplier:           4,
-		SetSize:                 25,
-		SetTimeout:              100 * time.Millisecond,
-		BatchTimeout:            500 * time.Millisecond,
-		RequestTimeout:          6 * time.Second,
-		NullRequestTimeout:      9 * time.Second,
-		VcResendTimeout:         10 * time.Second,
-		CleanVCTimeout:          60 * time.Second,
-		NewViewTimeout:          8 * time.Second,
-		FirstRequestTimeout:     30 * time.Second,
-		SyncStateTimeout:        1 * time.Second,
-		SyncStateRestartTimeout: 10 * time.Second,
-		RecoveryTimeout:         10 * time.Second,
-		UpdateTimeout:           4 * time.Second,
-		CheckPoolTimeout:        3 * time.Minute,
-
-		Logger:      log,
-		External:    external,
-		RequestPool: pool,
-	}
-	n, _ := newNode(conf)
-	n.rbft.on(Pending)
+	rbft, _ := newTestRBFTReplica(ctrl)
+	n := rbft.node
+	n.rbft.atomicOn(Pending)
 
 	n.currentState = &pb.ServiceState{
-		Applied: uint64(0),
-		Digest:  "GENESIS XXX",
-		VSet:    nil,
+		MetaState: &pb.MetaState{
+			Applied: uint64(0),
+			Digest:  "GENESIS XXX",
+		},
+		VSet: nil,
 	}
 	// Test Normal Case
 	_ = n.Start()
-	assert.Equal(t, false, n.rbft.in(Pending))
+	assert.Equal(t, false, n.rbft.atomicIn(Pending))
 }
 
 func TestNode_Stop(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	log := NewRawLogger()
-	external := mockexternal.NewMockMinimalExternal(ctrl)
-	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
-
-	conf := Config{
-		ID:                      2,
-		Hash:                    "node2",
-		IsNew:                   false,
-		Peers:                   peerSet,
-		K:                       10,
-		LogMultiplier:           4,
-		SetSize:                 25,
-		SetTimeout:              100 * time.Millisecond,
-		BatchTimeout:            500 * time.Millisecond,
-		RequestTimeout:          6 * time.Second,
-		NullRequestTimeout:      9 * time.Second,
-		VcResendTimeout:         10 * time.Second,
-		CleanVCTimeout:          60 * time.Second,
-		NewViewTimeout:          8 * time.Second,
-		FirstRequestTimeout:     30 * time.Second,
-		SyncStateTimeout:        1 * time.Second,
-		SyncStateRestartTimeout: 10 * time.Second,
-		RecoveryTimeout:         10 * time.Second,
-		UpdateTimeout:           4 * time.Second,
-		CheckPoolTimeout:        3 * time.Minute,
-
-		Logger:      log,
-		External:    external,
-		RequestPool: pool,
+	rbft, _ := newTestRBFTReplica(ctrl)
+	n := rbft.node
+	n.currentState = &pb.ServiceState{
+		MetaState: &pb.MetaState{
+			Applied: uint64(0),
+			Digest:  "GENESIS XXX",
+		},
+		VSet: nil,
 	}
-	n, _ := newNode(conf)
-	n.currentState = &pb.ServiceState{Digest: "digest"}
 
 	n.Stop()
 	assert.Nil(t, n.currentState)
@@ -153,37 +71,8 @@ func TestNode_Stop(t *testing.T) {
 func TestNode_Propose(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	log := NewRawLogger()
-	external := mockexternal.NewMockMinimalExternal(ctrl)
-	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
-
-	conf := Config{
-		ID:                      2,
-		Hash:                    "node2",
-		IsNew:                   false,
-		Peers:                   peerSet,
-		K:                       10,
-		LogMultiplier:           4,
-		SetSize:                 25,
-		SetTimeout:              100 * time.Millisecond,
-		BatchTimeout:            500 * time.Millisecond,
-		RequestTimeout:          6 * time.Second,
-		NullRequestTimeout:      9 * time.Second,
-		VcResendTimeout:         10 * time.Second,
-		CleanVCTimeout:          60 * time.Second,
-		NewViewTimeout:          8 * time.Second,
-		FirstRequestTimeout:     30 * time.Second,
-		SyncStateTimeout:        1 * time.Second,
-		SyncStateRestartTimeout: 10 * time.Second,
-		RecoveryTimeout:         10 * time.Second,
-		UpdateTimeout:           4 * time.Second,
-		CheckPoolTimeout:        3 * time.Minute,
-
-		Logger:      log,
-		External:    external,
-		RequestPool: pool,
-	}
-	n, _ := newNode(conf)
+	rbft, _ := newTestRBFTReplica(ctrl)
+	n := rbft.node
 
 	go func() {
 		requestsTmp := mockRequestList
@@ -200,42 +89,13 @@ func TestNode_Propose(t *testing.T) {
 func TestNode_Step(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	log := NewRawLogger()
-	external := mockexternal.NewMockMinimalExternal(ctrl)
-	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
-
-	conf := Config{
-		ID:                      2,
-		Hash:                    "node2",
-		IsNew:                   false,
-		Peers:                   peerSet,
-		K:                       10,
-		LogMultiplier:           4,
-		SetSize:                 25,
-		SetTimeout:              100 * time.Millisecond,
-		BatchTimeout:            500 * time.Millisecond,
-		RequestTimeout:          6 * time.Second,
-		NullRequestTimeout:      9 * time.Second,
-		VcResendTimeout:         10 * time.Second,
-		CleanVCTimeout:          60 * time.Second,
-		NewViewTimeout:          8 * time.Second,
-		FirstRequestTimeout:     30 * time.Second,
-		SyncStateTimeout:        1 * time.Second,
-		SyncStateRestartTimeout: 10 * time.Second,
-		RecoveryTimeout:         10 * time.Second,
-		UpdateTimeout:           4 * time.Second,
-		CheckPoolTimeout:        3 * time.Minute,
-
-		Logger:      log,
-		External:    external,
-		RequestPool: pool,
-	}
-	n, _ := newNode(conf)
+	rbft, _ := newTestRBFTReplica(ctrl)
+	n := rbft.node
 
 	// Post a Type_NULL_REQUEST Msg
 	// Type/Payload
 	nullRequest := &pb.NullRequest{
-		ReplicaId: n.rbft.peerPool.localID,
+		ReplicaId: n.rbft.peerPool.ID,
 	}
 	payload, _ := proto.Marshal(nullRequest)
 	msgTmp := &pb.ConsensusMessage{
@@ -252,37 +112,8 @@ func TestNode_Step(t *testing.T) {
 func TestNode_ApplyConfChange(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	log := NewRawLogger()
-	external := mockexternal.NewMockMinimalExternal(ctrl)
-	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
-
-	conf := Config{
-		ID:                      2,
-		Hash:                    "node2",
-		IsNew:                   false,
-		Peers:                   peerSet,
-		K:                       10,
-		LogMultiplier:           4,
-		SetSize:                 25,
-		SetTimeout:              100 * time.Millisecond,
-		BatchTimeout:            500 * time.Millisecond,
-		RequestTimeout:          6 * time.Second,
-		NullRequestTimeout:      9 * time.Second,
-		VcResendTimeout:         10 * time.Second,
-		CleanVCTimeout:          60 * time.Second,
-		NewViewTimeout:          8 * time.Second,
-		FirstRequestTimeout:     30 * time.Second,
-		SyncStateTimeout:        1 * time.Second,
-		SyncStateRestartTimeout: 10 * time.Second,
-		RecoveryTimeout:         10 * time.Second,
-		UpdateTimeout:           4 * time.Second,
-		CheckPoolTimeout:        3 * time.Minute,
-
-		Logger:      log,
-		External:    external,
-		RequestPool: pool,
-	}
-	n, _ := newNode(conf)
+	rbft, _ := newTestRBFTReplica(ctrl)
+	n := rbft.node
 
 	r := &pb.Router{Peers: peerSet}
 	cc := &pb.ConfState{QuorumRouter: r}
@@ -293,41 +124,14 @@ func TestNode_ApplyConfChange(t *testing.T) {
 func TestNode_ReportExecuted(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	log := NewRawLogger()
-	external := mockexternal.NewMockMinimalExternal(ctrl)
-	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
-
-	conf := Config{
-		ID:                      2,
-		Hash:                    "node2",
-		IsNew:                   false,
-		Peers:                   peerSet,
-		K:                       10,
-		LogMultiplier:           4,
-		SetSize:                 25,
-		SetTimeout:              100 * time.Millisecond,
-		BatchTimeout:            500 * time.Millisecond,
-		RequestTimeout:          6 * time.Second,
-		NullRequestTimeout:      9 * time.Second,
-		VcResendTimeout:         10 * time.Second,
-		CleanVCTimeout:          60 * time.Second,
-		NewViewTimeout:          8 * time.Second,
-		FirstRequestTimeout:     30 * time.Second,
-		SyncStateTimeout:        1 * time.Second,
-		SyncStateRestartTimeout: 10 * time.Second,
-		RecoveryTimeout:         10 * time.Second,
-		UpdateTimeout:           4 * time.Second,
-		CheckPoolTimeout:        3 * time.Minute,
-
-		Logger:      log,
-		External:    external,
-		RequestPool: pool,
-	}
-	n, _ := newNode(conf)
+	rbft, _ := newTestRBFTReplica(ctrl)
+	n := rbft.node
 
 	state1 := &pb.ServiceState{
-		Applied: 2,
-		Digest:  "msg",
+		MetaState: &pb.MetaState{
+			Applied: 2,
+			Digest:  "msg",
+		},
 	}
 
 	n.currentState = nil
@@ -335,22 +139,28 @@ func TestNode_ReportExecuted(t *testing.T) {
 	assert.Equal(t, state1, n.currentState)
 
 	state2 := &pb.ServiceState{
-		Applied: 2,
-		Digest:  "test",
+		MetaState: &pb.MetaState{
+			Applied: 2,
+			Digest:  "test",
+		},
 	}
 	n.ReportExecuted(state2)
-	assert.Equal(t, "msg", n.currentState.Digest)
+	assert.Equal(t, "msg", n.currentState.MetaState.Digest)
 
 	state3 := &pb.ServiceState{
-		Applied: 5,
-		Digest:  "test",
+		MetaState: &pb.MetaState{
+			Applied: 5,
+			Digest:  "test",
+		},
 	}
 	n.ReportExecuted(state3)
-	assert.Equal(t, "test", n.currentState.Digest)
+	assert.Equal(t, "test", n.currentState.MetaState.Digest)
 
 	state4 := &pb.ServiceState{
-		Applied: 40,
-		Digest:  "test",
+		MetaState: &pb.MetaState{
+			Applied: 40,
+			Digest:  "test",
+		},
 	}
 	go func() {
 		n.ReportExecuted(state4)
@@ -362,102 +172,55 @@ func TestNode_ReportExecuted(t *testing.T) {
 func TestNode_ReportStateUpdated(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	log := NewRawLogger()
-	external := mockexternal.NewMockMinimalExternal(ctrl)
-	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
-
-	conf := Config{
-		ID:                      2,
-		Hash:                    "node2",
-		IsNew:                   false,
-		Peers:                   peerSet,
-		K:                       10,
-		LogMultiplier:           4,
-		SetSize:                 25,
-		SetTimeout:              100 * time.Millisecond,
-		BatchTimeout:            500 * time.Millisecond,
-		RequestTimeout:          6 * time.Second,
-		NullRequestTimeout:      9 * time.Second,
-		VcResendTimeout:         10 * time.Second,
-		CleanVCTimeout:          60 * time.Second,
-		NewViewTimeout:          8 * time.Second,
-		FirstRequestTimeout:     30 * time.Second,
-		SyncStateTimeout:        1 * time.Second,
-		SyncStateRestartTimeout: 10 * time.Second,
-		RecoveryTimeout:         10 * time.Second,
-		UpdateTimeout:           4 * time.Second,
-		CheckPoolTimeout:        3 * time.Minute,
-
-		Logger:      log,
-		External:    external,
-		RequestPool: pool,
-	}
-	n, _ := newNode(conf)
+	rbft, _ := newTestRBFTReplica(ctrl)
+	n := rbft.node
 
 	state := &pb.ServiceState{
-		Applied: 2,
-		Digest:  "state1",
+		MetaState: &pb.MetaState{
+			Applied: 2,
+			Digest:  "state1",
+		},
 	}
 
 	state2 := &pb.ServiceState{
-		Applied: 2,
-		Digest:  "state2",
+		MetaState: &pb.MetaState{
+			Applied: 2,
+			Digest:  "state2",
+		},
 	}
 
 	n.currentState = state
 	n.ReportStateUpdated(state2)
-	assert.Equal(t, "state2", n.currentState.Digest)
+	assert.Equal(t, "state2", n.currentState.MetaState.Digest)
 
 	state3 := &pb.ServiceState{
-		Applied: 4,
-		Digest:  "state3",
+		MetaState: &pb.MetaState{
+			Applied: 4,
+			Digest:  "state3",
+		},
 	}
 	n.ReportStateUpdated(state3)
-	assert.Equal(t, "state3", n.currentState.Digest)
+	assert.Equal(t, "state3", n.currentState.MetaState.Digest)
 }
 
 func TestNode_getCurrentState(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	log := NewRawLogger()
-	external := mockexternal.NewMockMinimalExternal(ctrl)
-	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
+	rbft, _ := newTestRBFTReplica(ctrl)
+	n := rbft.node
 
-	conf := Config{
-		ID:                      2,
-		Hash:                    "node2",
-		IsNew:                   false,
-		Peers:                   peerSet,
-		K:                       10,
-		LogMultiplier:           4,
-		SetSize:                 25,
-		SetTimeout:              100 * time.Millisecond,
-		BatchTimeout:            500 * time.Millisecond,
-		RequestTimeout:          6 * time.Second,
-		NullRequestTimeout:      9 * time.Second,
-		VcResendTimeout:         10 * time.Second,
-		CleanVCTimeout:          60 * time.Second,
-		NewViewTimeout:          8 * time.Second,
-		FirstRequestTimeout:     30 * time.Second,
-		SyncStateTimeout:        1 * time.Second,
-		SyncStateRestartTimeout: 10 * time.Second,
-		RecoveryTimeout:         10 * time.Second,
-		UpdateTimeout:           4 * time.Second,
-		CheckPoolTimeout:        3 * time.Minute,
-
-		Logger:      log,
-		External:    external,
-		RequestPool: pool,
-	}
-	n, _ := newNode(conf)
 	n.currentState = &pb.ServiceState{
-		Applied: 4,
-		Digest:  "test",
+		MetaState: &pb.MetaState{
+			Applied: 4,
+			Digest:  "test",
+		},
 	}
 
 	expState := &pb.ServiceState{
-		Applied: 4,
-		Digest:  "test",
+		MetaState: &pb.MetaState{
+			Applied: 4,
+			Digest:  "test",
+		},
 	}
 	assert.Equal(t, expState, n.getCurrentState())
 }

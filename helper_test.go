@@ -234,27 +234,27 @@ func TestHelper_isPrePrepareLegal(t *testing.T) {
 		HashBatch:      nil,
 	}
 
-	rbft.on(InRecovery)
+	rbft.atomicOn(InRecovery)
 	assert.Equal(t, false, rbft.isPrePrepareLegal(preprep))
-	rbft.off(InRecovery)
+	rbft.atomicOff(InRecovery)
 
-	rbft.on(InViewChange)
+	rbft.atomicOn(InViewChange)
 	assert.Equal(t, false, rbft.isPrePrepareLegal(preprep))
-	rbft.off(InViewChange)
+	rbft.atomicOff(InViewChange)
 
-	rbft.on(InUpdatingN)
+	rbft.atomicOn(InConfChange)
 	assert.Equal(t, false, rbft.isPrePrepareLegal(preprep))
-	rbft.off(InUpdatingN)
+	rbft.atomicOff(InConfChange)
 
 	assert.Equal(t, false, rbft.isPrePrepareLegal(preprep))
 
 	preprep.ReplicaId = 1
 	assert.Equal(t, false, rbft.isPrePrepareLegal(preprep))
 
-	rbft.peerPool.localID = 1
+	rbft.peerPool.ID = 1
 	assert.Equal(t, false, rbft.isPrePrepareLegal(preprep))
 
-	rbft.peerPool.localID = 3
+	rbft.peerPool.ID = 3
 	assert.Equal(t, false, rbft.isPrePrepareLegal(preprep))
 
 	rbft.on(SkipInProgress)
@@ -367,7 +367,7 @@ func TestHelper_compareCheckpointWithWeakSet(t *testing.T) {
 
 	// if len(correctValues) > 1
 	rbft.f = 1
-	rbft.off(Pending)
+	rbft.atomicOff(Pending)
 	rbft.on(Normal)
 	chkpt.Digest = "msg"
 	chkptR1.Digest = "msg"
@@ -385,7 +385,7 @@ func TestHelper_compareCheckpointWithWeakSet(t *testing.T) {
 	flag, val = rbft.compareCheckpointWithWeakSet(chkpt)
 	assert.Equal(t, false, flag)
 	assert.Equal(t, 0, val)
-	assert.Equal(t, false, rbft.in(Pending))
+	assert.Equal(t, false, rbft.atomicIn(Pending))
 	assert.Equal(t, true, rbft.in(Normal))
 }
 

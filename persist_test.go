@@ -6,8 +6,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ultramesh/flato-rbft/external"
 	mockexternal "github.com/ultramesh/flato-rbft/mock/mock_external"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
+	txpool "github.com/ultramesh/flato-txpool"
 	txpoolmock "github.com/ultramesh/flato-txpool/mock"
 
 	"github.com/gogo/protobuf/proto"
@@ -15,13 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestPersist_restoreView(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
-	log := NewRawLogger()
-	external := mockexternal.NewMockExternalStack(ctrl)
-
+func newPersistTestReplica(ctrl *gomock.Controller, pool txpool.TxPool, log Logger, ext external.ExternalStack) *node {
 	conf := Config{
 		ID:                      2,
 		Hash:                    "node2",
@@ -41,31 +37,45 @@ func TestPersist_restoreView(t *testing.T) {
 		SyncStateTimeout:        1 * time.Second,
 		SyncStateRestartTimeout: 10 * time.Second,
 		RecoveryTimeout:         10 * time.Second,
-		UpdateTimeout:           4 * time.Second,
+		EpochCheckTimeout:       4 * time.Second,
 		CheckPoolTimeout:        3 * time.Minute,
 
 		Logger:      log,
-		External:    external,
+		External:    ext,
 		RequestPool: pool,
+
+		EpochInit:       uint64(0),
+		EpochInitDigest: "XXX GENESIS",
 	}
 
 	node, _ := newNode(conf)
+	return node
+}
+
+func TestPersist_restoreView(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
+	log := NewRawLogger()
+	ext := mockexternal.NewMockExternalStack(ctrl)
+	node := newPersistTestReplica(ctrl, pool, log, ext)
+
 	node.rbft.setView(2)
 
 	var ret []byte
 
 	ret = []byte("test")
-	external.EXPECT().ReadState("setView").Return(ret, nil)
-	external.EXPECT().DelState(gomock.Any()).Return(nil)
-	external.EXPECT().ReadState("view").Return(nil, errors.New("err"))
+	ext.EXPECT().ReadState("setView").Return(ret, nil)
+	ext.EXPECT().DelState(gomock.Any()).Return(nil)
+	ext.EXPECT().ReadState("view").Return(nil, errors.New("err"))
 
 	flag := node.rbft.restoreView()
 	assert.Equal(t, false, flag)
 	assert.Equal(t, uint64(0), node.rbft.view)
 
 	ret = []byte("1")
-	external.EXPECT().ReadState("setView").Return(ret, nil)
-	external.EXPECT().DelState(gomock.Any()).Return(nil)
+	ext.EXPECT().ReadState("setView").Return(ret, nil)
+	ext.EXPECT().DelState(gomock.Any()).Return(nil)
 
 	flag = node.rbft.restoreView()
 	assert.Equal(t, true, flag)
@@ -73,9 +83,9 @@ func TestPersist_restoreView(t *testing.T) {
 
 	var b = make([]byte, 8)
 	binary.LittleEndian.PutUint64(b, uint64(1))
-	external.EXPECT().ReadState("setView").Return(nil, errors.New("err"))
-	external.EXPECT().DelState(gomock.Any()).Return(nil)
-	external.EXPECT().ReadState("view").Return(b, nil)
+	ext.EXPECT().ReadState("setView").Return(nil, errors.New("err"))
+	ext.EXPECT().DelState(gomock.Any()).Return(nil)
+	ext.EXPECT().ReadState("view").Return(b, nil)
 
 	flag = node.rbft.restoreView()
 	assert.Equal(t, false, flag)
@@ -87,62 +97,34 @@ func TestPersist_restoreQList(t *testing.T) {
 	defer ctrl.Finish()
 	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
 	log := NewRawLogger()
-	external := mockexternal.NewMockExternalStack(ctrl)
-
-	conf := Config{
-		ID:                      2,
-		Hash:                    "node2",
-		IsNew:                   false,
-		Peers:                   peerSet,
-		K:                       10,
-		LogMultiplier:           4,
-		SetSize:                 25,
-		SetTimeout:              100 * time.Millisecond,
-		BatchTimeout:            500 * time.Millisecond,
-		RequestTimeout:          6 * time.Second,
-		NullRequestTimeout:      9 * time.Second,
-		VcResendTimeout:         10 * time.Second,
-		CleanVCTimeout:          60 * time.Second,
-		NewViewTimeout:          8 * time.Second,
-		FirstRequestTimeout:     30 * time.Second,
-		SyncStateTimeout:        1 * time.Second,
-		SyncStateRestartTimeout: 10 * time.Second,
-		RecoveryTimeout:         10 * time.Second,
-		UpdateTimeout:           4 * time.Second,
-		CheckPoolTimeout:        3 * time.Minute,
-
-		Logger:      log,
-		External:    external,
-		RequestPool: pool,
-	}
-
-	node, _ := newNode(conf)
+	ext := mockexternal.NewMockExternalStack(ctrl)
+	node := newPersistTestReplica(ctrl, pool, log, ext)
 
 	var ret map[string][]byte
 	var err error
 
 	ret = map[string][]byte{"qlist.": []byte("test")}
-	external.EXPECT().ReadStateSet("qlist.").Return(ret, nil)
+	ext.EXPECT().ReadStateSet("qlist.").Return(ret, nil)
 	_, err = node.rbft.restoreQList()
 	assert.Equal(t, errors.New("incorrect format"), err)
 
 	ret = map[string][]byte{"2.qlist.1": []byte("test")}
-	external.EXPECT().ReadStateSet("qlist.").Return(ret, nil)
+	ext.EXPECT().ReadStateSet("qlist.").Return(ret, nil)
 	_, err = node.rbft.restoreQList()
 	assert.Equal(t, errors.New("incorrect prefix"), err)
 
 	ret = map[string][]byte{"qlist.one.test": []byte("test")}
-	external.EXPECT().ReadStateSet("qlist.").Return(ret, nil)
+	ext.EXPECT().ReadStateSet("qlist.").Return(ret, nil)
 	_, err = node.rbft.restoreQList()
 	assert.Equal(t, errors.New("parse failed"), err)
 
 	ret = map[string][]byte{"qlist.1.test": []byte("test")}
-	external.EXPECT().ReadStateSet("qlist.").Return(ret, nil)
+	ext.EXPECT().ReadStateSet("qlist.").Return(ret, nil)
 	_, err = node.rbft.restoreQList()
 	assert.Equal(t, errors.New("proto: vc_PQ: wiretype end group for non-group"), err)
 
 	ret = map[string][]byte{"qlist.1.test": {24, 10}}
-	external.EXPECT().ReadStateSet("qlist.").Return(ret, nil)
+	ext.EXPECT().ReadStateSet("qlist.").Return(ret, nil)
 	qlist, _ := node.rbft.restoreQList()
 	assert.Equal(t, uint64(10), qlist[qidx{"test", 1}].View)
 }
@@ -152,57 +134,29 @@ func TestPersist_restorePList(t *testing.T) {
 	defer ctrl.Finish()
 	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
 	log := NewRawLogger()
-	external := mockexternal.NewMockExternalStack(ctrl)
-
-	conf := Config{
-		ID:                      2,
-		Hash:                    "node2",
-		IsNew:                   false,
-		Peers:                   peerSet,
-		K:                       10,
-		LogMultiplier:           4,
-		SetSize:                 25,
-		SetTimeout:              100 * time.Millisecond,
-		BatchTimeout:            500 * time.Millisecond,
-		RequestTimeout:          6 * time.Second,
-		NullRequestTimeout:      9 * time.Second,
-		VcResendTimeout:         10 * time.Second,
-		CleanVCTimeout:          60 * time.Second,
-		NewViewTimeout:          8 * time.Second,
-		FirstRequestTimeout:     30 * time.Second,
-		SyncStateTimeout:        1 * time.Second,
-		SyncStateRestartTimeout: 10 * time.Second,
-		RecoveryTimeout:         10 * time.Second,
-		UpdateTimeout:           4 * time.Second,
-		CheckPoolTimeout:        3 * time.Minute,
-
-		Logger:      log,
-		External:    external,
-		RequestPool: pool,
-	}
-
-	node, _ := newNode(conf)
+	ext := mockexternal.NewMockExternalStack(ctrl)
+	node := newPersistTestReplica(ctrl, pool, log, ext)
 
 	var ret map[string][]byte
 	var err error
 
 	ret = map[string][]byte{"plist.1.1": []byte("test")}
-	external.EXPECT().ReadStateSet("plist.").Return(ret, nil)
+	ext.EXPECT().ReadStateSet("plist.").Return(ret, nil)
 	_, err = node.rbft.restorePList()
 	assert.Equal(t, errors.New("incorrect format"), err)
 
 	ret = map[string][]byte{"1.plist": []byte("test")}
-	external.EXPECT().ReadStateSet("plist.").Return(ret, nil)
+	ext.EXPECT().ReadStateSet("plist.").Return(ret, nil)
 	_, err = node.rbft.restorePList()
 	assert.Equal(t, errors.New("incorrect prefix"), err)
 
 	ret = map[string][]byte{"plist.test": []byte("test")}
-	external.EXPECT().ReadStateSet("plist.").Return(ret, nil)
+	ext.EXPECT().ReadStateSet("plist.").Return(ret, nil)
 	_, err = node.rbft.restorePList()
 	assert.Equal(t, errors.New("parse failed"), err)
 
 	ret = map[string][]byte{"plist.1": {24, 9}}
-	external.EXPECT().ReadStateSet("plist.").Return(ret, nil)
+	ext.EXPECT().ReadStateSet("plist.").Return(ret, nil)
 	plist, _ := node.rbft.restorePList()
 	assert.Equal(t, uint64(9), plist[uint64(1)].View)
 }
@@ -212,39 +166,12 @@ func TestPersist_restoreBatchStore(t *testing.T) {
 	defer ctrl.Finish()
 	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
 	log := NewRawLogger()
-	external := mockexternal.NewMockExternalStack(ctrl)
-
-	conf := Config{
-		ID:                      2,
-		Hash:                    "node2",
-		IsNew:                   false,
-		Peers:                   peerSet,
-		K:                       10,
-		LogMultiplier:           4,
-		SetSize:                 25,
-		SetTimeout:              100 * time.Millisecond,
-		BatchTimeout:            500 * time.Millisecond,
-		RequestTimeout:          6 * time.Second,
-		NullRequestTimeout:      9 * time.Second,
-		VcResendTimeout:         10 * time.Second,
-		CleanVCTimeout:          60 * time.Second,
-		NewViewTimeout:          8 * time.Second,
-		FirstRequestTimeout:     30 * time.Second,
-		SyncStateTimeout:        1 * time.Second,
-		SyncStateRestartTimeout: 10 * time.Second,
-		RecoveryTimeout:         10 * time.Second,
-		UpdateTimeout:           4 * time.Second,
-		CheckPoolTimeout:        3 * time.Minute,
-
-		Logger:      log,
-		External:    external,
-		RequestPool: pool,
-	}
-	node, _ := newNode(conf)
+	ext := mockexternal.NewMockExternalStack(ctrl)
+	node := newPersistTestReplica(ctrl, pool, log, ext)
 
 	var ret map[string][]byte
 	ret = map[string][]byte{"batch.msg": {24, 10}}
-	external.EXPECT().ReadStateSet("batch.").Return(ret, nil)
+	ext.EXPECT().ReadStateSet("batch.").Return(ret, nil)
 	node.rbft.restoreBatchStore()
 
 	assert.Equal(t, int64(10), node.rbft.storeMgr.batchStore["msg"].Timestamp)
@@ -255,35 +182,8 @@ func TestPersist_restoreQSet(t *testing.T) {
 	defer ctrl.Finish()
 	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
 	log := NewRawLogger()
-	external := mockexternal.NewMockExternalStack(ctrl)
-
-	conf := Config{
-		ID:                      2,
-		Hash:                    "node2",
-		IsNew:                   false,
-		Peers:                   peerSet,
-		K:                       10,
-		LogMultiplier:           4,
-		SetSize:                 25,
-		SetTimeout:              100 * time.Millisecond,
-		BatchTimeout:            500 * time.Millisecond,
-		RequestTimeout:          6 * time.Second,
-		NullRequestTimeout:      9 * time.Second,
-		VcResendTimeout:         10 * time.Second,
-		CleanVCTimeout:          60 * time.Second,
-		NewViewTimeout:          8 * time.Second,
-		FirstRequestTimeout:     30 * time.Second,
-		SyncStateTimeout:        1 * time.Second,
-		SyncStateRestartTimeout: 10 * time.Second,
-		RecoveryTimeout:         10 * time.Second,
-		UpdateTimeout:           4 * time.Second,
-		CheckPoolTimeout:        3 * time.Minute,
-
-		Logger:      log,
-		External:    external,
-		RequestPool: pool,
-	}
-	node, _ := newNode(conf)
+	ext := mockexternal.NewMockExternalStack(ctrl)
+	node := newPersistTestReplica(ctrl, pool, log, ext)
 
 	q := &pb.PrePrepare{
 		ReplicaId:      1,
@@ -296,9 +196,9 @@ func TestPersist_restoreQSet(t *testing.T) {
 	retQset := map[string][]byte{
 		"qset.1.2.msg": prePrepareByte,
 	}
-	external.EXPECT().DelState(gomock.Any()).Return(nil).AnyTimes()
-	external.EXPECT().ReadState(gomock.Any()).Return(nil, errors.New("ReadState Error")).AnyTimes()
-	external.EXPECT().ReadStateSet("qset.").Return(retQset, nil)
+	ext.EXPECT().DelState(gomock.Any()).Return(nil).AnyTimes()
+	ext.EXPECT().ReadState(gomock.Any()).Return(nil, errors.New("ReadState Error")).AnyTimes()
+	ext.EXPECT().ReadStateSet("qset.").Return(retQset, nil)
 
 	qset, _ := node.rbft.restoreQSet()
 	assert.Equal(t, map[msgID]*pb.PrePrepare{{1, 2, "msg"}: q}, qset)
@@ -309,35 +209,8 @@ func TestPersist_restorePSet(t *testing.T) {
 	defer ctrl.Finish()
 	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
 	log := NewRawLogger()
-	external := mockexternal.NewMockExternalStack(ctrl)
-
-	conf := Config{
-		ID:                      2,
-		Hash:                    "node2",
-		IsNew:                   false,
-		Peers:                   peerSet,
-		K:                       10,
-		LogMultiplier:           4,
-		SetSize:                 25,
-		SetTimeout:              100 * time.Millisecond,
-		BatchTimeout:            500 * time.Millisecond,
-		RequestTimeout:          6 * time.Second,
-		NullRequestTimeout:      9 * time.Second,
-		VcResendTimeout:         10 * time.Second,
-		CleanVCTimeout:          60 * time.Second,
-		NewViewTimeout:          8 * time.Second,
-		FirstRequestTimeout:     30 * time.Second,
-		SyncStateTimeout:        1 * time.Second,
-		SyncStateRestartTimeout: 10 * time.Second,
-		RecoveryTimeout:         10 * time.Second,
-		UpdateTimeout:           4 * time.Second,
-		CheckPoolTimeout:        3 * time.Minute,
-
-		Logger:      log,
-		External:    external,
-		RequestPool: pool,
-	}
-	node, _ := newNode(conf)
+	ext := mockexternal.NewMockExternalStack(ctrl)
+	node := newPersistTestReplica(ctrl, pool, log, ext)
 
 	p := &pb.Prepare{
 		ReplicaId:      1,
@@ -350,9 +223,9 @@ func TestPersist_restorePSet(t *testing.T) {
 	retPset := map[string][]byte{
 		"pset.1.2.msg": PrepareByte,
 	}
-	external.EXPECT().DelState(gomock.Any()).Return(nil).AnyTimes()
-	external.EXPECT().ReadState(gomock.Any()).Return(nil, errors.New("ReadState Error")).AnyTimes()
-	external.EXPECT().ReadStateSet("pset.").Return(retPset, nil)
+	ext.EXPECT().DelState(gomock.Any()).Return(nil).AnyTimes()
+	ext.EXPECT().ReadState(gomock.Any()).Return(nil, errors.New("ReadState Error")).AnyTimes()
+	ext.EXPECT().ReadStateSet("pset.").Return(retPset, nil)
 
 	pset, _ := node.rbft.restorePSet()
 	assert.Equal(t, map[msgID]*pb.Pset{{1, 2, "msg"}: set}, pset)
@@ -363,35 +236,8 @@ func TestPersist_restoreCSet(t *testing.T) {
 	defer ctrl.Finish()
 	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
 	log := NewRawLogger()
-	external := mockexternal.NewMockExternalStack(ctrl)
-
-	conf := Config{
-		ID:                      2,
-		Hash:                    "node2",
-		IsNew:                   false,
-		Peers:                   peerSet,
-		K:                       10,
-		LogMultiplier:           4,
-		SetSize:                 25,
-		SetTimeout:              100 * time.Millisecond,
-		BatchTimeout:            500 * time.Millisecond,
-		RequestTimeout:          6 * time.Second,
-		NullRequestTimeout:      9 * time.Second,
-		VcResendTimeout:         10 * time.Second,
-		CleanVCTimeout:          60 * time.Second,
-		NewViewTimeout:          8 * time.Second,
-		FirstRequestTimeout:     30 * time.Second,
-		SyncStateTimeout:        1 * time.Second,
-		SyncStateRestartTimeout: 10 * time.Second,
-		RecoveryTimeout:         10 * time.Second,
-		UpdateTimeout:           4 * time.Second,
-		CheckPoolTimeout:        3 * time.Minute,
-
-		Logger:      log,
-		External:    external,
-		RequestPool: pool,
-	}
-	node, _ := newNode(conf)
+	ext := mockexternal.NewMockExternalStack(ctrl)
+	node := newPersistTestReplica(ctrl, pool, log, ext)
 
 	c := &pb.Commit{
 		ReplicaId:      1,
@@ -404,9 +250,9 @@ func TestPersist_restoreCSet(t *testing.T) {
 	retCset := map[string][]byte{
 		"cset.1.2.msg": CommitByte,
 	}
-	external.EXPECT().DelState(gomock.Any()).Return(nil).AnyTimes()
-	external.EXPECT().ReadState(gomock.Any()).Return(nil, errors.New("ReadState Error")).AnyTimes()
-	external.EXPECT().ReadStateSet("cset.").Return(retCset, nil)
+	ext.EXPECT().DelState(gomock.Any()).Return(nil).AnyTimes()
+	ext.EXPECT().ReadState(gomock.Any()).Return(nil, errors.New("ReadState Error")).AnyTimes()
+	ext.EXPECT().ReadStateSet("cset.").Return(retCset, nil)
 
 	cset, _ := node.rbft.restoreCSet()
 	assert.Equal(t, map[msgID]*pb.Cset{{1, 2, "msg"}: set}, cset)
@@ -417,35 +263,8 @@ func TestPersist_restoreCert(t *testing.T) {
 	defer ctrl.Finish()
 	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
 	log := NewRawLogger()
-	external := mockexternal.NewMockExternalStack(ctrl)
-
-	conf := Config{
-		ID:                      2,
-		Hash:                    "node2",
-		IsNew:                   false,
-		Peers:                   peerSet,
-		K:                       10,
-		LogMultiplier:           4,
-		SetSize:                 25,
-		SetTimeout:              100 * time.Millisecond,
-		BatchTimeout:            500 * time.Millisecond,
-		RequestTimeout:          6 * time.Second,
-		NullRequestTimeout:      9 * time.Second,
-		VcResendTimeout:         10 * time.Second,
-		CleanVCTimeout:          60 * time.Second,
-		NewViewTimeout:          8 * time.Second,
-		FirstRequestTimeout:     30 * time.Second,
-		SyncStateTimeout:        1 * time.Second,
-		SyncStateRestartTimeout: 10 * time.Second,
-		RecoveryTimeout:         10 * time.Second,
-		UpdateTimeout:           4 * time.Second,
-		CheckPoolTimeout:        3 * time.Minute,
-
-		Logger:      log,
-		External:    external,
-		RequestPool: pool,
-	}
-	node, _ := newNode(conf)
+	ext := mockexternal.NewMockExternalStack(ctrl)
+	node := newPersistTestReplica(ctrl, pool, log, ext)
 
 	q := &pb.PrePrepare{
 		ReplicaId:      1,
@@ -458,7 +277,7 @@ func TestPersist_restoreCert(t *testing.T) {
 	retQset := map[string][]byte{
 		"qset.1.2.msg": prePrepareByte,
 	}
-	external.EXPECT().ReadStateSet("qset.").Return(retQset, nil)
+	ext.EXPECT().ReadStateSet("qset.").Return(retQset, nil)
 
 	p := &pb.Prepare{
 		ReplicaId:      1,
@@ -471,7 +290,7 @@ func TestPersist_restoreCert(t *testing.T) {
 	retPset := map[string][]byte{
 		"pset.1.2.msg": PrepareByte,
 	}
-	external.EXPECT().ReadStateSet("pset.").Return(retPset, nil)
+	ext.EXPECT().ReadStateSet("pset.").Return(retPset, nil)
 
 	c := &pb.Commit{
 		ReplicaId:      1,
@@ -484,22 +303,22 @@ func TestPersist_restoreCert(t *testing.T) {
 	retCset := map[string][]byte{
 		"cset.1.2.msg": CommitByte,
 	}
-	external.EXPECT().ReadStateSet("cset.").Return(retCset, nil)
+	ext.EXPECT().ReadStateSet("cset.").Return(retCset, nil)
 
-	external.EXPECT().DelState(gomock.Any()).Return(nil).AnyTimes()
-	external.EXPECT().ReadState(gomock.Any()).Return(nil, errors.New("ReadState Error"))
-	external.EXPECT().ReadStateSet("qlist.").Return(map[string][]byte{"qlist.": []byte("QList")}, nil).AnyTimes()
-	external.EXPECT().ReadStateSet("plist.").Return(map[string][]byte{"plist.": []byte("PList")}, nil).AnyTimes()
+	ext.EXPECT().DelState(gomock.Any()).Return(nil).AnyTimes()
+	ext.EXPECT().ReadState(gomock.Any()).Return(nil, errors.New("ReadState Error"))
+	ext.EXPECT().ReadStateSet("qlist.").Return(map[string][]byte{"qlist.": []byte("QList")}, nil).AnyTimes()
+	ext.EXPECT().ReadStateSet("plist.").Return(map[string][]byte{"plist.": []byte("PList")}, nil).AnyTimes()
 
 	node.rbft.restoreCert()
 	exp := &msgCert{prePrepare: q, prepare: map[pb.Prepare]bool{*p: true}, commit: map[pb.Commit]bool{*c: true}}
 	assert.Equal(t, exp, node.rbft.storeMgr.certStore[msgID{1, 2, "msg"}])
 
 	node.rbft.storeMgr.certStore[msgID{1, 2, "msg"}] = nil
-	external.EXPECT().ReadState("cleanCert").Return([]byte("true"), nil)
-	external.EXPECT().ReadStateSet("qset.").Return(retQset, nil)
-	external.EXPECT().ReadStateSet("pset.").Return(retPset, nil)
-	external.EXPECT().ReadStateSet("cset.").Return(retCset, nil)
+	ext.EXPECT().ReadState("cleanCert").Return([]byte("true"), nil)
+	ext.EXPECT().ReadStateSet("qset.").Return(retQset, nil)
+	ext.EXPECT().ReadStateSet("pset.").Return(retPset, nil)
+	ext.EXPECT().ReadStateSet("cset.").Return(retCset, nil)
 	node.rbft.restoreCert()
 	assert.Equal(t, (*msgCert)(nil), node.rbft.storeMgr.certStore[msgID{1, 2, "msg"}])
 }
@@ -509,35 +328,8 @@ func TestPersist_restoreState(t *testing.T) {
 	defer ctrl.Finish()
 	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
 	log := NewRawLogger()
-	external := mockexternal.NewMockExternalStack(ctrl)
-
-	conf := Config{
-		ID:                      2,
-		Hash:                    "node2",
-		IsNew:                   false,
-		Peers:                   peerSet,
-		K:                       10,
-		LogMultiplier:           4,
-		SetSize:                 25,
-		SetTimeout:              100 * time.Millisecond,
-		BatchTimeout:            500 * time.Millisecond,
-		RequestTimeout:          6 * time.Second,
-		NullRequestTimeout:      9 * time.Second,
-		VcResendTimeout:         10 * time.Second,
-		CleanVCTimeout:          60 * time.Second,
-		NewViewTimeout:          8 * time.Second,
-		FirstRequestTimeout:     30 * time.Second,
-		SyncStateTimeout:        1 * time.Second,
-		SyncStateRestartTimeout: 10 * time.Second,
-		RecoveryTimeout:         10 * time.Second,
-		UpdateTimeout:           4 * time.Second,
-		CheckPoolTimeout:        3 * time.Minute,
-
-		Logger:      log,
-		External:    external,
-		RequestPool: pool,
-	}
-	node, _ := newNode(conf)
+	ext := mockexternal.NewMockExternalStack(ctrl)
+	node := newPersistTestReplica(ctrl, pool, log, ext)
 
 	var ret map[string][]byte
 	ret = map[string][]byte{
@@ -548,25 +340,26 @@ func TestPersist_restoreState(t *testing.T) {
 
 	var buff = make([]byte, 8)
 	binary.LittleEndian.PutUint64(buff, uint64(1))
-	external.EXPECT().SendFilterEvent(gomock.Any(), gomock.Any()).Return().AnyTimes()
-	external.EXPECT().DelState(gomock.Any()).Return(nil).AnyTimes()
+	ext.EXPECT().SendFilterEvent(gomock.Any(), gomock.Any()).Return().AnyTimes()
+	ext.EXPECT().DelState(gomock.Any()).Return(nil).AnyTimes()
 
-	external.EXPECT().ReadState("view").Return(buff, nil).AnyTimes()
-	external.EXPECT().ReadState("setView").Return([]byte("1"), nil)
-	external.EXPECT().ReadState("nodes").Return(buff, nil)
-	external.EXPECT().ReadState("cleanCert").Return([]byte("true"), nil)
-	external.EXPECT().ReadState("rbft.h").Return([]byte("10"), nil)
-	external.EXPECT().ReadState("epoch").Return(buff, nil)
+	ext.EXPECT().ReadState("view").Return(buff, nil).AnyTimes()
+	ext.EXPECT().ReadState("setView").Return([]byte("1"), nil)
+	ext.EXPECT().ReadState("nodes").Return(buff, nil)
+	ext.EXPECT().ReadState("cleanCert").Return([]byte("true"), nil)
+	ext.EXPECT().ReadState("rbft.h").Return([]byte("10"), nil)
+	ext.EXPECT().ReadState("latestConfigBatchHeight").Return(buff, nil).AnyTimes()
+	ext.EXPECT().ReadState("stableC").Return(buff, nil).AnyTimes()
 
-	external.EXPECT().StoreState(gomock.Any(), gomock.Any())
+	ext.EXPECT().StoreState(gomock.Any(), gomock.Any())
 
-	external.EXPECT().ReadStateSet("qset.").Return(map[string][]byte{"qset.": []byte("QSet")}, nil).AnyTimes()
-	external.EXPECT().ReadStateSet("qlist.").Return(map[string][]byte{"qset.": []byte("QSet")}, nil).AnyTimes()
-	external.EXPECT().ReadStateSet("pset.").Return(map[string][]byte{"pset.": []byte("PSet")}, nil).AnyTimes()
-	external.EXPECT().ReadStateSet("plist.").Return(map[string][]byte{"pset.": []byte("PSet")}, nil).AnyTimes()
-	external.EXPECT().ReadStateSet("cset.").Return(map[string][]byte{"pset.": []byte("PSet")}, nil).AnyTimes()
-	external.EXPECT().ReadStateSet("batch.").Return(map[string][]byte{"cset.": []byte("CSet")}, nil).AnyTimes()
-	external.EXPECT().ReadStateSet("chkpt.").Return(ret, nil)
+	ext.EXPECT().ReadStateSet("qset.").Return(map[string][]byte{"qset.": []byte("QSet")}, nil).AnyTimes()
+	ext.EXPECT().ReadStateSet("qlist.").Return(map[string][]byte{"qset.": []byte("QSet")}, nil).AnyTimes()
+	ext.EXPECT().ReadStateSet("pset.").Return(map[string][]byte{"pset.": []byte("PSet")}, nil).AnyTimes()
+	ext.EXPECT().ReadStateSet("plist.").Return(map[string][]byte{"pset.": []byte("PSet")}, nil).AnyTimes()
+	ext.EXPECT().ReadStateSet("cset.").Return(map[string][]byte{"pset.": []byte("PSet")}, nil).AnyTimes()
+	ext.EXPECT().ReadStateSet("batch.").Return(map[string][]byte{"cset.": []byte("CSet")}, nil).AnyTimes()
+	ext.EXPECT().ReadStateSet("chkpt.").Return(ret, nil)
 
 	// move h from 0 to 10
 	assert.Nil(t, node.rbft.restoreState())

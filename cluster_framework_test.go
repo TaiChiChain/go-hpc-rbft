@@ -8,13 +8,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ultramesh/fancylogger"
+	"github.com/ultramesh/flato-event/inner/protos"
 	"github.com/ultramesh/flato-rbft/external"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
 	"github.com/ultramesh/flato-txpool"
 
 	"github.com/gogo/protobuf/proto"
-	"github.com/ultramesh/fancylogger"
-	"github.com/ultramesh/flato-event/inner/protos"
 )
 
 // testFramework contains the core structure of test framework instance.
@@ -59,16 +59,20 @@ type testNode struct {
 	// testNode.Peers is the router map in one node.
 	Router pb.Router
 
-	Epoch uint64
-	//
+	// some important states for consensus
+	Epoch   uint64
 	Digest  string
 	Applied uint64
-	blocks  map[uint64]string
-	vset    map[uint64]pb.Router
+
+	// blocks created
+	blocks map[uint64]string
+
+	// vSet values which will be stored in blocks
+	vset map[uint64]pb.Router
 
 	// ID is the num-identity of the local rbft.peerPool.localIDde.
-	ID   uint64
-	Hash string
+	ID       uint64
+	Hostname string
 
 	// Normal indicates if current node could deal with messages.
 	normal bool
@@ -116,7 +120,7 @@ func (lookup *defaultRequestLookupSmokeTest) IsRequestExist(tx *protos.Transacti
 }
 
 // NewRawLoggerFile create log file for local cluster tests
-func NewRawLoggerFile(id uint64) *fancylogger.Logger {
+func FrameworkNewRawLoggerFile(hostname string) *fancylogger.Logger {
 	rawLogger := fancylogger.NewLogger("test", fancylogger.DEBUG)
 
 	consoleFormatter := &fancylogger.StringFormatter{
@@ -126,9 +130,26 @@ func NewRawLoggerFile(id uint64) *fancylogger.Logger {
 	}
 
 	//test with logger files
-	//fileName := "testLogger/node" + strconv.FormatInt(int64(id), 10) + ".log"
-	//f, _ := os.Create(fileName)
-	//consoleBackend := fancylogger.NewIOBackend(consoleFormatter, f)
+	_ = os.Mkdir("testLogger", os.ModePerm)
+	fileName := "testLogger/" + hostname + ".log"
+	f, _ := os.Create(fileName)
+	consoleBackend := fancylogger.NewIOBackend(consoleFormatter, f)
+
+	rawLogger.SetBackends(consoleBackend)
+	rawLogger.SetEnableCaller(true)
+
+	return rawLogger
+}
+
+// NewRawLoggerFile create log file for local cluster tests
+func FrameworkNewRawLogger() *fancylogger.Logger {
+	rawLogger := fancylogger.NewLogger("test", fancylogger.DEBUG)
+
+	consoleFormatter := &fancylogger.StringFormatter{
+		EnableColors:    true,
+		TimestampFormat: "2006-01-02T15:04:05.000",
+		IsTerminal:      true,
+	}
 
 	consoleBackend := fancylogger.NewIOBackend(consoleFormatter, os.Stdout)
 
@@ -142,16 +163,15 @@ func NewRawLoggerFile(id uint64) *fancylogger.Logger {
 // init process
 //=============================================================================
 // newTestFramework init the testFramework instance
-func newTestFramework(account int) *testFramework {
+func newTestFramework(account int, loggerFile bool) *testFramework {
 	// Init PeerSet
 	router := &pb.Router{}
 	for i := 0; i < account; i++ {
 		id := uint64(i + 1)
 		hostname := "node" + strconv.Itoa(i+1)
-		hash := hostname
 		peer := &pb.Peer{
 			Id:       id,
-			Hash:     hash,
+			Hash:     hash(hostname),
 			Hostname: hostname,
 		}
 		router.Peers = append(router.Peers, peer)
@@ -179,7 +199,7 @@ func newTestFramework(account int) *testFramework {
 
 	// Init testNode in TestFramework
 	for i := range tf.Router.Peers {
-		tn := tf.newTestNode(tf.Router.Peers[i].Id, tf.Router.Peers[i].Hash, cc)
+		tn := tf.newTestNode(tf.Router.Peers[i].Id, tf.Router.Peers[i].Hostname, cc, loggerFile)
 		tf.TestNode = append(tf.TestNode, tn)
 	}
 
@@ -187,11 +207,11 @@ func newTestFramework(account int) *testFramework {
 }
 
 // newNodeConfig init the Config of Node.
-func (tf *testFramework) newNodeConfig(id uint64, hash string, isNew bool, log Logger, ext external.ExternalStack, pool txpool.TxPool) Config {
+func (tf *testFramework) newNodeConfig(id uint64, hostname string, isNew bool, log Logger, ext external.ExternalStack, pool txpool.TxPool) Config {
 	return Config{
 		ID:                      id,
-		Hash:                    hash,
-		Epoch:                   uint64(0),
+		Hash:                    hash(hostname),
+		Hostname:                hostname,
 		IsNew:                   isNew,
 		Peers:                   tf.Router.Peers,
 		K:                       10,
@@ -208,12 +228,17 @@ func (tf *testFramework) newNodeConfig(id uint64, hash string, isNew bool, log L
 		SyncStateTimeout:        1 * time.Second,
 		SyncStateRestartTimeout: 10 * time.Second,
 		RecoveryTimeout:         10 * time.Second,
-		UpdateTimeout:           4 * time.Second,
+		EpochCheckTimeout:       4 * time.Second,
 		CheckPoolTimeout:        3 * time.Minute,
+		RequestSethMemLimit:     true,
+		RequestSetMaxMem:        DefaultRequestSetMaxMem,
 
 		Logger:      log,
 		External:    ext,
 		RequestPool: pool,
+
+		EpochInit:       uint64(0),
+		EpochInitDigest: "XXX GENESIS",
 	}
 }
 
@@ -231,9 +256,14 @@ func getRouter(router *pb.Router) pb.Router {
 }
 
 // newTestNode init the testNode instance
-func (tf *testFramework) newTestNode(id uint64, hash string, cc chan *channelMsg) *testNode {
+func (tf *testFramework) newTestNode(id uint64, hostname string, cc chan *channelMsg, loggerFile bool) *testNode {
 	// Init logger
-	log := NewRawLoggerFile(id)
+	var log *fancylogger.Logger
+	if loggerFile {
+		log = FrameworkNewRawLoggerFile(hostname)
+	} else {
+		log = FrameworkNewRawLogger()
+	}
 
 	// Simulation Function of External
 	var ext external.ExternalStack
@@ -257,7 +287,7 @@ func (tf *testFramework) newTestNode(id uint64, hash string, cc chan *channelMsg
 	namespace := "global"
 	pool := txpool.NewTxPool(namespace, rlu, confTxPool)
 
-	conf := tf.newNodeConfig(id, hash, false, log, ext, pool)
+	conf := tf.newNodeConfig(id, hostname, false, log, ext, pool)
 	n, _ := newNode(conf)
 	N := n
 	tn := &testNode{
@@ -266,7 +296,7 @@ func (tf *testFramework) newTestNode(id uint64, hash string, cc chan *channelMsg
 		Router:     getRouter(&tf.Router),
 		Epoch:      n.rbft.epoch,
 		ID:         id,
-		Hash:       hash,
+		Hostname:   hostname,
 		normal:     true,
 		online:     true,
 		close:      make(chan bool),
@@ -278,7 +308,8 @@ func (tf *testFramework) newTestNode(id uint64, hash string, cc chan *channelMsg
 	testExt.testNode = tn
 
 	// Init State
-	stateInit := &pb.ServiceState{
+	stateInit := &pb.ServiceState{}
+	stateInit.MetaState = &pb.MetaState{
 		Applied: 0,
 		Digest:  "",
 	}
@@ -298,7 +329,7 @@ func (tf *testFramework) clusterListen() {
 			return
 		case obj := <-tf.clusterChan:
 			for i := range tf.TestNode {
-				if obj.to == "" || obj.to == tf.TestNode[i].Hash {
+				if obj.to == "" || obj.to == tf.TestNode[i].n.rbft.peerPool.hash {
 					if tf.TestNode[i].online {
 						tf.TestNode[i].recvChan <- obj.msg
 					}
@@ -388,12 +419,13 @@ func (tf *testFramework) frameworkStop() {
 }
 
 // frameworkDelNode adds one node to the cluster.
-func (tf *testFramework) frameworkDelNode(hash string) {
-	tf.log.Noticef("Test Framework delete Node, ID: %s...", hash)
+func (tf *testFramework) frameworkDelNode(hostname string) {
+	hash := hash(hostname)
+	tf.log.Noticef("Test Framework delete Node, Hash: %s...", hostname)
 
 	// stop node id
 	for i, node := range tf.TestNode {
-		if node.Hash == hash {
+		if node.Hostname == hostname {
 			tf.TestNode[i].online = false
 			tf.TestNode[i].N.Stop()
 		}
@@ -403,7 +435,7 @@ func (tf *testFramework) frameworkDelNode(hash string) {
 	go func() {
 		var (
 			senderID     uint64
-			senderHash   string
+			senderHost   string
 			senderIndex  int
 			senderRouter pb.Router
 		)
@@ -412,7 +444,7 @@ func (tf *testFramework) frameworkDelNode(hash string) {
 		delRouter := pb.Router{}
 		for index, node := range tf.TestNode {
 			if node.ID == senderID {
-				senderHash = node.Hash
+				senderHost = node.Hostname
 				senderIndex = index
 				senderRouter = getRouter(&node.Router)
 				break
@@ -421,12 +453,12 @@ func (tf *testFramework) frameworkDelNode(hash string) {
 
 		delPeer := pb.Peer{
 			Hash:     hash,
-			Hostname: hash,
+			Hostname: hostname,
 		}
 
 		index := uint64(0)
 		for _, node := range senderRouter.Peers {
-			if node.Hash != hash {
+			if node.Hostname != hostname {
 				index++
 				node.Id = index
 				delRouter.Peers = append(delRouter.Peers, node)
@@ -435,8 +467,8 @@ func (tf *testFramework) frameworkDelNode(hash string) {
 			}
 		}
 
-		tf.log.Infof("[Cluster_Service %s] Del Node Req: %+v", senderHash, delPeer)
-		tf.log.Infof("[Cluster_Service %s] Target Validator Set: %+v", senderHash, delRouter)
+		tf.log.Infof("[Cluster_Service %s] Del Node Req: %+v", senderHost, delPeer)
+		tf.log.Infof("[Cluster_Service %s] Target Validator Set: %+v", senderHost, delRouter)
 
 		info, _ := proto.Marshal(&delRouter)
 		tx := &protos.Transaction{
@@ -454,8 +486,8 @@ func (tf *testFramework) frameworkDelNode(hash string) {
 }
 
 // frameworkAddNode adds one node to the cluster.
-func (tf *testFramework) frameworkAddNode(hostname string) {
-	tf.log.Noticef("Test Framework add Node, ID: %s...", hostname)
+func (tf *testFramework) frameworkAddNode(hostname string, loggerFile bool) {
+	tf.log.Noticef("Test Framework add Node, Host: %s...", hostname)
 
 	maxID := uint64(0)
 	for _, node := range tf.TestNode {
@@ -466,7 +498,12 @@ func (tf *testFramework) frameworkAddNode(hostname string) {
 	id := maxID + 1
 
 	// Init logger
-	log := NewRawLoggerFile(uint64(len(tf.TestNode)) + 1)
+	var log *fancylogger.Logger
+	if loggerFile {
+		log = FrameworkNewRawLoggerFile(hostname)
+	} else {
+		log = FrameworkNewRawLogger()
+	}
 
 	// Simulation Function of External
 	var ext external.ExternalStack
@@ -491,7 +528,7 @@ func (tf *testFramework) frameworkAddNode(hostname string) {
 	pool := txpool.NewTxPool(namespace, rlu, confTxPool)
 
 	// new peer
-	hash := hostname
+	hash := hash(hostname)
 	newPeer := &pb.Peer{
 		Id:       id,
 		Hash:     hash,
@@ -501,7 +538,7 @@ func (tf *testFramework) frameworkAddNode(hostname string) {
 	// Add Peer Info to Framework
 	var (
 		senderID     uint64
-		senderHash   string
+		senderHost   string
 		senderIndex  int
 		senderRouter pb.Router
 	)
@@ -510,7 +547,7 @@ func (tf *testFramework) frameworkAddNode(hostname string) {
 	newRouter := pb.Router{}
 	for index, node := range tf.TestNode {
 		if node.ID == senderID {
-			senderHash = node.Hash
+			senderHost = node.Hostname
 			senderIndex = index
 			senderRouter = getRouter(&node.Router)
 			break
@@ -519,7 +556,7 @@ func (tf *testFramework) frameworkAddNode(hostname string) {
 	newRouter = senderRouter
 	newRouter.Peers = append(newRouter.Peers, newPeer)
 
-	conf := tf.newNodeConfig(id, hash, true, log, ext, pool)
+	conf := tf.newNodeConfig(id, hostname, true, log, ext, pool)
 	conf.Peers = newRouter.Peers
 	n, _ := newNode(conf)
 	N := n
@@ -529,7 +566,7 @@ func (tf *testFramework) frameworkAddNode(hostname string) {
 		Router:   tf.Router,
 		Epoch:    n.rbft.epoch,
 		ID:       id,
-		Hash:     hash,
+		Hostname: hostname,
 		normal:   true,
 		online:   true,
 		close:    make(chan bool),
@@ -541,7 +578,8 @@ func (tf *testFramework) frameworkAddNode(hostname string) {
 	testExt.testNode = tn
 
 	// Init State
-	stateInit := &pb.ServiceState{
+	stateInit := &pb.ServiceState{}
+	stateInit.MetaState = &pb.MetaState{
 		Applied: 0,
 		Digest:  "",
 	}
@@ -550,8 +588,8 @@ func (tf *testFramework) frameworkAddNode(hostname string) {
 	// send config change tx
 	// node4 propose a ctx to add node
 	go func() {
-		tf.log.Infof("[Cluster_Service %s] Add Node Req: %s", senderHash, newPeer.Hash)
-		tf.log.Infof("[Cluster_Service %s] Target Validator Set: %+v", senderHash, newRouter)
+		tf.log.Infof("[Cluster_Service %s] Add Node Req: %s", senderHost, newPeer.Hash)
+		tf.log.Infof("[Cluster_Service %s] Target Validator Set: %+v", senderHost, newRouter)
 
 		info, _ := proto.Marshal(&newRouter)
 		tx := &protos.Transaction{
@@ -574,12 +612,12 @@ func (tf *testFramework) frameworkAddNode(hostname string) {
 	}()
 }
 
-func (tf *testFramework) sendTx(no uint64, sender uint64) {
+func (tf *testFramework) sendTx(no int, sender uint64) {
 	if sender == uint64(0) {
 		sender = uint64(rand.Int()%tf.N + 1)
 	}
 
-	str3 := "tx" + strconv.FormatInt(int64(no), 10)
+	str3 := "tx" + string(no)
 	tx3 := &protos.Transaction{Value: []byte(str3)}
 	txs3 := []*protos.Transaction{tx3}
 	_ = tf.TestNode[sender-1].N.Propose(txs3)
@@ -690,17 +728,21 @@ func (ext *testExternal) UnicastByHash(msg *pb.ConsensusMessage, to string) erro
 	return nil
 }
 func (ext *testExternal) UpdateTable(update *pb.ConfChange) {
-	// update router table
-	router := &pb.Router{}
-	err := proto.Unmarshal(update.Context, router)
-	if update.Type == pb.ConfChangeType_ConfChangeUpdateNode {
-		if err == nil {
-			ext.testNode.Router = getRouter(router)
-			ext.tf.log.Noticef("[Cluster_Service %s config updated] router: %+v", ext.testNode.Hash, router)
+	router := update.Router
+	var newPeers []*pb.Peer
+	for _, peer := range router.Peers {
+		newPeer := &pb.Peer{
+			Id:       peer.Id,
+			Hostname: peer.Hostname,
+			Hash:     hash(peer.Hostname),
 		}
-		cc := &pb.ConfState{QuorumRouter: router}
-		ext.testNode.N.ApplyConfChange(cc)
+		newPeers = append(newPeers, newPeer)
 	}
+	newRouter := &pb.Router{Peers: newPeers}
+	ext.testNode.Router = getRouter(router)
+	ext.tf.log.Noticef("[Cluster_Service %s update] router: %+v", ext.testNode.Hostname, newRouter)
+	cc := &pb.ConfState{QuorumRouter: newRouter}
+	ext.testNode.N.ApplyConfChange(cc)
 }
 
 // Crypto
@@ -720,26 +762,31 @@ func (ext *testExternal) Execute(requests []*protos.Transaction, localList []boo
 	}
 	batchDigest := calculateMD5Hash(txHashList, timestamp)
 
-	state := &pb.ServiceState{
+	state := &pb.ServiceState{}
+	state.MetaState = &pb.MetaState{
 		Applied: seqNo,
 		Digest:  batchDigest,
 	}
 
-	if state.Applied == ext.testNode.Applied+1 {
-		ext.testNode.Applied = state.Applied
-		ext.testNode.Digest = state.Digest
-		ext.testNode.blocks[state.Applied] = state.Digest
-		ext.testNode.n.logger.Debugf("Block Number %d", state.Applied)
-		ext.testNode.n.logger.Debugf("Block Hash %s", state.Digest)
+	if state.MetaState.Applied == ext.testNode.Applied+1 {
+		ext.testNode.Applied = state.MetaState.Applied
+		ext.testNode.Digest = state.MetaState.Digest
+		ext.testNode.blocks[state.MetaState.Applied] = state.MetaState.Digest
+		ext.testNode.n.logger.Debugf("Block Number %d", state.MetaState.Applied)
+		ext.testNode.n.logger.Debugf("Block Hash %s", state.MetaState.Digest)
 		//report latest validator set
 		if len(requests) != 0 {
 			if protos.IsConfigTx(requests[0]) {
 				r := &pb.Router{}
 				_ = proto.Unmarshal(requests[0].Value, r)
-				ext.testNode.vset[state.Applied] = *r
-				ext.testNode.n.logger.Debugf("Epoch Number %d", state.Applied)
+				ext.testNode.vset[state.MetaState.Applied] = *r
+				ext.testNode.n.logger.Debugf("Epoch Number %d", state.MetaState.Applied)
 				ext.testNode.n.logger.Debugf("Validator Set %+v", r)
-				ext.testNode.N.ReportRouterUpdated(r)
+				re := &pb.ReloadMessage{
+					Type:   pb.ReloadType_FinishReloadRouter,
+					Router: r,
+				}
+				ext.testNode.N.ReportReloadFinished(re)
 			}
 		}
 		// report executed
@@ -774,14 +821,29 @@ func (ext *testExternal) StateUpdate(seqNo uint64, digest string, peers []uint64
 		}
 	}
 
-	state := &pb.ServiceState{
+	state := &pb.ServiceState{}
+	state.MetaState = &pb.MetaState{
 		Applied: ext.testNode.Applied,
 		Digest:  ext.testNode.Digest,
-		VSet:    vSet,
 	}
 	ext.testNode.N.ReportStateUpdated(state)
 }
 func (ext *testExternal) SendFilterEvent(informType pb.InformType, message ...interface{}) {
+	if ext.testNode.n.rbft.atomicIn(InConfChange) {
+		height, ok := message[0].(uint64)
+		if !ok {
+			return
+		}
+
+		switch informType {
+		case pb.InformType_FilterStableCheckpoint:
+			re := &pb.ReloadMessage{
+				Type:   pb.ReloadType_FinishReloadCommitDB,
+				Height: height,
+			}
+			go ext.testNode.N.ReportReloadFinished(re)
+		}
+	}
 }
 
 //=============================================================================
@@ -794,4 +856,8 @@ func (tf *testFramework) setN(num int) {
 	defer tf.NLock.Unlock()
 	tf.N = num
 	tf.f = (tf.N - 1) / 3
+}
+
+func hash(hostname string) string {
+	return "hash-" + hostname
 }

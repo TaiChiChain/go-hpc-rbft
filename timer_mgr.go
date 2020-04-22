@@ -77,6 +77,35 @@ func newTimerMgr(eventC chan interface{}, c Config) *timerManager {
 
 // newTimer news a titleTimer with the given name and default timeout, then add this timer to timerManager
 func (tm *timerManager) newTimer(name string, d time.Duration) {
+	if d == 0 {
+		switch name {
+		case requestTimer:
+			d = DefaultRequestTimeout
+		case batchTimer:
+			d = DefaultBatchTimeout
+		case vcResendTimer:
+			d = DefaultVcResendTimeout
+		case newViewTimer:
+			d = DefaultNewViewTimeout
+		case nullRequestTimer:
+			d = DefaultNullRequestTimeout
+		case firstRequestTimer:
+			d = DefaultFirstRequestTimeout
+		case syncStateRspTimer:
+			d = DefaultSyncStateRspTimeout
+		case syncStateRestartTimer:
+			d = DefaultSyncStateRestartTimeout
+		case recoveryRestartTimer:
+			d = DefaultRecoveryRestartTimeout
+		case cleanViewChangeTimer:
+			d = DefaultCleanViewChangeTimeout
+		case checkPoolTimer:
+			d = DefaultCheckPoolTimeout
+		case epochCheckRspTimer:
+			d = DefaultEpochCheckRspTimeout
+		}
+	}
+
 	tm.tTimers[name] = &titleTimer{
 		timerName: name,
 		timeout:   d,
@@ -203,7 +232,7 @@ func (rbft *rbftImpl) initTimers() {
 	rbft.timerMgr.newTimer(requestTimer, rbft.config.RequestTimeout)
 	rbft.timerMgr.newTimer(cleanViewChangeTimer, rbft.config.CleanVCTimeout)
 	rbft.timerMgr.newTimer(checkPoolTimer, rbft.config.CheckPoolTimeout)
-	rbft.timerMgr.newTimer(epochCheckRspTimer, rbft.config.UpdateTimeout)
+	rbft.timerMgr.newTimer(epochCheckRspTimer, rbft.config.EpochCheckTimeout)
 
 	rbft.timerMgr.makeNullRequestTimeoutLegal()
 	rbft.timerMgr.makeRequestTimeoutLegal()

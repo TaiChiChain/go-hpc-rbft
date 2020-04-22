@@ -18,6 +18,6 @@ func NewMockMinimalNode(ctrl *gomock.Controller) *MockNode {
 	mock.EXPECT().Stop().Return().AnyTimes()
 	mock.EXPECT().ReportExecuted(gomock.Any()).Return().AnyTimes()
 	mock.EXPECT().ReportStateUpdated(gomock.Any()).Return().AnyTimes()
-	mock.EXPECT().ReportRouterUpdated(gomock.Any()).Return().AnyTimes()
+	mock.EXPECT().ReportReloadFinished(gomock.Any()).Return().AnyTimes()
 	return mock
 }
