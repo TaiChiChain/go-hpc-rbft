@@ -477,12 +477,12 @@ func (rbft *rbftImpl) dispatchConsensusMessage(msg *pb.ConsensusMessage) consens
 		rbft.checkIfOutOfEpoch(msg)
 	}
 
-	// A node will reject consensus messages from different epoch, except below:
+	// A node in different epoch or in epoch sync will reject normal consensus messages, except:
 	// For epoch check:   {EpochCheck, EpochCheckResponse},
 	// For sync state:    {SyncState, SyncStateResponse},
 	// For fetch missing: {FetchMissingRequests, SendMissingRequests},
 	// For txs requests:  {RequestSet},
-	if msg.Epoch != rbft.epoch {
+	if msg.Epoch != rbft.epoch || rbft.in(InEpochSync) {
 		switch msg.Type {
 		case pb.Type_EPOCH_CHECK:
 		case pb.Type_EPOCH_CHECK_RESPONSE:
@@ -1743,6 +1743,7 @@ func (rbft *rbftImpl) recvStateUpdatedEvent(ss *pb.ServiceState) consensusEvent 
 			rbft.batchMgr.setSeqNo(seqNo)
 			rbft.off(SkipInProgress)
 			rbft.off(StateTransferring)
+			rbft.node.setReloadRouter(nil)
 
 			return &LocalEvent{
 				Service:   EpochMgrService,
