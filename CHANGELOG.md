@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.2.1"></a>
+## [0.2.1](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.0...v0.2.1) (2020-04-29)
+
+
+### Bug Fixes
+
+* **rbft_impl.go:** fix the problem after new node finished state upadte ([c0194e7](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/c0194e7)), closes [#flato-1370](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-1370)
+
+
+
 <a name="0.2.0"></a>
 # [0.2.0](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.1.9...v0.2.0) (2020-04-17)
 
