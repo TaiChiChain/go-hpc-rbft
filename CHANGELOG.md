@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.2.2"></a>
+## [0.2.2](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.1...v0.2.2) (2020-05-26)
+
+
+### Features
+
+* send stable checkpoint after config tx executed ([ed1fa70](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/ed1fa70)), closes [#flato-1317](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-1317)
+
+
+
 <a name="0.2.1"></a>
 ## [0.2.1](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.0...v0.2.1) (2020-04-29)
 
