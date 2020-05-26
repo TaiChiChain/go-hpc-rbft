@@ -19,6 +19,8 @@ This file defines the structs uesd in RBFT
 */
 
 import (
+	"time"
+
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
 )
 
@@ -36,6 +38,26 @@ const (
 	cleanViewChangeTimer  = "cleanViewChangeTimer"  // timer track how long a viewchange msg will store in memory
 	checkPoolTimer        = "checkPoolTimer"        // timer track timeout for check pool interval
 	epochCheckRspTimer    = "epochCheckTimer"       // timer track how long a check epoch process will take
+)
+
+// constant default
+const (
+	// default timer timeout value
+	DefaultRequestTimeout          = 6 * time.Second
+	DefaultBatchTimeout            = 500 * time.Millisecond
+	DefaultVcResendTimeout         = 10 * time.Second
+	DefaultNewViewTimeout          = 8 * time.Second
+	DefaultNullRequestTimeout      = 9 * time.Second
+	DefaultFirstRequestTimeout     = 30 * time.Second
+	DefaultSyncStateRspTimeout     = 1 * time.Second
+	DefaultSyncStateRestartTimeout = 10 * time.Second
+	DefaultRecoveryRestartTimeout  = 10 * time.Second
+	DefaultCleanViewChangeTimeout  = 60 * time.Second
+	DefaultCheckPoolTimeout        = 3 * time.Minute
+	DefaultEpochCheckRspTimeout    = 5 * time.Second
+
+	// default k value
+	DefaultK = 10
 )
 
 // event type
@@ -56,7 +78,6 @@ const (
 	ViewChangedEvent
 
 	// 3.recovery
-	RecoveryInitEvent
 	RecoveryRestartTimerEvent
 	RecoveryDoneEvent
 	RecoverySyncStateRspTimerEvent
@@ -64,9 +85,9 @@ const (
 	NotificationQuorumEvent
 
 	// 4.epoch mgr service
+	EpochCheckInitEvent
 	EpochCheckTimerEvent
 	EpochCheckDoneEvent
-	EpochSyncFinishedEvent
 	EpochSyncDoneEvent
 )
 
@@ -77,6 +98,11 @@ const (
 	RecoveryService
 	NotSupportService
 	EpochMgrService
+)
+
+const (
+	// DefaultRequestSetMaxMem is the default memory size of request set
+	DefaultRequestSetMaxMem = 45 * 1024 * 1024 // 45MB
 )
 
 // LocalEvent represents event sent by local modules
@@ -157,4 +183,14 @@ type replicaInfo struct {
 type stateUpdateTarget struct {
 	targetMessage
 	replicas []replicaInfo
+}
+
+// -----------epoch check related structs-----------------
+type epochState struct {
+	// node epoch
+	epoch uint64
+
+	// check the state to send stable checkpoint
+	applied uint64
+	digest  string
 }

@@ -126,12 +126,15 @@ func newTestRBFT(ctrl *gomock.Controller) (*rbftImpl, Config) {
 		SyncStateTimeout:        1 * time.Second,
 		SyncStateRestartTimeout: 10 * time.Second,
 		RecoveryTimeout:         10 * time.Second,
-		UpdateTimeout:           4 * time.Second,
+		EpochCheckTimeout:       4 * time.Second,
 		CheckPoolTimeout:        3 * time.Minute,
 
 		Logger:      log,
 		External:    external,
 		RequestPool: pool,
+
+		EpochInit:       uint64(0),
+		EpochInitDigest: "XXX GENESIS",
 	}
 
 	node, _ := newNode(conf)
@@ -203,12 +206,15 @@ func newTestRBFTReplica(ctrl *gomock.Controller) (*rbftImpl, Config) {
 		SyncStateTimeout:        1 * time.Second,
 		SyncStateRestartTimeout: 10 * time.Second,
 		RecoveryTimeout:         10 * time.Second,
-		UpdateTimeout:           4 * time.Second,
+		EpochCheckTimeout:       4 * time.Second,
 		CheckPoolTimeout:        3 * time.Minute,
 
 		Logger:      log,
 		External:    external,
 		RequestPool: pool,
+
+		EpochInit:       uint64(0),
+		EpochInitDigest: "XXX GENESIS",
 	}
 
 	node, _ := newNode(conf)

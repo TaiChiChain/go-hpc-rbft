@@ -58,7 +58,7 @@ func TestRBFT_processEvent_NormalConsensusP(t *testing.T) {
 		Local:    false,
 	}
 	rbft.on(Normal)
-	rbft.peerPool.localID = 1
+	rbft.peerPool.ID = 1
 	assert.Equal(t, uint64(0), rbft.batchMgr.seqNo)
 	rbft.processEvent(e)
 	assert.Equal(t, reqBatchTmp, rbft.storeMgr.batchStore[reqBatchTmp.BatchHash])
@@ -112,7 +112,7 @@ func TestRBFT_processEvent_NormalConsensusP(t *testing.T) {
 		Epoch:   uint64(0),
 		Payload: payload,
 	}
-	rbft.peerPool.localID = uint64(2)
+	rbft.peerPool.ID = uint64(2)
 	// Node2 receive prePrepare, then sendPrepare
 	rbft.processEvent(event)
 	cert := rbft.storeMgr.getCert(preprep.View, preprep.SequenceNumber, preprep.BatchDigest)
@@ -122,7 +122,7 @@ func TestRBFT_processEvent_NormalConsensusP(t *testing.T) {
 		View:           preprep.View,
 		SequenceNumber: preprep.SequenceNumber,
 		BatchDigest:    preprep.BatchDigest,
-		ReplicaId:      rbft.peerPool.localID,
+		ReplicaId:      rbft.peerPool.ID,
 	}
 	prepNode1 := &pb.Prepare{
 		View:           preprep.View,
@@ -195,7 +195,8 @@ func TestRBFT_processEvent_NormalConsensusP(t *testing.T) {
 	// with digest calculateMD5Hash([]string{"Hash11", "Hash12"}, 1)
 	// after executed, delete from outstanding req batch
 	// cert.executed is true
-	stateTmp := &pb.ServiceState{
+	stateTmp := &pb.ServiceState{}
+	stateTmp.MetaState = &pb.MetaState{
 		Applied: 10,
 		Digest:  calculateMD5Hash([]string{"Hash11", "Hash12"}, 1),
 	}
@@ -231,7 +232,7 @@ func TestRBFT_newRBFT(t *testing.T) {
 	}
 
 	cpChan := make(chan *pb.ServiceState)
-	confC := make(chan bool)
+	confC := make(chan *pb.ReloadFinished)
 	// Nil Peers
 	conf.Peers = nil
 	rbft, err = newRBFT(cpChan, confC, conf)
@@ -257,7 +258,8 @@ func TestRBFT_reportStateUpdated(t *testing.T) {
 	rbft, _ := newTestRBFT(ctrl)
 	rbft.h = 200
 
-	state2 := &pb.ServiceState{
+	state2 := &pb.ServiceState{}
+	state2.MetaState = &pb.MetaState{
 		Applied: 2,
 		Digest:  "test",
 	}
@@ -312,35 +314,35 @@ func TestRBFT_getStatus(t *testing.T) {
 
 	var status NodeStatus
 
-	rbft.on(InViewChange)
+	rbft.atomicOn(InViewChange)
 	status = rbft.getStatus()
 	assert.Equal(t, InViewChange, int(status.Status))
-	rbft.off(InViewChange)
+	rbft.atomicOff(InViewChange)
 
-	rbft.on(InRecovery)
+	rbft.atomicOn(InRecovery)
 	status = rbft.getStatus()
 	assert.Equal(t, InRecovery, int(status.Status))
-	rbft.off(InRecovery)
+	rbft.atomicOff(InRecovery)
 
-	rbft.on(StateTransferring)
+	rbft.atomicOn(StateTransferring)
 	status = rbft.getStatus()
 	assert.Equal(t, StateTransferring, int(status.Status))
-	rbft.off(StateTransferring)
+	rbft.atomicOff(StateTransferring)
 
-	rbft.on(PoolFull)
+	rbft.atomicOn(PoolFull)
 	status = rbft.getStatus()
 	assert.Equal(t, PoolFull, int(status.Status))
-	rbft.off(PoolFull)
+	rbft.atomicOff(PoolFull)
 
-	rbft.on(Pending)
+	rbft.atomicOn(Pending)
 	status = rbft.getStatus()
 	assert.Equal(t, Pending, int(status.Status))
-	rbft.off(Pending)
+	rbft.atomicOff(Pending)
 
-	rbft.on(InConfChange)
+	rbft.atomicOn(InConfChange)
 	status = rbft.getStatus()
 	assert.Equal(t, InConfChange, int(status.Status))
-	rbft.off(InConfChange)
+	rbft.atomicOff(InConfChange)
 
 	rbft.on(Normal)
 	status = rbft.getStatus()
@@ -361,23 +363,23 @@ func TestRBFT_processNullRequset(t *testing.T) {
 	// If success process it, mode NeedSyncState will on
 	rbft.on(Normal)
 
-	rbft.on(InRecovery)
+	rbft.atomicOn(InRecovery)
 	rbft.off(NeedSyncState)
 	rbft.processNullRequest(msg)
 	assert.Equal(t, false, rbft.in(NeedSyncState))
-	rbft.off(InRecovery)
+	rbft.atomicOff(InRecovery)
 
-	rbft.on(InViewChange)
+	rbft.atomicOn(InViewChange)
 	rbft.off(NeedSyncState)
 	rbft.processNullRequest(msg)
 	assert.Equal(t, false, rbft.in(NeedSyncState))
-	rbft.off(InViewChange)
+	rbft.atomicOff(InViewChange)
 
-	rbft.on(InEpochSync)
+	rbft.atomicOn(InEpochSync)
 	rbft.off(NeedSyncState)
 	rbft.processNullRequest(msg)
 	assert.Equal(t, false, rbft.in(NeedSyncState))
-	rbft.off(InEpochSync)
+	rbft.atomicOff(InEpochSync)
 
 	// not primary
 	rbft.setView(uint64(3))
@@ -396,20 +398,20 @@ func TestRBFT_handleNullRequestTimerEvent(t *testing.T) {
 	defer ctrl.Finish()
 	rbft, _ := newTestRBFT(ctrl)
 
-	rbft.on(InRecovery)
+	rbft.atomicOn(InRecovery)
 	rbft.handleNullRequestTimerEvent()
 	assert.Equal(t, uint64(0), rbft.view)
-	rbft.off(InRecovery)
+	rbft.atomicOff(InRecovery)
 
-	rbft.on(InViewChange)
+	rbft.atomicOn(InViewChange)
 	rbft.handleNullRequestTimerEvent()
 	assert.Equal(t, uint64(0), rbft.view)
-	rbft.off(InViewChange)
+	rbft.atomicOff(InViewChange)
 
-	rbft.on(InEpochSync)
+	rbft.atomicOn(InEpochSync)
 	rbft.handleNullRequestTimerEvent()
 	assert.Equal(t, uint64(0), rbft.view)
-	rbft.off(InEpochSync)
+	rbft.atomicOff(InEpochSync)
 
 	rbft.setView(uint64(3))
 	rbft.handleNullRequestTimerEvent()
@@ -435,11 +437,11 @@ func TestRBFT_processReqSetEvent(t *testing.T) {
 	assert.Nil(t, rbft.processReqSetEvent(req))
 
 	rbft.off(SkipInProgress)
-	rbft.on(PoolFull)
+	rbft.atomicOn(PoolFull)
 	assert.Nil(t, rbft.processReqSetEvent(req))
 
 	rbft.on(Normal)
-	rbft.off(PoolFull)
+	rbft.atomicOff(PoolFull)
 	assert.Nil(t, rbft.processReqSetEvent(req))
 
 	rbft.setView(1)
@@ -453,14 +455,14 @@ func TestRBFT_processOutOfDateReqs(t *testing.T) {
 
 	// rbft.batchMgr.requestPool.IsPoolFull() mock return false
 	// so that if reach that sentence, will off PoolFull state
-	rbft.on(PoolFull)
+	rbft.atomicOn(PoolFull)
 	rbft.off(Normal)
 	rbft.processOutOfDateReqs()
-	assert.Equal(t, true, rbft.in(PoolFull))
+	assert.Equal(t, true, rbft.atomicIn(PoolFull))
 
 	rbft.on(Normal)
 	rbft.processOutOfDateReqs()
-	assert.Equal(t, false, rbft.in(PoolFull))
+	assert.Equal(t, false, rbft.atomicIn(PoolFull))
 }
 
 //============================================
@@ -698,12 +700,13 @@ func TestRBFT_checkpoint(t *testing.T) {
 	defer ctrl.Finish()
 	rbft, _ := newTestRBFT(ctrl)
 
-	state := &pb.ServiceState{
+	state := &pb.ServiceState{}
+	state.MetaState = &pb.MetaState{
 		Applied: 1,
 		Digest:  "checkpoint msg",
 	}
 	rbft.checkpoint(uint64(10), state)
-	assert.Equal(t, state.Digest, rbft.storeMgr.chkpts[uint64(10)])
+	assert.Equal(t, state.MetaState.Digest, rbft.storeMgr.chkpts[uint64(10)])
 }
 
 func TestRBFT_witnessCheckpointWeakCert(t *testing.T) {
@@ -725,10 +728,10 @@ func TestRBFT_witnessCheckpointWeakCert(t *testing.T) {
 	rbft.storeMgr.checkpointStore[*chkptReplica] = true
 
 	rbft.on(SkipInProgress)
-	rbft.off(StateTransferring)
+	rbft.atomicOff(StateTransferring)
 	rbft.witnessCheckpointWeakCert(chkptSelf)
 	assert.Equal(t, chkptSelf.Digest, rbft.storeMgr.highStateTarget.targetMessage.digest)
-	assert.Equal(t, true, rbft.in(StateTransferring))
+	assert.Equal(t, true, rbft.atomicIn(StateTransferring))
 }
 
 func TestRBFT_moveWatermarks(t *testing.T) {
@@ -845,7 +848,7 @@ func TestRBFT_tryStateTransfer(t *testing.T) {
 	}
 	target := &stateUpdateTarget{targetMessage: targetMsg}
 	rbft.off(SkipInProgress)
-	rbft.off(StateTransferring)
+	rbft.atomicOff(StateTransferring)
 	prePrepareTmp := &pb.PrePrepare{
 		ReplicaId:      1,
 		View:           0,
@@ -885,16 +888,16 @@ func TestRBFT_tryStateTransfer(t *testing.T) {
 	rbft.tryStateTransfer(target)
 	assert.Equal(t, (*msgCert)(nil), rbft.storeMgr.certStore[msgIDTmp])
 
-	// if rbft.in(StateTransferring)
+	// if rbft.atomicIn(StateTransferring)
 	rbft.storeMgr.certStore[msgIDTmp] = certTmp
 	rbft.exec.setLastExec(uint64(1))
-	rbft.on(StateTransferring)
+	rbft.atomicOn(StateTransferring)
 	rbft.tryStateTransfer(target)
 	assert.Equal(t, certTmp, rbft.storeMgr.certStore[msgIDTmp])
 
 	// if target == nil
 	// if rbft.storeMgr.highStateTarget == nil
-	rbft.off(StateTransferring)
+	rbft.atomicOff(StateTransferring)
 	target = nil
 	rbft.storeMgr.highStateTarget = nil
 	rbft.tryStateTransfer(target)
@@ -909,9 +912,11 @@ func TestRBFT_recvStateUpdatedEvent(t *testing.T) {
 	// normal
 	rbft.h = 20
 	ss0 := &pb.ServiceState{
+		VSet: nil,
+	}
+	ss0.MetaState = &pb.MetaState{
 		Applied: uint64(30),
 		Digest:  "block-number-30",
-		VSet:    nil,
 	}
 	rbft.node.currentState = ss0
 	ret0 := rbft.recvStateUpdatedEvent(ss0)
@@ -921,38 +926,21 @@ func TestRBFT_recvStateUpdatedEvent(t *testing.T) {
 	rbft.h = uint64(20)
 	rbft.view = uint64(3)
 	ss1 := &pb.ServiceState{
+		VSet: nil,
+	}
+	ss1.MetaState = &pb.MetaState{
 		Applied: uint64(30),
 		Digest:  "block-number-30",
-		VSet:    nil,
 	}
 	rbft.node.currentState = ss1
-	rbft.on(InRecovery)
+	rbft.atomicOn(InRecovery)
 	ret1 := rbft.recvStateUpdatedEvent(ss1)
 	expRet1 := &LocalEvent{
 		Service:   RecoveryService,
 		EventType: RecoveryDoneEvent,
 	}
-	rbft.off(InRecovery)
+	rbft.atomicOff(InRecovery)
 	assert.Equal(t, expRet1, ret1)
-
-	// epoch sync in process
-	rbft.h = 20
-	ss2 := &pb.ServiceState{
-		Applied: uint64(30),
-		Digest:  "block-number-30",
-		VSet:    nil,
-	}
-	rbft.node.currentState = ss2
-	rbft.on(InEpochSync)
-	rbft.epochMgr.epochStartState.Digest = ss2.Digest
-	rbft.epochMgr.epochStartState.Applied = ss2.Applied
-	ret2 := rbft.recvStateUpdatedEvent(ss1)
-	expRet2 := &LocalEvent{
-		Service:   EpochMgrService,
-		EventType: EpochSyncFinishedEvent,
-	}
-	assert.Equal(t, expRet2, ret2)
-	rbft.off(InEpochSync)
 
 	// state update target < h
 	rbft.h = 50
@@ -964,43 +952,49 @@ func TestRBFT_recvStateUpdatedEvent(t *testing.T) {
 		replicas: nil,
 	}
 	ss3 := &pb.ServiceState{
+		VSet: nil,
+	}
+	ss3.MetaState = &pb.MetaState{
 		Applied: uint64(42),
 		Digest:  "block-number-42",
-		VSet:    nil,
 	}
-	rbft.on(StateTransferring)
+	rbft.atomicOn(StateTransferring)
 	rbft.recvStateUpdatedEvent(ss3)
 	assert.Equal(t, uint64(42), rbft.exec.lastExec)
-	assert.Equal(t, true, rbft.in(StateTransferring))
+	assert.Equal(t, true, rbft.atomicIn(StateTransferring))
 
 	ss4 := &pb.ServiceState{
+		VSet: nil,
+	}
+	ss4.MetaState = &pb.MetaState{
 		Applied: uint64(45),
 		Digest:  "block-number-45",
-		VSet:    nil,
 	}
-	rbft.on(StateTransferring)
+	rbft.atomicOn(StateTransferring)
 	rbft.recvStateUpdatedEvent(ss4)
 	assert.Equal(t, uint64(45), rbft.exec.lastExec)
-	assert.Equal(t, false, rbft.in(StateTransferring))
+	assert.Equal(t, false, rbft.atomicIn(StateTransferring))
 
 	// errors
 	ss5 := &pb.ServiceState{
+		VSet: nil,
+	}
+	ss5.MetaState = &pb.MetaState{
 		Applied: uint64(46),
 		Digest:  "block-number-46",
-		VSet:    nil,
 	}
-	rbft.on(StateTransferring)
+	rbft.atomicOn(StateTransferring)
 	rbft.exec.setLastExec(uint64(0))
 	rbft.recvStateUpdatedEvent(ss5)
 	assert.Equal(t, uint64(0), rbft.exec.lastExec)
-	assert.Equal(t, true, rbft.in(StateTransferring))
+	assert.Equal(t, true, rbft.atomicIn(StateTransferring))
 
-	rbft.on(StateTransferring)
+	rbft.atomicOn(StateTransferring)
 	rbft.storeMgr.highStateTarget = nil
 	rbft.exec.setLastExec(uint64(0))
 	rbft.recvStateUpdatedEvent(ss5)
 	assert.Equal(t, uint64(0), rbft.exec.lastExec)
-	assert.Equal(t, true, rbft.in(StateTransferring))
+	assert.Equal(t, true, rbft.atomicIn(StateTransferring))
 }
 
 func TestRBFT_recvCheckpoint2(t *testing.T) {
@@ -1032,7 +1026,7 @@ func TestRBFT_recvCheckpoint2(t *testing.T) {
 	// Open skip in progress, could set h to target
 	rbft.on(SkipInProgress)
 	// Case1: in recovery
-	rbft.on(InRecovery)
+	rbft.atomicOn(InRecovery)
 	rbft.recvCheckpoint(checkpoint4)
 	// move to n
 	assert.Equal(t, uint64(10), rbft.h)
@@ -1067,7 +1061,7 @@ func TestRBFT_recvCheckpoint3(t *testing.T) {
 	// Open skip in progress, could set h to target
 	rbft.on(SkipInProgress)
 	// Case2: not in recovery
-	rbft.off(InRecovery)
+	rbft.atomicOff(InRecovery)
 	// But just fell behind larger than 20 blocks, update
 	rbft.recvCheckpoint(checkpoint4)
 	// move to n
