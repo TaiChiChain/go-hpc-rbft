@@ -65,7 +65,7 @@ func (rbft *rbftImpl) startBatchTimer() bool {
 
 	rbft.timerMgr.startTimer(batchTimer, localEvent)
 	rbft.batchMgr.batchTimerActive = true
-	rbft.logger.Debugf("Primary %d started the batch timer", rbft.peerPool.localID)
+	rbft.logger.Debugf("Primary %d started the batch timer", rbft.peerPool.ID)
 
 	return true
 }
@@ -74,7 +74,7 @@ func (rbft *rbftImpl) startBatchTimer() bool {
 func (rbft *rbftImpl) stopBatchTimer() {
 	rbft.timerMgr.stopTimer(batchTimer)
 	rbft.batchMgr.batchTimerActive = false
-	rbft.logger.Debugf("Primary %d stopped the batch timer", rbft.peerPool.localID)
+	rbft.logger.Debugf("Primary %d stopped the batch timer", rbft.peerPool.ID)
 }
 
 // restartBatchTimer restarts the batch timer
@@ -89,7 +89,7 @@ func (rbft *rbftImpl) restartBatchTimer() bool {
 
 	rbft.timerMgr.startTimer(batchTimer, localEvent)
 	rbft.batchMgr.batchTimerActive = true
-	rbft.logger.Debugf("Primary %d restarted the batch timer", rbft.peerPool.localID)
+	rbft.logger.Debugf("Primary %d restarted the batch timer", rbft.peerPool.ID)
 
 	return true
 }
@@ -103,11 +103,11 @@ func (rbft *rbftImpl) softRestartBatchTimer() bool {
 
 	hasStarted, _ := rbft.timerMgr.softStartTimerWithNewTT(batchTimer, rbft.timerMgr.getTimeoutValue(batchTimer), localEvent)
 	if hasStarted {
-		rbft.logger.Debugf("Replica %d has started batch timer before", rbft.peerPool.localID)
+		rbft.logger.Debugf("Replica %d has started batch timer before", rbft.peerPool.ID)
 		return false
 	}
 	rbft.batchMgr.batchTimerActive = true
-	rbft.logger.Debugf("Primary %d softly restarted the batch timer", rbft.peerPool.localID)
+	rbft.logger.Debugf("Primary %d softly restarted the batch timer", rbft.peerPool.ID)
 
 	return true
 }
@@ -120,13 +120,13 @@ func (rbft *rbftImpl) startCheckPoolTimer() {
 	}
 
 	rbft.timerMgr.startTimer(checkPoolTimer, localEvent)
-	rbft.logger.Debugf("Replica %d started the check pool timer", rbft.peerPool.localID)
+	rbft.logger.Debugf("Replica %d started the check pool timer", rbft.peerPool.ID)
 }
 
 // stopCheckPoolTimer stops the check pool timer when node enter abnormal status.
 func (rbft *rbftImpl) stopCheckPoolTimer() {
 	rbft.timerMgr.stopTimer(checkPoolTimer)
-	rbft.logger.Debugf("Replica %d stopped the check pool timer", rbft.peerPool.localID)
+	rbft.logger.Debugf("Replica %d stopped the check pool timer", rbft.peerPool.ID)
 }
 
 // restartCheckPoolTimer restarts the check pool timer.
@@ -139,7 +139,7 @@ func (rbft *rbftImpl) restartCheckPoolTimer() {
 	}
 
 	rbft.timerMgr.startTimer(checkPoolTimer, localEvent)
-	rbft.logger.Debugf("Replica %d restarted the check pool timer", rbft.peerPool.localID)
+	rbft.logger.Debugf("Replica %d restarted the check pool timer", rbft.peerPool.ID)
 }
 
 // maybeSendPrePrepare used by primary helps primary stores this batch and send prePrepare,
@@ -157,18 +157,18 @@ func (rbft *rbftImpl) maybeSendPrePrepare(batch *pb.RequestBatch, findCache bool
 	if !rbft.sendInW(nextSeqNo) {
 		if !findCache {
 			rbft.logger.Debugf("Replica %d is primary, not sending prePrepare for request batch %s because "+
-				"next seqNo is out of high watermark %d", rbft.peerPool.localID, batch.BatchHash, rbft.h+rbft.L)
+				"next seqNo is out of high watermark %d", rbft.peerPool.ID, batch.BatchHash, rbft.h+rbft.L)
 			rbft.batchMgr.cacheBatch = append(rbft.batchMgr.cacheBatch, batch)
 		}
 		rbft.logger.Debugf("Replica %d is primary, not sending prePrepare for request batch in cache because "+
-			"next seqNo is out of high watermark %d", rbft.peerPool.localID, rbft.h+rbft.L)
+			"next seqNo is out of high watermark %d", rbft.peerPool.ID, rbft.h+rbft.L)
 		return
 	}
 
 	if findCache {
 		nextBatch = rbft.batchMgr.cacheBatch[0]
 		rbft.batchMgr.cacheBatch = rbft.batchMgr.cacheBatch[1:]
-		rbft.logger.Infof("Primary %d finds cached batch, hash = %s", rbft.peerPool.localID, nextBatch.BatchHash)
+		rbft.logger.Infof("Primary %d finds cached batch, hash = %s", rbft.peerPool.ID, nextBatch.BatchHash)
 	} else {
 		nextBatch = batch
 	}
@@ -203,37 +203,37 @@ func (rbft *rbftImpl) maybeSendPrePrepare(batch *pb.RequestBatch, findCache bool
 func (rbft *rbftImpl) findNextCommitBatch(digest string, v uint64, n uint64) error {
 	cert := rbft.storeMgr.getCert(v, n, digest)
 	if v != rbft.view {
-		rbft.logger.Debugf("Replica %d find incorrect view in prepared cert with view=%d/seqNo=%d", rbft.peerPool.localID, v, n)
+		rbft.logger.Debugf("Replica %d find incorrect view in prepared cert with view=%d/seqNo=%d", rbft.peerPool.ID, v, n)
 		return nil
 	}
 
 	if cert.prePrepare == nil {
 		rbft.logger.Errorf("Replica %d get prePrepare failed for view=%d/seqNo=%d/digest=%s",
-			rbft.peerPool.localID, v, n, digest)
+			rbft.peerPool.ID, v, n, digest)
 		return nil
 	}
 
 	if rbft.in(SkipInProgress) {
-		rbft.logger.Debugf("Replica %d do not try to send commit because it's in stateUpdate", rbft.peerPool.localID)
+		rbft.logger.Debugf("Replica %d do not try to send commit because it's in stateUpdate", rbft.peerPool.ID)
 		return nil
 	}
 
 	if digest == "" {
-		rbft.logger.Infof("Replica %d send commit for no-op batch with view=%d/seqNo=%d", rbft.peerPool.localID, v, n)
+		rbft.logger.Infof("Replica %d send commit for no-op batch with view=%d/seqNo=%d", rbft.peerPool.ID, v, n)
 		return rbft.sendCommit(digest, v, n)
 	}
 	// when system restart or finished vc/recovery, we need to resend commit for cert
 	// with seqNo <= lastExec. However, those batches may have been deleted from requestPool
 	// so we can get those batches from batchStore first.
 	if existBatch, ok := rbft.storeMgr.batchStore[digest]; ok {
-		rbft.logger.Debugf("Replica %d commit batch for view=%d/seqNo=%d, batch size: %d", rbft.peerPool.localID, v, n, len(existBatch.RequestHashList))
+		rbft.logger.Debugf("Replica %d commit batch for view=%d/seqNo=%d, batch size: %d", rbft.peerPool.ID, v, n, len(existBatch.RequestHashList))
 		return rbft.sendCommit(digest, v, n)
 	}
 	prePrep := cert.prePrepare
 
 	txList, localList, missingTxs, err := rbft.batchMgr.requestPool.GetRequestsByHashList(digest, prePrep.HashBatch.Timestamp, prePrep.HashBatch.RequestHashList, prePrep.HashBatch.DeDuplicateRequestHashList)
 	if err != nil {
-		rbft.logger.Warningf("Replica %d get error when get txList, err: %v", rbft.peerPool.localID, err)
+		rbft.logger.Warningf("Replica %d get error when get txList, err: %v", rbft.peerPool.ID, err)
 		rbft.sendViewChange()
 		return nil
 	}
@@ -257,27 +257,27 @@ func (rbft *rbftImpl) findNextCommitBatch(digest string, v uint64, n uint64) err
 	rbft.persistBatch(digest)
 
 	if rbft.batchMgr.requestPool.IsConfigBatch(batch.BatchHash) {
-		rbft.logger.Debugf("Replica %d generate a config batch", rbft.peerPool.localID)
-		rbft.on(InConfChange)
+		rbft.logger.Debugf("Replica %d generate a config batch", rbft.peerPool.ID)
+		rbft.atomicOn(InConfChange)
 	}
 
-	rbft.logger.Debugf("Replica %d commit batch for view=%d/seqNo=%d, batch size: %d", rbft.peerPool.localID, v, n, len(txList))
+	rbft.logger.Debugf("Replica %d commit batch for view=%d/seqNo=%d, batch size: %d", rbft.peerPool.ID, v, n, len(txList))
 	return rbft.sendCommit(digest, v, n)
 }
 
 // primaryResubmitTransactions handles the transactions put in requestPool during
 // viewChange, updateN and recovery if current node is new primary.
 func (rbft *rbftImpl) primaryResubmitTransactions() {
-	if rbft.isPrimary(rbft.peerPool.localID) && !rbft.in(InConfChange) {
-		rbft.logger.Debugf("======== Primary %d resubmit transactions", rbft.peerPool.localID)
+	if rbft.isPrimary(rbft.peerPool.ID) && !rbft.atomicIn(InConfChange) {
+		rbft.logger.Debugf("======== Primary %d resubmit transactions", rbft.peerPool.ID)
 		//if primary has transactions in requestPool, generate batches of the transactions
 		for rbft.batchMgr.requestPool.HasPendingRequestInPool() {
 			batches := rbft.batchMgr.requestPool.GenerateRequestBatch()
 			rbft.postBatches(batches)
-			if rbft.in(InConfChange) {
+			if rbft.atomicIn(InConfChange) {
 				break
 			}
 		}
-		rbft.logger.Debugf("======== Primary %d finished transactions resubmit", rbft.peerPool.localID)
+		rbft.logger.Debugf("======== Primary %d finished transactions resubmit", rbft.peerPool.ID)
 	}
 }

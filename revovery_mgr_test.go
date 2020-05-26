@@ -24,7 +24,7 @@ func TestRecovery_recvNotification(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	rbft, _ := newTestRBFTReplica(ctrl)
-	rbft.on(InRecovery)
+	rbft.atomicOn(InRecovery)
 
 	// Set a Notification Msg
 	vbNode2 := &pb.VcBasis{
@@ -71,7 +71,7 @@ func TestRecovery_recvNotification(t *testing.T) {
 	rbft.recvNotification(notificationNode3)
 
 	// NewNode will not recv
-	rbft.on(InRecovery)
+	rbft.atomicOn(InRecovery)
 	rbft.off(Normal)
 	rbft.on(isNewNode)
 	retNil := rbft.recvNotification(notificationNode4)
@@ -134,7 +134,7 @@ func TestRecovery_resetStateForRecovery(t *testing.T) {
 	nrNode4.Basis.View = uint64(1)
 	nrNode4.Basis.Cset = []*pb.Vc_C{C}
 
-	rbft.on(InRecovery)
+	rbft.atomicOn(InRecovery)
 	rbft.recvNotificationResponse(nrNode2)
 	rbft.recvNotificationResponse(nrNode3)
 	rbft.recvNotificationResponse(nrNode4)
@@ -192,7 +192,7 @@ func TestRecovery_returnRecoveryPQC(t *testing.T) {
 		View:           preprep.View,
 		SequenceNumber: preprep.SequenceNumber,
 		BatchDigest:    preprep.BatchDigest,
-		ReplicaId:      rbft.peerPool.localID,
+		ReplicaId:      rbft.peerPool.ID,
 	}
 	prepNode4 := &pb.Prepare{
 		View:           preprep.View,
@@ -267,7 +267,7 @@ func TestRecovery_recvRecoveryReturnPQC(t *testing.T) {
 		View:           preprep.View,
 		SequenceNumber: preprep.SequenceNumber,
 		BatchDigest:    preprep.BatchDigest,
-		ReplicaId:      rbft.peerPool.localID,
+		ReplicaId:      rbft.peerPool.ID,
 	}
 	prepNode4 := &pb.Prepare{
 		View:           preprep.View,
@@ -358,25 +358,27 @@ func TestRecovery_initSyncState(t *testing.T) {
 
 	// call recv sync state rsp
 	rbft.node.currentState = &pb.ServiceState{
+		VSet: nil,
+	}
+	rbft.node.currentState.MetaState = &pb.MetaState{
 		Applied: uint64(10),
 		Digest:  "block-number-10",
-		VSet:    nil,
 	}
 	info := &pb.NodeInfo{
-		ReplicaId:   rbft.peerPool.localID,
-		ReplicaHash: rbft.peerPool.localHash,
+		ReplicaId:   rbft.peerPool.ID,
+		ReplicaHash: rbft.peerPool.hash,
 	}
 
 	s := rbft.node.getCurrentState()
 
 	// post the sync state response message event to myself
+	mRouter := minimizeRouter(rbft.peerPool.router)
 	syncStateRsp := &pb.SyncStateResponse{
 		NodeInfo:   info,
 		Epoch:      rbft.epoch,
 		View:       rbft.view,
-		Applied:    s.Applied,
-		Digest:     s.Digest,
-		RouterInfo: byte2Hex(rbft.peerPool.serializeRouterInfo()),
+		MetaState:  s.MetaState,
+		RouterInfo: serializeRouterInfo(mRouter),
 	}
 	rbft.off(InSyncState)
 	rbft.initSyncState()

@@ -26,14 +26,17 @@ func TestStatusMgr_inOne(t *testing.T) {
 		Logger:      log,
 		External:    external,
 		RequestPool: tx,
+
+		EpochInit:       uint64(0),
+		EpochInitDigest: "XXX GENESIS",
 	}
 
 	cpChan := make(chan *pb.ServiceState)
-	confC := make(chan bool)
+	confC := make(chan *pb.ReloadFinished)
 	rbft, _ := newRBFT(cpChan, confC, conf)
 
-	rbft.on(InViewChange)
-	assert.Equal(t, true, rbft.inOne(InViewChange, InRecovery, InUpdatingN))
+	rbft.atomicOn(InViewChange)
+	assert.Equal(t, true, rbft.atomicInOne(InViewChange, InRecovery))
 }
 
 func TestStatusMgr_setState(t *testing.T) {
@@ -51,17 +54,20 @@ func TestStatusMgr_setState(t *testing.T) {
 		Logger:      log,
 		External:    external,
 		RequestPool: tx,
+
+		EpochInit:       uint64(0),
+		EpochInitDigest: "XXX GENESIS",
 	}
 
 	cpChan := make(chan *pb.ServiceState)
-	confC := make(chan bool)
+	confC := make(chan *pb.ReloadFinished)
 	rbft, _ := newRBFT(cpChan, confC, conf)
 
 	rbft.setNormal()
 	assert.Equal(t, true, rbft.in(Normal))
 
 	rbft.setFull()
-	assert.Equal(t, true, rbft.in(PoolFull))
+	assert.Equal(t, true, rbft.atomicIn(PoolFull))
 }
 
 func TestStatusMgr_maybeSetNormal(t *testing.T) {
@@ -79,21 +85,24 @@ func TestStatusMgr_maybeSetNormal(t *testing.T) {
 		Logger:      log,
 		External:    external,
 		RequestPool: tx,
+
+		EpochInit:       uint64(0),
+		EpochInitDigest: "XXX GENESIS",
 	}
 
 	cpChan := make(chan *pb.ServiceState)
-	confC := make(chan bool)
+	confC := make(chan *pb.ReloadFinished)
 	rbft, _ := newRBFT(cpChan, confC, conf)
 
-	rbft.off(InRecovery)
-	rbft.off(InUpdatingN)
-	rbft.off(InViewChange)
-	rbft.off(StateTransferring)
-	rbft.off(Pending)
+	rbft.atomicOff(InRecovery)
+	rbft.atomicOff(InConfChange)
+	rbft.atomicOff(InViewChange)
+	rbft.atomicOff(StateTransferring)
+	rbft.atomicOff(Pending)
 	rbft.maybeSetNormal()
 	assert.Equal(t, true, rbft.in(Normal))
 
-	rbft.on(InRecovery)
+	rbft.atomicOn(InRecovery)
 	rbft.maybeSetNormal()
 	assert.Equal(t, true, rbft.in(Normal))
 }

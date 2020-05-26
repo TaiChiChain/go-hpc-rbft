@@ -69,9 +69,9 @@ func TestExec_handleCoreRbftEvent(t *testing.T) {
 	assert.Equal(t, false, rbft.batchMgr.batchTimerActive)
 
 	// Replica handle Null request to a viewChange
-	rbft.peerPool.localID = uint64(2)
-	rbft.off(InRecovery)
-	rbft.off(InViewChange)
+	rbft.peerPool.ID = uint64(2)
+	rbft.atomicOff(InRecovery)
+	rbft.atomicOff(InViewChange)
 	e.EventType = CoreNullRequestTimerEvent
 	assert.Equal(t, uint64(0), rbft.view)
 	assert.Nil(t, rbft.handleCoreRbftEvent(e))
@@ -80,7 +80,7 @@ func TestExec_handleCoreRbftEvent(t *testing.T) {
 	rbft.setView(newView)
 
 	// First Req to a ViewChange
-	rbft.peerPool.localID = uint64(1)
+	rbft.peerPool.ID = uint64(1)
 	e.EventType = CoreFirstRequestTimerEvent
 	assert.Equal(t, uint64(0), rbft.view)
 	assert.Nil(t, rbft.handleCoreRbftEvent(e))
@@ -92,22 +92,24 @@ func TestExec_handleCoreRbftEvent(t *testing.T) {
 	// Check the pool is not full
 	// if !rbft.isNormal(), cannot check
 	e.EventType = CoreCheckPoolTimerEvent
-	rbft.on(PoolFull)
+	rbft.atomicOn(PoolFull)
 	rbft.off(Normal)
 	assert.Nil(t, rbft.handleCoreRbftEvent(e))
-	assert.Equal(t, true, rbft.in(PoolFull))
+	assert.Equal(t, true, rbft.atomicIn(PoolFull))
 	// Else success
 	rbft.on(Normal)
 	assert.Nil(t, rbft.handleCoreRbftEvent(e))
-	assert.Equal(t, false, rbft.in(PoolFull))
+	assert.Equal(t, false, rbft.atomicIn(PoolFull))
 
 	// Trigger rbft.recvStateUpdatedEvent(e.Event.(uint64))
-	rbft.off(InRecovery)
+	rbft.atomicOff(InRecovery)
 	e.EventType = CoreStateUpdatedEvent
 	e.Event = &pb.ServiceState{
-		Applied: uint64(5),
-		Digest:  "block-number-5",
-		VSet:    nil,
+		MetaState: &pb.MetaState{
+			Applied: uint64(5),
+			Digest:  "block-number-5",
+		},
+		VSet: nil,
 	}
 	rbft.exec.setLastExec(uint64(3))
 	assert.Nil(t, rbft.handleCoreRbftEvent(e))
@@ -122,28 +124,25 @@ func TestExec_handleCoreRbftEvent(t *testing.T) {
 
 	// as for update conf msg
 	// found localId, initPeers to refresh the peerPool
-	rbft.off(InViewChange)
+	rbft.atomicOff(InViewChange)
 	peerTmp := []*pb.Peer{
 		{
-			Id:       1,
-			Hash:     "node1",
-			Hostname: "node1",
+			Id:   1,
+			Hash: "node1",
 		},
 		{
-			Id:       5,
-			Hash:     "node5",
-			Hostname: "node5",
+			Id:   5,
+			Hash: "node5",
 		},
 		{
-			Id:       6,
-			Hash:     "node6",
-			Hostname: "node6",
+			Id:   6,
+			Hash: "node6",
 		},
 	}
 	confState := &pb.ConfState{QuorumRouter: &pb.Router{Peers: peerTmp}}
-	rbft.off(Pending)
+	rbft.atomicOff(Pending)
 	rbft.postConfState(confState)
-	assert.Equal(t, false, rbft.in(Pending))
+	assert.Equal(t, false, rbft.atomicIn(Pending))
 	assert.Equal(t, peerTmp, rbft.peerPool.router.Peers)
 
 	// Not found localId, Pending the peer
@@ -151,16 +150,15 @@ func TestExec_handleCoreRbftEvent(t *testing.T) {
 		QuorumRouter: &pb.Router{
 			Peers: []*pb.Peer{
 				{
-					Id:       6,
-					Hash:     "node6",
-					Hostname: "node6",
+					Id:   6,
+					Hash: "node6",
 				},
 			},
 		},
 	}
-	rbft.off(Pending)
+	rbft.atomicOff(Pending)
 	rbft.postConfState(confState)
-	assert.Equal(t, true, rbft.in(Pending))
+	assert.Equal(t, true, rbft.atomicIn(Pending))
 
 	// Default
 	e.EventType = ViewChangeTimerEvent
@@ -186,28 +184,28 @@ func TestExec_handleViewChangeEvent(t *testing.T) {
 	assert.Equal(t, uint64(10), rbft.view)
 
 	rbft.setView(0)
-	rbft.on(InRecovery)
-	rbft.on(InViewChange)
+	rbft.atomicOn(InRecovery)
+	rbft.atomicOn(InViewChange)
 	rbft.handleViewChangeEvent(e)
-	assert.Equal(t, false, rbft.in(InViewChange))
+	assert.Equal(t, false, rbft.atomicIn(InViewChange))
 
 	e.EventType = ViewChangedEvent
 	rbft.setView(0)
-	rbft.off(InRecovery)
-	rbft.on(InViewChange)
+	rbft.atomicOff(InRecovery)
+	rbft.atomicOn(InViewChange)
 	rbft.handleViewChangeEvent(e)
-	assert.Equal(t, false, rbft.in(InViewChange))
+	assert.Equal(t, false, rbft.atomicIn(InViewChange))
 
 	e.EventType = ViewChangeResendTimerEvent
-	rbft.off(InViewChange)
+	rbft.atomicOff(InViewChange)
 	rbft.timerMgr.tTimers[newViewTimer].isActive.Store("tag", "1")
 	rbft.handleViewChangeEvent(e)
 	_, flag := rbft.timerMgr.tTimers[newViewTimer].isActive.Load("tag")
 	assert.Equal(t, true, flag)
 
-	rbft.on(InViewChange)
+	rbft.atomicOn(InViewChange)
 	rbft.handleViewChangeEvent(e)
-	assert.Equal(t, false, rbft.in(InViewChange))
+	assert.Equal(t, false, rbft.atomicIn(InViewChange))
 	_, flag = rbft.timerMgr.tTimers[newViewTimer].isActive.Load("tag")
 	assert.Equal(t, false, flag)
 
@@ -230,7 +228,7 @@ func TestExec_dispatchMsgToService(t *testing.T) {
 	}
 
 	cpChan := make(chan *pb.ServiceState)
-	confC := make(chan bool)
+	confC := make(chan *pb.ReloadFinished)
 	rbft, _ := newRBFT(cpChan, confC, conf)
 
 	var e consensusEvent

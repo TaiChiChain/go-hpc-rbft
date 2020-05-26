@@ -15,7 +15,6 @@
 package rbft
 
 import (
-	"errors"
 	"sync"
 
 	"github.com/ultramesh/flato-event/inner/protos"
@@ -67,7 +66,7 @@ type ServiceInbound interface {
 
 	// ReportRouterUpdated report router updated:
 	// If validator set was changed after reload, service reports the latest router info to RBFT by ReportRouterUpdated
-	ReportRouterUpdated(router *pb.Router)
+	ReportReloadFinished(reload *pb.ReloadMessage)
 }
 
 // node implements the Node interface and track application service synchronously to help RBFT core
@@ -82,12 +81,14 @@ type node struct {
 	cpChan chan *pb.ServiceState
 	// stateLock is used to ensure mutually exclusive access of currentState.
 	stateLock sync.Mutex
-	// confChan is used to check ctx was executed
-	confChan chan bool
-	// reloadRouter is used to store router info send from reload temporarily
+
+	// reloadRouter is used to store the validator set from reload temporarily
+	// for that consensus will use it to update router after the execution of config transaction
 	reloadRouter *pb.Router
 	// mutex to set value of reloadRouter
 	reloadRouterLock sync.RWMutex
+	// confChan is used to track if config transaction execution was finished by CommitDB
+	confChan chan *pb.ReloadFinished
 
 	config Config
 	logger Logger
@@ -101,7 +102,7 @@ func NewNode(conf Config) (Node, error) {
 // newNode help to initializes a Node service.
 func newNode(conf Config) (*node, error) {
 	cpChan := make(chan *pb.ServiceState)
-	confC := make(chan bool)
+	confC := make(chan *pb.ReloadFinished)
 
 	rbft, err := newRBFT(cpChan, confC, conf)
 	if err != nil {
@@ -109,11 +110,12 @@ func newNode(conf Config) (*node, error) {
 	}
 
 	n := &node{
-		rbft:         rbft,
-		cpChan:       cpChan,
-		confChan:     confC,
-		config:       conf,
-		logger:       conf.Logger,
+		rbft:     rbft,
+		cpChan:   cpChan,
+		confChan: confC,
+		config:   conf,
+		logger:   conf.Logger,
+
 		reloadRouter: nil,
 	}
 
@@ -153,12 +155,7 @@ func (n *node) Propose(requests []*protos.Transaction) error {
 // ProposeConfChange proposes config change.
 // Application needs to call ApplyConfChange when applying EntryConfChange type entry.
 func (n *node) ProposeConfChange(cc *pb.ConfChange) error {
-	switch cc.Type {
-	default:
-		n.logger.Errorf("Invalid Config Change Propose")
-		err := errors.New("invalid confChange propose")
-		return err
-	}
+	return nil
 }
 
 // Step advances the state machine using the given message.
@@ -183,7 +180,7 @@ func (n *node) ReportExecuted(state *pb.ServiceState) {
 		n.currentState = state
 		return
 	}
-	if state.Applied != 0 && state.Applied <= n.currentState.Applied {
+	if state.MetaState.Applied != 0 && state.MetaState.Applied <= n.currentState.MetaState.Applied {
 		n.logger.Warningf("Receive invalid service state %+v, "+
 			"current state %+v", state, n.currentState)
 		return
@@ -191,17 +188,9 @@ func (n *node) ReportExecuted(state *pb.ServiceState) {
 	n.logger.Debugf("Update service state: %+v", state)
 	n.currentState = state
 
-	// when there is a config transaction is waiting executed:
-	// 1. not in checkpoint: send executed message by confChan
-	// 2. else in checkpoint: send executed message by cpChan
-	if n.rbft.readConfigTransactionToExecute() == state.Applied && state.Applied%n.config.K != 0 {
-		n.logger.Debugf("Report config tx executed: {%d, %s} to RBFT core", state.Applied, state.Digest)
-		n.confChan <- true
-		return
-	}
-
-	if state.Applied%n.config.K == 0 {
-		n.logger.Debugf("Report checkpoint: {%d, %s} to RBFT core", state.Applied, state.Digest)
+	// a config transaction executed or checkpoint, send state to checkpoint channel
+	if n.rbft.readConfigTransactionToExecute() == state.MetaState.Applied || state.MetaState.Applied%n.config.K == 0 {
+		n.logger.Debugf("Report checkpoint: {%d, %s} to RBFT core", state.MetaState.Applied, state.MetaState.Digest)
 		n.cpChan <- state
 	}
 }
@@ -213,7 +202,7 @@ func (n *node) ReportExecuted(state *pb.ServiceState) {
 func (n *node) ReportStateUpdated(state *pb.ServiceState) {
 	n.stateLock.Lock()
 	defer n.stateLock.Unlock()
-	if state.Applied != 0 && state.Applied <= n.currentState.Applied {
+	if state.MetaState.Applied != 0 && state.MetaState.Applied <= n.currentState.MetaState.Applied {
 		n.logger.Infof("Receive a service state with applied ID which is not "+
 			"larger than current state, received: %+v, current state: %+v", state, n.currentState)
 	}
@@ -222,8 +211,17 @@ func (n *node) ReportStateUpdated(state *pb.ServiceState) {
 }
 
 // ReportRouterUpdated report router updated
-func (n *node) ReportRouterUpdated(router *pb.Router) {
-	n.setReloadRouter(router)
+func (n *node) ReportReloadFinished(reload *pb.ReloadMessage) {
+	switch reload.Type {
+	case pb.ReloadType_FinishReloadRouter:
+		n.logger.Noticef("Consensus-Reload finished, recv router: %+v", reload.Router)
+		n.setReloadRouter(reload.Router)
+	case pb.ReloadType_FinishReloadCommitDB:
+		rf := &pb.ReloadFinished{Height: reload.Height}
+		n.logger.Noticef("Commit-DB finished, recv height: %d", reload.Height)
+		n.confChan <- rf
+	}
+
 }
 
 // Status returns the current node status of the RBFT state machine.

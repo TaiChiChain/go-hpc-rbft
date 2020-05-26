@@ -17,11 +17,11 @@ func TestVC_replicaCheckNewView(t *testing.T) {
 	assert.Nil(t, rbft.replicaCheckNewView())
 
 	rbft.vcMgr.newViewStore[rbft.view] = &pb.NewView{}
-	rbft.off(InViewChange)
-	rbft.off(InRecovery)
+	rbft.atomicOff(InViewChange)
+	rbft.atomicOff(InRecovery)
 	assert.Nil(t, rbft.replicaCheckNewView())
 
-	rbft.on(InViewChange)
+	rbft.atomicOn(InViewChange)
 	rbft.replicaCheckNewView()
 	assert.Equal(t, uint64(1), rbft.view)
 	rbft.view--
@@ -78,25 +78,25 @@ func TestVC_resetStateForNewView(t *testing.T) {
 	assert.Nil(t, rbft.resetStateForNewView())
 
 	rbft.vcMgr.newViewStore[rbft.view] = &pb.NewView{}
-	rbft.off(InViewChange)
-	rbft.off(InRecovery)
+	rbft.atomicOff(InViewChange)
+	rbft.atomicOff(InRecovery)
 	assert.Nil(t, rbft.resetStateForNewView())
 
-	rbft.on(InViewChange)
+	rbft.atomicOn(InViewChange)
 	rbft.vcMgr.vcHandled = true
 	assert.Nil(t, rbft.resetStateForNewView())
-	rbft.off(InViewChange)
+	rbft.atomicOff(InViewChange)
 
-	rbft.on(InRecovery)
+	rbft.atomicOn(InRecovery)
 	rbft.recoveryMgr.recoveryHandled = true
 	assert.Nil(t, rbft.resetStateForNewView())
-	rbft.off(InRecovery)
+	rbft.atomicOff(InRecovery)
 
-	rbft.on(InViewChange)
+	rbft.atomicOn(InViewChange)
 	rbft.vcMgr.vcHandled = false
 	rbft.recoveryMgr.recoveryHandled = false
 	assert.Equal(t, reflect.TypeOf(&LocalEvent{}), reflect.TypeOf(rbft.resetStateForNewView()))
-	rbft.off(InViewChange)
+	rbft.atomicOff(InViewChange)
 
 	prePrepareTmp := &pb.PrePrepare{
 		ReplicaId:      1,
@@ -155,7 +155,7 @@ func TestVC_resetStateForNewView(t *testing.T) {
 		sentExecute: false,
 	}
 
-	rbft.on(InRecovery)
+	rbft.atomicOn(InRecovery)
 	rbft.vcMgr.vcHandled = false
 	rbft.recoveryMgr.recoveryHandled = false
 	rbft.view = 1

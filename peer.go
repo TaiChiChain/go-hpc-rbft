@@ -25,19 +25,32 @@ import (
 // router is the consensus network routing table which will be compared in syncState to ensure
 // every node has the latest peer list.
 type peerPool struct {
-	localID   uint64           // track local node's ID
-	localHash string           // track local node's Hash
-	router    *pb.Router       // track the vp replicas' routers
-	network   external.Network // network helper to broadcast/unicast messages.
-	logger    Logger
+	// track local node's ID
+	ID uint64
+
+	// track local node's Hash
+	hash string
+
+	// track local node's Hostname
+	hostname string
+
+	// track the vp replicas' routers
+	router *pb.Router
+
+	// network helper to broadcast/unicast messages.
+	network external.Network
+
+	// logger
+	logger Logger
 }
 
 func newPeerPool(c Config) *peerPool {
 	pool := &peerPool{
-		localID:   c.ID,
-		localHash: c.Hash,
-		network:   c.External,
-		logger:    c.Logger,
+		ID:       c.ID,
+		hash:     c.Hash,
+		hostname: c.Hostname,
+		network:  c.External,
+		logger:   c.Logger,
 	}
 	pool.initPeers(c.Peers)
 
@@ -45,37 +58,56 @@ func newPeerPool(c Config) *peerPool {
 }
 
 func (pool *peerPool) initPeers(peers []*pb.Peer) {
-	pool.logger.Infof("Local ID: %d, update routers:", pool.localID)
+	pool.logger.Infof("Local ID: %d, update routers:", pool.ID)
 	length := len(peers)
 	pool.router = &pb.Router{
 		Peers: make([]*pb.Peer, length),
 	}
-	preID := pool.localID
+	preID := pool.ID
 	for index, p := range peers {
 		if index >= length {
 			pool.logger.Errorf("Wrong length of peers, out of range: len=%d", length)
 			return
 		}
-		if p.Hash == pool.localHash {
-			pool.localID = p.Id
+		if p.Hash == pool.hash {
+			pool.ID = p.Id
+			pool.hostname = p.Hostname
 		}
-		pool.logger.Infof("ID: %d, Hash: %s, Hostname: %s", p.Id, p.Hash, p.Hostname)
+		pool.logger.Infof("ID: %d, Hash: %s", p.Id, p.Hash)
 		pool.router.Peers[index] = p
 	}
-	if preID != pool.localID {
-		pool.logger.Infof("Update Local ID: %d ===> %d", preID, pool.localID)
+	if preID != pool.ID {
+		pool.logger.Infof("Update Local ID: %d ===> %d", preID, pool.ID)
 	}
 }
 
-func (pool *peerPool) serializeRouterInfo() []byte {
-	info, _ := proto.Marshal(pool.router)
+func minimizeRouter(router *pb.Router) *pb.Router {
+	var minimizedPeers []*pb.Peer
+	for _, peer := range router.Peers {
+		minimizedPeer := &pb.Peer{
+			Id:       peer.Id,
+			Hostname: peer.Hostname,
+		}
+		minimizedPeers = append(minimizedPeers, minimizedPeer)
+	}
+	minimizedRouter := &pb.Router{Peers: minimizedPeers}
+	return minimizedRouter
+}
+
+func serializeRouterInfo(router *pb.Router) []byte {
+	info, _ := proto.Marshal(router)
 	return info
 }
 
-func (pool *peerPool) updateRouter(quorumRouter []byte) {
+func unSerializeRouterInfo(routerInfo []byte) *pb.Router {
+	router := &pb.Router{}
+	_ = proto.Unmarshal(routerInfo, router)
+	return router
+}
+
+func (pool *peerPool) updateRouter(router *pb.Router) {
 	cc := &pb.ConfChange{
-		Type:    pb.ConfChangeType_ConfChangeUpdateNode,
-		Context: quorumRouter,
+		Router: router,
 	}
 	pool.network.UpdateTable(cc)
 }

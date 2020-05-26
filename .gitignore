@@ -168,3 +168,5 @@ target
 go.sum
 
 testLogger
+
+cluster_init_test.go

@@ -47,8 +47,9 @@ type storeManager struct {
 
 	// ---------------checkpoint related--------------------
 	// checkpoints that we reached by ourselves after commit a block with a
-	// block number == integer multiple of K; map lastExec to a base64
-	// encoded BlockchainInfo
+	// block number == integer multiple of K;
+	// map lastExec to a base64 encoded BlockchainInfo
+	// TODO(wgr): store the meta state into checkpoints after config transaction execution
 	chkpts map[uint64]string
 
 	// checkpoint numbers received from others which are bigger than our
@@ -58,6 +59,9 @@ type storeManager struct {
 
 	// track all non-repeating checkpoints
 	checkpointStore map[pb.Checkpoint]bool
+
+	// track stable checkpoint
+	stableCheckpoint *pb.MetaState
 }
 
 // newStoreMgr news an instance of storeManager
@@ -74,6 +78,10 @@ func newStoreMgr(c Config) *storeManager {
 		logger:                c.Logger,
 	}
 	sm.chkpts[0] = "XXX GENESIS"
+	sm.stableCheckpoint = &pb.MetaState{
+		Applied: uint64(0),
+		Digest:  "XXX GENESIS",
+	}
 	return sm
 }
 
@@ -140,4 +148,12 @@ func (sm *storeManager) existedDigest(n uint64, view uint64, digest string) bool
 		}
 	}
 	return false
+}
+
+func (rbft *rbftImpl) updateStableCheckpoint(applied uint64, digest string) {
+	rbft.storeMgr.stableCheckpoint = &pb.MetaState{
+		Applied: applied,
+		Digest:  digest,
+	}
+	rbft.logger.Debugf("Replica %d update stable checkpoint: %+v", rbft.peerPool.ID, rbft.storeMgr.stableCheckpoint)
 }
