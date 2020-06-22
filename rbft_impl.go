@@ -1761,6 +1761,8 @@ func (rbft *rbftImpl) recvStateUpdatedEvent(ss *pb.ServiceState) consensusEvent 
 			finishMsg := fmt.Sprintf("======== Replica %d finished stateUpdate, height: %d", rbft.peerPool.ID, seqNo)
 
 			rbft.external.SendFilterEvent(pb.InformType_FilterFinishStateUpdate, finishMsg)
+			rbft.updateStableCheckpoint(ss.MetaState.Applied, ss.MetaState.Digest)
+			rbft.persistStableCheckpoint()
 			rbft.exec.setLastExec(seqNo)
 			rbft.batchMgr.setSeqNo(seqNo)
 			rbft.off(SkipInProgress)
