@@ -167,14 +167,22 @@ func (rbft *rbftImpl) recvEpochCheckRsp(rsp *pb.EpochCheckResponse) consensusEve
 	}
 
 	// get the values
-	es := epochState{
-		epoch:   rsp.Epoch,
-		applied: rsp.CheckState.Applied,
-		digest:  rsp.CheckState.Digest,
-	}
+	var es epochState
 	if rbft.atomicIn(InConfChange) {
+		// when we are in config change, there is a config batch waiting for stable-checkpoint
+		// so that we need to check the state for it
 		rbft.logger.Debugf("Replica %d in config change only check the latest config batch state", rbft.peerPool.ID)
-		es.epoch = es.applied
+		es = epochState{
+			applied: rsp.CheckState.Applied,
+			digest:  rsp.CheckState.Digest,
+		}
+	} else {
+		// we only need to check the epoch-number to find a correct epoch
+		// for that we are not processing any config batches
+		rbft.logger.Debugf("Replica %d only need to check epoch", rbft.peerPool.ID)
+		es = epochState{
+			epoch: rsp.Epoch,
+		}
 	}
 	from := rsp.ReplicaHash
 
