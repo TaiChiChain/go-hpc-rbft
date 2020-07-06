@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.2.4"></a>
+## [0.2.4](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.3...v0.2.4) (2020-07-06)
+
+
+### Bug Fixes
+
+* **epoch:** reset storage after the execution of config batch whether v-set was changed or not ([e76a549](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/e76a549)), closes [#flato-1729](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-1729)
+* **epoch-sync:** update stable checkpoint after state updated during recovery ([a71a012](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/a71a012)), closes [#flato-1730](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-1730)
+
+
+
 <a name="0.2.3"></a>
 ## [0.2.3](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.2...v0.2.3) (2020-06-30)
 
