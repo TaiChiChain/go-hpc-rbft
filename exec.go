@@ -385,11 +385,8 @@ func (rbft *rbftImpl) handleEpochMgrEvent(e *LocalEvent) consensusEvent {
 				rbft.turnIntoEpoch(routerInfo, applied)
 			}
 
-			// if the latest checkpoint is equal to current epoch, it means a new epoch has started
-			// reset store for a new epoch, including certs/batches/storage/etc.
-			if rbft.epoch == latestH {
-				rbft.resetStateForNewEpoch()
-			}
+			// as a config batch has been executed, reset storage, including certs/batches/storage/etc.
+			rbft.resetStateForNewEpoch()
 
 			// finish config change and restart consensus
 			rbft.atomicOff(InConfChange)
