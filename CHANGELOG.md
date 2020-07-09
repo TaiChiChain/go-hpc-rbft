@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.2.5"></a>
+## [0.2.5](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.4...v0.2.5) (2020-07-09)
+
+
+### Bug Fixes
+
+* **SendFilterEvent:** send recovery finished event whenever recovery has finished ([8245e9f](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/8245e9f)), closes [#flato-1736](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-1736)
+* **unit_test:** fix unit test fetch missing ([e109d69](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/e109d69))
+
+
+
 <a name="0.2.4"></a>
 ## [0.2.4](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.3...v0.2.4) (2020-07-06)
 
