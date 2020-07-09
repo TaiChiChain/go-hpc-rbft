@@ -190,7 +190,8 @@ func (rbft *rbftImpl) handleRecoveryEvent(e *LocalEvent) consensusEvent {
   +==============================================+
 
 `)
-
+		finishMsg := fmt.Sprintf("======== Replica %d finished recovery, primary=%d, epoch=%d/n=%d/f=%d/view=%d/h=%d/lastExec=%d", rbft.peerPool.ID, rbft.primaryID(rbft.view), rbft.epoch, rbft.N, rbft.f, rbft.view, rbft.h, rbft.exec.lastExec)
+		rbft.external.SendFilterEvent(pb.InformType_FilterFinishRecovery, finishMsg)
 		// after recovery, new primary need to send null request as a heartbeat, and non-primary will start a
 		// first request timer which must be longer than null request timer in which non-primary must receive a
 		// request from primary(null request or pre-prepare...), or this node will send viewChange.
@@ -350,8 +351,6 @@ func (rbft *rbftImpl) handleEpochMgrEvent(e *LocalEvent) consensusEvent {
 		rbft.timerMgr.stopTimer(epochCheckRspTimer)
 		rbft.logger.Infof("======== Replica %d finished epoch check, N=%d/epoch=%d/height=%d/view=%d",
 			rbft.peerPool.ID, rbft.N, rbft.epoch, rbft.exec.lastExec, rbft.view)
-		finishMsg := fmt.Sprintf("======== Replica %d finished updateN, primary=%d, n=%d/f=%d/view=%d/h=%d", rbft.peerPool.ID, rbft.view+1, rbft.N, rbft.f, rbft.view, rbft.h)
-		rbft.external.SendFilterEvent(pb.InformType_FilterFinishConfigChange, finishMsg)
 
 		// if there is a config transaction in process,
 		// we should wait for commit-db-reload finished before we restart consensus
@@ -392,6 +391,8 @@ func (rbft *rbftImpl) handleEpochMgrEvent(e *LocalEvent) consensusEvent {
 			rbft.atomicOff(InConfChange)
 			rbft.maybeSetNormal()
 			rbft.startTimerIfOutstandingRequests()
+			finishMsg := fmt.Sprintf("======== Replica %d finished config change, primary=%d, epoch=%d/n=%d/f=%d/view=%d/h=%d/lastExec=%d", rbft.peerPool.ID, rbft.primaryID(rbft.view), rbft.epoch, rbft.N, rbft.f, rbft.view, rbft.h, rbft.exec.lastExec)
+			rbft.external.SendFilterEvent(pb.InformType_FilterFinishConfigChange, finishMsg)
 			// set primary sequence log
 			if rbft.isPrimary(rbft.peerPool.ID) {
 				// set seqNo to lastExec for new primary to sort following batches from correct seqNo.

@@ -1828,8 +1828,6 @@ func (rbft *rbftImpl) recvStateUpdatedEvent(ss *pb.ServiceState) consensusEvent 
 			rbft.logger.Debugf("Primary %d init recovery after state update", rbft.peerPool.ID)
 			return rbft.initRecovery()
 		}
-		finishMsg := fmt.Sprintf("======== Replica %d finished recovery after stateUpdate, height: %d", rbft.peerPool.ID, seqNo)
-		rbft.external.SendFilterEvent(pb.InformType_FilterFinishRecovery, finishMsg)
 
 		// update stable checkpoint after state update in recovery
 		rbft.updateStableCheckpoint(ss.MetaState.Applied, ss.MetaState.Digest)
