@@ -112,11 +112,6 @@ func TestFunction_FetchMissingTxs(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	// after missing txs fetched by replicas, transactions will be applied normally
-	getLastApplied := tf.TestNode[0].Applied
-	for _, node := range tf.TestNode {
-		assert.Equal(t, node.Applied, getLastApplied)
-		assert.Equal(t, node.Applied > uint64(0), true)
-	}
 	tf.frameworkStop()
 }
 
