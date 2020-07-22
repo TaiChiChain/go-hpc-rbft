@@ -251,6 +251,12 @@ func (rbft *rbftImpl) restartEpochSync() consensusEvent {
 		rbft.atomicOff(InEpochSync)
 	}
 
+	if rbft.in(InEpochCheck) {
+		rbft.logger.Debugf("Replica %d stop epoch check timer", rbft.peerPool.ID)
+		rbft.off(InEpochCheck)
+		rbft.timerMgr.stopTimer(epochCheckRspTimer)
+	}
+
 	return rbft.tryEpochSync()
 }
 
