@@ -174,6 +174,11 @@ func (rbft *rbftImpl) recvNotification(n *pb.Notification) consensusEvent {
 	rbft.logger.Debugf("Replica %d received notification from replica %d, v:%d, h:%d, |C|:%d, |P|:%d, |Q|:%d",
 		rbft.peerPool.ID, n.ReplicaId, n.Basis.View, n.Basis.H, len(n.Basis.Cset), len(n.Basis.Pset), len(n.Basis.Qset))
 
+	if rbft.in(InEpochCheck) {
+		rbft.logger.Debugf("Replica %d is in epoch check, reject it", rbft.peerPool.ID)
+		return nil
+	}
+
 	// new node cannot process notification as new node is not in a consistent
 	// view/N with other nodes.
 	if rbft.in(isNewNode) {
@@ -237,10 +242,6 @@ func (rbft *rbftImpl) recvNotification(n *pb.Notification) consensusEvent {
 
 	// if we are in normal status, we should send back our info to the recovering node.
 	if rbft.isNormal() {
-		if rbft.isPrimary(n.ReplicaId) {
-			rbft.logger.Infof("Replica %d received notification from old primary %d, trigger recovery.", rbft.peerPool.ID, n.ReplicaId)
-			return rbft.initRecovery()
-		}
 
 		return rbft.sendNotificationResponse(n.ReplicaId)
 	}
