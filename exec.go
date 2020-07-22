@@ -338,10 +338,12 @@ func (rbft *rbftImpl) handleViewChangeEvent(e *LocalEvent) consensusEvent {
 func (rbft *rbftImpl) handleEpochMgrEvent(e *LocalEvent) consensusEvent {
 	switch e.EventType {
 	case EpochCheckInitEvent:
+		rbft.logger.Debugf("Replica %d epoch init event", rbft.peerPool.ID)
 		appliedToCheck := e.Event.(uint64)
 		rbft.initEpochCheck(appliedToCheck)
 		return nil
 	case EpochCheckTimerEvent:
+		rbft.logger.Debugf("Replica %d epoch check timer expired", rbft.peerPool.ID)
 		rbft.off(InEpochCheck)
 		appliedToCheck := e.Event.(uint64)
 		rbft.initEpochCheck(appliedToCheck)
