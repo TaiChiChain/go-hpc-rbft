@@ -441,12 +441,7 @@ func (rbft *rbftImpl) persistDelBatch(digest string) {
 
 // persistDelAllBatches removes all marshaled tx batches from database
 func (rbft *rbftImpl) persistDelAllBatches() {
-	batches, err := rbft.storage.ReadStateSet("batch.")
-	if err == nil {
-		for k := range batches {
-			_ = rbft.storage.DelState(k)
-		}
-	}
+	_ = rbft.storage.Destroy("batch")
 }
 
 // persistCheckpoint persists checkpoint to database, which, key contains the seqNo of checkpoint, value is the

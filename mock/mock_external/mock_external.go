@@ -93,17 +93,17 @@ func (mr *MockStorageMockRecorder) ReadStateSet(key interface{}) *gomock.Call {
 }
 
 // Destroy mocks base method
-func (m *MockStorage) Destroy() error {
+func (m *MockStorage) Destroy(key string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Destroy")
+	ret := m.ctrl.Call(m, "Destroy", key)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Destroy indicates an expected call of Destroy
-func (mr *MockStorageMockRecorder) Destroy() *gomock.Call {
+func (mr *MockStorageMockRecorder) Destroy(key interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Destroy", reflect.TypeOf((*MockStorage)(nil).Destroy))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Destroy", reflect.TypeOf((*MockStorage)(nil).Destroy), key)
 }
 
 // MockNetwork is a mock of Network interface
@@ -381,17 +381,17 @@ func (mr *MockExternalStackMockRecorder) ReadStateSet(key interface{}) *gomock.C
 }
 
 // Destroy mocks base method
-func (m *MockExternalStack) Destroy() error {
+func (m *MockExternalStack) Destroy(key string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Destroy")
+	ret := m.ctrl.Call(m, "Destroy", key)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Destroy indicates an expected call of Destroy
-func (mr *MockExternalStackMockRecorder) Destroy() *gomock.Call {
+func (mr *MockExternalStackMockRecorder) Destroy(key interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Destroy", reflect.TypeOf((*MockExternalStack)(nil).Destroy))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Destroy", reflect.TypeOf((*MockExternalStack)(nil).Destroy), key)
 }
 
 // Broadcast mocks base method
