@@ -242,7 +242,10 @@ func (rbft *rbftImpl) recvNotification(n *pb.Notification) consensusEvent {
 
 	// if we are in normal status, we should send back our info to the recovering node.
 	if rbft.isNormal() {
-
+		if rbft.isPrimary(n.ReplicaId) && n.Basis.View > rbft.view {
+			rbft.logger.Infof("Replica %d received notification from old primary %d, trigger recovery.", rbft.peerPool.ID, n.ReplicaId)
+			return rbft.initRecovery()
+		}
 		return rbft.sendNotificationResponse(n.ReplicaId)
 	}
 
