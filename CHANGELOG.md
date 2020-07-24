@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.2.7"></a>
+## [0.2.7](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.6...v0.2.7) (2020-07-24)
+
+
+### Bug Fixes
+
+* **recovery:** init recovery when we received a notification from primary with a larger view than se ([09bc208](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/09bc208)), closes [#flato-1859](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-1859)
+
+
+
 <a name="0.2.6"></a>
 ## [0.2.6](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.5...v0.2.6) (2020-07-22)
 
