@@ -487,20 +487,6 @@ func (rbft *rbftImpl) persistN(n int) {
 	}
 }
 
-// persistStableCheckpoint persists current stable checkpoint to database
-func (rbft *rbftImpl) persistStableCheckpoint() {
-	key := "stableC"
-	stableC, err := proto.Marshal(rbft.storeMgr.stableCheckpoint)
-	if err != nil {
-		rbft.logger.Warningf("Replica %d could not persist latest checkpoint: %s", rbft.peerPool.ID, err)
-		return
-	}
-	err = rbft.storage.StoreState(key, stableC)
-	if err != nil {
-		rbft.logger.Errorf("Persist epoch failed with err: %s ", err)
-	}
-}
-
 // restoreN restore current N from database
 func (rbft *rbftImpl) restoreN() {
 	n, err := rbft.storage.ReadState("nodes")
@@ -510,17 +496,6 @@ func (rbft *rbftImpl) restoreN() {
 		rbft.f = (rbft.N - 1) / 3
 	}
 	rbft.logger.Noticef("========= restore N=%d, f=%d =======", rbft.N, rbft.f)
-}
-
-// restoreStableCheckpoint restore current stable checkpoint from database
-func (rbft *rbftImpl) restoreStableCheckpoint() {
-	buf, err := rbft.storage.ReadState("stableC")
-	if err == nil {
-		stableC := &pb.MetaState{}
-		_ = proto.Unmarshal(buf, stableC)
-		rbft.updateStableCheckpoint(stableC.Applied, stableC.Digest)
-	}
-	rbft.logger.Noticef("========= restore stable checkpoint %+v =======", rbft.storeMgr.stableCheckpoint)
 }
 
 // restoreView restores current view from database and then re-construct certStore
@@ -588,8 +563,6 @@ func (rbft *rbftImpl) restoreState() error {
 	rbft.batchMgr.setSeqNo(rbft.exec.lastExec)
 	setView := rbft.restoreView()
 	rbft.restoreN()
-
-	rbft.restoreStableCheckpoint()
 
 	rbft.restoreCert()
 

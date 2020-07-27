@@ -101,8 +101,8 @@ func (tm *timerManager) newTimer(name string, d time.Duration) {
 			d = DefaultCleanViewChangeTimeout
 		case checkPoolTimer:
 			d = DefaultCheckPoolTimeout
-		case epochCheckRspTimer:
-			d = DefaultEpochCheckRspTimeout
+		case fetchCheckpointTimer:
+			d = DefaultFetchCheckpointTimeout
 		}
 	}
 
@@ -232,7 +232,7 @@ func (rbft *rbftImpl) initTimers() {
 	rbft.timerMgr.newTimer(requestTimer, rbft.config.RequestTimeout)
 	rbft.timerMgr.newTimer(cleanViewChangeTimer, rbft.config.CleanVCTimeout)
 	rbft.timerMgr.newTimer(checkPoolTimer, rbft.config.CheckPoolTimeout)
-	rbft.timerMgr.newTimer(epochCheckRspTimer, rbft.config.EpochCheckTimeout)
+	rbft.timerMgr.newTimer(fetchCheckpointTimer, rbft.config.FetchCheckpointTimeout)
 
 	rbft.timerMgr.makeNullRequestTimeoutLegal()
 	rbft.timerMgr.makeRequestTimeoutLegal()

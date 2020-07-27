@@ -285,3 +285,49 @@ func TestTimerMgr_makeSyncStateTimeoutLegal(t *testing.T) {
 	timeMgr.makeSyncStateTimeoutLegal()
 	assert.Equal(t, time.Duration(10), timeMgr.getTimeoutValue(syncStateRspTimer))
 }
+
+func TestTimerMgr_newTimer(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	log := FrameworkNewRawLogger()
+	external := mockexternal.NewMockMinimalExternal(ctrl)
+	tx := txpoolmock.NewMockMinimalTxPool(ctrl)
+
+	conf := Config{
+		ID:            1,
+		IsNew:         false,
+		Peers:         peerSet,
+		Logger:        log,
+		External:      external,
+		RequestPool:   tx,
+		K:             2,
+		LogMultiplier: 2,
+	}
+	eventC := make(chan interface{})
+	timeMgr := newTimerMgr(eventC, conf)
+
+	timeMgr.newTimer(requestTimer, 0)
+	timeMgr.newTimer(batchTimer, 0)
+	timeMgr.newTimer(vcResendTimer, 0)
+	timeMgr.newTimer(newViewTimer, 0)
+	timeMgr.newTimer(nullRequestTimer, 0)
+	timeMgr.newTimer(firstRequestTimer, 0)
+	timeMgr.newTimer(syncStateRspTimer, 0)
+	timeMgr.newTimer(syncStateRestartTimer, 0)
+	timeMgr.newTimer(recoveryRestartTimer, 0)
+	timeMgr.newTimer(cleanViewChangeTimer, 0)
+	timeMgr.newTimer(checkPoolTimer, 0)
+	timeMgr.newTimer(fetchCheckpointTimer, 0)
+	assert.Equal(t, DefaultRequestTimeout, timeMgr.tTimers[requestTimer].timeout)
+	assert.Equal(t, DefaultBatchTimeout, timeMgr.tTimers[batchTimer].timeout)
+	assert.Equal(t, DefaultVcResendTimeout, timeMgr.tTimers[vcResendTimer].timeout)
+	assert.Equal(t, DefaultNewViewTimeout, timeMgr.tTimers[newViewTimer].timeout)
+	assert.Equal(t, DefaultNullRequestTimeout, timeMgr.tTimers[nullRequestTimer].timeout)
+	assert.Equal(t, DefaultFirstRequestTimeout, timeMgr.tTimers[firstRequestTimer].timeout)
+	assert.Equal(t, DefaultSyncStateRspTimeout, timeMgr.tTimers[syncStateRspTimer].timeout)
+	assert.Equal(t, DefaultSyncStateRestartTimeout, timeMgr.tTimers[syncStateRestartTimer].timeout)
+	assert.Equal(t, DefaultRecoveryRestartTimeout, timeMgr.tTimers[recoveryRestartTimer].timeout)
+	assert.Equal(t, DefaultCleanViewChangeTimeout, timeMgr.tTimers[cleanViewChangeTimer].timeout)
+	assert.Equal(t, DefaultCheckPoolTimeout, timeMgr.tTimers[checkPoolTimer].timeout)
+	assert.Equal(t, DefaultFetchCheckpointTimeout, timeMgr.tTimers[fetchCheckpointTimer].timeout)
+}

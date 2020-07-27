@@ -2,11 +2,11 @@ package rbft
 
 import (
 	"errors"
-	"github.com/ultramesh/flato-event/inner/protos"
 	"os"
 	"reflect"
 	"time"
 
+	"github.com/ultramesh/flato-event/inner/protos"
 	mockexternal "github.com/ultramesh/flato-rbft/mock/mock_external"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
 	"github.com/ultramesh/flato-txpool"
@@ -126,15 +126,14 @@ func newTestRBFT(ctrl *gomock.Controller) (*rbftImpl, Config) {
 		SyncStateTimeout:        1 * time.Second,
 		SyncStateRestartTimeout: 10 * time.Second,
 		RecoveryTimeout:         10 * time.Second,
-		EpochCheckTimeout:       4 * time.Second,
+		FetchCheckpointTimeout:  5 * time.Second,
 		CheckPoolTimeout:        3 * time.Minute,
 
 		Logger:      log,
 		External:    external,
 		RequestPool: pool,
 
-		EpochInit:       uint64(0),
-		EpochInitDigest: "XXX GENESIS",
+		EpochInit: uint64(0),
 	}
 
 	node, _ := newNode(conf)
@@ -206,15 +205,14 @@ func newTestRBFTReplica(ctrl *gomock.Controller) (*rbftImpl, Config) {
 		SyncStateTimeout:        1 * time.Second,
 		SyncStateRestartTimeout: 10 * time.Second,
 		RecoveryTimeout:         10 * time.Second,
-		EpochCheckTimeout:       4 * time.Second,
+		FetchCheckpointTimeout:  5 * time.Second,
 		CheckPoolTimeout:        3 * time.Minute,
 
 		Logger:      log,
 		External:    external,
 		RequestPool: pool,
 
-		EpochInit:       uint64(0),
-		EpochInitDigest: "XXX GENESIS",
+		EpochInit: uint64(0),
 	}
 
 	node, _ := newNode(conf)

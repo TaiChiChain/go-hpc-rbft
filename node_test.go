@@ -44,7 +44,6 @@ func TestNode_Start(t *testing.T) {
 			Applied: uint64(0),
 			Digest:  "GENESIS XXX",
 		},
-		VSet: nil,
 	}
 	// Test Normal Case
 	_ = n.Start()
@@ -61,7 +60,6 @@ func TestNode_Stop(t *testing.T) {
 			Applied: uint64(0),
 			Digest:  "GENESIS XXX",
 		},
-		VSet: nil,
 	}
 
 	n.Stop()
@@ -118,7 +116,7 @@ func TestNode_ApplyConfChange(t *testing.T) {
 	r := &pb.Router{Peers: peerSet}
 	cc := &pb.ConfState{QuorumRouter: r}
 	n.ApplyConfChange(cc)
-	assert.Equal(t, len(peerSet), len(n.rbft.peerPool.router.Peers))
+	assert.Equal(t, len(peerSet), len(n.rbft.peerPool.routerMap.HashMap))
 }
 
 func TestNode_ReportExecuted(t *testing.T) {

@@ -58,11 +58,6 @@ func TestHelper_RBFT(t *testing.T) {
 	defer ctrl.Finish()
 	rbft, _ := newTestRBFT(ctrl)
 
-	// primaryID
-	assert.Equal(t, uint64(3), rbft.primaryID(uint64(14)))
-	// Test for Warningf
-	rbft.N = 5
-	assert.Equal(t, uint64(0), rbft.primaryID(uint64(4)))
 	rbft.N = 4
 
 	// isPrimary

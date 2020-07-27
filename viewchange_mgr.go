@@ -139,6 +139,11 @@ func (rbft *rbftImpl) recvViewChange(vc *pb.ViewChange) consensusEvent {
 
 	// TODO(DH): verify vc signature
 
+	if rbft.in(initialCheck) {
+		rbft.logger.Debugf("Replica %d is in initialCheck, cannot process viewChange messages", rbft.peerPool.ID)
+		return nil
+	}
+
 	if vc.Basis.View < rbft.view {
 		rbft.logger.Warningf("Replica %d found viewChange message for old view from replica %d: self view=%d, vc view=%d",
 			rbft.peerPool.ID, vc.Basis.ReplicaId, rbft.view, vc.Basis.View)
@@ -276,11 +281,12 @@ func (rbft *rbftImpl) sendNewView(notification bool) consensusEvent {
 
 	//get suitable checkpoint for later recovery, replicas contains the peer no who has this checkpoint.
 	//if can't find suitable checkpoint, ok return false.
-	cp, ok, replicas := rbft.selectInitialCheckpoint(basis)
+	cp, ok := rbft.selectInitialCheckpoint(basis)
 	if !ok {
 		rbft.logger.Infof("Replica %d could not find consistent checkpoint: %+v", rbft.peerPool.ID, rbft.vcMgr.viewChangeStore)
 		return nil
 	}
+	rbft.logger.Debugf("initial checkpoint: %+v", cp)
 	//select suitable pqcCerts for later recovery.Their sequence is greater then cp
 	//if msgList is nil, must some bug happened
 	msgList := rbft.assignSequenceNumbers(basis, cp.SequenceNumber)
@@ -288,6 +294,7 @@ func (rbft *rbftImpl) sendNewView(notification bool) consensusEvent {
 		rbft.logger.Infof("Replica %d could not assign sequence numbers for newView", rbft.peerPool.ID)
 		return nil
 	}
+	rbft.logger.Debugf("x-set: %+v", msgList)
 	//create new view message
 	nv := &pb.NewView{
 		View:      rbft.view,
@@ -297,7 +304,7 @@ func (rbft *rbftImpl) sendNewView(notification bool) consensusEvent {
 	}
 
 	// Check if primary need state update
-	need, err := rbft.checkIfNeedStateUpdate(cp, replicas)
+	need, err := rbft.checkIfNeedStateUpdate(cp)
 	if err != nil {
 		return nil
 	}
@@ -384,19 +391,24 @@ func (rbft *rbftImpl) replicaCheckNewView() consensusEvent {
 		return nil
 	}
 
-	cp, ok, replicas := rbft.selectInitialCheckpoint(nv.Bset)
+	cp, ok := rbft.selectInitialCheckpoint(nv.Bset)
+	// todo wgr we won't step into such branch
 	if !ok {
 		rbft.logger.Infof("Replica %d could not determine initial checkpoint", rbft.peerPool.ID)
 		return rbft.sendViewChange()
 	}
+	rbft.logger.Debugf("initial checkpoint: %+v", cp)
 
 	// Check if the xset sent by new primary is built correctly by the aset
 	msgList := rbft.assignSequenceNumbers(nv.Bset, cp.SequenceNumber)
+	// todo wgr we won't step into such branch
 	if msgList == nil {
 		rbft.logger.Infof("Replica %d could not assign sequence numbers: %+v",
 			rbft.peerPool.ID, rbft.vcMgr.viewChangeStore)
 		return rbft.sendViewChange()
 	}
+	rbft.logger.Debugf("x-set: %+v", msgList)
+	// todo wgr we won't step into such branch
 	if !(len(msgList) == 0 && len(nv.Xset) == 0) && !reflect.DeepEqual(msgList, nv.Xset) {
 		rbft.logger.Warningf("Replica %d failed to verify newView xset: computed %+v, received %+v",
 			rbft.peerPool.ID, msgList, nv.Xset)
@@ -404,7 +416,7 @@ func (rbft *rbftImpl) replicaCheckNewView() consensusEvent {
 	}
 
 	// Check if replica need state update
-	need, err := rbft.checkIfNeedStateUpdate(cp, replicas)
+	need, err := rbft.checkIfNeedStateUpdate(cp)
 	if err != nil {
 		return nil
 	}
@@ -699,7 +711,7 @@ func (rbft *rbftImpl) getViewChangeBasis() (basis []*pb.VcBasis) {
 // no list which replicas has this checkpoint.
 // The checkpoint is the max checkpoint which exists in at least oneCorrectQuorum
 // peers and greater then low waterMark in at least commonCaseQuorum.
-func (rbft *rbftImpl) selectInitialCheckpoint(set []*pb.VcBasis) (checkpoint pb.Vc_C, find bool, replicas []replicaInfo) {
+func (rbft *rbftImpl) selectInitialCheckpoint(set []*pb.VcBasis) (checkpoint pb.Vc_C, find bool) {
 
 	// For the checkpoint as key, find the corresponding basis messages
 	checkpoints := make(map[pb.Vc_C][]*pb.VcBasis)
@@ -749,13 +761,6 @@ func (rbft *rbftImpl) selectInitialCheckpoint(set []*pb.VcBasis) (checkpoint pb.
 
 		// Find the highest checkpoint
 		if checkpoint.SequenceNumber <= idx.SequenceNumber {
-			replicas = make([]replicaInfo, len(vcList))
-			for i, vc := range vcList {
-				replicas[i] = replicaInfo{
-					replicaID: vc.ReplicaId,
-				}
-			}
-
 			checkpoint = idx
 			find = true
 		}

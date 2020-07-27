@@ -27,8 +27,7 @@ func TestStatusMgr_inOne(t *testing.T) {
 		External:    external,
 		RequestPool: tx,
 
-		EpochInit:       uint64(0),
-		EpochInitDigest: "XXX GENESIS",
+		EpochInit: uint64(0),
 	}
 
 	cpChan := make(chan *pb.ServiceState)
@@ -55,8 +54,7 @@ func TestStatusMgr_setState(t *testing.T) {
 		External:    external,
 		RequestPool: tx,
 
-		EpochInit:       uint64(0),
-		EpochInitDigest: "XXX GENESIS",
+		EpochInit: uint64(0),
 	}
 
 	cpChan := make(chan *pb.ServiceState)
@@ -86,8 +84,7 @@ func TestStatusMgr_maybeSetNormal(t *testing.T) {
 		External:    external,
 		RequestPool: tx,
 
-		EpochInit:       uint64(0),
-		EpochInitDigest: "XXX GENESIS",
+		EpochInit: uint64(0),
 	}
 
 	cpChan := make(chan *pb.ServiceState)
