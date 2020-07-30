@@ -361,6 +361,11 @@ func (rbft *rbftImpl) stopFirstRequestTimer() {
 // isPrePrepareLegal firstly checks if current status can receive pre-prepare or not, then checks pre-prepare message
 // itself is legal or not
 func (rbft *rbftImpl) isPrePrepareLegal(preprep *pb.PrePrepare) bool {
+	if rbft.in(InEpochCheck) {
+		rbft.logger.Debugf("Replica %d try to receive prePrepare, but it's in epochCheck", rbft.peerPool.ID)
+		return false
+	}
+
 	if rbft.atomicIn(InRecovery) {
 		rbft.logger.Debugf("Replica %d try to receive prePrepare, but it's in recovery", rbft.peerPool.ID)
 		return false

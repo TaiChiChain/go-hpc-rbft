@@ -591,6 +591,11 @@ func (rbft *rbftImpl) processNullRequest(msg *pb.NullRequest) consensusEvent {
 		return nil
 	}
 
+	if rbft.in(InEpochCheck) {
+		rbft.logger.Infof("Replica %d is in epochCheck, reject null request from replica %d", rbft.peerPool.ID, msg.ReplicaId)
+		return nil
+	}
+
 	if rbft.atomicIn(InEpochSync) {
 		rbft.logger.Infof("Replica %d is in epochSync, reject null request from replica %d", rbft.peerPool.ID, msg.ReplicaId)
 		return nil
@@ -622,6 +627,11 @@ func (rbft *rbftImpl) handleNullRequestTimerEvent() {
 
 	if rbft.atomicIn(InViewChange) {
 		rbft.logger.Debugf("Replica %d try to nullRequestHandler, but it's in viewChange", rbft.peerPool.ID)
+		return
+	}
+
+	if rbft.in(InEpochCheck) {
+		rbft.logger.Debugf("Replica %d try to nullRequestHandler, but it's in epochCheck", rbft.peerPool.ID)
 		return
 	}
 
