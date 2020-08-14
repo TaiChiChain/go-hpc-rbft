@@ -1,309 +1,289 @@
 package rbft
 
 import (
-	"errors"
 	"testing"
 
-	mockexternal "github.com/ultramesh/flato-rbft/mock/mock_external"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
 
-	"github.com/gogo/protobuf/proto"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestExec_msgToEvent(t *testing.T) {
+func TestExec_handleCoreRbftEvent_batchTimerEvent(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
 
-	event := &pb.NullRequest{ReplicaId: uint64(2)}
-	payload, _ := proto.Marshal(event)
-	msg := &pb.ConsensusMessage{
-		Type:    pb.Type_NULL_REQUEST,
-		From:    uint64(1),
-		Payload: payload,
+	nodes, rbfts := newBasicClusterInstance()
+
+	// start state
+	ev := &LocalEvent{
+		Service:   CoreRbftService,
+		EventType: CoreBatchTimerEvent,
 	}
+	assert.False(t, rbfts[0].timerMgr.getTimer(batchTimer))
 
-	ret, err := rbft.msgToEvent(msg)
-	assert.Equal(t, event, ret)
-	assert.Equal(t, nil, err)
+	// abnormal state
+	rbfts[0].handleCoreRbftEvent(ev)
+	assert.False(t, rbfts[0].timerMgr.getTimer(batchTimer))
 
-	go func() {
-		msg.Payload = []byte("1")
-		ret, err = rbft.msgToEvent(msg)
-		assert.Nil(t, ret)
-		assert.Equal(t, errors.New("unexpected EOF"), err)
-	}()
+	// normal
+	rbfts[0].setNormal()
+	rbfts[0].atomicOn(InConfChange)
+	rbfts[0].handleCoreRbftEvent(ev)
+	assert.True(t, rbfts[0].timerMgr.getTimer(batchTimer))
+	rbfts[0].atomicOff(InConfChange)
+
+	tx := newTx()
+	rbfts[0].batchMgr.requestPool.AddNewRequest(tx, false, true)
+	reqBatch := rbfts[0].batchMgr.requestPool.GenerateRequestBatch()
+	batch := &pb.RequestBatch{
+		RequestHashList: reqBatch[0].TxHashList,
+		RequestList:     reqBatch[0].TxList,
+		Timestamp:       reqBatch[0].Timestamp,
+		LocalList:       reqBatch[0].LocalList,
+		BatchHash:       reqBatch[0].BatchHash,
+	}
+	rbfts[0].batchMgr.cacheBatch = append(rbfts[0].batchMgr.cacheBatch, batch)
+	rbfts[0].setNormal()
+	rbfts[0].handleCoreRbftEvent(ev)
+	assert.Equal(t, pb.Type_PRE_PREPARE, nodes[0].broadcastMessageCache.Type)
 }
 
-func TestExec_handleCoreRbftEvent(t *testing.T) {
+func TestExec_handleCoreRbftEvent_NullRequestTimerEvent(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
 
-	e := &LocalEvent{Service: CoreRbftService}
+	nodes, rbfts := newBasicClusterInstance()
 
-	e.EventType = CoreBatchTimerEvent
-	rbft.off(Normal)
-	assert.Nil(t, rbft.handleCoreRbftEvent(e))
-
-	rbft.on(Normal)
-	batchTmp := &pb.RequestBatch{
-		RequestHashList: []string{"hash"},
-		RequestList:     mockRequestList,
-		Timestamp:       10086,
-		SeqNo:           5,
-		LocalList:       []bool{false},
-		BatchHash:       "hashMsg",
+	// replica will send view change, primary will send null request
+	ev := &LocalEvent{
+		Service:   CoreRbftService,
+		EventType: CoreNullRequestTimerEvent,
 	}
-	rbft.batchMgr.cacheBatch = []*pb.RequestBatch{batchTmp}
-	assert.Nil(t, rbft.handleCoreRbftEvent(e))
-	assert.Equal(t, batchTmp, rbft.storeMgr.batchStore["hashMsg"])
-
-	// rbft.batchMgr.cacheBatch is empty
-	// stop batch timer
-	rbft.batchMgr.batchTimerActive = true
-	rbft.batchMgr.cacheBatch = []*pb.RequestBatch{}
-	assert.Nil(t, rbft.handleCoreRbftEvent(e))
-	assert.Equal(t, false, rbft.batchMgr.batchTimerActive)
-
-	// Replica handle Null request to a viewChange
-	rbft.peerPool.ID = uint64(2)
-	rbft.atomicOff(InRecovery)
-	rbft.atomicOff(InViewChange)
-	e.EventType = CoreNullRequestTimerEvent
-	assert.Equal(t, uint64(0), rbft.view)
-	assert.Nil(t, rbft.handleCoreRbftEvent(e))
-	assert.Equal(t, uint64(1), rbft.view)
-	newView := rbft.view - uint64(1)
-	rbft.setView(newView)
-
-	// First Req to a ViewChange
-	rbft.atomicOff(InViewChange)
-	rbft.peerPool.ID = uint64(1)
-	e.EventType = CoreFirstRequestTimerEvent
-	assert.Equal(t, uint64(0), rbft.view)
-	assert.Nil(t, rbft.handleCoreRbftEvent(e))
-	assert.Equal(t, uint64(1), rbft.view)
-	newView = rbft.view - uint64(1)
-	rbft.setView(newView)
-
-	// Trigger processOutOfDateReqs
-	// Check the pool is not full
-	// if !rbft.isNormal(), cannot check
-	e.EventType = CoreCheckPoolTimerEvent
-	rbft.atomicOn(PoolFull)
-	rbft.off(Normal)
-	assert.Nil(t, rbft.handleCoreRbftEvent(e))
-	assert.Equal(t, true, rbft.atomicIn(PoolFull))
-	// Else success
-	rbft.on(Normal)
-	assert.Nil(t, rbft.handleCoreRbftEvent(e))
-	assert.Equal(t, false, rbft.atomicIn(PoolFull))
-
-	// Trigger rbft.recvStateUpdatedEvent(e.Event.(uint64))
-	rbft.atomicOff(InRecovery)
-	e.EventType = CoreStateUpdatedEvent
-	e.Event = &pb.ServiceState{
-		MetaState: &pb.MetaState{
-			Applied: uint64(5),
-			Digest:  "block-number-5",
-		},
-	}
-	rbft.exec.setLastExec(uint64(3))
-	assert.Nil(t, rbft.handleCoreRbftEvent(e))
-	assert.Equal(t, uint64(5), rbft.exec.lastExec)
-
-	e.EventType = CoreResendMissingTxsEvent
-	e.Event = &pb.FetchMissingRequests{}
-	assert.Nil(t, rbft.handleCoreRbftEvent(e))
-
-	e.EventType = CoreResendFetchMissingEvent
-	assert.Nil(t, rbft.handleCoreRbftEvent(e))
-
-	// as for update conf msg
-	// found localId, initPeers to refresh the peerPool
-	rbft.atomicOff(InViewChange)
-	peerTmp := []*pb.Peer{
-		{
-			Id:   1,
-			Hash: "node1",
-		},
-		{
-			Id:   2,
-			Hash: "node2",
-		},
-		{
-			Id:   3,
-			Hash: "node3",
-		},
-	}
-	confState := &pb.ConfState{QuorumRouter: &pb.Router{Peers: peerTmp}}
-	rbft.atomicOff(Pending)
-	rbft.postConfState(confState)
-	assert.Equal(t, false, rbft.atomicIn(Pending))
-	assert.Equal(t, 3, len(rbft.peerPool.routerMap.HashMap))
-
-	// Not found localId, Pending the peer
-	confState = &pb.ConfState{
-		QuorumRouter: &pb.Router{
-			Peers: []*pb.Peer{
-				{
-					Id:   6,
-					Hash: "node6",
-				},
-			},
-		},
-	}
-	rbft.atomicOff(Pending)
-	rbft.postConfState(confState)
-	assert.Equal(t, true, rbft.atomicIn(Pending))
-
-	// Default
-	e.EventType = ViewChangeTimerEvent
-	assert.Nil(t, rbft.handleCoreRbftEvent(e))
+	rbfts[0].handleCoreRbftEvent(ev)
+	rbfts[1].handleCoreRbftEvent(ev)
+	rbfts[2].handleCoreRbftEvent(ev)
+	rbfts[3].handleCoreRbftEvent(ev)
+	assert.Equal(t, pb.Type_NULL_REQUEST, nodes[0].broadcastMessageCache.Type)
+	assert.Equal(t, pb.Type_VIEW_CHANGE, nodes[1].broadcastMessageCache.Type)
+	assert.Equal(t, pb.Type_VIEW_CHANGE, nodes[2].broadcastMessageCache.Type)
+	assert.Equal(t, pb.Type_VIEW_CHANGE, nodes[3].broadcastMessageCache.Type)
 }
 
-func TestExec_handleViewChangeEvent(t *testing.T) {
+func TestExec_handleCoreRbftEvent_FirstRequestTimerEvent(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
 
-	e := &LocalEvent{}
+	nodes, rbfts := newBasicClusterInstance()
 
-	e.EventType = ViewChangeTimerEvent
-	e.Event = nextDemandNewView(uint64(1))
-	rbft.handleViewChangeEvent(e)
-	assert.Equal(t, uint64(1), rbft.view)
-	newView := rbft.view - uint64(1)
-	rbft.setView(newView)
-
-	rbft.setView(10)
-	rbft.handleViewChangeEvent(e)
-	assert.Equal(t, uint64(10), rbft.view)
-
-	rbft.setView(0)
-	rbft.atomicOn(InRecovery)
-	rbft.atomicOn(InViewChange)
-	rbft.handleViewChangeEvent(e)
-	assert.Equal(t, false, rbft.atomicIn(InViewChange))
-
-	e.EventType = ViewChangedEvent
-	rbft.setView(0)
-	rbft.atomicOff(InRecovery)
-	rbft.atomicOn(InViewChange)
-	rbft.handleViewChangeEvent(e)
-	assert.Equal(t, false, rbft.atomicIn(InViewChange))
-
-	e.EventType = ViewChangeResendTimerEvent
-	rbft.atomicOff(InViewChange)
-	rbft.timerMgr.tTimers[newViewTimer].isActive.Store("tag", "1")
-	rbft.handleViewChangeEvent(e)
-	_, flag := rbft.timerMgr.tTimers[newViewTimer].isActive.Load("tag")
-	assert.Equal(t, true, flag)
-
-	rbft.atomicOn(InViewChange)
-	rbft.handleViewChangeEvent(e)
-	assert.Equal(t, false, rbft.atomicIn(InViewChange))
-	_, flag = rbft.timerMgr.tTimers[newViewTimer].isActive.Load("tag")
-	assert.Equal(t, false, flag)
-
-	e.EventType = CoreRbftService
-	assert.Nil(t, rbft.handleViewChangeEvent(e))
+	// every node will send view change
+	ev := &LocalEvent{
+		Service:   CoreRbftService,
+		EventType: CoreFirstRequestTimerEvent,
+	}
+	rbfts[0].handleCoreRbftEvent(ev)
+	rbfts[1].handleCoreRbftEvent(ev)
+	rbfts[2].handleCoreRbftEvent(ev)
+	rbfts[3].handleCoreRbftEvent(ev)
+	assert.Equal(t, pb.Type_VIEW_CHANGE, nodes[0].broadcastMessageCache.Type)
+	assert.Equal(t, pb.Type_VIEW_CHANGE, nodes[1].broadcastMessageCache.Type)
+	assert.Equal(t, pb.Type_VIEW_CHANGE, nodes[2].broadcastMessageCache.Type)
+	assert.Equal(t, pb.Type_VIEW_CHANGE, nodes[3].broadcastMessageCache.Type)
 }
 
-func TestExec_dispatchMsgToService(t *testing.T) {
+func TestExec_handleCoreRbftEvent_CheckPoolTimerEvent(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	log := NewRawLogger()
-	external := mockexternal.NewMockMinimalExternal(ctrl)
 
-	conf := Config{
-		ID:       1,
-		IsNew:    false,
-		Peers:    peerSet,
-		Logger:   log,
-		External: external,
+	_, rbfts := newBasicClusterInstance()
+
+	// node will restart check pool timer
+	ev := &LocalEvent{
+		Service:   CoreRbftService,
+		EventType: CoreCheckPoolTimerEvent,
+	}
+	assert.False(t, rbfts[0].timerMgr.getTimer(checkPoolTimer))
+
+	// for abnormal node
+	rbfts[0].handleCoreRbftEvent(ev)
+	assert.False(t, rbfts[0].timerMgr.getTimer(checkPoolTimer))
+
+	// for normal node
+	rbfts[0].setNormal()
+	rbfts[0].handleCoreRbftEvent(ev)
+	assert.True(t, rbfts[0].timerMgr.getTimer(checkPoolTimer))
+}
+
+func TestExec_handleCoreRbftEvent_StateUpdatedEvent(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	_, rbfts := newBasicClusterInstance()
+
+	metaS := &pb.MetaState{
+		Applied: uint64(10),
+		Digest:  "block-number-10",
+	}
+	epochInfo := &pb.EpochInfo{
+		Epoch: uint64(0),
+		VSet:  defaultValidatorSet,
+	}
+	ss := &pb.ServiceState{
+		MetaState: metaS,
+		EpochInfo: epochInfo,
+	}
+	ev := &LocalEvent{
+		Service:   CoreRbftService,
+		EventType: CoreStateUpdatedEvent,
+		Event:     ss,
+	}
+	assert.Equal(t, uint64(0), rbfts[1].exec.lastExec)
+	rbfts[1].handleCoreRbftEvent(ev)
+	assert.Equal(t, uint64(10), rbfts[1].exec.lastExec)
+}
+
+func TestExec_handleCoreRbftEvent_ResendMissingTxsEvent(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	nodes, rbfts := newBasicClusterInstance()
+
+	// create batch
+	tx := newTx()
+	rbfts[0].batchMgr.requestPool.AddNewRequest(tx, false, true)
+	reqBatch := rbfts[0].batchMgr.requestPool.GenerateRequestBatch()
+	batch := &pb.RequestBatch{
+		RequestHashList: reqBatch[0].TxHashList,
+		RequestList:     reqBatch[0].TxList,
+		Timestamp:       reqBatch[0].Timestamp,
+		LocalList:       reqBatch[0].LocalList,
+		BatchHash:       reqBatch[0].BatchHash,
+	}
+	rbfts[0].storeMgr.batchStore[batch.BatchHash] = batch
+
+	// create pre-prepare
+	hashBatch := &pb.HashBatch{
+		RequestHashList: batch.RequestHashList,
+		Timestamp:       batch.Timestamp,
+	}
+	prePrep := &pb.PrePrepare{
+		ReplicaId:      rbfts[0].peerPool.ID,
+		View:           0,
+		SequenceNumber: 1,
+		BatchDigest:    batch.BatchHash,
+		HashBatch:      hashBatch,
 	}
 
-	cpChan := make(chan *pb.ServiceState)
-	confC := make(chan *pb.ReloadFinished)
-	rbft, _ := newRBFT(cpChan, confC, conf)
+	// replica 2 reconstruct batch, find missing tx and create fetch missing request
+	_, _, missingTxHashes, _ := rbfts[1].batchMgr.requestPool.GetRequestsByHashList(prePrep.BatchDigest, prePrep.HashBatch.Timestamp, prePrep.HashBatch.RequestHashList, prePrep.HashBatch.DeDuplicateRequestHashList)
+	fetch := &pb.FetchMissingRequests{
+		View:                 prePrep.View,
+		SequenceNumber:       prePrep.SequenceNumber,
+		BatchDigest:          prePrep.BatchDigest,
+		MissingRequestHashes: missingTxHashes,
+		ReplicaId:            rbfts[1].peerPool.ID,
+	}
 
-	var e consensusEvent
-	var i int
+	// time out in primary 1
+	ev := &LocalEvent{
+		Service:   CoreRbftService,
+		EventType: CoreResendMissingTxsEvent,
+		Event:     fetch,
+	}
+	rbfts[0].handleCoreRbftEvent(ev)
+	assert.Equal(t, pb.Type_SEND_MISSING_REQUESTS, nodes[0].unicastMessageCache.Type)
+}
 
-	e = &pb.NullRequest{}
-	i = rbft.dispatchMsgToService(e)
-	assert.Equal(t, CoreRbftService, i)
+func TestExec_handleRecoveryEvent_RestartTimerEvent(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-	e = &pb.PrePrepare{}
-	i = rbft.dispatchMsgToService(e)
-	assert.Equal(t, CoreRbftService, i)
+	_, rbfts := newBasicClusterInstance()
 
-	e = &pb.Prepare{}
-	i = rbft.dispatchMsgToService(e)
-	assert.Equal(t, CoreRbftService, i)
+	ev := &LocalEvent{
+		Service:   RecoveryService,
+		EventType: RecoveryRestartTimerEvent,
+	}
+	assert.False(t, rbfts[1].atomicIn(InRecovery))
+	rbfts[1].handleRecoveryEvent(ev)
+	assert.True(t, rbfts[1].atomicIn(InRecovery))
+	assert.Equal(t, uint64(0), rbfts[1].view)
+}
 
-	e = &pb.Commit{}
-	i = rbft.dispatchMsgToService(e)
-	assert.Equal(t, CoreRbftService, i)
+func TestExec_handleRecoveryEvent_SyncStateRspTimerEvent(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-	e = &pb.Checkpoint{}
-	i = rbft.dispatchMsgToService(e)
-	assert.Equal(t, CoreRbftService, i)
+	_, rbfts := newBasicClusterInstance()
 
-	e = &pb.FetchMissingRequests{}
-	i = rbft.dispatchMsgToService(e)
-	assert.Equal(t, CoreRbftService, i)
+	ev := &LocalEvent{
+		Service:   RecoveryService,
+		EventType: RecoverySyncStateRspTimerEvent,
+	}
+	assert.False(t, rbfts[1].atomicIn(InRecovery))
 
-	e = &pb.SendMissingRequests{}
-	i = rbft.dispatchMsgToService(e)
-	assert.Equal(t, CoreRbftService, i)
+	// for abnormal
+	rbfts[1].handleRecoveryEvent(ev)
+	assert.False(t, rbfts[1].atomicIn(InRecovery))
 
-	e = &pb.ViewChange{}
-	i = rbft.dispatchMsgToService(e)
-	assert.Equal(t, ViewChangeService, i)
+	// for normal
+	rbfts[1].setNormal()
+	rbfts[1].handleRecoveryEvent(ev)
+	assert.True(t, rbfts[1].atomicIn(InRecovery))
+	assert.Equal(t, uint64(1), rbfts[1].view)
+}
 
-	e = &pb.NewView{}
-	i = rbft.dispatchMsgToService(e)
-	assert.Equal(t, ViewChangeService, i)
+func TestExec_handleRecoveryEvent_SyncStateRestartTimerEvent(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-	e = &pb.FetchRequestBatch{}
-	i = rbft.dispatchMsgToService(e)
-	assert.Equal(t, ViewChangeService, i)
+	_, rbfts := newBasicClusterInstance()
 
-	e = &pb.SendRequestBatch{}
-	i = rbft.dispatchMsgToService(e)
-	assert.Equal(t, ViewChangeService, i)
+	ev := &LocalEvent{
+		Service:   RecoveryService,
+		EventType: RecoverySyncStateRestartTimerEvent,
+	}
+	assert.False(t, rbfts[1].timerMgr.getTimer(syncStateRestartTimer))
 
-	e = &pb.RecoveryFetchPQC{}
-	i = rbft.dispatchMsgToService(e)
-	assert.Equal(t, RecoveryService, i)
+	rbfts[1].handleRecoveryEvent(ev)
+	assert.True(t, rbfts[1].timerMgr.getTimer(syncStateRestartTimer))
+}
 
-	e = &pb.RecoveryReturnPQC{}
-	i = rbft.dispatchMsgToService(e)
-	assert.Equal(t, RecoveryService, i)
+func TestExec_handleViewChangeEvent_ViewChangeTimerEvent(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-	e = &pb.SyncState{}
-	i = rbft.dispatchMsgToService(e)
-	assert.Equal(t, RecoveryService, i)
+	nodes, rbfts := newBasicClusterInstance()
 
-	e = &pb.SyncStateResponse{}
-	i = rbft.dispatchMsgToService(e)
-	assert.Equal(t, RecoveryService, i)
+	ev := &LocalEvent{
+		Service:   ViewChangeService,
+		EventType: ViewChangeTimerEvent,
+	}
 
-	e = &pb.Notification{}
-	i = rbft.dispatchMsgToService(e)
-	assert.Equal(t, RecoveryService, i)
+	preView := rbfts[1].view
+	rbfts[1].restartRecovery()
+	assert.Equal(t, pb.Type_NOTIFICATION, nodes[1].broadcastMessageCache.Type)
 
-	e = &pb.NotificationResponse{}
-	i = rbft.dispatchMsgToService(e)
-	assert.Equal(t, RecoveryService, i)
+	rbfts[1].handleViewChangeEvent(ev)
+	assert.Equal(t, pb.Type_NOTIFICATION, nodes[1].broadcastMessageCache.Type)
+	assert.Equal(t, preView+1, rbfts[1].view)
 
-	e = nil
-	i = rbft.dispatchMsgToService(e)
-	assert.Equal(t, NotSupportService, i)
+	rbfts[2].handleViewChangeEvent(ev)
+	assert.Equal(t, pb.Type_VIEW_CHANGE, nodes[2].broadcastMessageCache.Type)
+}
 
+func TestExec_handleViewChangeEvent_ViewChangeResendTimerEvent(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	nodes, rbfts := newBasicClusterInstance()
+
+	ev := &LocalEvent{
+		Service:   ViewChangeService,
+		EventType: ViewChangeResendTimerEvent,
+	}
+
+	rbfts[1].atomicOn(InViewChange)
+	rbfts[1].handleViewChangeEvent(ev)
+	assert.Equal(t, pb.Type_NOTIFICATION, nodes[1].broadcastMessageCache.Type)
 }

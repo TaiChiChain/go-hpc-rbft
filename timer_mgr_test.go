@@ -48,7 +48,7 @@ func TestTimerMgr_count(t *testing.T) {
 func TestTimerMgr_stopTimer(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	log := NewRawLogger()
+	log := FrameworkNewRawLogger()
 	external := mockexternal.NewMockMinimalExternal(ctrl)
 	tx := txpoolmock.NewMockMinimalTxPool(ctrl)
 
@@ -83,7 +83,7 @@ func TestTimerMgr_stopTimer(t *testing.T) {
 func TestTimerMgr_getTimeoutValue(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	log := NewRawLogger()
+	log := FrameworkNewRawLogger()
 	external := mockexternal.NewMockMinimalExternal(ctrl)
 	tx := txpoolmock.NewMockMinimalTxPool(ctrl)
 
@@ -119,7 +119,7 @@ func TestTimerMgr_getTimeoutValue(t *testing.T) {
 func TestTimerMgr_stopOneTimer(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	log := NewRawLogger()
+	log := FrameworkNewRawLogger()
 	external := mockexternal.NewMockMinimalExternal(ctrl)
 	tx := txpoolmock.NewMockMinimalTxPool(ctrl)
 
@@ -152,7 +152,7 @@ func TestTimerMgr_stopOneTimer(t *testing.T) {
 func TestTimerMgr_setTimeoutValue(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	log := NewRawLogger()
+	log := FrameworkNewRawLogger()
 	external := mockexternal.NewMockMinimalExternal(ctrl)
 	tx := txpoolmock.NewMockMinimalTxPool(ctrl)
 
@@ -187,7 +187,7 @@ func TestTimerMgr_setTimeoutValue(t *testing.T) {
 func TestTimerMgr_makeNullRequestTimeoutLegal(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	log := NewRawLogger()
+	log := FrameworkNewRawLogger()
 	external := mockexternal.NewMockMinimalExternal(ctrl)
 	tx := txpoolmock.NewMockMinimalTxPool(ctrl)
 
@@ -221,7 +221,7 @@ func TestTimerMgr_makeNullRequestTimeoutLegal(t *testing.T) {
 func TestTimerMgr_makeCleanVcTimeoutLegal(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	log := NewRawLogger()
+	log := FrameworkNewRawLogger()
 	external := mockexternal.NewMockMinimalExternal(ctrl)
 	tx := txpoolmock.NewMockMinimalTxPool(ctrl)
 
@@ -255,7 +255,7 @@ func TestTimerMgr_makeCleanVcTimeoutLegal(t *testing.T) {
 func TestTimerMgr_makeSyncStateTimeoutLegal(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	log := NewRawLogger()
+	log := FrameworkNewRawLogger()
 	external := mockexternal.NewMockMinimalExternal(ctrl)
 	tx := txpoolmock.NewMockMinimalTxPool(ctrl)
 
