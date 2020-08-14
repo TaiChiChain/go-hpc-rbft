@@ -74,6 +74,7 @@ func (rbft *rbftImpl) initMsgEventMap() {
 	eventCreators[pb.Type_PREPARE] = func() interface{} { return &pb.Prepare{} }
 	eventCreators[pb.Type_COMMIT] = func() interface{} { return &pb.Commit{} }
 	eventCreators[pb.Type_CHECKPOINT] = func() interface{} { return &pb.Checkpoint{} }
+	eventCreators[pb.Type_FETCH_CHECKPOINT] = func() interface{} { return &pb.FetchCheckpoint{} }
 	eventCreators[pb.Type_VIEW_CHANGE] = func() interface{} { return &pb.ViewChange{} }
 	eventCreators[pb.Type_NEW_VIEW] = func() interface{} { return &pb.NewView{} }
 	eventCreators[pb.Type_FETCH_REQUEST_BATCH] = func() interface{} { return &pb.FetchRequestBatch{} }
@@ -86,9 +87,6 @@ func (rbft *rbftImpl) initMsgEventMap() {
 	eventCreators[pb.Type_SYNC_STATE_RESPONSE] = func() interface{} { return &pb.SyncStateResponse{} }
 	eventCreators[pb.Type_NOTIFICATION] = func() interface{} { return &pb.Notification{} }
 	eventCreators[pb.Type_NOTIFICATION_RESPONSE] = func() interface{} { return &pb.NotificationResponse{} }
-
-	eventCreators[pb.Type_EPOCH_CHECK] = func() interface{} { return &pb.EpochCheck{} }
-	eventCreators[pb.Type_EPOCH_CHECK_RESPONSE] = func() interface{} { return &pb.EpochCheckResponse{} }
 }
 
 // dispatchLocalEvent dispatches local Event to corresponding handles using its service type
@@ -164,6 +162,23 @@ func (rbft *rbftImpl) handleCoreRbftEvent(e *LocalEvent) consensusEvent {
 		rbft.executeAfterStateUpdate()
 		return nil
 
+	case CoreCheckpointDoneEvent:
+		chkpt, ok := e.Event.(*pb.Checkpoint)
+		if !ok {
+			return nil
+		}
+		rbft.timerMgr.stopTimer(fetchCheckpointTimer)
+
+		rbft.logger.Infof("Replica %d found checkpoint quorum for seqNo %d, digest %s",
+			rbft.peerPool.ID, chkpt.SequenceNumber, chkpt.Digest)
+
+		rbft.moveWatermarks(chkpt.SequenceNumber)
+		rbft.logger.Infof("Replica %d post stable checkpoint event for seqNo %d after "+
+			"executed to the height with the same digest", rbft.peerPool.ID, rbft.h)
+		rbft.external.SendFilterEvent(pb.InformType_FilterStableCheckpoint, rbft.h)
+
+		return nil
+
 	default:
 		rbft.logger.Errorf("Invalid core RBFT event: %v", e)
 		return nil
@@ -173,6 +188,9 @@ func (rbft *rbftImpl) handleCoreRbftEvent(e *LocalEvent) consensusEvent {
 // handleRecoveryEvent handles recovery services related events.
 func (rbft *rbftImpl) handleRecoveryEvent(e *LocalEvent) consensusEvent {
 	switch e.EventType {
+	case RecoveryInitEvent:
+		rbft.logger.Debugf("Replica %d init recovery", rbft.peerPool.ID)
+		return rbft.initRecovery()
 	case RecoveryDoneEvent:
 		rbft.atomicOff(InRecovery)
 		rbft.recoveryMgr.recoveryHandled = false
@@ -180,7 +198,7 @@ func (rbft *rbftImpl) handleRecoveryEvent(e *LocalEvent) consensusEvent {
 		rbft.recoveryMgr.outOfElection = make(map[ntfIdx]*pb.NotificationResponse)
 		rbft.maybeSetNormal()
 		rbft.timerMgr.stopTimer(recoveryRestartTimer)
-		rbft.logger.Noticef("======== Replica %d finished recovery, view=%d/height=%d.", rbft.peerPool.ID, rbft.view, rbft.exec.lastExec)
+		rbft.logger.Noticef("======== Replica %d finished recovery, epoch=%d/view=%d/height=%d.", rbft.peerPool.ID, rbft.epoch, rbft.view, rbft.exec.lastExec)
 		rbft.logger.Notice(`
 
   +==============================================+
@@ -337,100 +355,72 @@ func (rbft *rbftImpl) handleViewChangeEvent(e *LocalEvent) consensusEvent {
 
 func (rbft *rbftImpl) handleEpochMgrEvent(e *LocalEvent) consensusEvent {
 	switch e.EventType {
-	case EpochCheckInitEvent:
-		rbft.logger.Debugf("Replica %d epoch init event", rbft.peerPool.ID)
-		appliedToCheck := e.Event.(uint64)
-		rbft.initEpochCheck(appliedToCheck)
-		return nil
-	case EpochCheckTimerEvent:
-		rbft.logger.Debugf("Replica %d epoch check timer expired", rbft.peerPool.ID)
-		rbft.off(InEpochCheck)
-		appliedToCheck := e.Event.(uint64)
-		rbft.initEpochCheck(appliedToCheck)
-	case EpochCheckDoneEvent:
-		// finish epoch check
-		rbft.off(InEpochCheck)
-		rbft.timerMgr.stopTimer(epochCheckRspTimer)
-		rbft.logger.Infof("======== Replica %d finished epoch check, N=%d/epoch=%d/height=%d/view=%d",
-			rbft.peerPool.ID, rbft.N, rbft.epoch, rbft.exec.lastExec, rbft.view)
-
-		// if there is a config transaction in process,
-		// we should wait for commit-db-reload finished before we restart consensus
-		if rbft.atomicIn(InConfChange) {
-			// post stable checkpoint event
-			latestH := e.Event.(uint64)
-			rbft.logger.Infof("Replica %d post stable checkpoint event for seqNo %d after config transaction executed",
-				rbft.peerPool.ID, latestH)
-			rbft.external.SendFilterEvent(pb.InformType_FilterStableCheckpoint, latestH)
-
-			// record the latest stable checkpoint
-			applied := latestH
-			digest := rbft.storeMgr.chkpts[latestH]
-			rbft.updateStableCheckpoint(applied, digest)
-			rbft.persistStableCheckpoint()
-
-			// waiting for commit db finish the reload
-			rbft.logger.Noticef("Replica %d is waiting for commit-db finished...", rbft.peerPool.ID)
-			rf := <-rbft.confChan
-			if rf.Height != latestH {
-				rbft.logger.Errorf("Replica %d receive a wrong height of config transaction, get %d, expect %d",
-					rbft.peerPool.ID, rf.Height, latestH)
-				return nil
-			}
-
-			// two types of config transaction:
-			// 1. validator set changed: try to start a new epoch
-			// 2. validator set not changed: do not start a new epoch
-			routerInfo := rbft.node.readReloadRouter()
-			if routerInfo != nil {
-				rbft.turnIntoEpoch(routerInfo, applied)
-			}
-
-			// as a config batch has been executed, reset storage, including certs/batches/storage/etc.
-			rbft.resetStateForNewEpoch()
-
-			// finish config change and restart consensus
-			rbft.atomicOff(InConfChange)
-			rbft.maybeSetNormal()
-			rbft.startTimerIfOutstandingRequests()
-			finishMsg := fmt.Sprintf("======== Replica %d finished config change, primary=%d, epoch=%d/n=%d/f=%d/view=%d/h=%d/lastExec=%d", rbft.peerPool.ID, rbft.primaryID(rbft.view), rbft.epoch, rbft.N, rbft.f, rbft.view, rbft.h, rbft.exec.lastExec)
-			rbft.external.SendFilterEvent(pb.InformType_FilterFinishConfigChange, finishMsg)
-			// set primary sequence log
-			if rbft.isPrimary(rbft.peerPool.ID) {
-				// set seqNo to lastExec for new primary to sort following batches from correct seqNo.
-				rbft.batchMgr.setSeqNo(rbft.exec.lastExec)
-
-				// resubmit transactions
-				rbft.primaryResubmitTransactions()
-			}
-
+	case ConfigCheckpointDoneEvent:
+		chkpt, ok := e.Event.(*pb.Checkpoint)
+		if !ok {
 			return nil
 		}
 
-		// finish epoch sync
-		if rbft.atomicIn(InEpochSync) {
-			rbft.off(isNewNode)
-			rbft.atomicOff(InEpochSync)
-			rbft.maybeSetNormal()
-			rbft.logger.Noticef("======== Replica %d finished epoch sync, N=%d/epoch=%d/height=%d/view=%d",
-				rbft.peerPool.ID, rbft.N, rbft.epoch, rbft.exec.lastExec, rbft.view)
+		rbft.timerMgr.stopTimer(fetchCheckpointTimer)
+
+		rbft.logger.Infof("Replica %d found checkpoint quorum for seqNo %d, digest %s",
+			rbft.peerPool.ID, chkpt.SequenceNumber, chkpt.Digest)
+
+		rbft.logger.Infof("Replica %d post stable checkpoint event for seqNo %d after "+
+			"executed to the height with the same digest", rbft.peerPool.ID, chkpt.SequenceNumber)
+		rbft.external.SendFilterEvent(pb.InformType_FilterStableCheckpoint, chkpt.SequenceNumber)
+
+		// waiting for commit db finish the reload
+		rbft.logger.Noticef("Replica %d is waiting for commit-db finished...", rbft.peerPool.ID)
+		for {
+			ev := <-rbft.confChan
+			rbft.logger.Debugf("Replica %d received a commit-db finished target at height %d", rbft.peerPool.ID, ev.Height)
+			if ev.Height == chkpt.SequenceNumber {
+				break
+			}
 		}
 
-		// start recovery to fetch essential info
-		return rbft.initRecovery()
-	case EpochSyncDoneEvent:
-		rbft.off(isNewNode)
-		rbft.atomicOff(InEpochSync)
+		// two types of config transaction:
+		// 1. validator set changed: try to start a new epoch
+		// 2. validator set not changed: do not start a new epoch
+		routerInfo := rbft.node.readReloadRouter()
+		if routerInfo != nil {
+			rbft.turnIntoEpoch(routerInfo, chkpt.SequenceNumber)
+		}
+
+		// move watermark for config batch
+		rbft.moveWatermarks(chkpt.SequenceNumber)
+
+		if rbft.in(initialCheck) {
+			rbft.off(initialCheck)
+			rbft.maybeSetNormal()
+			return rbft.initRecovery()
+		}
+
+		// finish config change and restart consensus
+		rbft.atomicOff(InConfChange)
 		rbft.maybeSetNormal()
-		rbft.logger.Noticef("======== Replica %d finished epoch sync, N=%d/epoch=%d/height=%d/view=%d",
-			rbft.peerPool.ID, rbft.N, rbft.epoch, rbft.exec.lastExec, rbft.view)
-		return rbft.initRecovery()
+		rbft.startTimerIfOutstandingRequests()
+		finishMsg := fmt.Sprintf("======== Replica %d finished config change, primary=%d, epoch=%d/n=%d/f=%d/view=%d/h=%d/lastExec=%d", rbft.peerPool.ID, rbft.primaryID(rbft.view), rbft.epoch, rbft.N, rbft.f, rbft.view, rbft.h, rbft.exec.lastExec)
+		rbft.external.SendFilterEvent(pb.InformType_FilterFinishConfigChange, finishMsg)
+
+		// set primary sequence log
+		if rbft.isPrimary(rbft.peerPool.ID) {
+			// set seqNo to lastExec for new primary to sort following batches from correct seqNo.
+			rbft.batchMgr.setSeqNo(rbft.exec.lastExec)
+
+			// resubmit transactions
+			rbft.primaryResubmitTransactions()
+		}
+
+		return nil
+	case FetchCheckpointEvent:
+		rbft.fetchCheckpoint()
+		return nil
 	default:
 		rbft.logger.Errorf("Invalid node manager event: %v", e)
 		return nil
 	}
-
-	return nil
 }
 
 // dispatchConsensusMsg dispatches consensus messages to corresponding handlers using its service type
@@ -498,12 +488,8 @@ func (rbft *rbftImpl) dispatchMsgToService(e consensusEvent) int {
 	case *pb.NotificationResponse:
 		return RecoveryService
 
-		// epoch_mgr service
-	case *pb.EpochCheck:
+	case *pb.FetchCheckpoint:
 		return EpochMgrService
-	case *pb.EpochCheckResponse:
-		return EpochMgrService
-
 	default:
 		return NotSupportService
 

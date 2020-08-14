@@ -16,6 +16,7 @@ package rbft
 
 import (
 	"fmt"
+
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
 	txpool "github.com/ultramesh/flato-txpool"
 )

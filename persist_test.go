@@ -37,15 +37,14 @@ func newPersistTestReplica(ctrl *gomock.Controller, pool txpool.TxPool, log Logg
 		SyncStateTimeout:        1 * time.Second,
 		SyncStateRestartTimeout: 10 * time.Second,
 		RecoveryTimeout:         10 * time.Second,
-		EpochCheckTimeout:       4 * time.Second,
+		FetchCheckpointTimeout:  5 * time.Second,
 		CheckPoolTimeout:        3 * time.Minute,
 
 		Logger:      log,
 		External:    ext,
 		RequestPool: pool,
 
-		EpochInit:       uint64(0),
-		EpochInitDigest: "XXX GENESIS",
+		EpochInit: uint64(0),
 	}
 
 	node, _ := newNode(conf)

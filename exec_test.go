@@ -2,9 +2,9 @@ package rbft
 
 import (
 	"errors"
-	mockexternal "github.com/ultramesh/flato-rbft/mock/mock_external"
 	"testing"
 
+	mockexternal "github.com/ultramesh/flato-rbft/mock/mock_external"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
 
 	"github.com/gogo/protobuf/proto"
@@ -109,7 +109,6 @@ func TestExec_handleCoreRbftEvent(t *testing.T) {
 			Applied: uint64(5),
 			Digest:  "block-number-5",
 		},
-		VSet: nil,
 	}
 	rbft.exec.setLastExec(uint64(3))
 	assert.Nil(t, rbft.handleCoreRbftEvent(e))
@@ -131,19 +130,19 @@ func TestExec_handleCoreRbftEvent(t *testing.T) {
 			Hash: "node1",
 		},
 		{
-			Id:   5,
-			Hash: "node5",
+			Id:   2,
+			Hash: "node2",
 		},
 		{
-			Id:   6,
-			Hash: "node6",
+			Id:   3,
+			Hash: "node3",
 		},
 	}
 	confState := &pb.ConfState{QuorumRouter: &pb.Router{Peers: peerTmp}}
 	rbft.atomicOff(Pending)
 	rbft.postConfState(confState)
 	assert.Equal(t, false, rbft.atomicIn(Pending))
-	assert.Equal(t, peerTmp, rbft.peerPool.router.Peers)
+	assert.Equal(t, 3, len(rbft.peerPool.routerMap.HashMap))
 
 	// Not found localId, Pending the peer
 	confState = &pb.ConfState{

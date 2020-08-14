@@ -42,14 +42,17 @@ type storeManager struct {
 	// some transactions in some batches, record batch no
 	missingReqBatches map[string]bool
 
+	// a pre-prepare sequence map,
+	// there need to be a one-to-one correspondence between sequence number and digest
+	seqMap map[uint64]string
+
 	// Set to the highest weak checkpoint cert we have observed
-	highStateTarget *stateUpdateTarget
+	highStateTarget *pb.MetaState
 
 	// ---------------checkpoint related--------------------
 	// checkpoints that we reached by ourselves after commit a block with a
 	// block number == integer multiple of K;
 	// map lastExec to a base64 encoded BlockchainInfo
-	// TODO(wgr): store the meta state into checkpoints after config transaction execution
 	chkpts map[uint64]string
 
 	// checkpoint numbers received from others which are bigger than our
@@ -59,9 +62,6 @@ type storeManager struct {
 
 	// track all non-repeating checkpoints
 	checkpointStore map[pb.Checkpoint]bool
-
-	// track stable checkpoint
-	stableCheckpoint *pb.MetaState
 }
 
 // newStoreMgr news an instance of storeManager
@@ -72,16 +72,13 @@ func newStoreMgr(c Config) *storeManager {
 		checkpointStore:       make(map[pb.Checkpoint]bool),
 		certStore:             make(map[msgID]*msgCert),
 		committedCert:         make(map[msgID]string),
+		seqMap:                make(map[uint64]string),
 		outstandingReqBatches: make(map[string]*pb.RequestBatch),
 		batchStore:            make(map[string]*pb.RequestBatch),
 		missingReqBatches:     make(map[string]bool),
 		logger:                c.Logger,
 	}
 	sm.chkpts[0] = "XXX GENESIS"
-	sm.stableCheckpoint = &pb.MetaState{
-		Applied: uint64(0),
-		Digest:  "XXX GENESIS",
-	}
 	return sm
 }
 
@@ -148,12 +145,4 @@ func (sm *storeManager) existedDigest(n uint64, view uint64, digest string) bool
 		}
 	}
 	return false
-}
-
-func (rbft *rbftImpl) updateStableCheckpoint(applied uint64, digest string) {
-	rbft.storeMgr.stableCheckpoint = &pb.MetaState{
-		Applied: applied,
-		Digest:  digest,
-	}
-	rbft.logger.Debugf("Replica %d update stable checkpoint: %+v", rbft.peerPool.ID, rbft.storeMgr.stableCheckpoint)
 }

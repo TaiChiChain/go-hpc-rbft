@@ -189,7 +189,7 @@ func (n *node) ReportExecuted(state *pb.ServiceState) {
 	n.currentState = state
 
 	// a config transaction executed or checkpoint, send state to checkpoint channel
-	if n.rbft.readConfigTransactionToExecute() == state.MetaState.Applied || state.MetaState.Applied%n.config.K == 0 {
+	if n.rbft.readConfigBatchToExecute() == state.MetaState.Applied || state.MetaState.Applied%n.config.K == 0 {
 		n.logger.Debugf("Report checkpoint: {%d, %s} to RBFT core", state.MetaState.Applied, state.MetaState.Digest)
 		n.cpChan <- state
 	}

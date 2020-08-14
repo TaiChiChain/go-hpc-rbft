@@ -17,6 +17,10 @@ import (
 	"github.com/gogo/protobuf/proto"
 )
 
+var (
+	defaultValidatorSet = []string{"node1", "node2", "node3", "node4"}
+)
+
 // testFramework contains the core structure of test framework instance.
 type testFramework struct {
 	N     int
@@ -30,12 +34,10 @@ type testFramework struct {
 	// we could regard it as the routerInfo of epoch in trusted node
 	Router pb.Router
 
-	Epoch uint64
-
-	Digest  string
-	Applied uint64
-	blocks  map[uint64]string
-	vset    map[uint64]pb.Router
+	// mem chain for framework
+	Epoch  uint64
+	Blocks map[uint64]string
+	VSet   map[uint64]pb.Router
 
 	// Channel to close this event process.
 	close chan bool
@@ -59,16 +61,17 @@ type testNode struct {
 	// testNode.Peers is the router map in one node.
 	Router pb.Router
 
-	// some important states for consensus
-	Epoch   uint64
-	Digest  string
+	// epoch info in mem-chain
+	Epoch uint64
+	VSet  []string
+
+	// last config transaction in mem-chain
 	Applied uint64
+	Digest  string
 
-	// blocks created
+	// block storage
+	Blocks []Blocks
 	blocks map[uint64]string
-
-	// vSet values which will be stored in blocks
-	vset map[uint64]pb.Router
 
 	// ID is the num-identity of the local rbft.peerPool.localIDde.
 	ID       uint64
@@ -88,6 +91,12 @@ type testNode struct {
 
 	// Storage of consensus logs.
 	stateStore map[string][]byte
+
+	// consensus message cache for broadcast
+	broadcastMessageCache *pb.ConsensusMessage
+
+	// consensus message cache for unicast
+	unicastMessageCache *pb.ConsensusMessage
 }
 
 // testExternal is the instance of External interface.
@@ -99,6 +108,12 @@ type testExternal struct {
 
 	// Channel to receive messages sent from nodes in cluster.
 	clusterChan chan *channelMsg
+}
+
+type Blocks struct {
+	sequenceNumber uint64
+	hash           string
+	value          interface{}
 }
 
 // channelMsg is the form of data in cluster network.
@@ -165,7 +180,7 @@ func FrameworkNewRawLogger() *fancylogger.Logger {
 // newTestFramework init the testFramework instance
 func newTestFramework(account int, loggerFile bool) *testFramework {
 	// Init PeerSet
-	router := &pb.Router{}
+	routers := pb.Router{}
 	for i := 0; i < account; i++ {
 		id := uint64(i + 1)
 		hostname := "node" + strconv.Itoa(i+1)
@@ -174,22 +189,19 @@ func newTestFramework(account int, loggerFile bool) *testFramework {
 			Hash:     hash(hostname),
 			Hostname: hostname,
 		}
-		router.Peers = append(router.Peers, peer)
+		routers.Peers = append(routers.Peers, peer)
 	}
 
 	cc := make(chan *channelMsg, 1)
 	// Init Framework
 	tf := &testFramework{
 		TestNode: nil,
-		Router:   getRouter(router),
+		Router:   routers,
 
 		close:       make(chan bool),
 		clusterChan: cc,
 
-		blocks: make(map[uint64]string),
-		vset:   make(map[uint64]pb.Router),
-
-		log: NewRawLogger(),
+		log: FrameworkNewRawLogger(),
 	}
 
 	tf.log.Debugf("%s", tf.Router)
@@ -207,13 +219,40 @@ func newTestFramework(account int, loggerFile bool) *testFramework {
 }
 
 // newNodeConfig init the Config of Node.
-func (tf *testFramework) newNodeConfig(id uint64, hostname string, isNew bool, log Logger, ext external.ExternalStack, pool txpool.TxPool) Config {
+func (tf *testFramework) newNodeConfig(
+	id uint64,
+	hostname string,
+	isNew bool,
+	log Logger,
+	ext external.ExternalStack,
+	pool txpool.TxPool,
+	epochInfo *pb.EpochInfo,
+	lastConfig *pb.MetaState) Config {
+
+	if len(epochInfo.VSet) < 4 {
+		epochInfo.VSet = defaultValidatorSet
+	}
+
+	var peers []*pb.Peer
+	for index, hostname := range epochInfo.VSet {
+		peer := &pb.Peer{
+			Id:       uint64(index + 1),
+			Hostname: hostname,
+			Hash:     hash(hostname),
+		}
+		peers = append(peers, peer)
+	}
+
 	return Config{
-		ID:                      id,
-		Hash:                    hash(hostname),
-		Hostname:                hostname,
-		IsNew:                   isNew,
-		Peers:                   tf.Router.Peers,
+		ID:       id,
+		Hash:     hash(hostname),
+		Hostname: hostname,
+		IsNew:    isNew,
+
+		EpochInit:    epochInfo.Epoch,
+		Peers:        peers,
+		LatestConfig: lastConfig,
+
 		K:                       10,
 		LogMultiplier:           4,
 		SetSize:                 25,
@@ -228,7 +267,7 @@ func (tf *testFramework) newNodeConfig(id uint64, hostname string, isNew bool, l
 		SyncStateTimeout:        1 * time.Second,
 		SyncStateRestartTimeout: 10 * time.Second,
 		RecoveryTimeout:         10 * time.Second,
-		EpochCheckTimeout:       4 * time.Second,
+		FetchCheckpointTimeout:  5 * time.Second,
 		CheckPoolTimeout:        3 * time.Minute,
 		RequestSethMemLimit:     true,
 		RequestSetMaxMem:        DefaultRequestSetMaxMem,
@@ -236,10 +275,20 @@ func (tf *testFramework) newNodeConfig(id uint64, hostname string, isNew bool, l
 		Logger:      log,
 		External:    ext,
 		RequestPool: pool,
-
-		EpochInit:       uint64(0),
-		EpochInitDigest: "XXX GENESIS",
 	}
+}
+
+func vSetToRouters(vSet []string) pb.Router {
+	var routers pb.Router
+	for index, hostname := range vSet {
+		peer := &pb.Peer{
+			Id:       uint64(index + 1),
+			Hash:     hash(hostname),
+			Hostname: hostname,
+		}
+		routers.Peers = append(routers.Peers, peer)
+	}
+	return routers
 }
 
 func getRouter(router *pb.Router) pb.Router {
@@ -287,14 +336,19 @@ func (tf *testFramework) newTestNode(id uint64, hostname string, cc chan *channe
 	namespace := "global"
 	pool := txpool.NewTxPool(namespace, rlu, confTxPool)
 
-	conf := tf.newNodeConfig(id, hostname, false, log, ext, pool)
+	epochInfo := &pb.EpochInfo{
+		Epoch: uint64(0),
+		VSet:  defaultValidatorSet,
+	}
+	conf := tf.newNodeConfig(id, hostname, false, log, ext, pool, epochInfo, nil)
 	n, _ := newNode(conf)
 	N := n
+	routers := vSetToRouters(epochInfo.VSet)
 	tn := &testNode{
 		N:          N,
 		n:          n,
-		Router:     getRouter(&tf.Router),
-		Epoch:      n.rbft.epoch,
+		Router:     routers,
+		Epoch:      epochInfo.Epoch,
 		ID:         id,
 		Hostname:   hostname,
 		normal:     true,
@@ -303,7 +357,6 @@ func (tf *testFramework) newTestNode(id uint64, hostname string, cc chan *channe
 		recvChan:   make(chan *pb.ConsensusMessage),
 		stateStore: make(map[string][]byte),
 		blocks:     make(map[uint64]string),
-		vset:       make(map[uint64]pb.Router),
 	}
 	testExt.testNode = tn
 
@@ -486,7 +539,7 @@ func (tf *testFramework) frameworkDelNode(hostname string) {
 }
 
 // frameworkAddNode adds one node to the cluster.
-func (tf *testFramework) frameworkAddNode(hostname string, loggerFile bool) {
+func (tf *testFramework) frameworkAddNode(hostname string, loggerFile bool, vSet []string) {
 	tf.log.Noticef("Test Framework add Node, Host: %s...", hostname)
 
 	maxID := uint64(0)
@@ -537,33 +590,23 @@ func (tf *testFramework) frameworkAddNode(hostname string, loggerFile bool) {
 
 	// Add Peer Info to Framework
 	var (
-		senderID     uint64
-		senderHost   string
-		senderIndex  int
-		senderRouter pb.Router
+		senderHost  string
+		senderIndex int
 	)
-	senderID = uint64(2)
 
-	newRouter := pb.Router{}
-	for index, node := range tf.TestNode {
-		if node.ID == senderID {
-			senderHost = node.Hostname
-			senderIndex = index
-			senderRouter = getRouter(&node.Router)
-			break
-		}
+	epochInfo := &pb.EpochInfo{
+		Epoch: uint64(0),
+		VSet:  vSet,
 	}
-	newRouter = senderRouter
-	newRouter.Peers = append(newRouter.Peers, newPeer)
-
-	conf := tf.newNodeConfig(id, hostname, true, log, ext, pool)
-	conf.Peers = newRouter.Peers
+	conf := tf.newNodeConfig(id, hostname, true, log, ext, pool, epochInfo, nil)
 	n, _ := newNode(conf)
 	N := n
+
+	routers := vSetToRouters(epochInfo.VSet)
 	tn := &testNode{
 		N:        N,
 		n:        n,
-		Router:   tf.Router,
+		Router:   routers,
 		Epoch:    n.rbft.epoch,
 		ID:       id,
 		Hostname: hostname,
@@ -572,7 +615,6 @@ func (tf *testFramework) frameworkAddNode(hostname string, loggerFile bool) {
 		close:    make(chan bool),
 		recvChan: make(chan *pb.ConsensusMessage),
 		blocks:   make(map[uint64]string),
-		vset:     make(map[uint64]pb.Router),
 	}
 	tf.TestNode = append(tf.TestNode, tn)
 	testExt.testNode = tn
@@ -588,10 +630,10 @@ func (tf *testFramework) frameworkAddNode(hostname string, loggerFile bool) {
 	// send config change tx
 	// node4 propose a ctx to add node
 	go func() {
-		tf.log.Infof("[Cluster_Service %s] Add Node Req: %s", senderHost, newPeer.Hash)
-		tf.log.Infof("[Cluster_Service %s] Target Validator Set: %+v", senderHost, newRouter)
+		tf.log.Infof("[Cluster_Service %d:%s] Add Node Req: %s", senderIndex, senderHost, newPeer.Hash)
+		tf.log.Infof("[Cluster_Service %d:%s] Target Validator Set: %+v", senderIndex, senderHost, vSet)
 
-		info, _ := proto.Marshal(&newRouter)
+		info, _ := proto.Marshal(epochInfo)
 		tx := &protos.Transaction{
 			Timestamp: time.Now().UnixNano(),
 			Id:        2,
@@ -623,9 +665,37 @@ func (tf *testFramework) sendTx(no int, sender uint64) {
 	_ = tf.TestNode[sender-1].N.Propose(txs3)
 }
 
+func newTx() *protos.Transaction {
+	return &protos.Transaction{
+		Value: []byte(string(rand.Int())),
+		Nonce: int64(rand.Int()),
+	}
+}
+
+func newCTX(vSet []string) *protos.Transaction {
+	epochInfo := &pb.EpochInfo{
+		Epoch: uint64(0),
+		VSet:  vSet,
+	}
+	info, _ := proto.Marshal(epochInfo)
+	return &protos.Transaction{
+		Timestamp: time.Now().UnixNano(),
+		Id:        2,
+		Nonce:     999,
+		// use new router as value
+		Value:  info,
+		TxType: protos.Transaction_CTX,
+	}
+}
+
 func (tf *testFramework) sendInitCtx() {
+	tf.log.Info("Send init ctx")
 	senderID3 := uint64(rand.Int()%tf.N + 1)
-	info, _ := proto.Marshal(&tf.Router)
+	epochInfo := &pb.EpochInfo{
+		Epoch: uint64(0),
+		VSet:  defaultValidatorSet,
+	}
+	info, _ := proto.Marshal(epochInfo)
 	tx := &protos.Transaction{
 		Timestamp: time.Now().UnixNano(),
 		Id:        2,
@@ -691,6 +761,7 @@ func (ext *testExternal) Broadcast(msg *pb.ConsensusMessage) error {
 		msg: msg,
 		to:  "",
 	}
+	ext.testNode.broadcastMessageCache = msg
 
 	go ext.postMsg(cm)
 	return nil
@@ -710,6 +781,7 @@ func (ext *testExternal) Unicast(msg *pb.ConsensusMessage, to uint64) error {
 			break
 		}
 	}
+	ext.testNode.unicastMessageCache = msg
 
 	go ext.postMsg(cm)
 	return nil
@@ -723,6 +795,7 @@ func (ext *testExternal) UnicastByHash(msg *pb.ConsensusMessage, to string) erro
 		msg: msg,
 		to:  to,
 	}
+	ext.testNode.unicastMessageCache = msg
 
 	go ext.postMsg(cm)
 	return nil
@@ -760,54 +833,74 @@ func (ext *testExternal) Execute(requests []*protos.Transaction, localList []boo
 		txHash := requestHash(req)
 		txHashList = append(txHashList, txHash)
 	}
-	batchDigest := calculateMD5Hash(txHashList, timestamp)
+	blockHash := calculateMD5Hash(txHashList, timestamp)
 
 	state := &pb.ServiceState{}
 	state.MetaState = &pb.MetaState{
 		Applied: seqNo,
-		Digest:  batchDigest,
+		Digest:  blockHash,
 	}
 
 	if state.MetaState.Applied == ext.testNode.Applied+1 {
 		ext.testNode.Applied = state.MetaState.Applied
 		ext.testNode.Digest = state.MetaState.Digest
+		block := Blocks{
+			sequenceNumber: state.MetaState.Applied,
+			hash:           state.MetaState.Digest,
+		}
+		ext.testNode.Blocks = append(ext.testNode.Blocks, block)
 		ext.testNode.blocks[state.MetaState.Applied] = state.MetaState.Digest
 		ext.testNode.n.logger.Debugf("Block Number %d", state.MetaState.Applied)
 		ext.testNode.n.logger.Debugf("Block Hash %s", state.MetaState.Digest)
 		//report latest validator set
 		if len(requests) != 0 {
 			if protos.IsConfigTx(requests[0]) {
-				r := &pb.Router{}
-				_ = proto.Unmarshal(requests[0].Value, r)
-				ext.testNode.vset[state.MetaState.Applied] = *r
+				info := &pb.EpochInfo{}
+				_ = proto.Unmarshal(requests[0].Value, info)
+				var peers []*pb.Peer
+				for index, hostname := range info.VSet {
+					peer := &pb.Peer{
+						Id:       uint64(index + 1),
+						Hostname: hostname,
+					}
+					peers = append(peers, peer)
+				}
+				router := &pb.Router{
+					Peers: peers,
+				}
+
+				ext.testNode.Epoch = state.MetaState.Applied
+				ext.testNode.VSet = info.VSet
+
 				ext.testNode.n.logger.Debugf("Epoch Number %d", state.MetaState.Applied)
-				ext.testNode.n.logger.Debugf("Validator Set %+v", r)
+				ext.testNode.n.logger.Debugf("Validator Set %+v", router)
+				ext.tf.log.Infof("router: %+v", router)
 				re := &pb.ReloadMessage{
 					Type:   pb.ReloadType_FinishReloadRouter,
-					Router: r,
+					Router: router,
 				}
 				ext.testNode.N.ReportReloadFinished(re)
 			}
 		}
 		// report executed
 		go ext.testNode.N.ReportExecuted(state)
+
+		if !protos.IsConfigTx(requests[0]) && state.MetaState.Applied%10 != 0 {
+			success := make(chan bool)
+			go func() {
+				for {
+					s := ext.testNode.n.getCurrentState()
+					if s.MetaState.Applied == state.MetaState.Applied {
+						success <- true
+						break
+					}
+				}
+			}()
+			<-success
+		}
 	}
 }
 func (ext *testExternal) StateUpdate(seqNo uint64, digest string, peers []uint64) {
-	vSet := make(map[uint64]string)
-	for key, val := range ext.tf.TestNode[0].vset {
-		if key <= seqNo {
-			ext.testNode.vset[key] = val
-			routerInfo, _ := proto.Marshal(&val)
-			vSet[key] = byte2Hex(routerInfo)
-
-			if key > ext.testNode.Epoch {
-				ext.testNode.Epoch = key
-				ext.testNode.Router = val
-			}
-		}
-	}
-
 	for key, val := range ext.tf.TestNode[0].blocks {
 		if key <= seqNo {
 			ext.testNode.blocks[key] = val
@@ -822,10 +915,15 @@ func (ext *testExternal) StateUpdate(seqNo uint64, digest string, peers []uint64
 	}
 
 	state := &pb.ServiceState{}
+	state.EpochInfo = &pb.EpochInfo{
+		Epoch: ext.tf.TestNode[0].Epoch,
+		VSet:  ext.tf.TestNode[0].VSet,
+	}
 	state.MetaState = &pb.MetaState{
 		Applied: ext.testNode.Applied,
 		Digest:  ext.testNode.Digest,
 	}
+	ext.tf.log.Infof("state: %+v", state)
 	ext.testNode.N.ReportStateUpdated(state)
 }
 func (ext *testExternal) SendFilterEvent(informType pb.InformType, message ...interface{}) {

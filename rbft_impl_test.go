@@ -2,10 +2,10 @@ package rbft
 
 import (
 	"errors"
-	"github.com/ultramesh/flato-event/inner/protos"
 	"testing"
 	"time"
 
+	"github.com/ultramesh/flato-event/inner/protos"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
 
 	"github.com/gogo/protobuf/proto"
@@ -375,12 +375,6 @@ func TestRBFT_processNullRequset(t *testing.T) {
 	assert.Equal(t, false, rbft.in(NeedSyncState))
 	rbft.atomicOff(InViewChange)
 
-	rbft.atomicOn(InEpochSync)
-	rbft.off(NeedSyncState)
-	rbft.processNullRequest(msg)
-	assert.Equal(t, false, rbft.in(NeedSyncState))
-	rbft.atomicOff(InEpochSync)
-
 	// not primary
 	rbft.setView(uint64(3))
 	rbft.processNullRequest(msg)
@@ -702,10 +696,10 @@ func TestRBFT_checkpoint(t *testing.T) {
 
 	state := &pb.ServiceState{}
 	state.MetaState = &pb.MetaState{
-		Applied: 1,
+		Applied: 10,
 		Digest:  "checkpoint msg",
 	}
-	rbft.checkpoint(uint64(10), state)
+	rbft.checkpoint(state.MetaState)
 	assert.Equal(t, state.MetaState.Digest, rbft.storeMgr.chkpts[uint64(10)])
 }
 
@@ -730,7 +724,7 @@ func TestRBFT_witnessCheckpointWeakCert(t *testing.T) {
 	rbft.on(SkipInProgress)
 	rbft.atomicOff(StateTransferring)
 	rbft.witnessCheckpointWeakCert(chkptSelf)
-	assert.Equal(t, chkptSelf.Digest, rbft.storeMgr.highStateTarget.targetMessage.digest)
+	assert.Equal(t, chkptSelf.Digest, rbft.storeMgr.highStateTarget.Digest)
 	assert.Equal(t, true, rbft.atomicIn(StateTransferring))
 }
 
@@ -813,28 +807,22 @@ func TestRBFT_updateHighStateTarget(t *testing.T) {
 	defer ctrl.Finish()
 	rbft, _ := newTestRBFT(ctrl)
 
-	rbft.storeMgr.highStateTarget = &stateUpdateTarget{
-		targetMessage: targetMessage{
-			height: uint64(4),
-			digest: "target",
-		},
-		replicas: nil,
+	rbft.storeMgr.highStateTarget = &pb.MetaState{
+		Applied: uint64(4),
+		Digest:  "target",
 	}
 
-	target := &stateUpdateTarget{
-		targetMessage: targetMessage{
-			height: uint64(3),
-			digest: "target",
-		},
-		replicas: nil,
+	target := &pb.MetaState{
+		Applied: uint64(3),
+		Digest:  "target",
 	}
 
 	rbft.updateHighStateTarget(target)
-	assert.Equal(t, uint64(4), rbft.storeMgr.highStateTarget.height)
+	assert.Equal(t, uint64(4), rbft.storeMgr.highStateTarget.Applied)
 
-	target.height = uint64(6)
+	target.Applied = uint64(6)
 	rbft.updateHighStateTarget(target)
-	assert.Equal(t, uint64(6), rbft.storeMgr.highStateTarget.height)
+	assert.Equal(t, uint64(6), rbft.storeMgr.highStateTarget.Applied)
 }
 
 func TestRBFT_tryStateTransfer(t *testing.T) {
@@ -842,11 +830,10 @@ func TestRBFT_tryStateTransfer(t *testing.T) {
 	defer ctrl.Finish()
 	rbft, _ := newTestRBFT(ctrl)
 
-	targetMsg := targetMessage{
-		height: uint64(5),
-		digest: "msg",
+	target := &pb.MetaState{
+		Applied: uint64(5),
+		Digest:  "msg",
 	}
-	target := &stateUpdateTarget{targetMessage: targetMsg}
 	rbft.off(SkipInProgress)
 	rbft.atomicOff(StateTransferring)
 	prePrepareTmp := &pb.PrePrepare{
@@ -911,9 +898,7 @@ func TestRBFT_recvStateUpdatedEvent(t *testing.T) {
 
 	// normal
 	rbft.h = 20
-	ss0 := &pb.ServiceState{
-		VSet: nil,
-	}
+	ss0 := &pb.ServiceState{}
 	ss0.MetaState = &pb.MetaState{
 		Applied: uint64(30),
 		Digest:  "block-number-30",
@@ -925,9 +910,7 @@ func TestRBFT_recvStateUpdatedEvent(t *testing.T) {
 	// in recovery
 	rbft.h = uint64(20)
 	rbft.view = uint64(3)
-	ss1 := &pb.ServiceState{
-		VSet: nil,
-	}
+	ss1 := &pb.ServiceState{}
 	ss1.MetaState = &pb.MetaState{
 		Applied: uint64(30),
 		Digest:  "block-number-30",
@@ -944,16 +927,11 @@ func TestRBFT_recvStateUpdatedEvent(t *testing.T) {
 
 	// state update target < h
 	rbft.h = 50
-	rbft.storeMgr.highStateTarget = &stateUpdateTarget{
-		targetMessage: targetMessage{
-			height: uint64(45),
-			digest: "block-number-45",
-		},
-		replicas: nil,
+	rbft.storeMgr.highStateTarget = &pb.MetaState{
+		Applied: uint64(45),
+		Digest:  "block-number-45",
 	}
-	ss3 := &pb.ServiceState{
-		VSet: nil,
-	}
+	ss3 := &pb.ServiceState{}
 	ss3.MetaState = &pb.MetaState{
 		Applied: uint64(42),
 		Digest:  "block-number-42",
@@ -963,9 +941,7 @@ func TestRBFT_recvStateUpdatedEvent(t *testing.T) {
 	assert.Equal(t, uint64(42), rbft.exec.lastExec)
 	assert.Equal(t, true, rbft.atomicIn(StateTransferring))
 
-	ss4 := &pb.ServiceState{
-		VSet: nil,
-	}
+	ss4 := &pb.ServiceState{}
 	ss4.MetaState = &pb.MetaState{
 		Applied: uint64(45),
 		Digest:  "block-number-45",
@@ -976,9 +952,7 @@ func TestRBFT_recvStateUpdatedEvent(t *testing.T) {
 	assert.Equal(t, false, rbft.atomicIn(StateTransferring))
 
 	// errors
-	ss5 := &pb.ServiceState{
-		VSet: nil,
-	}
+	ss5 := &pb.ServiceState{}
 	ss5.MetaState = &pb.MetaState{
 		Applied: uint64(46),
 		Digest:  "block-number-46",

@@ -36,15 +36,14 @@ func testNewStorage(ctrl *gomock.Controller) (*storeManager, Config) {
 		SyncStateTimeout:        1 * time.Second,
 		SyncStateRestartTimeout: 10 * time.Second,
 		RecoveryTimeout:         10 * time.Second,
-		EpochCheckTimeout:       4 * time.Second,
+		FetchCheckpointTimeout:  5 * time.Second,
 		CheckPoolTimeout:        3 * time.Minute,
 
 		Logger:      log,
 		External:    external,
 		RequestPool: pool,
 
-		EpochInit:       uint64(0),
-		EpochInitDigest: "XXX GENESIS",
+		EpochInit: uint64(0),
 	}
 
 	return newStoreMgr(conf), conf
@@ -85,8 +84,8 @@ func TestStoreMgr_moveWatermarks(t *testing.T) {
 	rbft.vcMgr.qlist[QID] = PQ
 	rbft.vcMgr.plist[uint64(20)] = PQ
 
-	// h is 30, delete them
-	s.moveWatermarks(rbft, uint64(30))
+	// h is 40, delete them
+	s.moveWatermarks(rbft, uint64(40))
 	assert.Equal(t, map[uint64]string{}, s.chkpts)
 	assert.Equal(t, map[qidx]*pb.Vc_PQ{}, rbft.vcMgr.qlist)
 	assert.Equal(t, map[uint64]*pb.Vc_PQ{}, rbft.vcMgr.plist)
