@@ -125,14 +125,14 @@ func (rbft *rbftImpl) sendNotification(keepCurrentVote bool) consensusEvent {
 	rbft.recoveryMgr.outOfElection = make(map[ntfIdx]*pb.NotificationResponse)
 
 	n := &pb.Notification{
-		Basis:     rbft.getVcBasis(),
-		ReplicaId: rbft.peerPool.ID,
+		Basis:    rbft.getVcBasis(),
+		NodeInfo: rbft.getNodeInfo(),
 	}
 
 	rbft.logger.Infof("Replica %d sending notification", rbft.peerPool.ID)
 
-	rbft.logger.Infof("Replica %d sending notification, v:%d, h:%d, |C|:%d, |P|:%d, |Q|:%d",
-		rbft.peerPool.ID, n.Basis.View, n.Basis.H, len(n.Basis.Cset), len(n.Basis.Pset), len(n.Basis.Qset))
+	rbft.logger.Infof("Replica %d sending notification, e:%d, v:%d, h:%d, |C|:%d, |P|:%d, |Q|:%d",
+		rbft.peerPool.ID, n.Epoch, n.Basis.View, n.Basis.H, len(n.Basis.Cset), len(n.Basis.Pset), len(n.Basis.Qset))
 
 	payload, err := proto.Marshal(n)
 	if err != nil {
@@ -171,13 +171,8 @@ func (rbft *rbftImpl) sendNotification(keepCurrentVote bool) consensusEvent {
 // 3. while current node is in normal, directly return NotificationResponse.
 func (rbft *rbftImpl) recvNotification(n *pb.Notification) consensusEvent {
 
-	rbft.logger.Debugf("Replica %d received notification from replica %d, v:%d, h:%d, |C|:%d, |P|:%d, |Q|:%d",
-		rbft.peerPool.ID, n.ReplicaId, n.Basis.View, n.Basis.H, len(n.Basis.Cset), len(n.Basis.Pset), len(n.Basis.Qset))
-
-	if rbft.in(InEpochCheck) {
-		rbft.logger.Debugf("Replica %d is in epoch check, reject it", rbft.peerPool.ID)
-		return nil
-	}
+	rbft.logger.Debugf("Replica %d received notification from replica %d, e:%d, v:%d, h:%d, |C|:%d, |P|:%d, |Q|:%d",
+		rbft.peerPool.ID, n.NodeInfo.ReplicaId, n.Epoch, n.Basis.View, n.Basis.H, len(n.Basis.Cset), len(n.Basis.Pset), len(n.Basis.Qset))
 
 	// new node cannot process notification as new node is not in a consistent
 	// view/N with other nodes.
@@ -186,10 +181,33 @@ func (rbft *rbftImpl) recvNotification(n *pb.Notification) consensusEvent {
 		return nil
 	}
 
+	if rbft.in(initialCheck) {
+		rbft.logger.Debugf("Node %d in initialCheck ignore notification", rbft.peerPool.ID)
+		return nil
+	}
+
+	if !rbft.inRouters(n.NodeInfo.ReplicaHash) {
+		return nil
+	}
+
+	if n.Epoch > rbft.epoch {
+		return nil
+	}
+
+	if n.Epoch < rbft.epoch {
+		if rbft.isNormal() {
+			// directly return notification response when we are in normal.
+			return rbft.sendNotificationResponse(n.NodeInfo.ReplicaHash)
+		}
+		rbft.logger.Debugf("Replica %d ignore notification with a lower epoch %d than self "+
+			"epoch %d because we are in abnormal", rbft.peerPool.ID, n.Epoch, rbft.epoch)
+		return nil
+	}
+
 	if n.Basis.View < rbft.view {
 		if rbft.isNormal() {
 			// directly return notification response as we are in normal.
-			return rbft.sendNotificationResponse(n.ReplicaId)
+			return rbft.sendNotificationResponse(n.NodeInfo.ReplicaHash)
 		}
 		// ignore notification with lower view as we are in abnormal.
 		rbft.logger.Debugf("Replica %d ignore notification with a lower view %d than self "+
@@ -197,7 +215,7 @@ func (rbft *rbftImpl) recvNotification(n *pb.Notification) consensusEvent {
 		return nil
 	}
 
-	rbft.recoveryMgr.notificationStore[ntfIdx{v: n.Basis.View, nodeID: n.ReplicaId}] = n
+	rbft.recoveryMgr.notificationStore[ntfIdx{v: n.Basis.View, nodeID: n.NodeInfo.ReplicaId}] = n
 	// find if there exists more than f same vote for view larger than current view.
 	replicas := make(map[uint64]bool)
 	minView := uint64(0)
@@ -242,18 +260,25 @@ func (rbft *rbftImpl) recvNotification(n *pb.Notification) consensusEvent {
 
 	// if we are in normal status, we should send back our info to the recovering node.
 	if rbft.isNormal() {
-		if rbft.isPrimary(n.ReplicaId) && n.Basis.View > rbft.view {
-			rbft.logger.Infof("Replica %d received notification from old primary %d, trigger recovery.", rbft.peerPool.ID, n.ReplicaId)
+		if rbft.isPrimary(n.NodeInfo.ReplicaId) && n.Basis.View > rbft.view {
+			rbft.logger.Infof("Replica %d received notification from old primary %d, trigger recovery.", rbft.peerPool.ID, n.NodeInfo.ReplicaId)
 			return rbft.initRecovery()
 		}
-		return rbft.sendNotificationResponse(n.ReplicaId)
+
+		return rbft.sendNotificationResponse(n.NodeInfo.ReplicaHash)
 	}
 
 	return nil
 }
 
 // sendNotificationResponse helps send notification response to the given sender.
-func (rbft *rbftImpl) sendNotificationResponse(destID uint64) consensusEvent {
+func (rbft *rbftImpl) sendNotificationResponse(destHash string) consensusEvent {
+
+	_, ok := rbft.peerPool.routerMap.HashMap[destHash]
+	if !ok {
+		rbft.logger.Debugf("sender %s isn't included in routers, ignore it", destHash)
+		return nil
+	}
 
 	nr := &pb.NotificationResponse{
 		Basis:    rbft.getVcBasis(),
@@ -262,8 +287,8 @@ func (rbft *rbftImpl) sendNotificationResponse(destID uint64) consensusEvent {
 		NodeInfo: rbft.getNodeInfo(),
 	}
 
-	rbft.logger.Debugf("Replica %d send NotificationResponse to replica %d, v:%d, h:%d, |C|:%d, |P|:%d, |Q|:%d",
-		rbft.peerPool.ID, destID, nr.Basis.View, nr.Basis.H, len(nr.Basis.Cset), len(nr.Basis.Pset), len(nr.Basis.Qset))
+	rbft.logger.Debugf("Replica %d send NotificationResponse to replica %s, e:%d, v:%d, h:%d, |C|:%d, |P|:%d, |Q|:%d",
+		rbft.peerPool.ID, destHash, nr.Epoch, nr.Basis.View, nr.Basis.H, len(nr.Basis.Cset), len(nr.Basis.Pset), len(nr.Basis.Qset))
 
 	rspMsg, err := proto.Marshal(nr)
 	if err != nil {
@@ -277,7 +302,7 @@ func (rbft *rbftImpl) sendNotificationResponse(destID uint64) consensusEvent {
 		Epoch:   rbft.epoch,
 		Payload: rspMsg,
 	}
-	rbft.peerPool.unicast(consensusMsg, destID)
+	rbft.peerPool.unicastByHash(consensusMsg, destHash)
 	return nil
 }
 
@@ -285,8 +310,8 @@ func (rbft *rbftImpl) sendNotificationResponse(destID uint64) consensusEvent {
 // collect quorum same responses to process new view.
 func (rbft *rbftImpl) recvNotificationResponse(nr *pb.NotificationResponse) consensusEvent {
 
-	rbft.logger.Debugf("Replica %d received notificationResponse from replica %d, v:%d, h:%d, |C|:%d, |P|:%d, |Q|:%d",
-		rbft.peerPool.ID, nr.NodeInfo.ReplicaId, nr.Basis.View, nr.Basis.H, len(nr.Basis.Cset), len(nr.Basis.Pset), len(nr.Basis.Qset))
+	rbft.logger.Debugf("Replica %d received notificationResponse from replica %d, e:%d, v:%d, h:%d, |C|:%d, |P|:%d, |Q|:%d",
+		rbft.peerPool.ID, nr.NodeInfo.ReplicaId, nr.Epoch, nr.Basis.View, nr.Basis.H, len(nr.Basis.Cset), len(nr.Basis.Pset), len(nr.Basis.Qset))
 
 	if !rbft.atomicIn(InRecovery) {
 		rbft.logger.Debugf("Replica %d is not in recovery, ignore notificationResponse", rbft.peerPool.ID)
@@ -325,13 +350,14 @@ func (rbft *rbftImpl) resetStateForRecovery() consensusEvent {
 	rbft.logger.Debugf("Replica %d reset state in recovery for view=%d", rbft.peerPool.ID, rbft.view)
 
 	basis := rbft.getOutOfElectionBasis()
-	cp, ok, replicas := rbft.selectInitialCheckpoint(basis)
+	cp, ok := rbft.selectInitialCheckpoint(basis)
 	if !ok {
 		rbft.logger.Infof("Replica %d could not find consistent checkpoint.", rbft.peerPool.ID)
 		return nil
 	}
+	rbft.logger.Debugf("initial checkpoint: %+v", cp)
 	// check if need state update
-	need, err := rbft.checkIfNeedStateUpdate(cp, replicas)
+	need, err := rbft.checkIfNeedStateUpdate(cp)
 	if err != nil {
 		return nil
 	}
@@ -363,6 +389,7 @@ func (rbft *rbftImpl) resetStateForRecovery() consensusEvent {
 			rbft.logger.Debugf("Replica %d clear cert with view=%d/seqNo=%d/digest=%s when reset state for recovery",
 				rbft.peerPool.ID, idx.v, idx.n, idx.d)
 			delete(rbft.storeMgr.certStore, idx)
+			delete(rbft.storeMgr.seqMap, idx.n)
 			rbft.persistDelQPCSet(idx.v, idx.n, idx.d)
 		}
 	}
@@ -578,19 +605,15 @@ func (rbft *rbftImpl) initSyncState() consensusEvent {
 	}
 	rbft.peerPool.broadcast(msg)
 
-	if !rbft.atomicIn(InEpochSync) {
-		// post the sync state response message event to myself
-		state := rbft.node.getCurrentState()
-		mRouter := minimizeRouter(rbft.peerPool.router)
-		syncStateRsp := &pb.SyncStateResponse{
-			NodeInfo:   rbft.getNodeInfo(),
-			Epoch:      rbft.epoch,
-			View:       rbft.view,
-			MetaState:  state.MetaState,
-			RouterInfo: serializeRouterInfo(mRouter),
-		}
-		rbft.recvSyncStateRsp(syncStateRsp)
+	// post the sync state response message event to myself
+	state := rbft.node.getCurrentState()
+	syncStateRsp := &pb.SyncStateResponse{
+		NodeInfo:     rbft.getNodeInfo(),
+		Epoch:        rbft.epoch,
+		View:         rbft.view,
+		InitialState: state.MetaState,
 	}
+	rbft.recvSyncStateRsp(syncStateRsp)
 	return nil
 }
 
@@ -602,41 +625,46 @@ func (rbft *rbftImpl) recvSyncState(sync *pb.SyncState) consensusEvent {
 		return nil
 	}
 
+	if !rbft.inRouters(sync.NodeInfo.ReplicaHash) {
+		return nil
+	}
+
 	if !rbft.isNormal() {
 		rbft.logger.Debugf("Replica %d is in abnormal, don't send sync state response", rbft.peerPool.ID)
 		return nil
 	}
 
 	if sync.Epoch < rbft.epoch {
-		// if node send request in a lower epoch, such sync state response will help it to sync epoch
+		// if requester is in a lower epoch, we need to help the requester to sync epoch
 		return rbft.sendSyncStateRsp(sync.NodeInfo.ReplicaHash, true)
 	} else if sync.Epoch == rbft.epoch {
-		// normal case sync state
+		// we are in the same epoch, so trigger a normal sync state
 		return rbft.sendSyncStateRsp(sync.NodeInfo.ReplicaHash, false)
 	} else {
 		// received a message from larger epoch, current node might be out of epoch
-		rbft.logger.Warningf("Replica %d might be out of epoch", rbft.peerPool.ID)
+		rbft.logger.Debugf("Replica %d might be out of epoch for requester's epoch is %d", rbft.peerPool.ID, sync.Epoch)
 		return nil
 	}
 }
 
 func (rbft *rbftImpl) sendSyncStateRsp(to string, needSyncEpoch bool) consensusEvent {
-	var syncStateRsp *pb.SyncStateResponse
-	mRouter := minimizeRouter(rbft.peerPool.router)
-	syncStateRsp = &pb.SyncStateResponse{
-		NodeInfo:   rbft.getNodeInfo(),
-		Epoch:      rbft.epoch,
-		View:       rbft.view,
-		RouterInfo: serializeRouterInfo(mRouter),
+	syncStateRsp := &pb.SyncStateResponse{
+		NodeInfo: rbft.getNodeInfo(),
+		Epoch:    rbft.epoch,
+		View:     rbft.view,
 	}
 
 	if needSyncEpoch {
-		// for request node in lower epoch, send latest stable checkpoint
-		syncStateRsp.MetaState = rbft.storeMgr.stableCheckpoint
+		// for requester in lower epoch, send the latest stable checkpoint
+		metaS := &pb.MetaState{
+			Applied: rbft.h,
+			Digest:  rbft.storeMgr.chkpts[rbft.h],
+		}
+		syncStateRsp.InitialState = metaS
 	} else {
 		// for normal case, send current state
 		state := rbft.node.getCurrentState()
-		syncStateRsp.MetaState = state.MetaState
+		syncStateRsp.InitialState = state.MetaState
 	}
 
 	payload, err := proto.Marshal(syncStateRsp)
@@ -652,27 +680,27 @@ func (rbft *rbftImpl) sendSyncStateRsp(to string, needSyncEpoch bool) consensusE
 	}
 	rbft.peerPool.unicastByHash(consensusMsg, to)
 	rbft.logger.Debugf("Replica %d send sync state response to host %s: epoch=%d, view=%d, meta_state=%+v",
-		rbft.peerPool.ID, to, syncStateRsp.Epoch, syncStateRsp.View, syncStateRsp.MetaState)
+		rbft.peerPool.ID, to, syncStateRsp.Epoch, syncStateRsp.View, syncStateRsp.InitialState)
 	return nil
 }
 
 func (rbft *rbftImpl) recvSyncStateRsp(rsp *pb.SyncStateResponse) consensusEvent {
 	rbft.logger.Debugf("Replica %d now received sync state response from host %s: epoch=%d, meta_state=%+v",
-		rbft.peerPool.ID, rsp.NodeInfo.ReplicaHash, rsp.Epoch, rsp.MetaState)
+		rbft.peerPool.ID, rsp.NodeInfo.ReplicaHash, rsp.Epoch, rsp.InitialState)
 
 	if !rbft.in(InSyncState) {
 		rbft.logger.Debugf("Replica %d is not in sync state, ignore it...", rbft.peerPool.ID)
 		return nil
 	}
 
-	if rsp.Epoch > rsp.MetaState.Applied {
+	if rsp.Epoch > rsp.InitialState.Applied {
 		rbft.logger.Warningf("Replica %d in epoch %d reject a illegal response", rbft.peerPool.ID, rbft.epoch)
 		return nil
 	}
 	if oldRsp, ok := rbft.recoveryMgr.syncRspStore[rsp.NodeInfo.ReplicaHash]; ok {
-		if oldRsp.MetaState.Applied > rsp.MetaState.Applied {
+		if oldRsp.InitialState.Applied > rsp.InitialState.Applied {
 			rbft.logger.Debugf("Duplicate sync state response, new applied=%d is lower than old applied=%d, reject it",
-				rsp.MetaState.Applied, oldRsp.MetaState.Applied)
+				rsp.InitialState.Applied, oldRsp.InitialState.Applied)
 			return nil
 		}
 	}
@@ -681,11 +709,10 @@ func (rbft *rbftImpl) recvSyncStateRsp(rsp *pb.SyncStateResponse) consensusEvent
 		states := make(wholeStates)
 		for _, rsp := range rbft.recoveryMgr.syncRspStore {
 			states[rsp.NodeInfo] = nodeState{
-				epoch:        rsp.Epoch,
-				view:         rsp.View,
-				appliedIndex: rsp.MetaState.Applied,
-				digest:       rsp.MetaState.Digest,
-				routerInfo:   byte2Hex(rsp.RouterInfo),
+				epoch:   rsp.Epoch,
+				view:    rsp.View,
+				applied: rsp.InitialState.Applied,
+				digest:  rsp.InitialState.Digest,
 			}
 		}
 		return rbft.compareWholeStates(states)

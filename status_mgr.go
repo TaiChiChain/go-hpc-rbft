@@ -14,7 +14,9 @@
 
 package rbft
 
-import "sync/atomic"
+import (
+	"sync/atomic"
+)
 
 // StatusType defines the RBFT internal status.
 type StatusType int
@@ -23,12 +25,12 @@ type StatusType int
 const (
 	// normal status, which will only be used in rbft
 	Normal         = iota // normal consensus state
-	InEpochCheck          // node is checking epoch
 	InSyncState           // node is syncing state
 	NeedSyncState         // node need to sync state
 	SkipInProgress        // node try to state update
 	isNewNode             // node is a new node
 	byzantine             // byzantine
+	initialCheck          // node is checking state at start
 
 	// atomic status, which might be used by consensus service
 	InConfChange      // node is processing a config transaction

@@ -127,11 +127,12 @@ func TestFunction_UpdateNode(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	// add node 5
-	tf.frameworkAddNode("node5", false)
+	addNode5 := append(defaultValidatorSet, "node5")
+	tf.frameworkAddNode("node5", false, addNode5)
 	time.Sleep(1 * time.Second)
 	tf.TestNode[4].n.rbft.atomicOff(InEpochSync)
 	tf.TestNode[4].n.rbft.off(InSyncState)
-	tf.TestNode[4].n.rbft.tryEpochSync()
+	tf.TestNode[4].n.rbft.initRecovery()
 	time.Sleep(2 * time.Second)
 
 	for i := 4; i < 13; i++ {

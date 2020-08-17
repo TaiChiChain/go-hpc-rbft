@@ -24,27 +24,20 @@ enum Type {
     PREPARE = 2;
     COMMIT = 3;
     CHECKPOINT = 4;
-    VIEW_CHANGE = 5;
-    NEW_VIEW = 6;
-    FETCH_REQUEST_BATCH = 7;
-    SEND_REQUEST_BATCH = 8;
-    RECOVERY_FETCH_QPC = 9;
-    RECOVERY_RETURN_QPC = 10;
-    READY_FOR_N = 11;
-    AGREE_UPDATE_N = 12;
-    UPDATE_N = 13;
-    FETCH_MISSING_REQUESTS = 14;
-    SEND_MISSING_REQUESTS = 15;
-    SYNC_STATE = 16;
-    SYNC_STATE_RESPONSE = 17;
-    NOTIFICATION = 18;
-    NOTIFICATION_RESPONSE = 19;
-    CONF_CHANGE = 20;
-    REQUEST_SET = 21;
-    EPOCH_CHECK = 22;
-    EPOCH_CHECK_RESPONSE = 23;
-    EPOCH_SYNC = 24;
-    UPDATE_ADD_OFFER = 25;
+    FETCH_CHECKPOINT = 5;
+    VIEW_CHANGE = 6;
+    NEW_VIEW = 7;
+    FETCH_REQUEST_BATCH = 8;
+    SEND_REQUEST_BATCH = 9;
+    RECOVERY_FETCH_QPC = 10;
+    RECOVERY_RETURN_QPC = 11;
+    FETCH_MISSING_REQUESTS = 12;
+    SEND_MISSING_REQUESTS = 13;
+    SYNC_STATE = 14;
+    SYNC_STATE_RESPONSE = 15;
+    NOTIFICATION = 16;
+    NOTIFICATION_RESPONSE = 17;
+    REQUEST_SET = 18;
 }
 
 message consensus_message {
@@ -131,6 +124,11 @@ message checkpoint {
      string digest = 3;
 }
 
+message fetch_checkpoint {
+    string replica_hash = 1;
+    uint64 sequence_number = 2;
+}
+
 message vc_C {
     uint64 sequence_number = 1;
     string digest = 2;
@@ -208,16 +206,16 @@ message sync_state_response {
     node_info node_info = 1;
     uint64 epoch = 2;
     uint64 view = 3;
-    meta_state meta_state = 4;
-    bytes routerInfo = 5;
+    meta_state initial_state = 4;
 }
 
 // notification message
 message notification {
-    vc_basis basis = 1;
-    bytes    signature = 2;
-    int64    timestamp = 3;
-    uint64   replica_id = 4;
+    vc_basis  basis = 1;
+    uint64    epoch = 2;
+    bytes     signature = 3;
+    int64     timestamp = 4;
+    node_info node_info = 5;
 }
 
 message notification_response {
@@ -247,24 +245,12 @@ message conf_state {
 
 message service_state {
     meta_state meta_state = 1;
-    repeated string v_set = 2;
+    epoch_info epoch_info = 2;
 }
 
 message epoch_info {
     uint64 epoch = 1;
     repeated string v_set = 2;
-}
-
-message epoch_check {
-    string replica_hash = 1;
-    uint64 epoch = 2;
-    uint64 applied = 3;
-}
-
-message epoch_check_response {
-    string replica_hash = 1;
-    uint64 epoch = 2;
-    meta_state check_state = 3;
 }
 
 enum inform_type {

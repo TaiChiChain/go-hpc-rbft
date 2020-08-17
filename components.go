@@ -15,7 +15,7 @@
 package rbft
 
 /**
-This file defines the structs uesd in RBFT
+This file defines the structs used in RBFT
 */
 
 import (
@@ -37,7 +37,7 @@ const (
 	recoveryRestartTimer  = "recoveryRestartTimer"  // timer track how long a recovery is finished and fires if needed
 	cleanViewChangeTimer  = "cleanViewChangeTimer"  // timer track how long a viewchange msg will store in memory
 	checkPoolTimer        = "checkPoolTimer"        // timer track timeout for check pool interval
-	epochCheckRspTimer    = "epochCheckTimer"       // timer track how long a check epoch process will take
+	fetchCheckpointTimer  = "fetchCheckpointTimer"  // timer for nodes to trigger fetch checkpoint when we are processing config transaction
 )
 
 // constant default
@@ -54,7 +54,7 @@ const (
 	DefaultRecoveryRestartTimeout  = 10 * time.Second
 	DefaultCleanViewChangeTimeout  = 60 * time.Second
 	DefaultCheckPoolTimeout        = 3 * time.Minute
-	DefaultEpochCheckRspTimeout    = 5 * time.Second
+	DefaultFetchCheckpointTimeout  = 5 * time.Second
 
 	// default k value
 	DefaultK = 10
@@ -70,6 +70,7 @@ const (
 	CoreStateUpdatedEvent
 	CoreResendMissingTxsEvent
 	CoreResendFetchMissingEvent
+	CoreCheckpointDoneEvent
 
 	// 2.view change
 	ViewChangeTimerEvent
@@ -78,6 +79,7 @@ const (
 	ViewChangedEvent
 
 	// 3.recovery
+	RecoveryInitEvent
 	RecoveryRestartTimerEvent
 	RecoveryDoneEvent
 	RecoverySyncStateRspTimerEvent
@@ -85,10 +87,8 @@ const (
 	NotificationQuorumEvent
 
 	// 4.epoch mgr service
-	EpochCheckInitEvent
-	EpochCheckTimerEvent
-	EpochCheckDoneEvent
-	EpochSyncDoneEvent
+	ConfigCheckpointDoneEvent
+	FetchCheckpointEvent
 )
 
 // service type
@@ -145,15 +145,20 @@ type ntfIdx struct {
 	nodeID uint64
 }
 
-// nodeState records every node's consensus status(n, view, routers) and
+// -----------router struct-----------------
+type routerMap struct {
+	//IDMap   map[uint64]string
+	HashMap map[string]uint64
+}
+
+// nodeState records every node's consensus status(n, view, routerMap) and
 // ledger status(block number, hash and seqNo)
 type nodeState struct {
-	n            uint64
-	view         uint64
-	epoch        uint64
-	appliedIndex uint64
-	digest       string
-	routerInfo   string
+	n       uint64
+	view    uint64
+	epoch   uint64
+	applied uint64
+	digest  string
 }
 
 // wholeStates maps node ID to nodeState
@@ -169,28 +174,3 @@ type vcIdx struct {
 type xset map[uint64]string
 
 type nextDemandNewView uint64
-
-// -----------state update related structs-----------------
-type targetMessage struct {
-	height uint64
-	digest string
-}
-
-type replicaInfo struct {
-	replicaID uint64
-}
-
-type stateUpdateTarget struct {
-	targetMessage
-	replicas []replicaInfo
-}
-
-// -----------epoch check related structs-----------------
-type epochState struct {
-	// node epoch
-	epoch uint64
-
-	// check the state to send stable checkpoint
-	applied uint64
-	digest  string
-}

@@ -17,8 +17,6 @@ package rbft
 import (
 	"github.com/ultramesh/flato-rbft/external"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
-
-	"github.com/gogo/protobuf/proto"
 )
 
 // peerPool maintains local peer ID which is the unique peer through the consensus network.
@@ -31,11 +29,8 @@ type peerPool struct {
 	// track local node's Hash
 	hash string
 
-	// track local node's Hostname
-	hostname string
-
-	// track the vp replicas' routers
-	router *pb.Router
+	// track the vp router
+	routerMap routerMap
 
 	// network helper to broadcast/unicast messages.
 	network external.Network
@@ -44,13 +39,13 @@ type peerPool struct {
 	logger Logger
 }
 
+// init peer pool in rbft core
 func newPeerPool(c Config) *peerPool {
 	pool := &peerPool{
-		ID:       c.ID,
-		hash:     c.Hash,
-		hostname: c.Hostname,
-		network:  c.External,
-		logger:   c.Logger,
+		ID:      c.ID,
+		hash:    c.Hash,
+		network: c.External,
+		logger:  c.Logger,
 	}
 	pool.initPeers(c.Peers)
 
@@ -58,51 +53,24 @@ func newPeerPool(c Config) *peerPool {
 }
 
 func (pool *peerPool) initPeers(peers []*pb.Peer) {
-	pool.logger.Infof("Local ID: %d, update routers:", pool.ID)
+	pool.logger.Infof("Local ID: %d, update routerMap:", pool.ID)
 	length := len(peers)
-	pool.router = &pb.Router{
-		Peers: make([]*pb.Peer, length),
-	}
 	preID := pool.ID
-	for index, p := range peers {
-		if index >= length {
-			pool.logger.Errorf("Wrong length of peers, out of range: len=%d", length)
+	pool.routerMap.HashMap = make(map[string]uint64)
+	for _, p := range peers {
+		if p.Id > uint64(length) {
+			pool.logger.Errorf("Something wrong with peer[id=%d], peer id cannot be larger than peers' amount %d", p.Id, length)
 			return
 		}
 		if p.Hash == pool.hash {
 			pool.ID = p.Id
-			pool.hostname = p.Hostname
 		}
 		pool.logger.Infof("ID: %d, Hash: %s", p.Id, p.Hash)
-		pool.router.Peers[index] = p
+		pool.routerMap.HashMap[p.Hash] = p.Id
 	}
 	if preID != pool.ID {
 		pool.logger.Infof("Update Local ID: %d ===> %d", preID, pool.ID)
 	}
-}
-
-func minimizeRouter(router *pb.Router) *pb.Router {
-	var minimizedPeers []*pb.Peer
-	for _, peer := range router.Peers {
-		minimizedPeer := &pb.Peer{
-			Id:       peer.Id,
-			Hostname: peer.Hostname,
-		}
-		minimizedPeers = append(minimizedPeers, minimizedPeer)
-	}
-	minimizedRouter := &pb.Router{Peers: minimizedPeers}
-	return minimizedRouter
-}
-
-func serializeRouterInfo(router *pb.Router) []byte {
-	info, _ := proto.Marshal(router)
-	return info
-}
-
-func unSerializeRouterInfo(routerInfo []byte) *pb.Router {
-	router := &pb.Router{}
-	_ = proto.Unmarshal(routerInfo, router)
-	return router
 }
 
 func (pool *peerPool) updateRouter(router *pb.Router) {

@@ -1,9 +1,10 @@
 package rbft
 
 import (
-	pb "github.com/ultramesh/flato-rbft/rbftpb"
 	"reflect"
 	"testing"
+
+	pb "github.com/ultramesh/flato-rbft/rbftpb"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"

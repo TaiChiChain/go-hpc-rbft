@@ -46,17 +46,29 @@ func TestRecovery_recvNotification(t *testing.T) {
 	}
 	vbNode4.Cset, vbNode4.Pset, vbNode4.Qset = rbft.gatherPQC()
 
+	nodeInfo2 := &pb.NodeInfo{
+		ReplicaId:   uint64(2),
+		ReplicaHash: "node2",
+	}
 	notificationNode2 := &pb.Notification{
-		Basis:     vbNode2,
-		ReplicaId: uint64(2),
+		Basis:    vbNode2,
+		NodeInfo: nodeInfo2,
+	}
+	nodeInfo3 := &pb.NodeInfo{
+		ReplicaId:   uint64(3),
+		ReplicaHash: "node3",
 	}
 	notificationNode3 := &pb.Notification{
-		Basis:     vbNode3,
-		ReplicaId: uint64(3),
+		Basis:    vbNode3,
+		NodeInfo: nodeInfo3,
+	}
+	nodeInfo4 := &pb.NodeInfo{
+		ReplicaId:   uint64(4),
+		ReplicaHash: "node4",
 	}
 	notificationNode4 := &pb.Notification{
-		Basis:     vbNode4,
-		ReplicaId: uint64(4),
+		Basis:    vbNode4,
+		NodeInfo: nodeInfo4,
 	}
 
 	// recv quorum notifications
@@ -344,43 +356,4 @@ func TestRecovery_trySyncState(t *testing.T) {
 	rbft.trySyncState()
 	assert.Equal(t, true, rbft.in(NeedSyncState))
 
-}
-
-func TestRecovery_initSyncState(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
-
-	// in InSyncState, return nil
-	rbft.on(InSyncState)
-	ret := rbft.initSyncState()
-	assert.Nil(t, ret)
-
-	// call recv sync state rsp
-	rbft.node.currentState = &pb.ServiceState{
-		VSet: nil,
-	}
-	rbft.node.currentState.MetaState = &pb.MetaState{
-		Applied: uint64(10),
-		Digest:  "block-number-10",
-	}
-	info := &pb.NodeInfo{
-		ReplicaId:   rbft.peerPool.ID,
-		ReplicaHash: rbft.peerPool.hash,
-	}
-
-	s := rbft.node.getCurrentState()
-
-	// post the sync state response message event to myself
-	mRouter := minimizeRouter(rbft.peerPool.router)
-	syncStateRsp := &pb.SyncStateResponse{
-		NodeInfo:   info,
-		Epoch:      rbft.epoch,
-		View:       rbft.view,
-		MetaState:  s.MetaState,
-		RouterInfo: serializeRouterInfo(mRouter),
-	}
-	rbft.off(InSyncState)
-	rbft.initSyncState()
-	assert.Equal(t, syncStateRsp, rbft.recoveryMgr.syncRspStore[syncStateRsp.NodeInfo.ReplicaHash])
 }
