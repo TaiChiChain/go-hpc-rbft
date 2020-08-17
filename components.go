@@ -70,7 +70,6 @@ const (
 	CoreStateUpdatedEvent
 	CoreResendMissingTxsEvent
 	CoreResendFetchMissingEvent
-	CoreCheckpointDoneEvent
 
 	// 2.view change
 	ViewChangeTimerEvent
@@ -87,7 +86,6 @@ const (
 	NotificationQuorumEvent
 
 	// 4.epoch mgr service
-	ConfigCheckpointDoneEvent
 	FetchCheckpointEvent
 )
 
