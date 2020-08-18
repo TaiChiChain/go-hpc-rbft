@@ -250,7 +250,7 @@ func newRBFT(cpChan chan *pb.ServiceState, confC chan *pb.ReloadFinished, c Conf
 	rbft.storeMgr = newStoreMgr(c)
 
 	// new batch manager
-	rbft.batchMgr = newBatchManager(rbft.recvChan, c)
+	rbft.batchMgr = newBatchManager(c)
 
 	// new recovery manager
 	rbft.recoveryMgr = newRecoveryMgr(c)

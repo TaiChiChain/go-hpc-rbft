@@ -15,8 +15,7 @@ func TestBatchMgr_newBatchManager(t *testing.T) {
 	defer ctrl.Finish()
 	rbft, conf := newTestRBFT(ctrl)
 
-	eventC := make(chan interface{})
-	bm := newBatchManager(eventC, conf)
+	bm := newBatchManager(conf)
 
 	structName, nilElems, err := checkNilElems(bm)
 	if err == nil {
