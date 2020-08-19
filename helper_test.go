@@ -79,34 +79,6 @@ func TestHelper_RBFT(t *testing.T) {
 	// sendInW
 	assert.Equal(t, true, rbft.sendInW(uint64(3)))
 
-	var n int64
-	var v uint64
-
-	// getAddNV
-	n, v = rbft.getAddNV()
-	assert.Equal(t, int64(5), n)
-	assert.Equal(t, uint64(5), v)
-
-	rbft.setView(5)
-	_, v = rbft.getAddNV()
-	assert.Equal(t, uint64(6), v)
-
-	// getDelNV
-	rbft.setView(0)
-	n, v = rbft.getDelNV(uint64(2))
-	assert.Equal(t, int64(3), n)
-	assert.Equal(t, uint64(3), v)
-
-	rbft.setView(3)
-	_, v = rbft.getDelNV(uint64(2))
-	assert.Equal(t, uint64(5), v)
-
-	rbft.setView(uint64(11))
-	rbft.N = 5
-	n, v = rbft.getDelNV(uint64(0))
-	assert.Equal(t, uint64(12), v)
-	assert.Equal(t, int64(4), n)
-
 	// cleanOutstandingAndCert
 	rbft.cleanOutstandingAndCert()
 

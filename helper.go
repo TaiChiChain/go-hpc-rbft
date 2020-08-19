@@ -86,44 +86,6 @@ func (rbft *rbftImpl) sendInW(n uint64) bool {
 	return n > rbft.h && n <= rbft.h+rbft.L
 }
 
-// getAddNV calculates the new N and view after add a new node
-func (rbft *rbftImpl) getAddNV() (n int64, v uint64) {
-	n = int64(rbft.N) + 1
-	if rbft.view < uint64(rbft.N) {
-		v = rbft.view + uint64(n)
-	} else {
-		v = rbft.view/uint64(rbft.N)*uint64(rbft.N+1) + rbft.view%uint64(rbft.N)
-	}
-
-	return
-}
-
-// getDelNV calculates the new N and view after delete a new node
-func (rbft *rbftImpl) getDelNV(delIndex uint64) (n int64, v uint64) {
-	n = int64(rbft.N) - 1
-
-	rbft.logger.Debugf("Before update, N: %d, view: %d, delIndex: %d", rbft.N, rbft.view, delIndex)
-
-	// guarantee seed is multiple of rbft.N-1 and larger than rbft.view
-	seed := uint64(rbft.N-1) * (rbft.view/uint64(rbft.N-1) + uint64(1))
-	primaryIndex := rbft.view % uint64(rbft.N)
-	// to ensure that the primary node does not change
-	if primaryIndex > delIndex {
-		v = rbft.view%uint64(rbft.N) - 1 + seed
-	} else {
-		v = rbft.view%uint64(rbft.N) + seed
-	}
-
-	// calculate the lowest view higher than rbft.view and keep the primary node does not change
-	newV := v - uint64(n)
-	for newV > rbft.view {
-		v = newV
-		newV = v - uint64(n)
-	}
-	rbft.logger.Debugf("After update, N: %d, view: %d", n, v)
-	return
-}
-
 // cleanAllBatchAndCert cleans all outstandingReqBatches and committedCert
 func (rbft *rbftImpl) cleanOutstandingAndCert() {
 	rbft.storeMgr.outstandingReqBatches = make(map[string]*pb.RequestBatch)
@@ -737,11 +699,11 @@ func (rbft *rbftImpl) getVcBasis() *pb.VcBasis {
 	rbft.vcMgr.plist = rbft.calcPSet()
 	rbft.vcMgr.qlist = rbft.calcQSet()
 
-	// Note. before vc/recovery/updateN, we need to persist QPList to ensure we can restore committed entries
-	// after above abnormal situations as we will delete all PQCSet when we enter abnormal, after finish
-	// vc/recovery/updateN we will re-broadcast and persist PQCSet which is enough to ensure continuity of
-	// committed entries in next vc/recovery/updateN. However, QPList cannot be deleted immediately after
-	// finish vc/recovery/updateN as we may loss some committed entries after crash down in normal status.
+	// Note. before vc/recovery, we need to persist QPList to ensure we can restore committed entries after
+	// above abnormal situations as we will delete all PQCSet when we enter abnormal, after finish vc/recovery
+	// we will re-broadcast and persist PQCSet which is enough to ensure continuity of committed entries in
+	// next vc/recovery. However, QPList cannot be deleted immediately after finish vc/recovery as we may loss
+	// some committed entries after crash down in normal status.
 	// So:
 	// 1. during normal status, we have: QPSet with pre-prepare certs and prepare certs and QPList generated in
 	// previous abnormal status which is used to catch some useful committed entries after system crash down.

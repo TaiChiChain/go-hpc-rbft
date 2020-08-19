@@ -369,7 +369,7 @@ func (rbft *rbftImpl) primaryCheckNewView(xSet xset) consensusEvent {
 		return rbft.resetStateForNewView()
 	} else if newReqBatchMissing {
 		// if received all batches, jump into resetStateForNewView
-		rbft.fetchRequestBatches(xSet)
+		rbft.fetchRequestBatches()
 	}
 
 	return nil
@@ -432,7 +432,7 @@ func (rbft *rbftImpl) replicaCheckNewView() consensusEvent {
 		return rbft.resetStateForNewView()
 	} else if newReqBatchMissing {
 		// if received all batches, jump into resetStateForNewView
-		rbft.fetchRequestBatches(msgList)
+		rbft.fetchRequestBatches()
 	}
 
 	return nil
@@ -500,7 +500,7 @@ func (rbft *rbftImpl) resetStateForNewView() consensusEvent {
 }
 
 // used in view-change to fetch missing assigned, non-checkpointed requests
-func (rbft *rbftImpl) fetchRequestBatches(xSet xset) {
+func (rbft *rbftImpl) fetchRequestBatches() {
 
 	for digest := range rbft.storeMgr.missingReqBatches {
 		rbft.logger.Debugf("Replica %d try to fetch missing request batch with digest: %s", rbft.peerPool.ID, digest)
