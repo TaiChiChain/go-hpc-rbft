@@ -80,6 +80,7 @@ func TestExec_handleCoreRbftEvent(t *testing.T) {
 	rbft.setView(newView)
 
 	// First Req to a ViewChange
+	rbft.atomicOff(InViewChange)
 	rbft.peerPool.ID = uint64(1)
 	e.EventType = CoreFirstRequestTimerEvent
 	assert.Equal(t, uint64(0), rbft.view)
