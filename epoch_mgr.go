@@ -159,16 +159,18 @@ func (rbft *rbftImpl) checkIfOutOfEpoch(msg *pb.ConsensusMessage) consensusEvent
 	return nil
 }
 
-func (rbft *rbftImpl) turnIntoEpoch(router *pb.Router, epoch uint64) {
+func (rbft *rbftImpl) turnIntoEpoch(router *pb.Router, epoch uint64, resetView bool) {
 	// validator set has been changed, start a new epoch and check new epoch
 	rbft.peerPool.updateRouter(router)
 
 	// set the latest epoch
 	rbft.setEpoch(epoch)
 
-	// initial the view, start from view=0
-	rbft.setView(uint64(0))
-	rbft.persistView(rbft.view)
+	if resetView {
+		// initial the view, start from view=0
+		rbft.setView(uint64(0))
+		rbft.persistView(rbft.view)
+	}
 
 	// update N/f
 	rbft.N = len(rbft.peerPool.routerMap.HashMap)

@@ -125,6 +125,7 @@ func (rbft *rbftImpl) sendNotification(keepCurrentVote bool) consensusEvent {
 	rbft.recoveryMgr.outOfElection = make(map[ntfIdx]*pb.NotificationResponse)
 
 	n := &pb.Notification{
+		Epoch:    rbft.epoch,
 		Basis:    rbft.getVcBasis(),
 		NodeInfo: rbft.getNodeInfo(),
 	}

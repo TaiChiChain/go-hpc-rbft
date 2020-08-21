@@ -452,11 +452,7 @@ func (rbft *rbftImpl) getStatus() (status NodeStatus) {
 	case rbft.atomicIn(InRecovery):
 		status.Status = InRecovery
 	case rbft.atomicIn(StateTransferring):
-		if rbft.atomicIn(InEpochSync) {
-			status.Status = InEpochSync
-		} else {
-			status.Status = StateTransferring
-		}
+		status.Status = StateTransferring
 	case rbft.isPoolFull():
 		status.Status = PoolFull
 	case rbft.atomicIn(Pending):
@@ -1018,7 +1014,6 @@ func (rbft *rbftImpl) sendCommit(digest string, v uint64, n uint64) error {
 		SequenceNumber: n,
 		BatchDigest:    digest,
 		ReplicaId:      rbft.peerPool.ID,
-		Epoch:          rbft.epoch,
 	}
 	cert.sentCommit = true
 
@@ -1496,16 +1491,9 @@ func (rbft *rbftImpl) recvCheckpoint(chkpt *pb.Checkpoint) consensusEvent {
 		rbft.logger.Debugf("Replica %d found checkpoint quorum for seqNo %d, digest %s, but it has not reached this checkpoint itself yet",
 			rbft.peerPool.ID, chkpt.SequenceNumber, chkpt.Digest)
 		if rbft.in(initialCheck) {
-			rbft.on(SkipInProgress)
-			rbft.logger.Criticalf("Replica %d in initial check for restart has not reached the quorum checkpoint %d,"+
-				" trigger state update", rbft.peerPool.ID, chkpt.SequenceNumber)
-
-			target := &pb.MetaState{
-				Applied: chkpt.SequenceNumber,
-				Digest:  chkpt.Digest,
-			}
-			rbft.updateHighStateTarget(target)
-			rbft.tryStateTransfer(target)
+			rbft.off(initialCheck)
+			rbft.maybeSetNormal()
+			return rbft.initRecovery()
 		}
 		if rbft.in(SkipInProgress) {
 			// When this node started state update, it would set h to the target, and finally it would receive a StateUpdatedEvent whose seqNo is this h.
@@ -1534,23 +1522,79 @@ func (rbft *rbftImpl) recvCheckpoint(chkpt *pb.Checkpoint) consensusEvent {
 
 	if rbft.epochMgr.configBatchToCheck != nil {
 		if chkpt.SequenceNumber == rbft.epochMgr.configBatchToCheck.Applied {
-			rbft.epochMgr.configBatchToCheck = nil
-
-			return &LocalEvent{
-				Service:   EpochMgrService,
-				EventType: ConfigCheckpointDoneEvent,
-				Event:     chkpt,
-			}
+			rbft.finishConfigCheckpoint(chkpt)
 		}
-
 		return nil
 	}
 
-	return &LocalEvent{
-		Service:   CoreRbftService,
-		EventType: CoreCheckpointDoneEvent,
-		Event:     chkpt,
+	rbft.finishNormalCheckpoint(chkpt)
+	return nil
+}
+
+func (rbft *rbftImpl) finishConfigCheckpoint(chkpt *pb.Checkpoint) {
+	rbft.timerMgr.stopTimer(fetchCheckpointTimer)
+
+	rbft.logger.Infof("Replica %d found config checkpoint quorum for seqNo %d, digest %s",
+		rbft.peerPool.ID, chkpt.SequenceNumber, chkpt.Digest)
+
+	rbft.logger.Infof("Replica %d post stable checkpoint event for seqNo %d after "+
+		"executed to the height with the same digest", rbft.peerPool.ID, chkpt.SequenceNumber)
+	rbft.external.SendFilterEvent(pb.InformType_FilterStableCheckpoint, chkpt.SequenceNumber)
+	rbft.epochMgr.configBatchToCheck = nil
+
+	// waiting for commit db finish the reload
+	rbft.logger.Noticef("Replica %d is waiting for commit-db finished...", rbft.peerPool.ID)
+	ev := <-rbft.confChan
+	rbft.logger.Debugf("Replica %d received a commit-db finished target at height %d", rbft.peerPool.ID, ev.Height)
+	if ev.Height != chkpt.SequenceNumber {
+		rbft.logger.Warningf("Wrong commit-db height: %d", ev.Height)
 	}
+
+	// two types of config transaction:
+	// 1. validator set changed: try to start a new epoch
+	// 2. validator set not changed: do not start a new epoch
+	routerInfo := rbft.node.readReloadRouter()
+	if routerInfo != nil {
+		rbft.turnIntoEpoch(routerInfo, chkpt.SequenceNumber, true)
+	}
+
+	// move watermark for config batch
+	rbft.moveWatermarks(chkpt.SequenceNumber)
+
+	if rbft.in(initialCheck) {
+		rbft.off(initialCheck)
+		rbft.maybeSetNormal()
+		rbft.initRecovery()
+		return
+	}
+
+	// finish config change and restart consensus
+	rbft.atomicOff(InConfChange)
+	rbft.maybeSetNormal()
+	rbft.startTimerIfOutstandingRequests()
+	finishMsg := fmt.Sprintf("======== Replica %d finished config change, primary=%d, epoch=%d/n=%d/f=%d/view=%d/h=%d/lastExec=%d", rbft.peerPool.ID, rbft.primaryID(rbft.view), rbft.epoch, rbft.N, rbft.f, rbft.view, rbft.h, rbft.exec.lastExec)
+	rbft.external.SendFilterEvent(pb.InformType_FilterFinishConfigChange, finishMsg)
+
+	// set primary sequence log
+	if rbft.isPrimary(rbft.peerPool.ID) {
+		// set seqNo to lastExec for new primary to sort following batches from correct seqNo.
+		rbft.batchMgr.setSeqNo(rbft.exec.lastExec)
+
+		// resubmit transactions
+		rbft.primaryResubmitTransactions()
+	}
+}
+
+func (rbft *rbftImpl) finishNormalCheckpoint(chkpt *pb.Checkpoint) {
+	rbft.timerMgr.stopTimer(fetchCheckpointTimer)
+
+	rbft.logger.Infof("Replica %d found normal checkpoint quorum for seqNo %d, digest %s",
+		rbft.peerPool.ID, chkpt.SequenceNumber, chkpt.Digest)
+
+	rbft.moveWatermarks(chkpt.SequenceNumber)
+	rbft.logger.Infof("Replica %d post stable checkpoint event for seqNo %d after "+
+		"executed to the height with the same digest", rbft.peerPool.ID, rbft.h)
+	rbft.external.SendFilterEvent(pb.InformType_FilterStableCheckpoint, rbft.h)
 }
 
 // weakCheckpointSetOutOfRange checks if this node is fell behind or not. If we receive f+1 checkpoints whose seqNo > H (for example 150),
@@ -1798,6 +1842,14 @@ func (rbft *rbftImpl) recvStateUpdatedEvent(ss *pb.ServiceState) consensusEvent 
 	changed := false
 	if ss.EpochInfo != nil {
 		changed = ss.EpochInfo.Epoch != rbft.epoch
+		if seqNo == ss.EpochInfo.LastConfig {
+			rbft.logger.Noticef("Replica %d is waiting for commit-db finished...", rbft.peerPool.ID)
+			ev := <-rbft.confChan
+			rbft.logger.Debugf("Replica %d received a commit-db finished target at height %d", rbft.peerPool.ID, ev.Height)
+			if ev.Height != seqNo {
+				rbft.logger.Warningf("Wrong commit-db height: %d", ev.Height)
+			}
+		}
 	}
 	if changed {
 		var peers []*pb.Peer
@@ -1811,12 +1863,7 @@ func (rbft *rbftImpl) recvStateUpdatedEvent(ss *pb.ServiceState) consensusEvent 
 		router := &pb.Router{
 			Peers: peers,
 		}
-		rbft.turnIntoEpoch(router, ss.EpochInfo.Epoch)
-	}
-
-	if rbft.in(initialCheck) {
-		rbft.off(initialCheck)
-		return rbft.initRecovery()
+		rbft.turnIntoEpoch(router, ss.EpochInfo.Epoch, !rbft.atomicIn(InRecovery))
 	}
 
 	if seqNo%rbft.K == 0 || seqNo == rbft.epoch {
@@ -1836,10 +1883,13 @@ func (rbft *rbftImpl) recvStateUpdatedEvent(ss *pb.ServiceState) consensusEvent 
 			Service:   RecoveryService,
 			EventType: RecoveryDoneEvent,
 		}
-
 	}
-	rbft.executeAfterStateUpdate()
 
+	if changed {
+		return rbft.initRecovery()
+	}
+
+	rbft.executeAfterStateUpdate()
 	return nil
 }
 
