@@ -140,6 +140,10 @@ func (rbft *rbftImpl) handleCoreRbftEvent(e *LocalEvent) consensusEvent {
 
 	case CoreFirstRequestTimerEvent:
 		rbft.logger.Warningf("Replica %d first request timer expired", rbft.peerPool.ID)
+		if rbft.atomicInOne(InViewChange, InRecovery) {
+			rbft.logger.Debugf("Replica %d has already been in view-change or recovery, return directly", rbft.peerPool.ID)
+			return nil
+		}
 		return rbft.sendViewChange()
 
 	case CoreCheckPoolTimerEvent:
@@ -261,9 +265,15 @@ func (rbft *rbftImpl) handleViewChangeEvent(e *LocalEvent) consensusEvent {
 	switch e.EventType {
 	case ViewChangeTimerEvent:
 		demand, ok := e.Event.(nextDemandNewView)
-		if ok && rbft.view > uint64(demand) {
+		if ok {
+			if rbft.view > uint64(demand) {
+				rbft.logger.Debugf("Replica %d received viewChangeTimerEvent, but we"+
+					"have sent the next viewChange maybe just before a moment.", rbft.peerPool.ID)
+				return nil
+			}
+		} else if rbft.atomicIn(InViewChange) {
 			rbft.logger.Debugf("Replica %d received viewChangeTimerEvent, but we"+
-				"have sent the next viewChange maybe just before a moment.", rbft.peerPool.ID)
+				"are already in view-change and it has not reached quorum.", rbft.peerPool.ID)
 			return nil
 		}
 
