@@ -3,6 +3,7 @@ package rbft
 import (
 	"testing"
 
+	"github.com/ultramesh/flato-common/metrics/disabled"
 	mockexternal "github.com/ultramesh/flato-rbft/mock/mock_external"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
 	txpoolmock "github.com/ultramesh/flato-txpool/mock"
@@ -26,6 +27,7 @@ func TestStatusMgr_inOne(t *testing.T) {
 		Logger:      log,
 		External:    external,
 		RequestPool: tx,
+		MetricsProv: &disabled.Provider{},
 
 		EpochInit:    uint64(0),
 		LatestConfig: nil,
@@ -54,6 +56,7 @@ func TestStatusMgr_setState(t *testing.T) {
 		Logger:      log,
 		External:    external,
 		RequestPool: tx,
+		MetricsProv: &disabled.Provider{},
 
 		EpochInit:    uint64(0),
 		LatestConfig: nil,
@@ -85,6 +88,7 @@ func TestStatusMgr_maybeSetNormal(t *testing.T) {
 		Logger:      log,
 		External:    external,
 		RequestPool: tx,
+		MetricsProv: &disabled.Provider{},
 
 		EpochInit:    uint64(0),
 		LatestConfig: nil,

@@ -159,6 +159,7 @@ func (rbft *rbftImpl) maybeSendPrePrepare(batch *pb.RequestBatch, findCache bool
 			rbft.logger.Debugf("Replica %d is primary, not sending prePrepare for request batch %s because "+
 				"next seqNo is out of high watermark %d", rbft.peerPool.ID, batch.BatchHash, rbft.h+rbft.L)
 			rbft.batchMgr.cacheBatch = append(rbft.batchMgr.cacheBatch, batch)
+			rbft.metrics.cacheBatchNumber.Add(float64(1))
 		}
 		rbft.logger.Debugf("Replica %d is primary, not sending prePrepare for request batch in cache because "+
 			"next seqNo is out of high watermark %d", rbft.peerPool.ID, rbft.h+rbft.L)
@@ -168,6 +169,7 @@ func (rbft *rbftImpl) maybeSendPrePrepare(batch *pb.RequestBatch, findCache bool
 	if findCache {
 		nextBatch = rbft.batchMgr.cacheBatch[0]
 		rbft.batchMgr.cacheBatch = rbft.batchMgr.cacheBatch[1:]
+		rbft.metrics.cacheBatchNumber.Add(float64(-1))
 		rbft.logger.Infof("Primary %d finds cached batch, hash = %s", rbft.peerPool.ID, nextBatch.BatchHash)
 	} else {
 		nextBatch = batch
@@ -185,6 +187,8 @@ func (rbft *rbftImpl) maybeSendPrePrepare(batch *pb.RequestBatch, findCache bool
 	rbft.storeMgr.outstandingReqBatches[digest] = nextBatch
 	rbft.storeMgr.batchStore[digest] = nextBatch
 	rbft.persistBatch(digest)
+	rbft.metrics.batchesGauge.Add(float64(1))
+	rbft.metrics.outstandingBatchesGauge.Add(float64(1))
 
 	// here we soft start a new view timer with requestTimeout, if primary cannot execute this batch
 	// during that timeout, we think there may exist some problems with this primary which will trigger viewChange.
@@ -255,6 +259,8 @@ func (rbft *rbftImpl) findNextCommitBatch(digest string, v uint64, n uint64) err
 	rbft.storeMgr.outstandingReqBatches[digest] = batch
 	rbft.storeMgr.batchStore[digest] = batch
 	rbft.persistBatch(digest)
+	rbft.metrics.batchesGauge.Add(float64(1))
+	rbft.metrics.outstandingBatchesGauge.Add(float64(1))
 
 	if rbft.batchMgr.requestPool.IsConfigBatch(batch.BatchHash) {
 		rbft.logger.Debugf("Replica %d generate a config batch", rbft.peerPool.ID)

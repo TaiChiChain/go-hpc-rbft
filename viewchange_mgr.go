@@ -85,6 +85,7 @@ func (rbft *rbftImpl) setView(view uint64) {
 	rbft.viewLock.Lock()
 	rbft.view = view
 	rbft.viewLock.Unlock()
+	rbft.metrics.viewGauge.Set(float64(view))
 }
 
 // sendViewChange sends view change message to other peers using broadcast.
@@ -519,6 +520,7 @@ func (rbft *rbftImpl) fetchRequestBatches() {
 			Epoch:   rbft.epoch,
 			Payload: payload,
 		}
+		rbft.metrics.fetchRequestBatchCounter.Add(float64(1))
 		rbft.peerPool.broadcast(consensusMsg)
 	}
 
@@ -580,6 +582,7 @@ func (rbft *rbftImpl) recvSendRequestBatch(batch *pb.SendRequestBatch) consensus
 	// store into batchStore only，and store into requestPool by order when processNewView.
 	rbft.storeMgr.batchStore[digest] = batch.Batch
 	rbft.persistBatch(digest)
+	rbft.metrics.batchesGauge.Add(float64(1))
 
 	//delete missingReqBatches in this batch
 	delete(rbft.storeMgr.missingReqBatches, digest)

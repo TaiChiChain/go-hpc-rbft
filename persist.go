@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
 
@@ -427,7 +428,10 @@ func (rbft *rbftImpl) persistBatch(digest string) {
 		rbft.logger.Warningf("Replica %d could not persist request batch %s: %s", rbft.peerPool.ID, digest, err)
 		return
 	}
+	start := time.Now()
 	_ = rbft.storage.StoreState("batch."+digest, batchPacked)
+	duration := time.Now().Sub(start).Seconds()
+	rbft.metrics.batchPersistDuration.Observe(duration)
 }
 
 // persistDelBatch removes one marshaled tx batch with the given digest from database
@@ -543,6 +547,7 @@ func (rbft *rbftImpl) restoreBatchStore() {
 				if err == nil {
 					rbft.logger.Debugf("Replica %d restore batch %s", rbft.peerPool.ID, digest)
 					rbft.storeMgr.batchStore[digest] = batch
+					rbft.metrics.batchesGauge.Add(float64(1))
 				} else {
 					rbft.logger.Warningf("Replica %d could not unmarshal batch key %s for error: %v", rbft.peerPool.ID, key, err)
 				}

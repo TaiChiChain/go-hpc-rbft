@@ -177,6 +177,9 @@ func (rbft *rbftImpl) turnIntoEpoch(router *pb.Router, epoch uint64, resetView b
 	rbft.f = (rbft.N - 1) / 3
 	rbft.persistN(rbft.N)
 
+	rbft.metrics.clusterSizeGauge.Set(float64(rbft.N))
+	rbft.metrics.quorumSizeGauge.Set(float64(rbft.commonCaseQuorum()))
+
 	rbft.logger.Debugf("======== Replica %d turn into a new epoch, epoch=%d/view=%d/height=%d.",
 		rbft.peerPool.ID, rbft.epoch, rbft.view, rbft.exec.lastExec)
 	rbft.logger.Notice(`
@@ -196,8 +199,9 @@ func (rbft *rbftImpl) turnIntoEpoch(router *pb.Router, epoch uint64, resetView b
 // setEpoch sets the epoch with the epochLock.
 func (rbft *rbftImpl) setEpoch(epoch uint64) {
 	rbft.epochLock.Lock()
-	defer rbft.epochLock.Unlock()
 	rbft.epoch = epoch
+	rbft.epochLock.Unlock()
+	rbft.metrics.epochGauge.Set(float64(epoch))
 }
 
 func (rbft *rbftImpl) resetConfigBatchToExecute() {
