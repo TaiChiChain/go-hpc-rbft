@@ -66,7 +66,7 @@ var eventCreators map[pb.Type]func() interface{}
 
 // initMsgEventMap maps consensus_message to real consensus msg type which used to Unmarshal consensus_message's payload
 // to actual consensus msg
-func (rbft *rbftImpl) initMsgEventMap() {
+func initMsgEventMap() {
 	eventCreators = make(map[pb.Type]func() interface{})
 
 	eventCreators[pb.Type_NULL_REQUEST] = func() interface{} { return &pb.NullRequest{} }

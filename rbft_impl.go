@@ -174,8 +174,14 @@ type rbftImpl struct {
 	logger Logger // write logger to record some info
 }
 
+var once sync.Once
+
 // newRBFT init the RBFT instance
 func newRBFT(cpChan chan *pb.ServiceState, confC chan *pb.ReloadFinished, c Config) (*rbftImpl, error) {
+
+	// init message event converter
+	once.Do(initMsgEventMap)
+
 	recvC := make(chan interface{})
 	rbft := &rbftImpl{
 		K:                   c.K,
@@ -270,9 +276,6 @@ func newRBFT(cpChan chan *pb.ServiceState, confC chan *pb.ReloadFinished, c Conf
 
 	// update viewChange seqNo after restore state which may update seqNo
 	rbft.updateViewChangeSeqNo(rbft.exec.lastExec, rbft.K)
-
-	// init message event converter
-	rbft.initMsgEventMap()
 
 	rbft.logger.Infof("RBFT Max number of validating peers (N) = %v", rbft.N)
 	rbft.logger.Infof("RBFT Max number of failing peers (f) = %v", rbft.f)
