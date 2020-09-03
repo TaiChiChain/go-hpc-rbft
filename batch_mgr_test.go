@@ -4,84 +4,72 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ultramesh/flato-event/inner/protos"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestBatchMgr_newBatchManager(t *testing.T) {
+func TestBatchMgr_startBatchTimer(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	rbft, conf := newTestRBFT(ctrl)
 
-	eventC := make(chan interface{})
-	bm := newBatchManager(eventC, conf)
-
-	structName, nilElems, err := checkNilElems(bm)
-	if err == nil {
-		assert.Equal(t, "batchManager", structName)
-		assert.Nil(t, nilElems)
-	}
-
-	assert.Equal(t, conf.RequestPool, bm.requestPool)
-
-	bm.seqNo = 1
-	assert.Equal(t, uint64(1), bm.getSeqNo())
-
-	bm.setSeqNo(uint64(10))
-	assert.Equal(t, uint64(10), bm.getSeqNo())
-
-	bm.batchTimerActive = true
-	assert.Equal(t, true, bm.isBatchTimerActive())
-
-	rbft.batchMgr.batchTimerActive = false
-	rbft.startBatchTimer()
-	assert.Equal(t, true, rbft.batchMgr.batchTimerActive)
-
-	rbft.stopBatchTimer()
-	assert.Equal(t, false, rbft.batchMgr.batchTimerActive)
-
-	rbft.restartBatchTimer()
-	assert.Equal(t, true, rbft.batchMgr.batchTimerActive)
+	_, rbfts := newBasicClusterInstance()
+	assert.False(t, rbfts[0].timerMgr.getTimer(batchTimer))
+	assert.False(t, rbfts[0].batchMgr.isBatchTimerActive())
+	rbfts[0].startBatchTimer()
+	assert.True(t, rbfts[0].timerMgr.getTimer(batchTimer))
+	assert.True(t, rbfts[0].batchMgr.isBatchTimerActive())
 }
 
 // Test for only this function
 func TestBatchMgr_maybeSendPrePrepare(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
+
+	_, rbfts := newBasicClusterInstance()
 
 	// Set a Batch
-	batchTmp := &pb.RequestBatch{
-		RequestHashList: nil,
-		RequestList:     nil,
+	batchTmp41 := &pb.RequestBatch{
+		RequestHashList: []string{"tx-hash-41"},
+		RequestList:     []*protos.Transaction{newTx()},
 		Timestamp:       time.Now().UnixNano(),
-		SeqNo:           40,
-		LocalList:       nil,
-		BatchHash:       "test digest",
+		LocalList:       []bool{true},
+		BatchHash:       "test digest 41",
+	}
+	batchTmp42 := &pb.RequestBatch{
+		RequestHashList: []string{"tx-hash-42"},
+		RequestList:     []*protos.Transaction{newTx()},
+		Timestamp:       time.Now().UnixNano(),
+		LocalList:       []bool{true},
+		BatchHash:       "test digest 42",
 	}
 
 	// Be out of range, need usage of catch
 	// And, it is the first one to be in catch
-	rbft.batchMgr.setSeqNo(uint64(40))
-	rbft.maybeSendPrePrepare(batchTmp, false)
-	assert.Equal(t, batchTmp, rbft.batchMgr.cacheBatch[0])
+	rbfts[0].batchMgr.setSeqNo(40)
+	rbfts[0].maybeSendPrePrepare(batchTmp41, false)
+	rbfts[0].maybeSendPrePrepare(batchTmp42, false)
+	assert.Equal(t, batchTmp41, rbfts[0].batchMgr.cacheBatch[0])
+	assert.Equal(t, batchTmp42, rbfts[0].batchMgr.cacheBatch[1])
 
 	// Be in the range
 	// to find in catch
 	// Now, rbft.batchMgr.cacheBatch[0] has already store a value
 	// Set rbft.h 10, 10~50
-	rbft.h = 10
-	rbft.maybeSendPrePrepare(nil, true)
+	rbfts[0].moveWatermarks(10)
+	rbfts[0].maybeSendPrePrepare(nil, true)
 	//assume that
-	assert.Equal(t, batchTmp, rbft.storeMgr.batchStore[batchTmp.BatchHash])
+	assert.Equal(t, batchTmp41, rbfts[0].storeMgr.batchStore[batchTmp41.BatchHash])
+	assert.Equal(t, batchTmp42, rbfts[0].storeMgr.batchStore[batchTmp42.BatchHash])
 }
 
 func TestBatchMgr_findNextCommitBatch(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
+
+	_, rbfts := newBasicClusterInstance()
 
 	// Struct of certTmp which stored in rbft.storeMgr.certStore
 	prePrepareTmp := &pb.PrePrepare{
@@ -118,20 +106,20 @@ func TestBatchMgr_findNextCommitBatch(t *testing.T) {
 		commit:      nil, //map[pb.Commit]bool{commitTmp: true},
 		sentExecute: false,
 	}
-	rbft.storeMgr.certStore[msgIDTmp] = certTmp
+	rbfts[0].storeMgr.certStore[msgIDTmp] = certTmp
 
 	// When view is incorrect, exit with nil, without any change
-	rbft.setView(1)
-	assert.Nil(t, rbft.findNextCommitBatch("msg", 0, 20))
-	rbft.setView(0)
+	rbfts[0].setView(1)
+	assert.Nil(t, rbfts[0].findNextCommitBatch("msg", 0, 20))
+	rbfts[0].setView(0)
 
 	// When prePrepare is nil, exit with nil, without any change
-	assert.Nil(t, rbft.findNextCommitBatch("msg", 0, 20))
+	assert.Nil(t, rbfts[0].findNextCommitBatch("msg", 0, 20))
 	certTmp.prePrepare = prePrepareTmp
 
 	// If replica is in stateUpdate, exit with nil, without any change
-	rbft.on(SkipInProgress)
-	assert.Nil(t, rbft.findNextCommitBatch("msg", 0, 20))
+	rbfts[0].on(SkipInProgress)
+	assert.Nil(t, rbfts[0].findNextCommitBatch("msg", 0, 20))
 
 	// To The End
 	// store the HashBatch which was input by certTmp
@@ -139,16 +127,16 @@ func TestBatchMgr_findNextCommitBatch(t *testing.T) {
 	// verified key: Timestamp
 	certTmp.prepare = map[pb.Prepare]bool{prePareTmp: true}
 	certTmp.commit = map[pb.Commit]bool{commitTmp: true}
-	rbft.off(SkipInProgress)
-	assert.Nil(t, rbft.findNextCommitBatch("msg", 0, 20))
-	assert.Equal(t, int64(10086), rbft.storeMgr.outstandingReqBatches["msg"].Timestamp)
-	assert.Equal(t, int64(10086), rbft.storeMgr.batchStore["msg"].Timestamp)
-	assert.Equal(t, true, rbft.storeMgr.certStore[msgIDTmp].sentCommit)
+	rbfts[0].off(SkipInProgress)
+	assert.Nil(t, rbfts[0].findNextCommitBatch("msg", 0, 20))
+	assert.Equal(t, int64(10086), rbfts[0].storeMgr.outstandingReqBatches["msg"].Timestamp)
+	assert.Equal(t, int64(10086), rbfts[0].storeMgr.batchStore["msg"].Timestamp)
+	assert.Equal(t, true, rbfts[0].storeMgr.certStore[msgIDTmp].sentCommit)
 
 	// To resend commit
-	rbft.storeMgr.certStore[msgIDTmp].sentCommit = false
-	assert.Nil(t, rbft.findNextCommitBatch("msg", 0, 20))
-	assert.Equal(t, true, rbft.storeMgr.certStore[msgIDTmp].sentCommit)
+	rbfts[0].storeMgr.certStore[msgIDTmp].sentCommit = false
+	assert.Nil(t, rbfts[0].findNextCommitBatch("msg", 0, 20))
+	assert.Equal(t, true, rbfts[0].storeMgr.certStore[msgIDTmp].sentCommit)
 
 	// Digest == ""
 	prePrepareTmpNil := &pb.PrePrepare{
@@ -183,9 +171,10 @@ func TestBatchMgr_findNextCommitBatch(t *testing.T) {
 		commit:      map[pb.Commit]bool{commitTmpNil: true},
 		sentExecute: false,
 	}
-	rbft.setView(0)
-	rbft.storeMgr.certStore[msgIDTmpNil] = certTmpNil
-	rbft.storeMgr.certStore[msgIDTmpNil].sentCommit = false
-	_ = rbft.findNextCommitBatch("", 0, 30)
-	assert.Equal(t, true, rbft.storeMgr.certStore[msgIDTmpNil].sentCommit)
+	rbfts[0].setView(0)
+	rbfts[0].storeMgr.certStore[msgIDTmpNil] = certTmpNil
+	rbfts[0].storeMgr.certStore[msgIDTmpNil].sentCommit = false
+	_ = rbfts[0].findNextCommitBatch("", 0, 30)
+	assert.Equal(t, true, rbfts[0].storeMgr.certStore[msgIDTmpNil].sentCommit)
+	assert.Equal(t, true, rbfts[0].storeMgr.certStore[msgIDTmpNil].sentCommit)
 }

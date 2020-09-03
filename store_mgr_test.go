@@ -14,12 +14,12 @@ import (
 
 func testNewStorage(ctrl *gomock.Controller) (*storeManager, Config) {
 	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
-	log := NewRawLogger()
+	log := FrameworkNewRawLogger()
 	external := mockexternal.NewMockMinimalExternal(ctrl)
 
 	conf := Config{
 		ID:                      2,
-		Hash:                    "node2",
+		Hash:                    "hash-node2",
 		IsNew:                   false,
 		Peers:                   peerSet,
 		K:                       10,
@@ -43,7 +43,8 @@ func testNewStorage(ctrl *gomock.Controller) (*storeManager, Config) {
 		External:    external,
 		RequestPool: pool,
 
-		EpochInit: uint64(0),
+		EpochInit:    uint64(0),
+		LatestConfig: nil,
 	}
 
 	return newStoreMgr(conf), conf
@@ -84,8 +85,8 @@ func TestStoreMgr_moveWatermarks(t *testing.T) {
 	rbft.vcMgr.qlist[QID] = PQ
 	rbft.vcMgr.plist[uint64(20)] = PQ
 
-	// h is 40, delete them
-	s.moveWatermarks(rbft, uint64(40))
+	// h is 30, delete them
+	s.moveWatermarks(rbft, uint64(30))
 	assert.Equal(t, map[uint64]string{}, s.chkpts)
 	assert.Equal(t, map[qidx]*pb.Vc_PQ{}, rbft.vcMgr.qlist)
 	assert.Equal(t, map[uint64]*pb.Vc_PQ{}, rbft.vcMgr.plist)

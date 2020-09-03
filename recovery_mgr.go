@@ -125,6 +125,7 @@ func (rbft *rbftImpl) sendNotification(keepCurrentVote bool) consensusEvent {
 	rbft.recoveryMgr.outOfElection = make(map[ntfIdx]*pb.NotificationResponse)
 
 	n := &pb.Notification{
+		Epoch:    rbft.epoch,
 		Basis:    rbft.getVcBasis(),
 		NodeInfo: rbft.getNodeInfo(),
 	}
@@ -560,8 +561,8 @@ func (rbft *rbftImpl) trySyncState() {
 }
 
 // initSyncState prepares to sync state:
-// 1. if we are in syncState, which means last syncState progress hasn't finish, so reject a new syncState request
-// 2. if we are in abnormal, reject syncState as the priority of syncState is lower than recovery/viewChange/updateN
+// 1. if we are in syncState, which means last syncState progress hasn't finish, reject a new syncState request
+// 2. if we are in abnormal, reject syncState as the priority of syncState is lower than recovery/viewChange
 // 3. construct a syncState request then broadcast to other replicas
 // 4. construct a syncStateRsp to myself
 func (rbft *rbftImpl) initSyncState() consensusEvent {

@@ -20,7 +20,7 @@ import (
 func newPersistTestReplica(ctrl *gomock.Controller, pool txpool.TxPool, log Logger, ext external.ExternalStack) *node {
 	conf := Config{
 		ID:                      2,
-		Hash:                    "node2",
+		Hash:                    calHash("node2"),
 		IsNew:                   false,
 		Peers:                   peerSet,
 		K:                       10,
@@ -44,7 +44,8 @@ func newPersistTestReplica(ctrl *gomock.Controller, pool txpool.TxPool, log Logg
 		External:    ext,
 		RequestPool: pool,
 
-		EpochInit: uint64(0),
+		EpochInit:    uint64(0),
+		LatestConfig: nil,
 	}
 
 	node, _ := newNode(conf)
@@ -55,7 +56,7 @@ func TestPersist_restoreView(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
-	log := NewRawLogger()
+	log := FrameworkNewRawLogger()
 	ext := mockexternal.NewMockExternalStack(ctrl)
 	node := newPersistTestReplica(ctrl, pool, log, ext)
 
@@ -95,7 +96,7 @@ func TestPersist_restoreQList(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
-	log := NewRawLogger()
+	log := FrameworkNewRawLogger()
 	ext := mockexternal.NewMockExternalStack(ctrl)
 	node := newPersistTestReplica(ctrl, pool, log, ext)
 
@@ -132,7 +133,7 @@ func TestPersist_restorePList(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
-	log := NewRawLogger()
+	log := FrameworkNewRawLogger()
 	ext := mockexternal.NewMockExternalStack(ctrl)
 	node := newPersistTestReplica(ctrl, pool, log, ext)
 
@@ -164,7 +165,7 @@ func TestPersist_restoreBatchStore(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
-	log := NewRawLogger()
+	log := FrameworkNewRawLogger()
 	ext := mockexternal.NewMockExternalStack(ctrl)
 	node := newPersistTestReplica(ctrl, pool, log, ext)
 
@@ -180,7 +181,7 @@ func TestPersist_restoreQSet(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
-	log := NewRawLogger()
+	log := FrameworkNewRawLogger()
 	ext := mockexternal.NewMockExternalStack(ctrl)
 	node := newPersistTestReplica(ctrl, pool, log, ext)
 
@@ -207,7 +208,7 @@ func TestPersist_restorePSet(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
-	log := NewRawLogger()
+	log := FrameworkNewRawLogger()
 	ext := mockexternal.NewMockExternalStack(ctrl)
 	node := newPersistTestReplica(ctrl, pool, log, ext)
 
@@ -234,7 +235,7 @@ func TestPersist_restoreCSet(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
-	log := NewRawLogger()
+	log := FrameworkNewRawLogger()
 	ext := mockexternal.NewMockExternalStack(ctrl)
 	node := newPersistTestReplica(ctrl, pool, log, ext)
 
@@ -261,7 +262,7 @@ func TestPersist_restoreCert(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
-	log := NewRawLogger()
+	log := FrameworkNewRawLogger()
 	ext := mockexternal.NewMockExternalStack(ctrl)
 	node := newPersistTestReplica(ctrl, pool, log, ext)
 
@@ -326,7 +327,7 @@ func TestPersist_restoreState(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
-	log := NewRawLogger()
+	log := FrameworkNewRawLogger()
 	ext := mockexternal.NewMockExternalStack(ctrl)
 	node := newPersistTestReplica(ctrl, pool, log, ext)
 
@@ -368,8 +369,9 @@ func TestPersist_restoreState(t *testing.T) {
 func TestPersist_parseCertStore(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
-	rbft.setView(3)
+
+	_, rbfts := newBasicClusterInstance()
+	rbfts[0].setView(3)
 
 	msgID1 := msgID{
 		v: 3,
@@ -385,12 +387,12 @@ func TestPersist_parseCertStore(t *testing.T) {
 	}
 	cert2 := &msgCert{}
 
-	rbft.storeMgr.certStore[msgID1] = cert1
-	rbft.storeMgr.certStore[msgID2] = cert2
+	rbfts[0].storeMgr.certStore[msgID1] = cert1
+	rbfts[0].storeMgr.certStore[msgID2] = cert2
 
-	assert.Equal(t, map[msgID]*msgCert{msgID1: cert1, msgID2: cert2}, rbft.storeMgr.certStore)
-	rbft.parseCertStore()
-	assert.Equal(t, map[msgID]*msgCert{msgID1: cert1}, rbft.storeMgr.certStore)
+	assert.Equal(t, map[msgID]*msgCert{msgID1: cert1, msgID2: cert2}, rbfts[0].storeMgr.certStore)
+	rbfts[0].parseCertStore()
+	assert.Equal(t, map[msgID]*msgCert{msgID1: cert1}, rbfts[0].storeMgr.certStore)
 
 	persistPrePrepare := &pb.PrePrepare{}
 	cert1.prePrepare = persistPrePrepare
@@ -401,48 +403,48 @@ func TestPersist_parseCertStore(t *testing.T) {
 	persistCommit := pb.Commit{}
 	cert1.commit[persistCommit] = true
 
-	rbft.storeMgr.certStore[msgID1] = cert1
-	rbft.storeMgr.certStore[msgID2] = cert2
+	rbfts[0].storeMgr.certStore[msgID1] = cert1
+	rbfts[0].storeMgr.certStore[msgID2] = cert2
 
-	assert.Equal(t, map[msgID]*msgCert{msgID1: cert1, msgID2: cert2}, rbft.storeMgr.certStore)
-	rbft.parseCertStore()
-	assert.Equal(t, map[msgID]*msgCert{msgID1: cert1}, rbft.storeMgr.certStore)
+	assert.Equal(t, map[msgID]*msgCert{msgID1: cert1, msgID2: cert2}, rbfts[0].storeMgr.certStore)
+	rbfts[0].parseCertStore()
+	assert.Equal(t, map[msgID]*msgCert{msgID1: cert1}, rbfts[0].storeMgr.certStore)
 }
 
 func TestPersist_parseQPCKey(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
 
+	_, rbfts := newBasicClusterInstance()
 	var u1, u2 uint64
 	var str string
 	var err error
 
-	u1, u2, str, err = rbft.parseQPCKey("test.1.wang", "test")
+	u1, u2, str, err = rbfts[0].parseQPCKey("test.1.wang", "test")
 	assert.Equal(t, uint64(0), u1)
 	assert.Equal(t, uint64(0), u2)
 	assert.Equal(t, "", str)
 	assert.Equal(t, errors.New("incorrect format"), err)
 
-	u1, u2, str, err = rbft.parseQPCKey("test.1.wang.2", "msg")
+	u1, u2, str, err = rbfts[0].parseQPCKey("test.1.wang.2", "msg")
 	assert.Equal(t, uint64(0), u1)
 	assert.Equal(t, uint64(0), u2)
 	assert.Equal(t, "", str)
 	assert.Equal(t, errors.New("incorrect prefix"), err)
 
-	u1, u2, str, err = rbft.parseQPCKey("test.a.wang.1", "test")
+	u1, u2, str, err = rbfts[0].parseQPCKey("test.a.wang.1", "test")
 	assert.Equal(t, uint64(0), u1)
 	assert.Equal(t, uint64(0), u2)
 	assert.Equal(t, "", str)
 	assert.Equal(t, errors.New("parse failed"), err)
 
-	u1, u2, str, err = rbft.parseQPCKey("test.1.b.wang", "test")
+	u1, u2, str, err = rbfts[0].parseQPCKey("test.1.b.wang", "test")
 	assert.Equal(t, uint64(0), u1)
 	assert.Equal(t, uint64(0), u2)
 	assert.Equal(t, "", str)
 	assert.Equal(t, errors.New("parse failed"), err)
 
-	u1, u2, str, err = rbft.parseQPCKey("test.1.2.wang", "test")
+	u1, u2, str, err = rbfts[0].parseQPCKey("test.1.2.wang", "test")
 	assert.Equal(t, uint64(1), u1)
 	assert.Equal(t, uint64(2), u2)
 	assert.Equal(t, "wang", str)

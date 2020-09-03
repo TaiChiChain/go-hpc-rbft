@@ -115,7 +115,6 @@ message commit {
     uint64 view = 2;
     uint64 sequence_number = 3;
     string batch_digest = 4;
-    uint64 epoch = 5;
 }
 
 message checkpoint {
@@ -251,6 +250,7 @@ message service_state {
 message epoch_info {
     uint64 epoch = 1;
     repeated string v_set = 2;
+    uint64 lastConfig = 3;
 }
 
 enum inform_type {

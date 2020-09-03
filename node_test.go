@@ -1,9 +1,9 @@
 package rbft
 
 import (
-	"errors"
 	"testing"
 
+	"github.com/ultramesh/flato-event/inner/protos"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
 
 	"github.com/gogo/protobuf/proto"
@@ -11,32 +11,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNode_NewNode(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	rbft, conf := newTestRBFTReplica(ctrl)
-	n := rbft.node
-
-	structName, nilElems, err := checkNilElems(n)
-	if err == nil {
-		assert.Equal(t, "node", structName)
-		assert.Nil(t, nilElems)
-	}
-
-	_, err = NewNode(conf)
-	assert.Equal(t, nil, err)
-
-	conf.Peers = nil
-	_, err = NewNode(conf)
-	expErr := errors.New("nil peers")
-	assert.Equal(t, expErr, err)
-}
-
 func TestNode_Start(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	rbft, _ := newTestRBFTReplica(ctrl)
-	n := rbft.node
+
+	_, rbfts := newBasicClusterInstance()
+	n := rbfts[0].node
 	n.rbft.atomicOn(Pending)
 
 	n.currentState = &pb.ServiceState{
@@ -53,8 +33,9 @@ func TestNode_Start(t *testing.T) {
 func TestNode_Stop(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	rbft, _ := newTestRBFTReplica(ctrl)
-	n := rbft.node
+
+	_, rbfts := newBasicClusterInstance()
+	n := rbfts[0].node
 	n.currentState = &pb.ServiceState{
 		MetaState: &pb.MetaState{
 			Applied: uint64(0),
@@ -69,11 +50,12 @@ func TestNode_Stop(t *testing.T) {
 func TestNode_Propose(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	rbft, _ := newTestRBFTReplica(ctrl)
-	n := rbft.node
+
+	_, rbfts := newBasicClusterInstance()
+	n := rbfts[0].node
 
 	go func() {
-		requestsTmp := mockRequestList
+		requestsTmp := []*protos.Transaction{newTx()}
 		_ = n.Propose(requestsTmp)
 		obj := <-n.rbft.recvChan
 		rSet := &pb.RequestSet{
@@ -87,8 +69,9 @@ func TestNode_Propose(t *testing.T) {
 func TestNode_Step(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	rbft, _ := newTestRBFTReplica(ctrl)
-	n := rbft.node
+
+	_, rbfts := newBasicClusterInstance()
+	n := rbfts[0].node
 
 	// Post a Type_NULL_REQUEST Msg
 	// Type/Payload
@@ -110,8 +93,9 @@ func TestNode_Step(t *testing.T) {
 func TestNode_ApplyConfChange(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	rbft, _ := newTestRBFTReplica(ctrl)
-	n := rbft.node
+
+	_, rbfts := newBasicClusterInstance()
+	n := rbfts[0].node
 
 	r := &pb.Router{Peers: peerSet}
 	cc := &pb.ConfState{QuorumRouter: r}
@@ -122,8 +106,9 @@ func TestNode_ApplyConfChange(t *testing.T) {
 func TestNode_ReportExecuted(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	rbft, _ := newTestRBFTReplica(ctrl)
-	n := rbft.node
+
+	_, rbfts := newBasicClusterInstance()
+	n := rbfts[0].node
 
 	state1 := &pb.ServiceState{
 		MetaState: &pb.MetaState{
@@ -170,8 +155,9 @@ func TestNode_ReportExecuted(t *testing.T) {
 func TestNode_ReportStateUpdated(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	rbft, _ := newTestRBFTReplica(ctrl)
-	n := rbft.node
+
+	_, rbfts := newBasicClusterInstance()
+	n := rbfts[0].node
 
 	state := &pb.ServiceState{
 		MetaState: &pb.MetaState{
@@ -204,8 +190,9 @@ func TestNode_ReportStateUpdated(t *testing.T) {
 func TestNode_getCurrentState(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	rbft, _ := newTestRBFTReplica(ctrl)
-	n := rbft.node
+
+	_, rbfts := newBasicClusterInstance()
+	n := rbfts[0].node
 
 	n.currentState = &pb.ServiceState{
 		MetaState: &pb.MetaState{

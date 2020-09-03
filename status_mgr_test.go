@@ -14,20 +14,21 @@ import (
 func TestStatusMgr_inOne(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	log := NewRawLogger()
+	log := FrameworkNewRawLogger()
 	external := mockexternal.NewMockMinimalExternal(ctrl)
 	tx := txpoolmock.NewMockMinimalTxPool(ctrl)
 
 	conf := Config{
 		ID:          1,
-		Hash:        "node1",
+		Hash:        calHash("node1"),
 		IsNew:       false,
 		Peers:       peerSet,
 		Logger:      log,
 		External:    external,
 		RequestPool: tx,
 
-		EpochInit: uint64(0),
+		EpochInit:    uint64(0),
+		LatestConfig: nil,
 	}
 
 	cpChan := make(chan *pb.ServiceState)
@@ -41,20 +42,21 @@ func TestStatusMgr_inOne(t *testing.T) {
 func TestStatusMgr_setState(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	log := NewRawLogger()
+	log := FrameworkNewRawLogger()
 	external := mockexternal.NewMockMinimalExternal(ctrl)
 	tx := txpoolmock.NewMockMinimalTxPool(ctrl)
 
 	conf := Config{
 		ID:          1,
-		Hash:        "node1",
+		Hash:        calHash("node1"),
 		IsNew:       false,
 		Peers:       peerSet,
 		Logger:      log,
 		External:    external,
 		RequestPool: tx,
 
-		EpochInit: uint64(0),
+		EpochInit:    uint64(0),
+		LatestConfig: nil,
 	}
 
 	cpChan := make(chan *pb.ServiceState)
@@ -71,20 +73,21 @@ func TestStatusMgr_setState(t *testing.T) {
 func TestStatusMgr_maybeSetNormal(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	log := NewRawLogger()
+	log := FrameworkNewRawLogger()
 	external := mockexternal.NewMockMinimalExternal(ctrl)
 	tx := txpoolmock.NewMockMinimalTxPool(ctrl)
 
 	conf := Config{
 		ID:          1,
-		Hash:        "node1",
+		Hash:        calHash("node1"),
 		IsNew:       false,
 		Peers:       peerSet,
 		Logger:      log,
 		External:    external,
 		RequestPool: tx,
 
-		EpochInit: uint64(0),
+		EpochInit:    uint64(0),
+		LatestConfig: nil,
 	}
 
 	cpChan := make(chan *pb.ServiceState)

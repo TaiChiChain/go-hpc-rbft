@@ -4,8 +4,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ultramesh/flato-event/inner/protos"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
 
+	"github.com/gogo/protobuf/proto"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 )
@@ -33,7 +35,7 @@ func TestHelper_Less(t *testing.T) {
 		4,
 		5,
 	}
-	assert.Equal(t, false, a.Less(2, 1))
+	assert.False(t, a.Less(2, 1))
 }
 
 func TestHelper_Swap(t *testing.T) {
@@ -45,7 +47,7 @@ func TestHelper_Swap(t *testing.T) {
 		5,
 	}
 	a.Swap(1, 2)
-	assert.Equal(t, true, a.Less(2, 1))
+	assert.True(t, a.Less(2, 1))
 	a.Swap(1, 2)
 }
 
@@ -56,69 +58,42 @@ func TestHelper_Swap(t *testing.T) {
 func TestHelper_RBFT(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
 
-	rbft.N = 4
+	_, rbfts := newBasicClusterInstance()
+
+	rbfts[0].N = 4
 
 	// isPrimary
 	// Default view.id=1 rbft.view=0
-	assert.Equal(t, false, rbft.isPrimary(uint64(5)))
-	assert.Equal(t, false, rbft.isPrimary(uint64(3)))
-	assert.Equal(t, true, rbft.isPrimary(uint64(1)))
+	assert.Equal(t, false, rbfts[0].isPrimary(uint64(5)))
+	assert.Equal(t, false, rbfts[0].isPrimary(uint64(3)))
+	assert.Equal(t, true, rbfts[0].isPrimary(uint64(1)))
 
 	// inW
 	// Default rbft.h=0
-	assert.Equal(t, true, rbft.inW(uint64(1)))
+	assert.Equal(t, true, rbfts[0].inW(uint64(1)))
 
 	// inV
-	assert.Equal(t, true, rbft.inV(uint64(0)))
+	assert.Equal(t, true, rbfts[0].inV(uint64(0)))
 
 	// inWV
-	assert.Equal(t, false, rbft.inWV(uint64(1), uint64(1)))
+	assert.Equal(t, false, rbfts[0].inWV(uint64(1), uint64(1)))
 
 	// sendInW
-	assert.Equal(t, true, rbft.sendInW(uint64(3)))
-
-	var n int64
-	var v uint64
-
-	// getAddNV
-	n, v = rbft.getAddNV()
-	assert.Equal(t, int64(5), n)
-	assert.Equal(t, uint64(5), v)
-
-	rbft.setView(5)
-	_, v = rbft.getAddNV()
-	assert.Equal(t, uint64(6), v)
-
-	// getDelNV
-	rbft.setView(0)
-	n, v = rbft.getDelNV(uint64(2))
-	assert.Equal(t, int64(3), n)
-	assert.Equal(t, uint64(3), v)
-
-	rbft.setView(3)
-	_, v = rbft.getDelNV(uint64(2))
-	assert.Equal(t, uint64(5), v)
-
-	rbft.setView(uint64(11))
-	rbft.N = 5
-	n, v = rbft.getDelNV(uint64(0))
-	assert.Equal(t, uint64(12), v)
-	assert.Equal(t, int64(4), n)
+	assert.Equal(t, true, rbfts[0].sendInW(uint64(3)))
 
 	// cleanOutstandingAndCert
-	rbft.cleanOutstandingAndCert()
+	rbfts[0].cleanOutstandingAndCert()
 
 	// commonCaseQuorum
-	rbft.N = 4
-	assert.Equal(t, 3, rbft.commonCaseQuorum())
+	rbfts[0].N = 4
+	assert.Equal(t, 3, rbfts[0].commonCaseQuorum())
 
 	// allCorrectReplicasQuorum
-	assert.Equal(t, 3, rbft.allCorrectReplicasQuorum())
+	assert.Equal(t, 3, rbfts[0].allCorrectReplicasQuorum())
 
 	// oneCorrectQuorum
-	assert.Equal(t, 2, rbft.oneCorrectQuorum())
+	assert.Equal(t, 2, rbfts[0].oneCorrectQuorum())
 }
 
 // =============================================================================
@@ -128,7 +103,8 @@ func TestHelper_RBFT(t *testing.T) {
 func TestHelper_Check(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
+
+	_, rbfts := newBasicClusterInstance()
 
 	var IDTmp = msgID{
 		v: 1,
@@ -200,16 +176,16 @@ func TestHelper_Check(t *testing.T) {
 		commit:      commitMapTmp,
 		sentExecute: false,
 	}
-	rbft.storeMgr.certStore[IDTmp] = certTmp
+	rbfts[0].storeMgr.certStore[IDTmp] = certTmp
 
-	assert.Equal(t, true, rbft.prePrepared("msg", uint64(1), uint64(20)))
-	assert.Equal(t, false, rbft.prePrepared("error msg", uint64(1), uint64(20)))
+	assert.True(t, rbfts[0].prePrepared("msg", uint64(1), uint64(20)))
+	assert.False(t, rbfts[0].prePrepared("error msg", uint64(1), uint64(20)))
 
-	assert.Equal(t, false, rbft.prepared("no prePrepared", 1, 20))
-	assert.Equal(t, true, rbft.prepared("msg", 1, 20))
+	assert.False(t, rbfts[0].prepared("no prePrepared", 1, 20))
+	assert.True(t, rbfts[0].prepared("msg", 1, 20))
 
-	assert.Equal(t, false, rbft.committed("no prepared", 1, 20))
-	assert.Equal(t, true, rbft.committed("msg", 1, 20))
+	assert.False(t, rbfts[0].committed("no prepared", 1, 20))
+	assert.True(t, rbfts[0].committed("msg", 1, 20))
 }
 
 // =============================================================================
@@ -219,55 +195,49 @@ func TestHelper_Check(t *testing.T) {
 func TestHelper_isPrePrepareLegal(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
+
+	_, rbfts := newBasicClusterInstance()
 
 	preprep := &pb.PrePrepare{
-		ReplicaId:      2,
-		View:           1,
+		ReplicaId:      1,
+		View:           0,
 		SequenceNumber: 20,
 		BatchDigest:    "msg",
 		HashBatch:      nil,
 	}
 
-	rbft.atomicOn(InRecovery)
-	assert.Equal(t, false, rbft.isPrePrepareLegal(preprep))
-	rbft.atomicOff(InRecovery)
+	rbfts[0].atomicOn(InRecovery)
+	assert.False(t, rbfts[0].isPrePrepareLegal(preprep))
+	rbfts[0].atomicOff(InRecovery)
 
-	rbft.atomicOn(InViewChange)
-	assert.Equal(t, false, rbft.isPrePrepareLegal(preprep))
-	rbft.atomicOff(InViewChange)
+	rbfts[0].atomicOn(InViewChange)
+	assert.False(t, rbfts[0].isPrePrepareLegal(preprep))
+	rbfts[0].atomicOff(InViewChange)
 
-	rbft.atomicOn(InConfChange)
-	assert.Equal(t, false, rbft.isPrePrepareLegal(preprep))
-	rbft.atomicOff(InConfChange)
+	rbfts[0].atomicOn(InConfChange)
+	assert.False(t, rbfts[0].isPrePrepareLegal(preprep))
+	rbfts[0].atomicOff(InConfChange)
 
-	assert.Equal(t, false, rbft.isPrePrepareLegal(preprep))
+	assert.False(t, rbfts[0].isPrePrepareLegal(preprep))
 
-	preprep.ReplicaId = 1
-	assert.Equal(t, false, rbft.isPrePrepareLegal(preprep))
+	assert.True(t, rbfts[3].isPrePrepareLegal(preprep))
 
-	rbft.peerPool.ID = 1
-	assert.Equal(t, false, rbft.isPrePrepareLegal(preprep))
+	rbfts[3].h = 20
+	assert.False(t, rbfts[3].isPrePrepareLegal(preprep))
 
-	rbft.peerPool.ID = 3
-	assert.Equal(t, false, rbft.isPrePrepareLegal(preprep))
+	rbfts[3].h = 100
+	assert.False(t, rbfts[3].isPrePrepareLegal(preprep))
 
-	rbft.on(SkipInProgress)
-	assert.Equal(t, false, rbft.isPrePrepareLegal(preprep))
-
-	preprep.View = 0
-	rbft.setView(0)
-	rbft.exec.setLastExec(uint64(30))
-	assert.Equal(t, false, rbft.isPrePrepareLegal(preprep))
-
-	rbft.exec.setLastExec(uint64(10))
-	assert.Equal(t, true, rbft.isPrePrepareLegal(preprep))
+	rbfts[3].h = 10
+	rbfts[3].exec.setLastExec(uint64(21))
+	assert.False(t, rbfts[3].isPrePrepareLegal(preprep))
 }
 
 func TestHelper_isPrepareLegal(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
+
+	_, rbfts := newBasicClusterInstance()
 
 	prep := &pb.Prepare{
 		ReplicaId:      2,
@@ -275,19 +245,20 @@ func TestHelper_isPrepareLegal(t *testing.T) {
 		SequenceNumber: 2,
 		BatchDigest:    "test",
 	}
-	assert.Equal(t, true, rbft.isPrepareLegal(prep))
+	assert.True(t, rbfts[0].isPrepareLegal(prep))
 	prep.View = 1
-	assert.Equal(t, false, rbft.isPrepareLegal(prep))
-	rbft.h = 2
-	assert.Equal(t, false, rbft.isPrepareLegal(prep))
+	assert.False(t, rbfts[0].isPrepareLegal(prep))
+	rbfts[0].h = 10
+	assert.False(t, rbfts[0].isPrepareLegal(prep))
 	prep.ReplicaId = 1
-	assert.Equal(t, false, rbft.isPrepareLegal(prep))
+	assert.False(t, rbfts[0].isPrepareLegal(prep))
 }
 
 func TestHelper_isCommitLegal(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
+
+	_, rbfts := newBasicClusterInstance()
 
 	commit := &pb.Commit{
 		ReplicaId:      1,
@@ -296,17 +267,18 @@ func TestHelper_isCommitLegal(t *testing.T) {
 		BatchDigest:    "test",
 	}
 
-	assert.Equal(t, true, rbft.isCommitLegal(commit))
+	assert.True(t, rbfts[0].isCommitLegal(commit))
 	commit.View = 1
-	assert.Equal(t, false, rbft.isCommitLegal(commit))
-	rbft.h = 2
-	assert.Equal(t, false, rbft.isCommitLegal(commit))
+	assert.False(t, rbfts[0].isCommitLegal(commit))
+	rbfts[0].h = 10
+	assert.False(t, rbfts[0].isCommitLegal(commit))
 }
 
 func TestHelper_compareCheckpointWithWeakSet(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
+
+	_, rbfts := newBasicClusterInstance()
 
 	var (
 		flag bool
@@ -331,75 +303,123 @@ func TestHelper_compareCheckpointWithWeakSet(t *testing.T) {
 
 	// if !rbft.inW(chkpt.SequenceNumber)
 	// if chkpt.SequenceNumber != rbft.h && !rbft.in(SkipInProgress)
-	rbft.h = 70
-	rbft.on(SkipInProgress)
-	flag, val = rbft.compareCheckpointWithWeakSet(chkpt)
+	rbfts[0].h = 70
+	rbfts[0].on(SkipInProgress)
+	flag, val = rbfts[0].compareCheckpointWithWeakSet(chkpt)
 	assert.Equal(t, false, flag)
 	assert.Equal(t, 0, val)
 
-	rbft.off(SkipInProgress)
-	flag, val = rbft.compareCheckpointWithWeakSet(chkpt)
+	rbfts[0].off(SkipInProgress)
+	flag, val = rbfts[0].compareCheckpointWithWeakSet(chkpt)
 	assert.Equal(t, false, flag)
 	assert.Equal(t, 0, val)
 
 	// if len(diffValues) > rbft.f+1
-	rbft.h = 20
-	rbft.storeMgr.checkpointStore[*chkpt] = true
-	rbft.storeMgr.checkpointStore[*chkptR1] = true
-	rbft.storeMgr.checkpointStore[*chkptR2] = true
-	flag, val = rbft.compareCheckpointWithWeakSet(chkpt)
+	rbfts[0].h = 20
+	rbfts[0].storeMgr.checkpointStore[*chkpt] = true
+	rbfts[0].storeMgr.checkpointStore[*chkptR1] = true
+	rbfts[0].storeMgr.checkpointStore[*chkptR2] = true
+	flag, val = rbfts[0].compareCheckpointWithWeakSet(chkpt)
 	assert.Equal(t, false, flag)
 	assert.Equal(t, 0, val)
 
 	// if len(correctValues) == 0
-	delete(rbft.storeMgr.checkpointStore, *chkpt)
-	delete(rbft.storeMgr.checkpointStore, *chkptR1)
-	delete(rbft.storeMgr.checkpointStore, *chkptR2)
-	rbft.storeMgr.checkpointStore[*chkpt] = true
-	flag, val = rbft.compareCheckpointWithWeakSet(chkpt)
+	delete(rbfts[0].storeMgr.checkpointStore, *chkpt)
+	delete(rbfts[0].storeMgr.checkpointStore, *chkptR1)
+	delete(rbfts[0].storeMgr.checkpointStore, *chkptR2)
+	rbfts[0].storeMgr.checkpointStore[*chkpt] = true
+	flag, val = rbfts[0].compareCheckpointWithWeakSet(chkpt)
 	assert.Equal(t, false, flag)
 	assert.Equal(t, 0, val)
 
 	// if len(correctValues) > 1
-	rbft.f = 1
-	rbft.atomicOff(Pending)
-	rbft.on(Normal)
+	rbfts[0].atomicOff(Pending)
+	rbfts[0].setNormal()
 	chkpt.Digest = "msg"
 	chkptR1.Digest = "msg"
 	chkptR2.Digest = "msg"
-	rbft.storeMgr.checkpointStore[*chkpt] = true
-	rbft.storeMgr.checkpointStore[*chkptR1] = true
-	rbft.storeMgr.checkpointStore[*chkptR2] = true
+	rbfts[0].storeMgr.checkpointStore[*chkpt] = true
+	rbfts[0].storeMgr.checkpointStore[*chkptR1] = true
+	rbfts[0].storeMgr.checkpointStore[*chkptR2] = true
 	chkpt.Digest = "msgR1"
 	chkptR1.Digest = "msgR1"
 	chkptR2.Digest = "msgR1"
-	rbft.storeMgr.checkpointStore[*chkpt] = true
-	rbft.storeMgr.checkpointStore[*chkptR1] = true
-	rbft.storeMgr.checkpointStore[*chkptR2] = true
-	delete(rbft.storeMgr.checkpointStore, *chkptR2)
-	flag, val = rbft.compareCheckpointWithWeakSet(chkpt)
+	rbfts[0].storeMgr.checkpointStore[*chkpt] = true
+	rbfts[0].storeMgr.checkpointStore[*chkptR1] = true
+	rbfts[0].storeMgr.checkpointStore[*chkptR2] = true
+	delete(rbfts[0].storeMgr.checkpointStore, *chkptR2)
+	flag, val = rbfts[0].compareCheckpointWithWeakSet(chkpt)
 	assert.Equal(t, false, flag)
 	assert.Equal(t, 0, val)
-	assert.Equal(t, false, rbft.atomicIn(Pending))
-	assert.Equal(t, true, rbft.in(Normal))
+	assert.Equal(t, false, rbfts[0].atomicIn(Pending))
+	assert.Equal(t, true, rbfts[0].in(Normal))
 }
 
 func TestRBFT_startTimerIfOutstandingRequests(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
 
-	rbft.off(SkipInProgress)
+	_, rbfts := newBasicClusterInstance()
+
+	rbfts[0].off(SkipInProgress)
 
 	requestBatchTmp := &pb.RequestBatch{
 		RequestHashList: []string{"request hash list", "request hash list"},
-		RequestList:     mockRequestLists,
+		RequestList:     []*protos.Transaction{newTx()},
 		Timestamp:       time.Now().UnixNano(),
 		SeqNo:           2,
 		LocalList:       []bool{true, true},
 		BatchHash:       "hash",
 	}
-	rbft.storeMgr.outstandingReqBatches["msg"] = requestBatchTmp
+	rbfts[0].storeMgr.outstandingReqBatches["msg"] = requestBatchTmp
 
-	rbft.startTimerIfOutstandingRequests()
+	assert.False(t, rbfts[0].timerMgr.getTimer(newViewTimer))
+	rbfts[0].startTimerIfOutstandingRequests()
+	assert.True(t, rbfts[0].timerMgr.getTimer(newViewTimer))
+}
+
+func TestHelper_RequestSet(t *testing.T) {
+	tx1 := newTx()
+	tx2 := newTx()
+	tx3 := newTx()
+	tx4 := newTx()
+	tx5 := newTx()
+
+	req := &pb.RequestSet{
+		Local:    true,
+		Requests: []*protos.Transaction{tx1, tx2, tx3, tx4, tx5},
+	}
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	nodes, rbfts := newBasicClusterInstance()
+
+	rbfts[0].processEvent(req)
+	reqEventNormal := nodes[0].broadcastMessageCache
+	payload, _ := proto.Marshal(req)
+	consensusMsgNormal := &pb.ConsensusMessage{
+		Type:    pb.Type_REQUEST_SET,
+		From:    rbfts[0].peerPool.ID,
+		Epoch:   rbfts[0].epoch,
+		Payload: payload,
+	}
+	assert.Equal(t, consensusMsgNormal, reqEventNormal)
+
+	rbfts[1].requestSethMemLimit = true
+	rbfts[1].requestSetMaxMem = 1
+	rbfts[1].processEvent(req)
+	reqEventSplit := nodes[1].broadcastMessageCache
+	lastSplitSet := &pb.RequestSet{
+		Local:    true,
+		Requests: []*protos.Transaction{tx5},
+	}
+	payload, _ = proto.Marshal(lastSplitSet)
+	consensusMsgSplit := &pb.ConsensusMessage{
+		Type:    pb.Type_REQUEST_SET,
+		From:    rbfts[1].peerPool.ID,
+		Epoch:   rbfts[1].epoch,
+		Payload: payload,
+	}
+	assert.Equal(t, consensusMsgSplit, reqEventSplit)
 }

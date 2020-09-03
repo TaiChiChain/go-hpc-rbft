@@ -202,7 +202,7 @@ func (rbft *rbftImpl) restoreCSet() (map[msgID]*pb.Cset, error) {
 	return cset, err
 }
 
-// persistQList persists marshaled qList into DB before vc/recovery/updateN.
+// persistQList persists marshaled qList into DB before vc/recovery.
 func (rbft *rbftImpl) persistQList(ql map[qidx]*pb.Vc_PQ) {
 	for idx, q := range ql {
 		raw, err := proto.Marshal(q)
@@ -218,7 +218,7 @@ func (rbft *rbftImpl) persistQList(ql map[qidx]*pb.Vc_PQ) {
 	}
 }
 
-// persistPList persists marshaled pList into DB before vc/recovery/updateN.
+// persistPList persists marshaled pList into DB before vc/recovery.
 func (rbft *rbftImpl) persistPList(pl map[uint64]*pb.Vc_PQ) {
 	for idx, p := range pl {
 		raw, err := proto.Marshal(p)
@@ -234,7 +234,7 @@ func (rbft *rbftImpl) persistPList(pl map[uint64]*pb.Vc_PQ) {
 	}
 }
 
-// persistDelQPList deletes all qList and pList stored in DB after finish vc/recovery/updateN.
+// persistDelQPList deletes all qList and pList stored in DB after finish vc/recovery.
 func (rbft *rbftImpl) persistDelQPList() {
 	qIndex, err := rbft.external.ReadStateSet("qlist.")
 	if err != nil {

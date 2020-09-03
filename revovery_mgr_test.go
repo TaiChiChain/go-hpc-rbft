@@ -3,357 +3,509 @@ package rbft
 import (
 	"testing"
 
+	"github.com/ultramesh/flato-event/inner/protos"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
 
-	"github.com/gogo/protobuf/proto"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestRecovery_restartRecovery(t *testing.T) {
+func TestRecovery_ClusterInitRecovery(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
 
-	assert.Equal(t, uint64(0), rbft.view)
-	assert.Nil(t, rbft.restartRecovery())
-	assert.Equal(t, uint64(0), rbft.view)
-}
+	nodes, rbfts := newBasicClusterInstance()
+	unlockCluster(rbfts)
 
-func TestRecovery_recvNotification(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	rbft, _ := newTestRBFTReplica(ctrl)
-	rbft.atomicOn(InRecovery)
+	notificationSet := make([]*pb.ConsensusMessage, 4)
+	rbfts[0].initRecovery()
+	notificationSet[0] = nodes[0].broadcastMessageCache
+	assert.Equal(t, pb.Type_NOTIFICATION, notificationSet[0].Type)
 
-	// Set a Notification Msg
-	vbNode2 := &pb.VcBasis{
-		ReplicaId: uint64(2),
-		View:      1,
-		H:         rbft.h,
-	}
-	vbNode2.Cset, vbNode2.Pset, vbNode2.Qset = rbft.gatherPQC()
-	vbNode3 := &pb.VcBasis{
-		ReplicaId: uint64(3),
-		View:      1,
-		H:         rbft.h,
-	}
-	vbNode3.Cset, vbNode3.Pset, vbNode3.Qset = rbft.gatherPQC()
-	vbNode4 := &pb.VcBasis{
-		ReplicaId: uint64(4),
-		View:      1,
-		H:         rbft.h,
-	}
-	vbNode4.Cset, vbNode4.Pset, vbNode4.Qset = rbft.gatherPQC()
+	rbfts[1].processEvent(notificationSet[0])
+	notificationSet[1] = nodes[1].broadcastMessageCache
+	assert.Equal(t, pb.Type_NOTIFICATION, notificationSet[1].Type)
 
-	nodeInfo2 := &pb.NodeInfo{
-		ReplicaId:   uint64(2),
-		ReplicaHash: "node2",
-	}
-	notificationNode2 := &pb.Notification{
-		Basis:    vbNode2,
-		NodeInfo: nodeInfo2,
-	}
-	nodeInfo3 := &pb.NodeInfo{
-		ReplicaId:   uint64(3),
-		ReplicaHash: "node3",
-	}
-	notificationNode3 := &pb.Notification{
-		Basis:    vbNode3,
-		NodeInfo: nodeInfo3,
-	}
-	nodeInfo4 := &pb.NodeInfo{
-		ReplicaId:   uint64(4),
-		ReplicaHash: "node4",
-	}
-	notificationNode4 := &pb.Notification{
-		Basis:    vbNode4,
-		NodeInfo: nodeInfo4,
-	}
+	rbfts[2].processEvent(notificationSet[0])
+	notificationSet[2] = nodes[2].broadcastMessageCache
+	assert.Equal(t, pb.Type_NOTIFICATION, notificationSet[2].Type)
 
-	// recv quorum notifications
-	// return LocalEvent to RecoveryService NotificationQuorumEvent
-	payload, _ := proto.Marshal(notificationNode2)
-	event := &pb.ConsensusMessage{
-		Type:    pb.Type_NOTIFICATION,
-		Epoch:   uint64(0),
-		Payload: payload,
-	}
-	rbft.processEvent(event)
-	rbft.recvNotification(notificationNode3)
+	rbfts[3].processEvent(notificationSet[1])
+	rbfts[3].processEvent(notificationSet[2])
+	notificationSet[3] = nodes[3].broadcastMessageCache
+	assert.Equal(t, pb.Type_NOTIFICATION, notificationSet[3].Type)
 
-	// NewNode will not recv
-	rbft.atomicOn(InRecovery)
-	rbft.off(Normal)
-	rbft.on(isNewNode)
-	retNil := rbft.recvNotification(notificationNode4)
-	assert.Nil(t, retNil)
-	rbft.off(isNewNode)
-
-	// in recovery, get in reEvent
-	retEvent := rbft.recvNotification(notificationNode4)
-	expEvent := &LocalEvent{
+	doneNotificationQuorum := &LocalEvent{
 		Service:   RecoveryService,
 		EventType: NotificationQuorumEvent,
 	}
-	assert.Equal(t, expEvent, retEvent)
+	for index := range rbfts {
+		for j := range notificationSet {
+			done := rbfts[index].processEvent(notificationSet[j])
+			if done != nil {
+				assert.Equal(t, doneNotificationQuorum, done)
+				break
+			}
+		}
+	}
+
+	for index := range rbfts {
+		rbfts[index].processEvent(doneNotificationQuorum)
+	}
+	nv := nodes[1].broadcastMessageCache
+	assert.Equal(t, pb.Type_NEW_VIEW, nv.Type)
+
+	doneRecovery := &LocalEvent{
+		Service:   RecoveryService,
+		EventType: RecoveryDoneEvent,
+	}
+	for index := range rbfts {
+		if index == 1 {
+			continue
+		}
+		done := rbfts[index].processEvent(nv)
+		assert.Equal(t, doneRecovery, done)
+	}
+
+	fetchPQCSet := make([]*pb.ConsensusMessage, 4)
+	for index := range rbfts {
+		rbfts[index].processEvent(doneRecovery)
+		fetchPQCSet[index] = nodes[index].broadcastMessageCache
+		assert.Equal(t, pb.Type_RECOVERY_FETCH_QPC, fetchPQCSet[index].Type)
+	}
 }
 
-func TestRecovery_resetStateForRecovery(t *testing.T) {
+func TestRecovery_ReplicaRecovery(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
 
-	// behind by checkpoint, move watermark and state transfer to the target
-	C := &pb.Vc_C{
-		SequenceNumber: 20,
-		Digest:         "cp",
+	nodes, rbfts := newBasicClusterInstance()
+	unlockCluster(rbfts)
+
+	tx1 := newTx()
+	executeExceptN(t, rbfts, nodes, tx1, false, 3)
+
+	tx2 := newTx()
+	execute(t, rbfts, nodes, tx2, false)
+
+	rbfts[3].initRecovery()
+	notificationNode4 := nodes[3].broadcastMessageCache
+	assert.Equal(t, pb.Type_NOTIFICATION, notificationNode4.Type)
+	assert.Equal(t, uint64(1), rbfts[3].view)
+
+	notificationRsp := make([]*pb.ConsensusMessage, 4)
+	for index := range rbfts {
+		if index == 3 {
+			continue
+		}
+		rbfts[index].processEvent(notificationNode4)
+		notificationRsp[index] = nodes[index].unicastMessageCache
+		assert.Equal(t, pb.Type_NOTIFICATION_RESPONSE, notificationRsp[index].Type)
 	}
 
-	nrNode2 := &pb.NotificationResponse{
-		Basis: rbft.getVcBasis(),
-		N:     uint64(rbft.N),
-		NodeInfo: &pb.NodeInfo{
-			ReplicaId:   uint64(2),
-			ReplicaHash: "node2",
-		},
+	var node4FetchPQC *pb.ConsensusMessage
+	for index := range notificationRsp {
+		if index == 3 {
+			continue
+		}
+		recoveryDone := rbfts[3].processEvent(notificationRsp[index])
+		if recoveryDone != nil {
+			recoveryDoneTag := &LocalEvent{
+				Service:   RecoveryService,
+				EventType: RecoveryDoneEvent,
+			}
+			assert.Equal(t, recoveryDoneTag, recoveryDone)
+			rbfts[3].processEvent(recoveryDone)
+			node4FetchPQC = nodes[3].broadcastMessageCache
+			assert.Equal(t, pb.Type_RECOVERY_FETCH_QPC, node4FetchPQC.Type)
+			break
+		}
 	}
-	nrNode2.Basis.ReplicaId = uint64(2)
-	nrNode2.Basis.View = uint64(1)
-	nrNode2.Basis.Cset = []*pb.Vc_C{C}
 
-	nrNode3 := &pb.NotificationResponse{
-		Basis: rbft.getVcBasis(),
-		N:     uint64(rbft.N),
-		NodeInfo: &pb.NodeInfo{
-			ReplicaId:   uint64(3),
-			ReplicaHash: "node3",
-		},
+	returnRecoveryPQC := make([]*pb.ConsensusMessage, 4)
+	for index := range rbfts {
+		if index == 3 {
+			continue
+		}
+		rbfts[index].processEvent(node4FetchPQC)
+		returnRecoveryPQC[index] = nodes[index].unicastMessageCache
+		assert.Equal(t, pb.Type_RECOVERY_RETURN_QPC, returnRecoveryPQC[index].Type)
 	}
-	nrNode3.Basis.ReplicaId = uint64(3)
-	nrNode3.Basis.View = uint64(1)
-	nrNode3.Basis.Cset = []*pb.Vc_C{C}
 
-	nrNode4 := &pb.NotificationResponse{
-		Basis: rbft.getVcBasis(),
-		N:     uint64(rbft.N),
-		NodeInfo: &pb.NodeInfo{
-			ReplicaId:   uint64(4),
-			ReplicaHash: "node4",
-		},
+	for index := range returnRecoveryPQC {
+		if index == 3 {
+			continue
+		}
+		rbfts[3].processEvent(returnRecoveryPQC[index])
 	}
-	nrNode4.Basis.ReplicaId = uint64(4)
-	nrNode4.Basis.View = uint64(1)
-	nrNode4.Basis.Cset = []*pb.Vc_C{C}
-
-	rbft.atomicOn(InRecovery)
-	rbft.recvNotificationResponse(nrNode2)
-	rbft.recvNotificationResponse(nrNode3)
-	rbft.recvNotificationResponse(nrNode4)
-
-	// clear outstanding batch
-	rbft.storeMgr.outstandingReqBatches["delete"] = &pb.RequestBatch{BatchHash: "delete"}
-	rbft.resetStateForRecovery()
-	assert.Nil(t, rbft.storeMgr.outstandingReqBatches["delete"])
+	assert.Equal(t, uint64(2), rbfts[3].exec.lastExec)
 }
 
-func TestRecovery_fetchRecoveryPQC(t *testing.T) {
+func TestRecovery_PrimaryRecovery(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	rbft, _ := newTestRBFTReplica(ctrl)
 
-	rbft.h = 10
-	ret := rbft.fetchRecoveryPQC()
-	// return nil means running normally
-	assert.Nil(t, ret)
+	nodes, rbfts := newBasicClusterInstance()
+	unlockCluster(rbfts)
+
+	ctx := newCTX(defaultValidatorSet)
+	executeExceptPrimary(t, rbfts, nodes, ctx, true)
+
+	rbfts[0].initRecovery()
+	notificationNode1 := nodes[0].broadcastMessageCache
+	assert.Equal(t, pb.Type_NOTIFICATION, notificationNode1.Type)
+
+	notificationRsp := make([]*pb.ConsensusMessage, 4)
+	for index := range rbfts {
+		if index == 0 {
+			continue
+		}
+		rbfts[index].processEvent(notificationNode1)
+		notificationRsp[index] = nodes[index].unicastMessageCache
+		assert.Equal(t, pb.Type_NOTIFICATION_RESPONSE, notificationRsp[index].Type)
+	}
+
+	for index := range notificationRsp {
+		if index == 0 {
+			continue
+		}
+		rbfts[0].processEvent(notificationRsp[index])
+	}
+	vc := nodes[0].broadcastMessageCache
+	assert.Equal(t, pb.Type_VIEW_CHANGE, vc.Type)
 }
 
-func TestRecovery_returnRecoveryPQC(t *testing.T) {
+func TestRecovery_NormalCheckpointFailing_Recovery(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
 
-	fetchTmp := &pb.RecoveryFetchPQC{
-		ReplicaId: uint64(1),
-		H:         20,
-	}
-	// Too large H, could not fetch PQC
-	fetchTmp.H = 100
-	ret := rbft.returnRecoveryPQC(fetchTmp)
-	assert.Nil(t, ret)
+	nodes, rbfts := newBasicClusterInstance()
+	unlockCluster(rbfts)
 
-	// After fetching the PQC, return nil
-	fetchTmp.H = 20
+	txSet := make([]*protos.Transaction, 13)
+	for index := 0; index < 13; index++ {
+		txSet[index] = newTx()
+	}
+	for index := range txSet {
+		if index == 9 {
+			break
+		}
+		execute(t, rbfts, nodes, txSet[index], false)
+	}
 
-	rbft.h = 10
-	rbft.setView(0)
-	// If return is nil, it runs normally
-	hashBatch := &pb.HashBatch{
-		RequestHashList:            []string{"Hash11", "Hash12"},
-		DeDuplicateRequestHashList: []string{"Hash11", "Hash12"},
-		Timestamp:                  1,
+	executeExceptN(t, rbfts, nodes, txSet[9], true, 3)
+	execute(t, rbfts, nodes, txSet[10], false)
+	execute(t, rbfts, nodes, txSet[11], false)
+	execute(t, rbfts, nodes, txSet[12], false)
+
+	rbfts[3].initRecovery()
+	notificationNode4 := nodes[3].broadcastMessageCache
+	assert.Equal(t, pb.Type_NOTIFICATION, notificationNode4.Type)
+	assert.Equal(t, uint64(1), rbfts[3].view)
+
+	notificationRsp := make([]*pb.ConsensusMessage, 4)
+	for index := range rbfts {
+		if index == 3 {
+			continue
+		}
+		rbfts[index].processEvent(notificationNode4)
+		notificationRsp[index] = nodes[index].unicastMessageCache
+		assert.Equal(t, pb.Type_NOTIFICATION_RESPONSE, notificationRsp[index].Type)
 	}
-	preprep := &pb.PrePrepare{
-		ReplicaId:      1,
-		View:           0,
-		SequenceNumber: 40,
-		BatchDigest:    calculateMD5Hash([]string{"Hash11", "Hash12"}, 1),
-		HashBatch:      hashBatch,
+
+	//var node4FetchPQC *pb.ConsensusMessage
+	for index := range notificationRsp {
+		if index == 3 {
+			continue
+		}
+		rbfts[3].processEvent(notificationRsp[index])
 	}
-	prepNode2 := &pb.Prepare{
-		View:           preprep.View,
-		SequenceNumber: preprep.SequenceNumber,
-		BatchDigest:    preprep.BatchDigest,
-		ReplicaId:      rbft.peerPool.ID,
+
+	msg := <-rbfts[3].recvChan
+	event := msg.(*LocalEvent)
+	ss := event.Event.(*pb.ServiceState)
+	assert.Equal(t, uint64(10), ss.MetaState.Applied)
+
+	recoveryDone := rbfts[3].processEvent(event)
+	assert.Equal(t, uint64(10), rbfts[3].h)
+	assert.Equal(t, uint64(10), rbfts[3].exec.lastExec)
+
+	recoveryDoneEvent := &LocalEvent{
+		Service:   RecoveryService,
+		EventType: RecoveryDoneEvent,
 	}
-	prepNode4 := &pb.Prepare{
-		View:           preprep.View,
-		SequenceNumber: preprep.SequenceNumber,
-		BatchDigest:    preprep.BatchDigest,
-		ReplicaId:      uint64(4),
+	assert.Equal(t, recoveryDoneEvent, recoveryDone)
+
+	checkpointNode4 := nodes[3].broadcastMessageCache
+	assert.Equal(t, pb.Type_CHECKPOINT, checkpointNode4.Type)
+
+	rbfts[3].processEvent(recoveryDone)
+	node4FetchPQC := nodes[3].broadcastMessageCache
+	assert.Equal(t, pb.Type_RECOVERY_FETCH_QPC, node4FetchPQC.Type)
+
+	returnRecoveryPQC := make([]*pb.ConsensusMessage, 4)
+	for index := range rbfts {
+		if index == 3 {
+			continue
+		}
+		rbfts[index].processEvent(node4FetchPQC)
+		returnRecoveryPQC[index] = nodes[index].unicastMessageCache
+		assert.Equal(t, pb.Type_RECOVERY_RETURN_QPC, returnRecoveryPQC[index].Type)
 	}
-	prepNode3 := &pb.Prepare{
-		View:           preprep.View,
-		SequenceNumber: preprep.SequenceNumber,
-		BatchDigest:    preprep.BatchDigest,
-		ReplicaId:      uint64(3),
+
+	for index := range returnRecoveryPQC {
+		if index == 3 {
+			continue
+		}
+		rbfts[3].processEvent(returnRecoveryPQC[index])
 	}
-	commitNode2 := &pb.Commit{
-		ReplicaId:      2,
-		View:           preprep.View,
-		SequenceNumber: preprep.SequenceNumber,
-		BatchDigest:    preprep.BatchDigest,
-	}
-	commitNode1 := &pb.Commit{
-		ReplicaId:      1,
-		View:           preprep.View,
-		SequenceNumber: preprep.SequenceNumber,
-		BatchDigest:    preprep.BatchDigest,
-	}
-	commitNode3 := &pb.Commit{
-		ReplicaId:      3,
-		View:           preprep.View,
-		SequenceNumber: preprep.SequenceNumber,
-		BatchDigest:    preprep.BatchDigest,
-	}
-	msgIDTmp := msgID{
-		v: 0,
-		n: 40,
-		d: calculateMD5Hash([]string{"Hash11", "Hash12"}, 1),
-	}
-	rbft.storeMgr.certStore[msgIDTmp] = &msgCert{
-		prePrepare:  preprep,
-		sentPrepare: true,
-		prepare:     map[pb.Prepare]bool{*prepNode2: true, *prepNode3: true, *prepNode4: true},
-		sentCommit:  true,
-		commit:      map[pb.Commit]bool{*commitNode3: true, *commitNode2: true, *commitNode1: true},
-		sentExecute: true,
-	}
-	payload, _ := proto.Marshal(fetchTmp)
-	event := &pb.ConsensusMessage{
-		Type:    pb.Type_RECOVERY_FETCH_QPC,
-		Payload: payload,
-	}
-	ret = rbft.processEvent(event)
-	assert.Nil(t, ret)
+	assert.Equal(t, uint64(13), rbfts[3].exec.lastExec)
 }
 
-func TestRecovery_recvRecoveryReturnPQC(t *testing.T) {
+func TestRecovery_EpochCheckpointFailing_Recovery(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	rbft, _ := newTestRBFTReplica(ctrl)
 
-	hashBatch := &pb.HashBatch{
-		RequestHashList:            []string{"Hash11", "Hash12"},
-		DeDuplicateRequestHashList: []string{"Hash11", "Hash12"},
-		Timestamp:                  1,
-	}
-	preprep := &pb.PrePrepare{
-		ReplicaId:      1,
-		View:           0,
-		SequenceNumber: 10,
-		BatchDigest:    calculateMD5Hash([]string{"Hash11", "Hash12"}, 1),
-		HashBatch:      hashBatch,
-	}
-	prepNode2 := &pb.Prepare{
-		View:           preprep.View,
-		SequenceNumber: preprep.SequenceNumber,
-		BatchDigest:    preprep.BatchDigest,
-		ReplicaId:      rbft.peerPool.ID,
-	}
-	prepNode4 := &pb.Prepare{
-		View:           preprep.View,
-		SequenceNumber: preprep.SequenceNumber,
-		BatchDigest:    preprep.BatchDigest,
-		ReplicaId:      uint64(4),
-	}
-	prepNode3 := &pb.Prepare{
-		View:           preprep.View,
-		SequenceNumber: preprep.SequenceNumber,
-		BatchDigest:    preprep.BatchDigest,
-		ReplicaId:      uint64(3),
-	}
-	commitNode2 := &pb.Commit{
-		ReplicaId:      2,
-		View:           preprep.View,
-		SequenceNumber: preprep.SequenceNumber,
-		BatchDigest:    preprep.BatchDigest,
-	}
-	commitNode4 := &pb.Commit{
-		ReplicaId:      4,
-		View:           preprep.View,
-		SequenceNumber: preprep.SequenceNumber,
-		BatchDigest:    preprep.BatchDigest,
-	}
-	commitNode3 := &pb.Commit{
-		ReplicaId:      3,
-		View:           preprep.View,
-		SequenceNumber: preprep.SequenceNumber,
-		BatchDigest:    preprep.BatchDigest,
+	nodes, rbfts := newBasicClusterInstance()
+	unlockCluster(rbfts)
+
+	ctx := newCTX(defaultValidatorSet)
+	executeExceptN(t, rbfts, nodes, ctx, true, 3)
+
+	tx := newTx()
+	executeExceptN(t, rbfts, nodes, tx, false, 3)
+
+	rbfts[3].initRecovery()
+	notificationNode4 := nodes[3].broadcastMessageCache
+	assert.Equal(t, pb.Type_NOTIFICATION, notificationNode4.Type)
+	assert.Equal(t, uint64(1), rbfts[3].view)
+
+	notificationRsp := make([]*pb.ConsensusMessage, 4)
+	for index := range rbfts {
+		if index == 3 {
+			continue
+		}
+		rbfts[index].processEvent(notificationNode4)
+		notificationRsp[index] = nodes[index].unicastMessageCache
+		assert.Equal(t, pb.Type_NOTIFICATION_RESPONSE, notificationRsp[index].Type)
 	}
 
-	PQCInfo := &pb.RecoveryReturnPQC{
-		ReplicaId: 1,
-		PrepreSet: []*pb.PrePrepare{preprep},
-		PreSet:    []*pb.Prepare{prepNode4, prepNode2, prepNode3},
-		CmtSet:    []*pb.Commit{commitNode4, commitNode2, commitNode3},
+	for index := range notificationRsp {
+		if index == 3 {
+			continue
+		}
+		rbfts[3].processEvent(notificationRsp[index])
 	}
 
-	// Recovery consensus process
-	payload, _ := proto.Marshal(PQCInfo)
-	event := &pb.ConsensusMessage{
-		Type:    pb.Type_RECOVERY_RETURN_QPC,
-		Epoch:   uint64(0),
-		Payload: payload,
+	msg := <-rbfts[3].recvChan
+	event := msg.(*LocalEvent)
+	ss := event.Event.(*pb.ServiceState)
+	assert.Equal(t, defaultValidatorSet, ss.EpochInfo.VSet)
+	assert.Equal(t, uint64(1), ss.EpochInfo.Epoch)
+	assert.Equal(t, uint64(1), ss.MetaState.Applied)
+
+	recoveryDone := rbfts[3].processEvent(event)
+	assert.Equal(t, uint64(1), rbfts[3].h)
+	assert.Equal(t, uint64(1), rbfts[3].epoch)
+	assert.Equal(t, uint64(1), rbfts[3].exec.lastExec)
+
+	recoveryDoneEvent := &LocalEvent{
+		Service:   RecoveryService,
+		EventType: RecoveryDoneEvent,
 	}
-	rbft.processEvent(event)
-	certTmp := rbft.storeMgr.getCert(preprep.View, preprep.SequenceNumber, preprep.BatchDigest)
-	assert.Equal(t, preprep, certTmp.prePrepare)
-	assert.Equal(t, true, certTmp.prepare[*prepNode4])
-	assert.Equal(t, true, certTmp.prepare[*prepNode2])
-	assert.Equal(t, true, certTmp.prepare[*prepNode3])
-	assert.Equal(t, true, certTmp.sentPrepare)
-	assert.Equal(t, true, certTmp.commit[*commitNode4])
-	assert.Equal(t, true, certTmp.commit[*commitNode2])
-	assert.Equal(t, true, certTmp.commit[*commitNode3])
-	assert.Equal(t, true, certTmp.sentCommit)
+	assert.Equal(t, recoveryDoneEvent, recoveryDone)
+
+	checkpointNode4 := nodes[3].broadcastMessageCache
+	assert.Equal(t, pb.Type_CHECKPOINT, checkpointNode4.Type)
+
+	rbfts[3].processEvent(recoveryDone)
+	node4FetchPQC := nodes[3].broadcastMessageCache
+	assert.Equal(t, pb.Type_RECOVERY_FETCH_QPC, node4FetchPQC.Type)
+
+	returnRecoveryPQC := make([]*pb.ConsensusMessage, 4)
+	for index := range rbfts {
+		if index == 3 {
+			continue
+		}
+		rbfts[index].processEvent(node4FetchPQC)
+		returnRecoveryPQC[index] = nodes[index].unicastMessageCache
+		assert.Equal(t, pb.Type_RECOVERY_RETURN_QPC, returnRecoveryPQC[index].Type)
+	}
+
+	for index := range returnRecoveryPQC {
+		if index == 3 {
+			continue
+		}
+		rbfts[3].processEvent(returnRecoveryPQC[index])
+	}
+	node4FetchMissingTx := nodes[3].unicastMessageCache
+	assert.Equal(t, pb.Type_FETCH_MISSING_REQUESTS, node4FetchMissingTx.Type)
+
+	rbfts[0].processEvent(node4FetchMissingTx)
+	node1SendMissingTx := nodes[0].unicastMessageCache
+	assert.Equal(t, pb.Type_SEND_MISSING_REQUESTS, node1SendMissingTx.Type)
+
+	rbfts[3].processEvent(node1SendMissingTx)
+	assert.Equal(t, uint64(2), rbfts[3].exec.lastExec)
 }
 
-func TestRecovery_trySyncState(t *testing.T) {
+func TestRecovery_SyncStateToStateUpdate(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
 
-	rbft.off(NeedSyncState)
+	nodes, rbfts := newBasicClusterInstance()
+	unlockCluster(rbfts)
 
-	// abnormal replica could not be in SyncState
-	rbft.off(Normal)
-	rbft.trySyncState()
-	assert.Equal(t, false, rbft.in(NeedSyncState))
+	tx := newTx()
+	executeExceptN(t, rbfts, nodes, tx, false, 3)
+	metaS := &pb.MetaState{
+		Applied: uint64(1),
+		Digest:  "wrong-digest",
+	}
+	rbfts[3].node.currentState = &pb.ServiceState{
+		MetaState: metaS,
+	}
 
-	// normal node
-	rbft.on(Normal)
-	rbft.trySyncState()
-	assert.Equal(t, true, rbft.in(NeedSyncState))
+	syncEvent := &LocalEvent{
+		Service:   RecoveryService,
+		EventType: RecoverySyncStateRestartTimerEvent,
+	}
+	rbfts[3].processEvent(syncEvent)
+	node4SyncStateReq := nodes[3].broadcastMessageCache
+	assert.Equal(t, pb.Type_SYNC_STATE, node4SyncStateReq.Type)
 
+	syncStateResponse := make([]*pb.ConsensusMessage, 4)
+	for index := range rbfts {
+		rbfts[index].processEvent(node4SyncStateReq)
+		syncStateResponse[index] = nodes[index].unicastMessageCache
+		assert.Equal(t, pb.Type_SYNC_STATE_RESPONSE, syncStateResponse[index].Type)
+	}
+
+	for index := range syncStateResponse {
+		rbfts[3].processEvent(syncStateResponse[index])
+	}
+
+	msg := <-rbfts[3].recvChan
+	event := msg.(*LocalEvent)
+	ss := event.Event.(*pb.ServiceState)
+	assert.Equal(t, uint64(1), ss.MetaState.Applied)
+
+	assert.Equal(t, uint64(0), rbfts[3].exec.lastExec)
+	rbfts[3].processEvent(msg)
+	assert.Equal(t, uint64(1), rbfts[3].exec.lastExec)
+}
+
+func TestRecovery_SyncStateToSyncEpoch(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	nodes, rbfts := newBasicClusterInstance()
+	unlockCluster(rbfts)
+
+	ctx := newCTX(defaultValidatorSet)
+	executeExceptN(t, rbfts, nodes, ctx, true, 3)
+	metaS := &pb.MetaState{
+		Applied: uint64(1),
+		Digest:  "wrong-digest",
+	}
+	rbfts[3].node.currentState = &pb.ServiceState{
+		MetaState: metaS,
+	}
+
+	syncEvent := &LocalEvent{
+		Service:   RecoveryService,
+		EventType: RecoverySyncStateRestartTimerEvent,
+	}
+
+	rbfts[3].processEvent(syncEvent)
+	node4SyncStateReq := nodes[3].broadcastMessageCache
+	assert.Equal(t, pb.Type_SYNC_STATE, node4SyncStateReq.Type)
+
+	syncStateResponse := make([]*pb.ConsensusMessage, 4)
+	for index := range rbfts {
+		rbfts[index].processEvent(node4SyncStateReq)
+		syncStateResponse[index] = nodes[index].unicastMessageCache
+		assert.Equal(t, pb.Type_SYNC_STATE_RESPONSE, syncStateResponse[index].Type)
+	}
+
+	for index := range syncStateResponse {
+		rbfts[3].processEvent(syncStateResponse[index])
+	}
+
+	msg := <-rbfts[3].recvChan
+	event := msg.(*LocalEvent)
+	ss := event.Event.(*pb.ServiceState)
+	assert.Equal(t, uint64(1), ss.MetaState.Applied)
+
+	assert.Equal(t, uint64(0), rbfts[3].exec.lastExec)
+	rbfts[3].processEvent(msg)
+	assert.Equal(t, uint64(1), rbfts[3].exec.lastExec)
+}
+
+func TestRecovery_ReplicaSyncStateToRecovery(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	nodes, rbfts := newBasicClusterInstance()
+	unlockCluster(rbfts)
+
+	tx := newTx()
+	executeExceptN(t, rbfts, nodes, tx, false, 3)
+
+	syncEvent := &LocalEvent{
+		Service:   RecoveryService,
+		EventType: RecoverySyncStateRestartTimerEvent,
+	}
+
+	rbfts[3].processEvent(syncEvent)
+	node4SyncStateReq := nodes[3].broadcastMessageCache
+	assert.Equal(t, pb.Type_SYNC_STATE, node4SyncStateReq.Type)
+
+	syncStateResponse := make([]*pb.ConsensusMessage, 4)
+	for index := range rbfts {
+		rbfts[index].processEvent(node4SyncStateReq)
+		syncStateResponse[index] = nodes[index].unicastMessageCache
+		assert.Equal(t, pb.Type_SYNC_STATE_RESPONSE, syncStateResponse[index].Type)
+	}
+
+	for index := range syncStateResponse {
+		rbfts[3].processEvent(syncStateResponse[index])
+	}
+
+	node4Notification := nodes[3].broadcastMessageCache
+	assert.Equal(t, pb.Type_NOTIFICATION, node4Notification.Type)
+}
+
+func TestRecovery_PrimarySyncStateToRecovery(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	nodes, rbfts := newBasicClusterInstance()
+	unlockCluster(rbfts)
+
+	tx := newTx()
+	executeExceptPrimary(t, rbfts, nodes, tx, false)
+
+	syncEvent := &LocalEvent{
+		Service:   RecoveryService,
+		EventType: RecoverySyncStateRestartTimerEvent,
+	}
+
+	rbfts[0].processEvent(syncEvent)
+	node4SyncStateReq := nodes[0].broadcastMessageCache
+	assert.Equal(t, pb.Type_SYNC_STATE, node4SyncStateReq.Type)
+
+	syncStateResponse := make([]*pb.ConsensusMessage, 4)
+	for index := range rbfts {
+		rbfts[index].processEvent(node4SyncStateReq)
+		syncStateResponse[index] = nodes[index].unicastMessageCache
+		assert.Equal(t, pb.Type_SYNC_STATE_RESPONSE, syncStateResponse[index].Type)
+	}
+
+	for index := range syncStateResponse {
+		rbfts[0].processEvent(syncStateResponse[index])
+	}
+
+	node4Notification := nodes[0].broadcastMessageCache
+	assert.Equal(t, pb.Type_VIEW_CHANGE, node4Notification.Type)
 }

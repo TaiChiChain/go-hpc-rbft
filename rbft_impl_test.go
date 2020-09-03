@@ -6,214 +6,14 @@ import (
 	"time"
 
 	"github.com/ultramesh/flato-event/inner/protos"
+	mockexternal "github.com/ultramesh/flato-rbft/mock/mock_external"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
+	txpoolmock "github.com/ultramesh/flato-txpool/mock"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 )
-
-// A normal process of consensus
-func TestRBFT_processEvent_NormalConsensusP(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
-
-	//******************************************************
-	requestsTmp := mockRequestList
-	// The first sent
-	reqBatchTmp := &pb.RequestBatch{
-		BatchHash:       calculateMD5Hash([]string{"Hash11", "Hash12"}, 1),
-		RequestHashList: []string{"Hash11", "Hash12"},
-		RequestList:     mockRequestLists,
-		LocalList:       []bool{true, true},
-		Timestamp:       1,
-		SeqNo:           1,
-	}
-
-	// Start:
-	// In processEvent function
-	// Receive a consensusEvent which Type is RequestSet(isn't local msg)
-	// Call processReqSetEvent to process it
-	//
-	// Req Process:
-	// In processReqSetEvent function
-	// As for Normal case, the primary submit Reqs to txpool
-	// Assuming that txpool has already make three batches, primary receives them
-	// Call postBatches to post them
-	//
-	// Batches to sendPrePrepare:
-	// In postBatches function, call recvRequestBatch to deal with the batches
-	// In recvRequestBatch function, deal with one batch to prepare prePrepare msg
-	// Call maybeSendPrePrepare(here is cacheBatch processing)
-	// In maybeSendPrePrepare function,
-	// Give batch.seqNo, it is rbft.batchMgr.SeqNo+1
-	// rbft.storeMgr stores the batch and storage StoreState it
-	// Finally send prePrepare
-	// After sending prePrepare, rbft.batchMgr.SeqNo is equal to new batch
-	// It means that rbft.batchMgr.SeqNo++
-	// As for there are three batches, rbft.batchMgr.SeqNo==3
-	e := &pb.RequestSet{
-		Requests: requestsTmp,
-		Local:    false,
-	}
-	rbft.on(Normal)
-	rbft.peerPool.ID = 1
-	assert.Equal(t, uint64(0), rbft.batchMgr.seqNo)
-	rbft.processEvent(e)
-	assert.Equal(t, reqBatchTmp, rbft.storeMgr.batchStore[reqBatchTmp.BatchHash])
-	assert.Equal(t, uint64(3), rbft.batchMgr.seqNo)
-	// Now rbft.batchMgr.seqNo=3
-	// Other cases:
-	// There are batches in BatchCache
-	// Firstly process the batch in cache
-	// Thought we send 4 batches(1 from cache, 3 from txPool), only the one in cache have new digest
-	// So that rbft.batchMgr.seqNo=4
-	batch := &pb.RequestBatch{
-		BatchHash:       calculateMD5Hash([]string{"HashC1", "HashC2"}, 0),
-		RequestHashList: []string{"HashC1", "HashC2"},
-		RequestList:     mockRequestLists,
-		LocalList:       []bool{true, true},
-		Timestamp:       0,
-	}
-	cacheBatch := []*pb.RequestBatch{batch}
-	rbft.batchMgr.cacheBatch = cacheBatch
-	// As a consensusMessage to process
-	payloadReq, _ := proto.Marshal(e)
-	eventReq := &pb.ConsensusMessage{
-		Type:    pb.Type_REQUEST_SET,
-		Epoch:   uint64(0),
-		Payload: payloadReq,
-	}
-	rbft.processEvent(eventReq)
-	assert.Equal(t, uint64(4), rbft.batchMgr.seqNo)
-	// Cover processReqSetEvent, postBatches, recvRequestBatch, sendPrePrepare
-	// maybeSendPrePrepare in batch_mgr.go
-	//******************************************************
-
-	// After primary has send prePrepare
-	// Replica node2 recvPrePrepare
-	//*******************************************************
-	hashBatch := &pb.HashBatch{
-		RequestHashList:            []string{"Hash11", "Hash12"},
-		DeDuplicateRequestHashList: []string{"Hash11", "Hash12"},
-		Timestamp:                  1,
-	}
-	preprep := &pb.PrePrepare{
-		ReplicaId:      1,
-		View:           0,
-		SequenceNumber: 10,
-		BatchDigest:    calculateMD5Hash([]string{"Hash11", "Hash12"}, 1),
-		HashBatch:      hashBatch,
-	}
-	payload, _ := proto.Marshal(preprep)
-	event := &pb.ConsensusMessage{
-		Type:    pb.Type_PRE_PREPARE,
-		Epoch:   uint64(0),
-		Payload: payload,
-	}
-	rbft.peerPool.ID = uint64(2)
-	// Node2 receive prePrepare, then sendPrepare
-	rbft.processEvent(event)
-	cert := rbft.storeMgr.getCert(preprep.View, preprep.SequenceNumber, preprep.BatchDigest)
-	assert.Equal(t, true, cert.sentPrepare)
-
-	prepNode2 := &pb.Prepare{
-		View:           preprep.View,
-		SequenceNumber: preprep.SequenceNumber,
-		BatchDigest:    preprep.BatchDigest,
-		ReplicaId:      rbft.peerPool.ID,
-	}
-	prepNode1 := &pb.Prepare{
-		View:           preprep.View,
-		SequenceNumber: preprep.SequenceNumber,
-		BatchDigest:    preprep.BatchDigest,
-		ReplicaId:      uint64(1),
-	}
-	prepNode3 := &pb.Prepare{
-		View:           preprep.View,
-		SequenceNumber: preprep.SequenceNumber,
-		BatchDigest:    preprep.BatchDigest,
-		ReplicaId:      uint64(3),
-	}
-	// Node2 has received prepare from itself, then receives quorum prepare
-	assert.Equal(t, true, cert.prepare[*prepNode2])
-	// Receive from node1
-	payload, _ = proto.Marshal(prepNode1)
-	event = &pb.ConsensusMessage{
-		Type:    pb.Type_PREPARE,
-		Epoch:   uint64(0),
-		Payload: payload,
-	}
-	rbft.processEvent(event)
-	// Receive from node3
-	payload, _ = proto.Marshal(prepNode3)
-	event = &pb.ConsensusMessage{
-		Type:    pb.Type_PREPARE,
-		Epoch:   uint64(0),
-		Payload: payload,
-	}
-	rbft.processEvent(event)
-	// When reach quorum Prepare, sendCommit and recvCommit
-	// Send commit from rbft.storeMgr.batchStore(needn't recovery)
-	assert.Equal(t, true, cert.sentCommit)
-
-	commitNode1 := &pb.Commit{
-		ReplicaId:      1,
-		View:           preprep.View,
-		SequenceNumber: preprep.SequenceNumber,
-		BatchDigest:    preprep.BatchDigest,
-	}
-	commitNode3 := &pb.Commit{
-		ReplicaId:      3,
-		View:           preprep.View,
-		SequenceNumber: preprep.SequenceNumber,
-		BatchDigest:    preprep.BatchDigest,
-	}
-
-	// Node2 received commit from itself, after receive quorum commits
-	// it could commitPendingBlocks
-	payload, _ = proto.Marshal(commitNode1)
-	event = &pb.ConsensusMessage{
-		Type:    pb.Type_COMMIT,
-		Epoch:   uint64(0),
-		Payload: payload,
-	}
-	rbft.processEvent(event)
-	rbft.processEvent(event)
-	// send repeat commit, cannot be committed
-	assert.Equal(t, false, rbft.committed(commitNode1.BatchDigest, commitNode1.View, commitNode1.SequenceNumber))
-	// Receive from node3
-	payload, _ = proto.Marshal(commitNode3)
-	event = &pb.ConsensusMessage{
-		Type:    pb.Type_COMMIT,
-		Epoch:   uint64(0),
-		Payload: payload,
-	}
-
-	// assuming that last exec is 9, then execute this req
-	// with digest calculateMD5Hash([]string{"Hash11", "Hash12"}, 1)
-	// after executed, delete from outstanding req batch
-	// cert.executed is true
-	stateTmp := &pb.ServiceState{}
-	stateTmp.MetaState = &pb.MetaState{
-		Applied: 10,
-		Digest:  calculateMD5Hash([]string{"Hash11", "Hash12"}, 1),
-	}
-
-	go func() {
-		rbft.cpChan <- stateTmp
-		rbft.exec.setLastExec(uint64(9))
-		// committed, then make checkpoint and send it
-		rbft.processEvent(event)
-		d := calculateMD5Hash([]string{"Hash11", "Hash12"}, 1)
-		assert.Nil(t, rbft.storeMgr.outstandingReqBatches[d])
-		assert.Equal(t, true, cert.sentExecute)
-		assert.Nil(t, rbft.exec.currentExec)
-		assert.Equal(t, preprep.BatchDigest, rbft.storeMgr.chkpts[preprep.SequenceNumber])
-		// As for checkpoint recv, test in TestRBFT_recvCheckpoint1~3
-	}()
-}
 
 //============================================
 // Basic Tools
@@ -222,7 +22,42 @@ func TestRBFT_processEvent_NormalConsensusP(t *testing.T) {
 func TestRBFT_newRBFT(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	rbft, conf := newTestRBFT(ctrl)
+
+	pool := txpoolmock.NewMockTxPool(ctrl)
+	log := FrameworkNewRawLogger()
+	external := mockexternal.NewMockMinimalExternal(ctrl)
+
+	conf := Config{
+		ID:                      1,
+		Hash:                    calHash("node1"),
+		IsNew:                   false,
+		Peers:                   peerSet,
+		K:                       10,
+		LogMultiplier:           4,
+		SetSize:                 25,
+		SetTimeout:              100 * time.Millisecond,
+		BatchTimeout:            500 * time.Millisecond,
+		RequestTimeout:          6 * time.Second,
+		NullRequestTimeout:      9 * time.Second,
+		VcResendTimeout:         10 * time.Second,
+		CleanVCTimeout:          60 * time.Second,
+		NewViewTimeout:          8 * time.Second,
+		FirstRequestTimeout:     30 * time.Second,
+		SyncStateTimeout:        1 * time.Second,
+		SyncStateRestartTimeout: 10 * time.Second,
+		RecoveryTimeout:         10 * time.Second,
+		CheckPoolTimeout:        3 * time.Minute,
+
+		Logger:      log,
+		External:    external,
+		RequestPool: pool,
+
+		EpochInit:    uint64(0),
+		LatestConfig: nil,
+	}
+	cpChan := make(chan *pb.ServiceState)
+	confC := make(chan *pb.ReloadFinished)
+	rbft, _ := newRBFT(cpChan, confC, conf)
 
 	// Normal case
 	structName, nilElems, err := checkNilElems(rbft)
@@ -231,8 +66,6 @@ func TestRBFT_newRBFT(t *testing.T) {
 		assert.Nil(t, nilElems)
 	}
 
-	cpChan := make(chan *pb.ServiceState)
-	confC := make(chan *pb.ReloadFinished)
 	// Nil Peers
 	conf.Peers = nil
 	rbft, err = newRBFT(cpChan, confC, conf)
@@ -247,6 +80,121 @@ func TestRBFT_newRBFT(t *testing.T) {
 	assert.Equal(t, true, rbft.in(isNewNode))
 }
 
+func TestRBFT_start_FetchCheckpoint(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	nodes, rbfts := newBasicClusterInstance()
+	rbfts[1].epochMgr.configBatchToCheck = &pb.MetaState{
+		Applied: uint64(1),
+		Digest:  "test-to-check",
+	}
+	err := rbfts[1].start()
+	close(rbfts[1].close)
+	assert.Nil(t, err)
+	msg := <-rbfts[1].recvChan
+	rbfts[1].processEvent(msg)
+	fetchCheckpoint := nodes[1].broadcastMessageCache
+	assert.Equal(t, pb.Type_FETCH_CHECKPOINT, fetchCheckpoint.Type)
+}
+
+//============================================
+// Consensus Message Filter
+//============================================
+
+func TestRBFT_consensusMessageFilter(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	nodes, rbfts := newBasicClusterInstance()
+	unlockCluster(rbfts)
+
+	rbfts[2].initSyncState()
+	sync := nodes[2].broadcastMessageCache
+	assert.Equal(t, pb.Type_SYNC_STATE, sync.Type)
+	sync.Epoch = uint64(5)
+	rbfts[1].consensusMessageFilter(sync)
+	assert.Equal(t, 0, len(rbfts[1].epochMgr.checkOutOfEpoch))
+
+	tx := newTx()
+	rbfts[0].batchMgr.requestPool.AddNewRequest(tx, false, true)
+	batchTimerEvent := &LocalEvent{
+		Service:   CoreRbftService,
+		EventType: CoreBatchTimerEvent,
+	}
+	rbfts[0].processEvent(batchTimerEvent)
+	preprepMsg := nodes[0].broadcastMessageCache
+	assert.Equal(t, pb.Type_PRE_PREPARE, preprepMsg.Type)
+	preprepMsg.Epoch = uint64(5)
+	rbfts[1].consensusMessageFilter(preprepMsg)
+	assert.Equal(t, 1, len(rbfts[1].epochMgr.checkOutOfEpoch))
+
+	// test for request set
+	req := &pb.RequestSet{
+		Local:    true,
+		Requests: []*protos.Transaction{tx},
+	}
+	payload, _ := proto.Marshal(req)
+	reqMsg := &pb.ConsensusMessage{
+		Type:    pb.Type_REQUEST_SET,
+		From:    rbfts[0].peerPool.ID,
+		Epoch:   rbfts[0].epoch,
+		Payload: payload,
+	}
+	rbfts[1].consensusMessageFilter(reqMsg)
+	batch := rbfts[1].batchMgr.requestPool.GenerateRequestBatch()
+	assert.Equal(t, tx, batch[0].TxList[0])
+}
+
+//============================================
+// Process Request Set
+//============================================
+
+func TestRBFT_processReqSetEvent_PrimaryGenerateBatch(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	nodes, rbfts := newBasicClusterInstance()
+	unlockCluster(rbfts)
+
+	// the batch size is 4
+	// it means we will generate a batch directly when we receive 4 transactions
+	var transactionSet []*protos.Transaction
+	for i := 0; i < 4; i++ {
+		tx := newTx()
+		transactionSet = append(transactionSet, tx)
+	}
+	req := &pb.RequestSet{
+		Local:    true,
+		Requests: transactionSet,
+	}
+
+	// for primary
+	rbfts[0].processEvent(req)
+	conMsg := nodes[0].broadcastMessageCache
+	assert.Equal(t, pb.Type_PRE_PREPARE, conMsg.Type)
+	assert.True(t, rbfts[0].timerMgr.getTimer(batchTimer))
+}
+
+func TestRBFT_processReqSetEvent(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	_, rbfts := newBasicClusterInstance()
+	unlockCluster(rbfts)
+
+	ctx := newCTX(defaultValidatorSet)
+	req := &pb.RequestSet{
+		Local:    true,
+		Requests: []*protos.Transaction{ctx},
+	}
+
+	rbfts[1].atomicOn(InConfChange)
+	rbfts[1].processEvent(req)
+	batch := rbfts[1].batchMgr.requestPool.GenerateRequestBatch()
+	assert.Nil(t, batch)
+}
+
 //============================================
 // Post Tools
 // Test Case: Should receive target Event from rbft.recvChan
@@ -255,13 +203,13 @@ func TestRBFT_newRBFT(t *testing.T) {
 func TestRBFT_reportStateUpdated(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
-	rbft.h = 200
+
+	_, rbfts := newBasicClusterInstance()
 
 	state2 := &pb.ServiceState{}
 	state2.MetaState = &pb.MetaState{
-		Applied: 2,
-		Digest:  "test",
+		Applied: 20,
+		Digest:  "block-number-20",
 	}
 
 	event := &LocalEvent{
@@ -270,8 +218,8 @@ func TestRBFT_reportStateUpdated(t *testing.T) {
 		Event:     state2,
 	}
 
-	rbft.reportStateUpdated(state2)
-	obj := <-rbft.recvChan
+	rbfts[0].reportStateUpdated(state2)
+	obj := <-rbfts[0].recvChan
 	assert.Equal(t, event, obj)
 }
 
@@ -279,15 +227,16 @@ func TestRBFT_postRequests(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	_, rbfts := newBasicClusterInstance()
+
+	txSet := []*protos.Transaction{newTx()}
 	rSet := &pb.RequestSet{
-		Requests: mockRequestLists,
+		Requests: txSet,
 		Local:    true,
 	}
 
-	rbft, _ := newTestRBFT(ctrl)
-
-	rbft.postRequests(mockRequestLists)
-	obj := <-rbft.recvChan
+	rbfts[0].postRequests(txSet)
+	obj := <-rbfts[0].recvChan
 
 	assert.Equal(t, rSet, obj)
 }
@@ -296,10 +245,10 @@ func TestRBFT_postMsg(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	rbft, _ := newTestRBFT(ctrl)
+	_, rbfts := newBasicClusterInstance()
 
-	go rbft.postMsg([]byte("postMsg"))
-	obj := <-rbft.recvChan
+	go rbfts[0].postMsg([]byte("postMsg"))
+	obj := <-rbfts[0].recvChan
 	assert.Equal(t, []byte("postMsg"), obj)
 }
 
@@ -310,42 +259,43 @@ func TestRBFT_postMsg(t *testing.T) {
 func TestRBFT_getStatus(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
+
+	_, rbfts := newBasicClusterInstance()
 
 	var status NodeStatus
 
-	rbft.atomicOn(InViewChange)
-	status = rbft.getStatus()
+	rbfts[0].atomicOn(InViewChange)
+	status = rbfts[0].getStatus()
 	assert.Equal(t, InViewChange, int(status.Status))
-	rbft.atomicOff(InViewChange)
+	rbfts[0].atomicOff(InViewChange)
 
-	rbft.atomicOn(InRecovery)
-	status = rbft.getStatus()
+	rbfts[0].atomicOn(InRecovery)
+	status = rbfts[0].getStatus()
 	assert.Equal(t, InRecovery, int(status.Status))
-	rbft.atomicOff(InRecovery)
+	rbfts[0].atomicOff(InRecovery)
 
-	rbft.atomicOn(StateTransferring)
-	status = rbft.getStatus()
+	rbfts[0].atomicOn(StateTransferring)
+	status = rbfts[0].getStatus()
 	assert.Equal(t, StateTransferring, int(status.Status))
-	rbft.atomicOff(StateTransferring)
+	rbfts[0].atomicOff(StateTransferring)
 
-	rbft.atomicOn(PoolFull)
-	status = rbft.getStatus()
+	rbfts[0].atomicOn(PoolFull)
+	status = rbfts[0].getStatus()
 	assert.Equal(t, PoolFull, int(status.Status))
-	rbft.atomicOff(PoolFull)
+	rbfts[0].atomicOff(PoolFull)
 
-	rbft.atomicOn(Pending)
-	status = rbft.getStatus()
+	rbfts[0].atomicOn(Pending)
+	status = rbfts[0].getStatus()
 	assert.Equal(t, Pending, int(status.Status))
-	rbft.atomicOff(Pending)
+	rbfts[0].atomicOff(Pending)
 
-	rbft.atomicOn(InConfChange)
-	status = rbft.getStatus()
+	rbfts[0].atomicOn(InConfChange)
+	status = rbfts[0].getStatus()
 	assert.Equal(t, InConfChange, int(status.Status))
-	rbft.atomicOff(InConfChange)
+	rbfts[0].atomicOff(InConfChange)
 
-	rbft.on(Normal)
-	status = rbft.getStatus()
+	rbfts[0].on(Normal)
+	status = rbfts[0].getStatus()
 	assert.Equal(t, Normal, int(status.Status))
 }
 
@@ -356,458 +306,111 @@ func TestRBFT_getStatus(t *testing.T) {
 func TestRBFT_processNullRequset(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
+
+	_, rbfts := newBasicClusterInstance()
 
 	msg := &pb.NullRequest{ReplicaId: uint64(1)}
 
 	// If success process it, mode NeedSyncState will on
-	rbft.on(Normal)
+	rbfts[0].on(Normal)
 
-	rbft.atomicOn(InRecovery)
-	rbft.off(NeedSyncState)
-	rbft.processNullRequest(msg)
-	assert.Equal(t, false, rbft.in(NeedSyncState))
-	rbft.atomicOff(InRecovery)
+	rbfts[0].atomicOn(InRecovery)
+	rbfts[0].processNullRequest(msg)
+	assert.Equal(t, false, rbfts[0].in(NeedSyncState))
+	rbfts[0].atomicOff(InRecovery)
 
-	rbft.atomicOn(InViewChange)
-	rbft.off(NeedSyncState)
-	rbft.processNullRequest(msg)
-	assert.Equal(t, false, rbft.in(NeedSyncState))
-	rbft.atomicOff(InViewChange)
+	rbfts[0].atomicOn(InViewChange)
+	rbfts[0].processNullRequest(msg)
+	assert.Equal(t, false, rbfts[0].in(NeedSyncState))
+	rbfts[0].atomicOff(InViewChange)
+
+	rbfts[0].processNullRequest(msg)
+	assert.Equal(t, true, rbfts[0].in(NeedSyncState))
 
 	// not primary
-	rbft.setView(uint64(3))
-	rbft.processNullRequest(msg)
-	assert.Equal(t, false, rbft.in(NeedSyncState))
-	rbft.setView(uint64(0))
-
-	// Call trySyncState, set NeedSyncState true
-	msg.ReplicaId = uint64(1)
-	rbft.processNullRequest(msg)
-	assert.Equal(t, true, rbft.in(NeedSyncState))
+	rbfts[1].on(NeedSyncState)
+	rbfts[1].processNullRequest(msg)
+	event := &LocalEvent{
+		Service:   CoreRbftService,
+		EventType: CoreFirstRequestTimerEvent,
+	}
+	rbfts[1].timerMgr.startTimer(firstRequestTimer, event)
+	assert.Equal(t, true, rbfts[1].timerMgr.getTimer(firstRequestTimer))
 }
 
 func TestRBFT_handleNullRequestTimerEvent(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
 
-	rbft.atomicOn(InRecovery)
-	rbft.handleNullRequestTimerEvent()
-	assert.Equal(t, uint64(0), rbft.view)
-	rbft.atomicOff(InRecovery)
+	nodes, rbfts := newBasicClusterInstance()
 
-	rbft.atomicOn(InViewChange)
-	rbft.handleNullRequestTimerEvent()
-	assert.Equal(t, uint64(0), rbft.view)
-	rbft.atomicOff(InViewChange)
+	rbfts[0].atomicOn(InRecovery)
+	rbfts[0].handleNullRequestTimerEvent()
+	assert.Equal(t, uint64(0), rbfts[0].view)
+	assert.Nil(t, nodes[0].broadcastMessageCache)
+	rbfts[0].atomicOff(InRecovery)
 
-	rbft.atomicOn(InEpochSync)
-	rbft.handleNullRequestTimerEvent()
-	assert.Equal(t, uint64(0), rbft.view)
-	rbft.atomicOff(InEpochSync)
+	rbfts[0].atomicOn(InViewChange)
+	rbfts[0].handleNullRequestTimerEvent()
+	assert.Equal(t, uint64(0), rbfts[0].view)
+	assert.Nil(t, nodes[0].broadcastMessageCache)
+	rbfts[0].atomicOff(InViewChange)
 
-	rbft.setView(uint64(3))
-	rbft.handleNullRequestTimerEvent()
-	assert.Equal(t, uint64(4), rbft.view)
-}
+	rbfts[0].setView(uint64(1))
+	rbfts[0].handleNullRequestTimerEvent()
+	assert.Equal(t, uint64(2), rbfts[0].view)
+	assert.Equal(t, pb.Type_VIEW_CHANGE, nodes[0].broadcastMessageCache.Type)
+	rbfts[0].atomicOff(InViewChange)
 
-//=============================================================================
-// process request set and batch methods
-//=============================================================================
-
-func TestRBFT_processReqSetEvent(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
-
-	req := &pb.RequestSet{
-		Requests: mockRequestLists,
-		Local:    false,
-	}
-
-	rbft.off(Normal)
-	rbft.on(SkipInProgress)
-	assert.Nil(t, rbft.processReqSetEvent(req))
-
-	rbft.off(SkipInProgress)
-	rbft.atomicOn(PoolFull)
-	assert.Nil(t, rbft.processReqSetEvent(req))
-
-	rbft.on(Normal)
-	rbft.atomicOff(PoolFull)
-	assert.Nil(t, rbft.processReqSetEvent(req))
-
-	rbft.setView(1)
-	assert.Nil(t, rbft.processReqSetEvent(req))
-}
-
-func TestRBFT_processOutOfDateReqs(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
-
-	// rbft.batchMgr.requestPool.IsPoolFull() mock return false
-	// so that if reach that sentence, will off PoolFull state
-	rbft.atomicOn(PoolFull)
-	rbft.off(Normal)
-	rbft.processOutOfDateReqs()
-	assert.Equal(t, true, rbft.atomicIn(PoolFull))
-
-	rbft.on(Normal)
-	rbft.processOutOfDateReqs()
-	assert.Equal(t, false, rbft.atomicIn(PoolFull))
+	rbfts[0].setView(uint64(4))
+	rbfts[0].handleNullRequestTimerEvent()
+	assert.Equal(t, uint64(4), rbfts[0].view)
+	assert.Equal(t, pb.Type_NULL_REQUEST, nodes[0].broadcastMessageCache.Type)
 }
 
 //============================================
-// Execute Transactions
+// Checkpoint Tests
 //============================================
-
-func TestRBFT_commitPendingBlocks(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
-
-	// Struct of certTmp which stored in rbft.storeMgr.certStore
-	// A test when batch digest is ""
-	// Other cases have been test in normal consensus case
-	prePrepareTmp := &pb.PrePrepare{
-		ReplicaId:      1,
-		View:           0,
-		SequenceNumber: 15,
-		BatchDigest:    "",
-		HashBatch:      &pb.HashBatch{Timestamp: 10086},
-	}
-	prePareTmp1 := &pb.Prepare{
-		ReplicaId:      1,
-		View:           prePrepareTmp.View,
-		SequenceNumber: prePrepareTmp.SequenceNumber,
-		BatchDigest:    prePrepareTmp.BatchDigest,
-	}
-	prePareTmp2 := &pb.Prepare{
-		ReplicaId:      2,
-		View:           prePrepareTmp.View,
-		SequenceNumber: prePrepareTmp.SequenceNumber,
-		BatchDigest:    prePrepareTmp.BatchDigest,
-	}
-	prePareTmp3 := &pb.Prepare{
-		ReplicaId:      3,
-		View:           prePrepareTmp.View,
-		SequenceNumber: prePrepareTmp.SequenceNumber,
-		BatchDigest:    prePrepareTmp.BatchDigest,
-	}
-	commitTmp1 := &pb.Commit{
-		ReplicaId:      1,
-		View:           prePrepareTmp.View,
-		SequenceNumber: prePrepareTmp.SequenceNumber,
-		BatchDigest:    prePrepareTmp.BatchDigest,
-	}
-	commitTmp2 := &pb.Commit{
-		ReplicaId:      2,
-		View:           prePrepareTmp.View,
-		SequenceNumber: prePrepareTmp.SequenceNumber,
-		BatchDigest:    prePrepareTmp.BatchDigest,
-	}
-	commitTmp3 := &pb.Commit{
-		ReplicaId:      3,
-		View:           prePrepareTmp.View,
-		SequenceNumber: prePrepareTmp.SequenceNumber,
-		BatchDigest:    prePrepareTmp.BatchDigest,
-	}
-	msgIDTmp := msgID{
-		v: prePrepareTmp.View,
-		n: prePrepareTmp.SequenceNumber,
-		d: prePrepareTmp.BatchDigest,
-	}
-	certTmp := &msgCert{
-		prePrepare:  prePrepareTmp,
-		sentPrepare: false,
-		prepare:     map[pb.Prepare]bool{*prePareTmp1: true, *prePareTmp2: true, *prePareTmp3: true},
-		sentCommit:  false,
-		commit:      map[pb.Commit]bool{*commitTmp1: true, *commitTmp2: true, *commitTmp3: true},
-		sentExecute: false,
-	}
-	rbft.exec.setLastExec(uint64(14))
-	rbft.storeMgr.committedCert[msgIDTmp] = ""
-	rbft.storeMgr.certStore[msgIDTmp] = certTmp
-
-	// outstandingReqBatch has been deleted for it has already been executed
-	// tag in cert is true
-	// rbft.exec.currentExec turn to nil
-	i := uint64(10)
-	rbft.exec.currentExec = &i
-	rbft.commitPendingBlocks()
-	assert.Nil(t, rbft.storeMgr.outstandingReqBatches[""])
-	assert.Equal(t, true, certTmp.sentExecute)
-	assert.Nil(t, rbft.exec.currentExec)
-}
-
-func TestRBFT_filterExecutableReqs(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
-
-	var digest string
-	var deDuplicateRequestHashes []string
-
-	var executableReqs []*protos.Transaction
-	var executableLocalList []bool
-
-	digest = "digest"
-	deDuplicateRequestHashes = []string{"de"}
-
-	rbft.storeMgr.batchStore[digest] = &pb.RequestBatch{
-		RequestHashList: []string{"request hash list"},
-		RequestList:     mockRequestList,
-		Timestamp:       time.Now().UnixNano(),
-		SeqNo:           2,
-		LocalList:       []bool{true},
-		BatchHash:       "hash",
-	}
-
-	executableReqs, executableLocalList = rbft.filterExecutableTxs(digest, deDuplicateRequestHashes)
-	assert.Equal(t, mockRequestList, executableReqs)
-	assert.Equal(t, []bool{true}, executableLocalList)
-}
-
-func TestRBFT_findNextCommitReq(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
-
-	var find bool
-	var idx msgID
-	var cer *msgCert
-
-	IDTmp := msgID{
-		v: 1,
-		n: 20,
-		d: "msg",
-	}
-
-	prePrepareTmp := &pb.PrePrepare{
-		ReplicaId:      2,
-		View:           1,
-		SequenceNumber: 20,
-		BatchDigest:    "msg",
-		HashBatch:      nil,
-	}
-
-	prepareTmp1 := pb.Prepare{
-		ReplicaId:      1,
-		View:           1,
-		SequenceNumber: 20,
-		BatchDigest:    "msg",
-	}
-	prepareTmp2 := pb.Prepare{
-		ReplicaId:      3,
-		View:           1,
-		SequenceNumber: 20,
-		BatchDigest:    "msg",
-	}
-	prepareTmp3 := pb.Prepare{
-		ReplicaId:      4,
-		View:           1,
-		SequenceNumber: 20,
-		BatchDigest:    "msg",
-	}
-	prepareMapTmp := map[pb.Prepare]bool{
-		prepareTmp1: true,
-		prepareTmp2: true,
-		prepareTmp3: true,
-	}
-
-	commitTmp1 := pb.Commit{
-		ReplicaId:      1,
-		View:           1,
-		SequenceNumber: 20,
-		BatchDigest:    "msg",
-	}
-	commitTmp2 := pb.Commit{
-		ReplicaId:      3,
-		View:           1,
-		SequenceNumber: 20,
-		BatchDigest:    "msg",
-	}
-	commitTmp3 := pb.Commit{
-		ReplicaId:      4,
-		View:           1,
-		SequenceNumber: 20,
-		BatchDigest:    "msg",
-	}
-	commitMapTmp := map[pb.Commit]bool{
-		commitTmp1: true,
-		commitTmp2: true,
-		commitTmp3: true,
-	}
-
-	certTmp := &msgCert{
-		prePrepare:  prePrepareTmp,
-		sentPrepare: false,
-		prepare:     prepareMapTmp,
-		sentCommit:  false,
-		commit:      commitMapTmp,
-		sentExecute: false,
-	}
-
-	rbft.off(SkipInProgress)
-	rbft.storeMgr.committedCert[IDTmp] = "committed"
-	find, _, _ = rbft.findNextCommitTx()
-	assert.Equal(t, false, find)
-
-	certTmp.sentExecute = true
-	rbft.storeMgr.certStore[IDTmp] = certTmp
-	find, _, _ = rbft.findNextCommitTx()
-	assert.Equal(t, false, find)
-
-	certTmp.sentExecute = false
-	find, _, _ = rbft.findNextCommitTx()
-	assert.Equal(t, false, find)
-
-	rbft.exec.lastExec++
-	rbft.on(SkipInProgress)
-	find, _, _ = rbft.findNextCommitTx()
-	assert.Equal(t, false, find)
-
-	rbft.off(SkipInProgress)
-	batch := &pb.RequestBatch{
-		RequestHashList: []string{"request hash list"},
-		RequestList:     mockRequestList,
-		Timestamp:       time.Now().UnixNano(),
-		SeqNo:           2,
-		LocalList:       []bool{true},
-		BatchHash:       "msg",
-	}
-	rbft.storeMgr.batchStore["msg"] = batch
-	find, idx, cer = rbft.findNextCommitTx()
-	assert.Equal(t, false, find)
-	assert.Equal(t, IDTmp, idx)
-	assert.Equal(t, certTmp, cer)
-}
-
-//============================================
-// Checkpoint issues
-//============================================
-
-func TestRBFT_checkpoint(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
-
-	state := &pb.ServiceState{}
-	state.MetaState = &pb.MetaState{
-		Applied: 10,
-		Digest:  "checkpoint msg",
-	}
-	rbft.checkpoint(state.MetaState)
-	assert.Equal(t, state.MetaState.Digest, rbft.storeMgr.chkpts[uint64(10)])
-}
 
 func TestRBFT_witnessCheckpointWeakCert(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
 
-	chkptSelf := &pb.Checkpoint{
+	_, rbfts := newBasicClusterInstance()
+
+	chkptReplica2 := &pb.Checkpoint{
 		ReplicaId:      2,
-		SequenceNumber: 2,
+		SequenceNumber: 40,
 		Digest:         "chkpt msg",
 	}
-	chkptReplica := &pb.Checkpoint{
-		ReplicaId:      1,
-		SequenceNumber: 2,
+	chkptReplica3 := &pb.Checkpoint{
+		ReplicaId:      3,
+		SequenceNumber: 40,
 		Digest:         "chkpt msg",
 	}
-	rbft.storeMgr.checkpointStore[*chkptSelf] = true
-	rbft.storeMgr.checkpointStore[*chkptReplica] = true
-
-	rbft.on(SkipInProgress)
-	rbft.atomicOff(StateTransferring)
-	rbft.witnessCheckpointWeakCert(chkptSelf)
-	assert.Equal(t, chkptSelf.Digest, rbft.storeMgr.highStateTarget.Digest)
-	assert.Equal(t, true, rbft.atomicIn(StateTransferring))
-}
-
-func TestRBFT_moveWatermarks(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
-
-	prePrepareTmp := &pb.PrePrepare{
-		ReplicaId:      1,
-		View:           0,
-		SequenceNumber: 2,
-		BatchDigest:    "msg",
-		HashBatch:      &pb.HashBatch{Timestamp: 10086},
+	chkptReplica4 := &pb.Checkpoint{
+		ReplicaId:      4,
+		SequenceNumber: 40,
+		Digest:         "chkpt msg",
 	}
-	prePareTmp := pb.Prepare{
-		ReplicaId:      1,
-		View:           0,
-		SequenceNumber: 2,
-		BatchDigest:    "msg",
-	}
-	commitTmp := pb.Commit{
-		ReplicaId:      1,
-		View:           0,
-		SequenceNumber: 2,
-		BatchDigest:    "msg",
-	}
-	msgIDTmp := msgID{
-		v: 0,
-		n: 2,
-		d: "msg",
-	}
-	certTmp := &msgCert{
-		prePrepare:  prePrepareTmp,
-		sentPrepare: false,
-		prepare:     map[pb.Prepare]bool{prePareTmp: true},
-		sentCommit:  false,
-		commit:      map[pb.Commit]bool{commitTmp: true},
-		sentExecute: false,
-	}
+	rbfts[0].storeMgr.checkpointStore[*chkptReplica2] = true
+	rbfts[0].storeMgr.checkpointStore[*chkptReplica3] = true
+	rbfts[0].storeMgr.checkpointStore[*chkptReplica4] = true
 
-	// Delete rbft.storeMgr.certStore[msgIdTmp]
-	rbft.storeMgr.certStore[msgIDTmp] = certTmp
-	rbft.moveWatermarks(uint64(16))
-	assert.Equal(t, (*msgCert)(nil), rbft.storeMgr.certStore[msgIDTmp])
-
-	batchTmp := &pb.RequestBatch{
-		RequestHashList: nil,
-		RequestList:     nil,
-		Timestamp:       10086,
-		SeqNo:           0,
-		LocalList:       nil,
-		BatchHash:       "",
-	}
-
-	// Delete rbft.storeMgr.batchStore["msg"]
-	rbft.storeMgr.batchStore["msg"] = batchTmp
-	rbft.moveWatermarks(uint64(16))
-	assert.Equal(t, (*pb.RequestBatch)(nil), rbft.storeMgr.batchStore["msg"])
-
-	// Delete rbft.storeMgr.committedCert[msgIdTmp]
-	committedCertTmp := map[msgID]string{msgIDTmp: "msg"}
-	rbft.storeMgr.committedCert = committedCertTmp
-	rbft.moveWatermarks(uint64(64))
-	assert.Equal(t, "", rbft.storeMgr.committedCert[msgIDTmp])
-
-	// Delete rbft.storeMgr.checkpointStore[cp]
-	cp := pb.Checkpoint{
-		ReplicaId:      1,
-		SequenceNumber: 2,
-		Digest:         "msg",
-	}
-	rbft.storeMgr.checkpointStore[cp] = true
-	rbft.moveWatermarks(uint64(64))
-	assert.Equal(t, false, rbft.storeMgr.checkpointStore[cp])
+	rbfts[0].on(SkipInProgress)
+	rbfts[0].atomicOff(StateTransferring)
+	rbfts[0].witnessCheckpointWeakCert(chkptReplica4)
+	assert.Equal(t, chkptReplica4.Digest, rbfts[0].storeMgr.highStateTarget.Digest)
+	assert.Equal(t, true, rbfts[0].atomicIn(StateTransferring))
 }
 
 func TestRBFT_updateHighStateTarget(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
 
-	rbft.storeMgr.highStateTarget = &pb.MetaState{
+	_, rbfts := newBasicClusterInstance()
+
+	rbfts[0].storeMgr.highStateTarget = &pb.MetaState{
 		Applied: uint64(4),
 		Digest:  "target",
 	}
@@ -816,26 +419,26 @@ func TestRBFT_updateHighStateTarget(t *testing.T) {
 		Applied: uint64(3),
 		Digest:  "target",
 	}
-
-	rbft.updateHighStateTarget(target)
-	assert.Equal(t, uint64(4), rbft.storeMgr.highStateTarget.Applied)
+	rbfts[0].updateHighStateTarget(target)
+	assert.Equal(t, uint64(4), rbfts[0].storeMgr.highStateTarget.Applied)
 
 	target.Applied = uint64(6)
-	rbft.updateHighStateTarget(target)
-	assert.Equal(t, uint64(6), rbft.storeMgr.highStateTarget.Applied)
+	rbfts[0].updateHighStateTarget(target)
+	assert.Equal(t, uint64(6), rbfts[0].storeMgr.highStateTarget.Applied)
 }
 
 func TestRBFT_tryStateTransfer(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
+
+	_, rbfts := newBasicClusterInstance()
 
 	target := &pb.MetaState{
 		Applied: uint64(5),
 		Digest:  "msg",
 	}
-	rbft.off(SkipInProgress)
-	rbft.atomicOff(StateTransferring)
+	rbfts[0].off(SkipInProgress)
+	rbfts[0].atomicOff(StateTransferring)
 	prePrepareTmp := &pb.PrePrepare{
 		ReplicaId:      1,
 		View:           0,
@@ -870,111 +473,31 @@ func TestRBFT_tryStateTransfer(t *testing.T) {
 	}
 
 	// To The End and clean cert with seqNo>lastExec
-	rbft.storeMgr.certStore[msgIDTmp] = certTmp
-	rbft.exec.setLastExec(uint64(1))
-	rbft.tryStateTransfer(target)
-	assert.Equal(t, (*msgCert)(nil), rbft.storeMgr.certStore[msgIDTmp])
+	rbfts[0].storeMgr.certStore[msgIDTmp] = certTmp
+	rbfts[0].exec.setLastExec(uint64(1))
+	rbfts[0].tryStateTransfer(target)
+	assert.Equal(t, (*msgCert)(nil), rbfts[0].storeMgr.certStore[msgIDTmp])
 
 	// if rbft.atomicIn(StateTransferring)
-	rbft.storeMgr.certStore[msgIDTmp] = certTmp
-	rbft.exec.setLastExec(uint64(1))
-	rbft.atomicOn(StateTransferring)
-	rbft.tryStateTransfer(target)
-	assert.Equal(t, certTmp, rbft.storeMgr.certStore[msgIDTmp])
+	rbfts[0].storeMgr.certStore[msgIDTmp] = certTmp
+	rbfts[0].exec.setLastExec(uint64(1))
+	rbfts[0].atomicOn(StateTransferring)
+	rbfts[0].tryStateTransfer(target)
+	assert.Equal(t, certTmp, rbfts[0].storeMgr.certStore[msgIDTmp])
 
 	// if target == nil
 	// if rbft.storeMgr.highStateTarget == nil
-	rbft.atomicOff(StateTransferring)
+	rbfts[0].atomicOff(StateTransferring)
 	target = nil
-	rbft.storeMgr.highStateTarget = nil
-	rbft.tryStateTransfer(target)
-	assert.Equal(t, certTmp, rbft.storeMgr.certStore[msgIDTmp])
+	rbfts[0].storeMgr.highStateTarget = nil
+	rbfts[0].tryStateTransfer(target)
+	assert.Equal(t, certTmp, rbfts[0].storeMgr.certStore[msgIDTmp])
 }
 
-func TestRBFT_recvStateUpdatedEvent(t *testing.T) {
+func TestRBFT_recvCheckpoint1(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
-
-	// normal
-	rbft.h = 20
-	ss0 := &pb.ServiceState{}
-	ss0.MetaState = &pb.MetaState{
-		Applied: uint64(30),
-		Digest:  "block-number-30",
-	}
-	rbft.node.currentState = ss0
-	ret0 := rbft.recvStateUpdatedEvent(ss0)
-	assert.Equal(t, nil, ret0)
-
-	// in recovery
-	rbft.h = uint64(20)
-	rbft.view = uint64(3)
-	ss1 := &pb.ServiceState{}
-	ss1.MetaState = &pb.MetaState{
-		Applied: uint64(30),
-		Digest:  "block-number-30",
-	}
-	rbft.node.currentState = ss1
-	rbft.atomicOn(InRecovery)
-	ret1 := rbft.recvStateUpdatedEvent(ss1)
-	expRet1 := &LocalEvent{
-		Service:   RecoveryService,
-		EventType: RecoveryDoneEvent,
-	}
-	rbft.atomicOff(InRecovery)
-	assert.Equal(t, expRet1, ret1)
-
-	// state update target < h
-	rbft.h = 50
-	rbft.storeMgr.highStateTarget = &pb.MetaState{
-		Applied: uint64(45),
-		Digest:  "block-number-45",
-	}
-	ss3 := &pb.ServiceState{}
-	ss3.MetaState = &pb.MetaState{
-		Applied: uint64(42),
-		Digest:  "block-number-42",
-	}
-	rbft.atomicOn(StateTransferring)
-	rbft.recvStateUpdatedEvent(ss3)
-	assert.Equal(t, uint64(42), rbft.exec.lastExec)
-	assert.Equal(t, true, rbft.atomicIn(StateTransferring))
-
-	ss4 := &pb.ServiceState{}
-	ss4.MetaState = &pb.MetaState{
-		Applied: uint64(45),
-		Digest:  "block-number-45",
-	}
-	rbft.atomicOn(StateTransferring)
-	rbft.recvStateUpdatedEvent(ss4)
-	assert.Equal(t, uint64(45), rbft.exec.lastExec)
-	assert.Equal(t, false, rbft.atomicIn(StateTransferring))
-
-	// errors
-	ss5 := &pb.ServiceState{}
-	ss5.MetaState = &pb.MetaState{
-		Applied: uint64(46),
-		Digest:  "block-number-46",
-	}
-	rbft.atomicOn(StateTransferring)
-	rbft.exec.setLastExec(uint64(0))
-	rbft.recvStateUpdatedEvent(ss5)
-	assert.Equal(t, uint64(0), rbft.exec.lastExec)
-	assert.Equal(t, true, rbft.atomicIn(StateTransferring))
-
-	rbft.atomicOn(StateTransferring)
-	rbft.storeMgr.highStateTarget = nil
-	rbft.exec.setLastExec(uint64(0))
-	rbft.recvStateUpdatedEvent(ss5)
-	assert.Equal(t, uint64(0), rbft.exec.lastExec)
-	assert.Equal(t, true, rbft.atomicIn(StateTransferring))
-}
-
-func TestRBFT_recvCheckpoint2(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
+	_, rbfts := newBasicClusterInstance()
 
 	chkptSeqNo := uint64(10)
 	chkptDigest := "msg"
@@ -994,22 +517,23 @@ func TestRBFT_recvCheckpoint2(t *testing.T) {
 		Digest:         chkptDigest,
 	}
 
-	rbft.recvCheckpoint(checkpoint1)
-	rbft.recvCheckpoint(checkpoint3)
+	rbfts[0].recvCheckpoint(checkpoint1)
+	rbfts[0].recvCheckpoint(checkpoint3)
 	// Node has not reached the chkpt
 	// Open skip in progress, could set h to target
-	rbft.on(SkipInProgress)
+	rbfts[0].on(SkipInProgress)
 	// Case1: in recovery
-	rbft.atomicOn(InRecovery)
-	rbft.recvCheckpoint(checkpoint4)
+	rbfts[0].atomicOn(InRecovery)
+	rbfts[0].recvCheckpoint(checkpoint4)
 	// move to n
-	assert.Equal(t, uint64(10), rbft.h)
+	assert.Equal(t, uint64(10), rbfts[0].h)
 }
 
-func TestRBFT_recvCheckpoint3(t *testing.T) {
+func TestRBFT_recvCheckpoint2(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
+
+	_, rbfts := newBasicClusterInstance()
 
 	chkptSeqNo := uint64(30)
 	chkptDigest := "msg"
@@ -1029,23 +553,24 @@ func TestRBFT_recvCheckpoint3(t *testing.T) {
 		Digest:         chkptDigest,
 	}
 
-	rbft.recvCheckpoint(checkpoint1)
-	rbft.recvCheckpoint(checkpoint3)
+	rbfts[0].recvCheckpoint(checkpoint1)
+	rbfts[0].recvCheckpoint(checkpoint3)
 	// Node has not reached the chkpt
 	// Open skip in progress, could set h to target
-	rbft.on(SkipInProgress)
+	rbfts[0].on(SkipInProgress)
 	// Case2: not in recovery
-	rbft.atomicOff(InRecovery)
+	rbfts[0].atomicOff(InRecovery)
 	// But just fell behind larger than 20 blocks, update
-	rbft.recvCheckpoint(checkpoint4)
+	rbfts[0].recvCheckpoint(checkpoint4)
 	// move to n
-	assert.Equal(t, uint64(30), rbft.h)
+	assert.Equal(t, uint64(30), rbfts[0].h)
 }
 
 func TestRBFT_weakCheckpointSetOutOfRange(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	rbft, _ := newTestRBFT(ctrl)
+
+	_, rbfts := newBasicClusterInstance()
 
 	cp := &pb.Checkpoint{
 		ReplicaId:      3,
@@ -1056,25 +581,380 @@ func TestRBFT_weakCheckpointSetOutOfRange(t *testing.T) {
 
 	// storage for CheckBiggerNumber
 	// Case some value in storage but state is normal, not out of range
-	rbft.storeMgr.hChkpts[uint64(3)] = uint64(20)
-	flag = rbft.weakCheckpointSetOutOfRange(cp)
+	rbfts[0].storeMgr.hChkpts[uint64(3)] = uint64(20)
+	flag = rbfts[0].weakCheckpointSetOutOfRange(cp)
 	assert.Equal(t, false, flag)
-	assert.Equal(t, uint64(0), rbft.storeMgr.hChkpts[uint64(3)])
+	assert.Equal(t, uint64(0), rbfts[0].storeMgr.hChkpts[uint64(3)])
 
 	// Case: be out of range, but not reach th oneCorrectQuorum
 	cp.SequenceNumber = 100
-	flag = rbft.weakCheckpointSetOutOfRange(cp)
+	flag = rbfts[0].weakCheckpointSetOutOfRange(cp)
 	assert.Equal(t, false, flag)
-	assert.Equal(t, uint64(100), rbft.storeMgr.hChkpts[uint64(3)])
+	assert.Equal(t, uint64(100), rbfts[0].storeMgr.hChkpts[uint64(3)])
 
 	// Case: f+1 replicas out of range
 	// Now current node(node 2) might fallen behind
 	// Here, will delete the stored msg that not out of range(node 5)(assuming there is node 5)
-	rbft.storeMgr.hChkpts[uint64(1)] = uint64(100)
-	rbft.storeMgr.hChkpts[uint64(3)] = uint64(100)
-	rbft.storeMgr.hChkpts[uint64(4)] = uint64(100)
-	rbft.storeMgr.hChkpts[uint64(5)] = uint64(20)
-	flag = rbft.weakCheckpointSetOutOfRange(cp)
+	rbfts[0].storeMgr.hChkpts[uint64(1)] = uint64(100)
+	rbfts[0].storeMgr.hChkpts[uint64(3)] = uint64(100)
+	rbfts[0].storeMgr.hChkpts[uint64(4)] = uint64(100)
+	rbfts[0].storeMgr.hChkpts[uint64(5)] = uint64(20)
+	flag = rbfts[0].weakCheckpointSetOutOfRange(cp)
 	assert.Equal(t, true, flag)
-	assert.Equal(t, uint64(0), rbft.storeMgr.hChkpts[uint64(5)])
+	assert.Equal(t, uint64(0), rbfts[0].storeMgr.hChkpts[uint64(5)])
+}
+
+func TestRBFT_fetchMissingTxs(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	nodes, rbfts := newBasicClusterInstance()
+	prePrep := &pb.PrePrepare{
+		SequenceNumber: uint64(1),
+	}
+	missingTxHashes := map[uint64]string{
+		uint64(0): "transaction",
+	}
+	err := rbfts[0].fetchMissingTxs(prePrep, missingTxHashes)
+	assert.Nil(t, err)
+
+	fetch := &pb.FetchMissingRequests{
+		View:                 prePrep.View,
+		SequenceNumber:       prePrep.SequenceNumber,
+		BatchDigest:          prePrep.BatchDigest,
+		MissingRequestHashes: missingTxHashes,
+		ReplicaId:            uint64(1),
+	}
+	consensusMsg := rbfts[0].consensusMessagePacker(fetch)
+	assert.Equal(t, consensusMsg, nodes[0].unicastMessageCache)
+}
+
+func TestRBFT_start(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	_, rbfts := newBasicClusterInstance()
+	err := rbfts[0].start()
+	assert.Nil(t, err)
+
+	assert.Equal(t, false, rbfts[0].in(Pending))
+}
+
+func TestRBFT_postConfState_NormalCase(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	_, rbfts := newBasicClusterInstance()
+	vSetNode5 := append(defaultValidatorSet, "node5")
+	r := vSetToRouters(vSetNode5)
+	cc := &pb.ConfState{
+		QuorumRouter: &r,
+	}
+	rbfts[0].postConfState(cc)
+	assert.Equal(t, 5, len(rbfts[0].peerPool.routerMap.HashMap))
+}
+
+func TestRBFT_postConfState_NotExitInRouter(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	_, rbfts := newBasicClusterInstance()
+	removeNode1 := []string{"node2", "node3", "node4", "node5"}
+	r := vSetToRouters(removeNode1)
+	cc := &pb.ConfState{
+		QuorumRouter: &r,
+	}
+	rbfts[0].postConfState(cc)
+	assert.Equal(t, true, rbfts[0].atomicIn(Pending))
+}
+
+func TestRBFT_processOutOfDateReqs(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	_, rbfts := newBasicClusterInstance()
+	tx := newTx()
+
+	rbfts[1].batchMgr.requestPool.AddNewRequest(tx, false, true)
+	rbfts[1].setFull()
+	rbfts[1].processOutOfDateReqs()
+	assert.Equal(t, true, rbfts[1].isPoolFull())
+
+	rbfts[1].setNormal()
+	rbfts[1].processOutOfDateReqs()
+	assert.Equal(t, false, rbfts[1].isPoolFull())
+}
+
+func TestRBFT_sendNullRequest(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	nodes, rbfts := newBasicClusterInstance()
+	rbfts[0].sendNullRequest()
+
+	nullRequest := &pb.NullRequest{
+		ReplicaId: rbfts[0].peerPool.ID,
+	}
+	consensusMsg := rbfts[0].consensusMessagePacker(nullRequest)
+	assert.Equal(t, consensusMsg, nodes[0].broadcastMessageCache)
+}
+
+func TestRBFT_recvPrePrepare_WrongDigest(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	nodes, rbfts := newBasicClusterInstance()
+	hashBatch := &pb.HashBatch{
+		RequestHashList: []string{"tx-hash"},
+	}
+	preprep1 := &pb.PrePrepare{
+		View:           rbfts[0].view,
+		SequenceNumber: uint64(1),
+		BatchDigest:    "wrong hash",
+		HashBatch:      hashBatch,
+		ReplicaId:      rbfts[0].peerPool.ID,
+	}
+	err := rbfts[1].recvPrePrepare(preprep1)
+	assert.Nil(t, err)
+	assert.Equal(t, pb.Type_VIEW_CHANGE, nodes[1].broadcastMessageCache.Type)
+}
+
+func TestRBFT_recvPrePrepare_EmptyDigest(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	nodes, rbfts := newBasicClusterInstance()
+	hashBatch := &pb.HashBatch{
+		RequestHashList: []string{"tx-hash"},
+	}
+	preprep1 := &pb.PrePrepare{
+		View:           rbfts[0].view,
+		SequenceNumber: uint64(1),
+		BatchDigest:    "",
+		HashBatch:      hashBatch,
+		ReplicaId:      rbfts[0].peerPool.ID,
+	}
+	err := rbfts[1].recvPrePrepare(preprep1)
+	assert.Nil(t, err)
+	assert.Equal(t, pb.Type_VIEW_CHANGE, nodes[1].broadcastMessageCache.Type)
+}
+
+func TestRBFT_recvPrePrepare_WrongSeqNo(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	nodes, rbfts := newBasicClusterInstance()
+	hashBatch := &pb.HashBatch{
+		RequestHashList: []string{"tx-hash"},
+	}
+	preprep := &pb.PrePrepare{
+		View:           rbfts[0].view,
+		SequenceNumber: uint64(1),
+		HashBatch:      hashBatch,
+		ReplicaId:      rbfts[0].peerPool.ID,
+	}
+	preprep.BatchDigest = calculateMD5Hash(preprep.HashBatch.RequestHashList, preprep.HashBatch.Timestamp)
+
+	err := rbfts[1].recvPrePrepare(preprep)
+	assert.Nil(t, err)
+	assert.Equal(t, pb.Type_PREPARE, nodes[1].broadcastMessageCache.Type)
+
+	hashBatchWrong := &pb.HashBatch{
+		RequestHashList: []string{"tx-hash-wrong"},
+	}
+	preprepDup := &pb.PrePrepare{
+		View:           rbfts[0].view,
+		SequenceNumber: uint64(1),
+		HashBatch:      hashBatchWrong,
+		ReplicaId:      rbfts[0].peerPool.ID,
+	}
+	preprepDup.BatchDigest = calculateMD5Hash(preprepDup.HashBatch.RequestHashList, preprepDup.HashBatch.Timestamp)
+	err = rbfts[1].recvPrePrepare(preprepDup)
+
+	assert.Nil(t, err)
+	assert.Equal(t, pb.Type_VIEW_CHANGE, nodes[1].broadcastMessageCache.Type)
+}
+
+func TestRBFT_recvFetchMissingTxs(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	nodes, rbfts := newBasicClusterInstance()
+	hashBatch := &pb.HashBatch{
+		RequestHashList: []string{"tx-hash"},
+	}
+	preprep := &pb.PrePrepare{
+		View:           rbfts[0].view,
+		SequenceNumber: uint64(1),
+		HashBatch:      hashBatch,
+		ReplicaId:      rbfts[0].peerPool.ID,
+	}
+	preprep.BatchDigest = calculateMD5Hash(preprep.HashBatch.RequestHashList, preprep.HashBatch.Timestamp)
+
+	fetch := &pb.FetchMissingRequests{
+		View:                 preprep.View,
+		SequenceNumber:       preprep.SequenceNumber,
+		BatchDigest:          preprep.BatchDigest,
+		MissingRequestHashes: map[uint64]string{uint64(0): "tx-hash"},
+		ReplicaId:            rbfts[1].peerPool.ID,
+	}
+
+	err := rbfts[0].recvFetchMissingTxs(fetch)
+	assert.Nil(t, err)
+	assert.Nil(t, nodes[0].unicastMessageCache)
+
+	tx := newTx()
+	rbfts[0].storeMgr.batchStore[fetch.BatchDigest] = &pb.RequestBatch{
+		RequestHashList: []string{"tx-hash"},
+		RequestList:     []*protos.Transaction{tx},
+		SeqNo:           uint64(1),
+		LocalList:       []bool{true},
+	}
+	err = rbfts[0].recvFetchMissingTxs(fetch)
+	assert.Nil(t, err)
+	assert.Equal(t, pb.Type_SEND_MISSING_REQUESTS, nodes[0].unicastMessageCache.Type)
+
+	re := &pb.SendMissingRequests{
+		View:                 fetch.View,
+		SequenceNumber:       fetch.SequenceNumber,
+		BatchDigest:          fetch.BatchDigest,
+		MissingRequestHashes: fetch.MissingRequestHashes,
+		MissingRequests:      map[uint64]*protos.Transaction{},
+		ReplicaId:            rbfts[0].peerPool.ID,
+	}
+
+	var ret consensusEvent
+	rbfts[1].exec.lastExec = uint64(10)
+	ret = rbfts[1].recvSendMissingTxs(re)
+	assert.Nil(t, ret)
+
+	rbfts[1].exec.lastExec = uint64(0)
+	ret = rbfts[1].recvSendMissingTxs(re)
+	assert.Nil(t, ret)
+
+	re.MissingRequests = map[uint64]*protos.Transaction{uint64(0): tx}
+	rbfts[1].exec.lastExec = uint64(0)
+	ret = rbfts[1].recvSendMissingTxs(re)
+	assert.Nil(t, ret)
+
+	_ = rbfts[1].recvPrePrepare(preprep)
+	assert.Equal(t, pb.Type_PREPARE, nodes[1].broadcastMessageCache.Type)
+	ret = rbfts[1].recvSendMissingTxs(re)
+	assert.Nil(t, ret)
+
+	cert := rbfts[1].storeMgr.getCert(re.View, re.SequenceNumber, re.BatchDigest)
+	cert.sentCommit = true
+	ret = rbfts[1].recvSendMissingTxs(re)
+	assert.Nil(t, ret)
+
+	rbfts[1].setView(uint64(2))
+	ret = rbfts[1].recvSendMissingTxs(re)
+	assert.Nil(t, ret)
+}
+
+func TestRBFT_recvStateUpdatedEvent_updateEpoch(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	_, rbfts := newBasicClusterInstance()
+
+	metaS := &pb.MetaState{
+		Applied: uint64(10),
+		Digest:  "block-number-10",
+	}
+
+	addNode5 := append(defaultValidatorSet, "node5")
+	epochInfo := &pb.EpochInfo{
+		Epoch: uint64(3),
+		VSet:  addNode5,
+	}
+
+	ss := &pb.ServiceState{
+		MetaState: metaS,
+		EpochInfo: epochInfo,
+	}
+
+	rbfts[0].recvStateUpdatedEvent(ss)
+	assert.Equal(t, 5, len(rbfts[0].peerPool.routerMap.HashMap))
+}
+
+func TestRBFT_recvStateUpdatedEvent_RecoveryDone(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	nodes, rbfts := newBasicClusterInstance()
+
+	metaS := &pb.MetaState{
+		Applied: uint64(10),
+		Digest:  "block-number-10",
+	}
+
+	addNode5 := append(defaultValidatorSet, "node5")
+	epochInfo := &pb.EpochInfo{
+		Epoch: uint64(3),
+		VSet:  addNode5,
+	}
+
+	ss := &pb.ServiceState{
+		MetaState: metaS,
+		EpochInfo: epochInfo,
+	}
+
+	rbfts[1].atomicOn(InRecovery)
+	ret := rbfts[1].recvStateUpdatedEvent(ss)
+	exp := &LocalEvent{
+		Service:   RecoveryService,
+		EventType: RecoveryDoneEvent,
+	}
+	assert.Equal(t, exp, ret)
+
+	// Primary in recovery
+	rbfts[0].atomicOn(InRecovery)
+	rbfts[0].recvStateUpdatedEvent(ss)
+	assert.Equal(t, pb.Type_NOTIFICATION, nodes[0].broadcastMessageCache.Type)
+}
+
+func TestRBFT_recvStateUpdatedEvent_lowSeqNo(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	_, rbfts := newBasicClusterInstance()
+
+	metaS := &pb.MetaState{
+		Applied: uint64(10),
+		Digest:  "block-number-10",
+	}
+
+	addNode5 := append(defaultValidatorSet, "node5")
+	epochInfo := &pb.EpochInfo{
+		Epoch: uint64(3),
+		VSet:  addNode5,
+	}
+
+	ss := &pb.ServiceState{
+		MetaState: metaS,
+		EpochInfo: epochInfo,
+	}
+
+	rbfts[1].h = uint64(20)
+	rbfts[1].atomicOn(StateTransferring)
+	ret := rbfts[1].recvStateUpdatedEvent(ss)
+	assert.Nil(t, ret)
+
+	rbfts[1].storeMgr.highStateTarget = &pb.MetaState{
+		Applied: uint64(10),
+		Digest:  "block-number-10",
+	}
+	ret = rbfts[1].recvStateUpdatedEvent(ss)
+	assert.Nil(t, ret)
+	assert.Equal(t, uint64(10), rbfts[1].exec.lastExec)
+
+	rbfts[1].exec.setLastExec(uint64(0))
+	rbfts[1].storeMgr.highStateTarget = &pb.MetaState{
+		Applied: uint64(30),
+		Digest:  "block-number-30",
+	}
+	ret = rbfts[1].recvStateUpdatedEvent(ss)
+	assert.Nil(t, ret)
+	assert.Equal(t, uint64(10), rbfts[1].exec.lastExec)
 }

@@ -5,7 +5,6 @@ go 1.12
 require (
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/mock v1.4.3
-	github.com/magiconair/properties v1.8.0
 	github.com/stretchr/testify v1.5.1
 	github.com/ultramesh/fancylogger v0.1.2
 	github.com/ultramesh/flato-event v0.1.26
