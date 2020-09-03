@@ -4,8 +4,8 @@ import (
 	"errors"
 	"math/rand"
 	"os"
+	"reflect"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/ultramesh/fancylogger"
@@ -21,11 +21,28 @@ var (
 	defaultValidatorSet = []string{"node1", "node2", "node3", "node4"}
 )
 
+var peerSet = []*pb.Peer{
+	{
+		Id:   uint64(1),
+		Hash: calHash("node1"),
+	},
+	{
+		Id:   uint64(2),
+		Hash: calHash("node2"),
+	},
+	{
+		Id:   uint64(3),
+		Hash: calHash("node3"),
+	},
+	{
+		Id:   uint64(4),
+		Hash: calHash("node4"),
+	},
+}
+
 // testFramework contains the core structure of test framework instance.
 type testFramework struct {
-	N     int
-	f     int
-	NLock sync.RWMutex
+	N int
 
 	// Instance of nodes.
 	TestNode []*testNode
@@ -35,9 +52,8 @@ type testFramework struct {
 	Router pb.Router
 
 	// mem chain for framework
-	Epoch  uint64
-	Blocks map[uint64]string
-	VSet   map[uint64]pb.Router
+	Epoch uint64
+	VSet  map[uint64]pb.Router
 
 	// Channel to close this event process.
 	close chan bool
@@ -70,11 +86,11 @@ type testNode struct {
 	Digest  string
 
 	// block storage
-	Blocks []Blocks
 	blocks map[uint64]string
 
 	// ID is the num-identity of the local rbft.peerPool.localIDde.
 	ID       uint64
+	Hash     string
 	Hostname string
 
 	// Normal indicates if current node could deal with messages.
@@ -110,17 +126,11 @@ type testExternal struct {
 	clusterChan chan *channelMsg
 }
 
-type Blocks struct {
-	sequenceNumber uint64
-	hash           string
-	value          interface{}
-}
-
 // channelMsg is the form of data in cluster network.
 type channelMsg struct {
-	// Target of consensus message.
-	// When it is 0, the channelMsg is a broadcast message.
-	// Or it means a unicast's target.
+	// target node of consensus message.
+	// if it is "", the channelMsg is a broadcast message.
+	// else it means the target node to unicast message.
 	to string
 
 	// consensus message
@@ -186,7 +196,7 @@ func newTestFramework(account int, loggerFile bool) *testFramework {
 		hostname := "node" + strconv.Itoa(i+1)
 		peer := &pb.Peer{
 			Id:       id,
-			Hash:     hash(hostname),
+			Hash:     calHash(hostname),
 			Hostname: hostname,
 		}
 		routers.Peers = append(routers.Peers, peer)
@@ -238,14 +248,14 @@ func (tf *testFramework) newNodeConfig(
 		peer := &pb.Peer{
 			Id:       uint64(index + 1),
 			Hostname: hostname,
-			Hash:     hash(hostname),
+			Hash:     calHash(hostname),
 		}
 		peers = append(peers, peer)
 	}
 
 	return Config{
 		ID:       id,
-		Hash:     hash(hostname),
+		Hash:     calHash(hostname),
 		Hostname: hostname,
 		IsNew:    isNew,
 
@@ -283,7 +293,7 @@ func vSetToRouters(vSet []string) pb.Router {
 	for index, hostname := range vSet {
 		peer := &pb.Peer{
 			Id:       uint64(index + 1),
-			Hash:     hash(hostname),
+			Hash:     calHash(hostname),
 			Hostname: hostname,
 		}
 		routers.Peers = append(routers.Peers, peer)
@@ -350,6 +360,7 @@ func (tf *testFramework) newTestNode(id uint64, hostname string, cc chan *channe
 		Router:     routers,
 		Epoch:      epochInfo.Epoch,
 		ID:         id,
+		Hash:       calHash(hostname),
 		Hostname:   hostname,
 		normal:     true,
 		online:     true,
@@ -382,8 +393,8 @@ func (tf *testFramework) clusterListen() {
 			return
 		case obj := <-tf.clusterChan:
 			for i := range tf.TestNode {
-				if obj.to == "" || obj.to == tf.TestNode[i].n.rbft.peerPool.hash {
-					if tf.TestNode[i].online {
+				if obj.to == "" || obj.to == tf.TestNode[i].Hash {
+					if tf.TestNode[i].online && obj.msg.From != tf.TestNode[i].ID {
 						tf.TestNode[i].recvChan <- obj.msg
 					}
 				}
@@ -473,7 +484,7 @@ func (tf *testFramework) frameworkStop() {
 
 // frameworkDelNode adds one node to the cluster.
 func (tf *testFramework) frameworkDelNode(hostname string) {
-	hash := hash(hostname)
+	hash := calHash(hostname)
 	tf.log.Noticef("Test Framework delete Node, Hash: %s...", hostname)
 
 	// stop node id
@@ -581,7 +592,7 @@ func (tf *testFramework) frameworkAddNode(hostname string, loggerFile bool, vSet
 	pool := txpool.NewTxPool(namespace, rlu, confTxPool)
 
 	// new peer
-	hash := hash(hostname)
+	hash := calHash(hostname)
 	newPeer := &pb.Peer{
 		Id:       id,
 		Hash:     hash,
@@ -609,6 +620,7 @@ func (tf *testFramework) frameworkAddNode(hostname string, loggerFile bool, vSet
 		Router:   routers,
 		Epoch:    n.rbft.epoch,
 		ID:       id,
+		Hash:     hash,
 		Hostname: hostname,
 		normal:   true,
 		online:   true,
@@ -807,7 +819,7 @@ func (ext *testExternal) UpdateTable(update *pb.ConfChange) {
 		newPeer := &pb.Peer{
 			Id:       peer.Id,
 			Hostname: peer.Hostname,
-			Hash:     hash(peer.Hostname),
+			Hash:     calHash(peer.Hostname),
 		}
 		newPeers = append(newPeers, newPeer)
 	}
@@ -844,11 +856,6 @@ func (ext *testExternal) Execute(requests []*protos.Transaction, localList []boo
 	if state.MetaState.Applied == ext.testNode.Applied+1 {
 		ext.testNode.Applied = state.MetaState.Applied
 		ext.testNode.Digest = state.MetaState.Digest
-		block := Blocks{
-			sequenceNumber: state.MetaState.Applied,
-			hash:           state.MetaState.Digest,
-		}
-		ext.testNode.Blocks = append(ext.testNode.Blocks, block)
 		ext.testNode.blocks[state.MetaState.Applied] = state.MetaState.Digest
 		ext.testNode.n.logger.Debugf("Block Number %d", state.MetaState.Applied)
 		ext.testNode.n.logger.Debugf("Block Hash %s", state.MetaState.Digest)
@@ -882,7 +889,6 @@ func (ext *testExternal) Execute(requests []*protos.Transaction, localList []boo
 				ext.testNode.N.ReportReloadFinished(re)
 			}
 		}
-		// report executed
 		go ext.testNode.N.ReportExecuted(state)
 
 		if !protos.IsConfigTx(requests[0]) && state.MetaState.Applied%10 != 0 {
@@ -950,12 +956,144 @@ func (ext *testExternal) SendFilterEvent(informType pb.InformType, message ...in
 
 // set N/f of cluster
 func (tf *testFramework) setN(num int) {
-	tf.NLock.Lock()
-	defer tf.NLock.Unlock()
 	tf.N = num
-	tf.f = (tf.N - 1) / 3
 }
 
-func hash(hostname string) string {
+func calHash(hostname string) string {
 	return "hash-" + hostname
+}
+
+func newBasicClusterInstance() ([]*testNode, []*rbftImpl) {
+	tf := newTestFramework(4, false)
+	var rbfts []*rbftImpl
+	var nodes []*testNode
+	for _, tn := range tf.TestNode {
+		nodes = append(nodes, tn)
+		rbfts = append(rbfts, tn.n.rbft)
+	}
+
+	return nodes, rbfts
+}
+
+func (rbft *rbftImpl) consensusMessagePacker(e consensusEvent) *pb.ConsensusMessage {
+	var (
+		eventType pb.Type
+		payload   []byte
+		err       error
+	)
+
+	switch et := e.(type) {
+	case *pb.NullRequest:
+		eventType = pb.Type_NULL_REQUEST
+		payload, err = proto.Marshal(et)
+	case *pb.PrePrepare:
+		eventType = pb.Type_PRE_PREPARE
+		payload, err = proto.Marshal(et)
+	case *pb.Prepare:
+		eventType = pb.Type_PREPARE
+		payload, err = proto.Marshal(et)
+	case *pb.Commit:
+		eventType = pb.Type_COMMIT
+		payload, err = proto.Marshal(et)
+	case *pb.Checkpoint:
+		eventType = pb.Type_CHECKPOINT
+		payload, err = proto.Marshal(et)
+	case *pb.FetchCheckpoint:
+		eventType = pb.Type_FETCH_CHECKPOINT
+		payload, err = proto.Marshal(et)
+	case *pb.NewView:
+		eventType = pb.Type_NEW_VIEW
+		payload, err = proto.Marshal(et)
+	case *pb.FetchRequestBatch:
+		eventType = pb.Type_FETCH_REQUEST_BATCH
+		payload, err = proto.Marshal(et)
+	case *pb.SendRequestBatch:
+		eventType = pb.Type_SEND_REQUEST_BATCH
+		payload, err = proto.Marshal(et)
+	case *pb.RecoveryFetchPQC:
+		eventType = pb.Type_RECOVERY_FETCH_QPC
+		payload, err = proto.Marshal(et)
+	case *pb.RecoveryReturnPQC:
+		eventType = pb.Type_RECOVERY_RETURN_QPC
+		payload, err = proto.Marshal(et)
+	case *pb.FetchMissingRequests:
+		eventType = pb.Type_FETCH_MISSING_REQUESTS
+		payload, err = proto.Marshal(et)
+	case *pb.SendMissingRequests:
+		eventType = pb.Type_SEND_MISSING_REQUESTS
+		payload, err = proto.Marshal(et)
+	case *pb.SyncState:
+		eventType = pb.Type_SYNC_STATE
+		payload, err = proto.Marshal(et)
+	case *pb.SyncStateResponse:
+		eventType = pb.Type_SYNC_STATE_RESPONSE
+		payload, err = proto.Marshal(et)
+	case *pb.Notification:
+		eventType = pb.Type_NOTIFICATION
+		payload, err = proto.Marshal(et)
+	case *pb.NotificationResponse:
+		eventType = pb.Type_NOTIFICATION_RESPONSE
+		payload, err = proto.Marshal(et)
+	case *pb.RequestSet:
+		eventType = pb.Type_REQUEST_SET
+		payload, err = proto.Marshal(et)
+	default:
+		rbft.logger.Errorf("ConsensusMessage Unknown Type: %+v", e)
+		return nil
+	}
+
+	if err != nil {
+		rbft.logger.Errorf("ConsensusMessage Marshal Error: %s", err)
+		return nil
+	}
+
+	consensusMsg := &pb.ConsensusMessage{
+		Type:    eventType,
+		From:    rbft.peerPool.ID,
+		Epoch:   rbft.epoch,
+		Payload: payload,
+	}
+
+	return consensusMsg
+}
+
+func (tm *timerManager) getTimer(name string) bool {
+	if tm.tTimers[name].count() != 0 {
+		return true
+	}
+	return false
+}
+
+// checkNilElems checks if provided struct has nil elements, returns error if provided
+// param is not a struct pointer and returns all nil elements' name if has.
+func checkNilElems(i interface{}) (string, []string, error) {
+	typ := reflect.TypeOf(i)
+	value := reflect.Indirect(reflect.ValueOf(i))
+
+	if typ.Kind() != reflect.Ptr {
+		return "", nil, errors.New("got a non-ptr to check if has nil elements")
+	}
+	typ = typ.Elem()
+	if typ.Kind() != reflect.Struct {
+		return "", nil, errors.New("got a non-struct to check if has nil elements")
+	}
+
+	structName := typ.Name()
+	nilElems := make([]string, 0)
+	hasNil := false
+
+	for i := 0; i < typ.NumField(); i++ {
+		kind := typ.Field(i).Type.Kind()
+		if kind == reflect.Chan || kind == reflect.Map {
+			elemName := typ.Field(i).Name
+			if value.FieldByName(elemName).IsNil() {
+				nilElems = append(nilElems, elemName)
+				hasNil = true
+			}
+		}
+	}
+	if hasNil {
+		return structName, nilElems, nil
+	}
+	return structName, nil, nil
 }
