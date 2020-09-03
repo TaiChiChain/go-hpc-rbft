@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.2.10"></a>
+## [0.2.10](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.9...v0.2.10) (2020-09-03)
+
+
+### Bug Fixes
+
+* fix the problems in smoke tests ([a05818e](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/a05818e))
+* **batch_mgr.go:** remove useless channel ([32e70f8](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/32e70f8))
+* **initMsgMap:** only init message event map once ([8ee7c7b](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/8ee7c7b))
+* **view-change:** don't send view-change in some situation ([5ace2f7](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/5ace2f7))
+
+
+### Features
+
+* **unit_test:** update unit tests for rbft core ([3f6325d](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/3f6325d))
+
+
+
 <a name="0.2.9"></a>
 ## [0.2.9](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.8...v0.2.9) (2020-08-17)
 
