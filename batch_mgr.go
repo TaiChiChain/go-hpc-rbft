@@ -270,11 +270,22 @@ func (rbft *rbftImpl) findNextCommitBatch(digest string, v uint64, n uint64) err
 func (rbft *rbftImpl) primaryResubmitTransactions() {
 	if rbft.isPrimary(rbft.peerPool.ID) && !rbft.atomicIn(InConfChange) {
 		rbft.logger.Debugf("======== Primary %d resubmit transactions", rbft.peerPool.ID)
-		//if primary has transactions in requestPool, generate batches of the transactions
+
+		// we need to send pre-prepare for the cached batches in primary
+		if len(rbft.batchMgr.cacheBatch) > 0 {
+			rbft.restartBatchTimer()
+			rbft.timerMgr.stopTimer(nullRequestTimer)
+			rbft.maybeSendPrePrepare(nil, true)
+		}
+
+		// if primary has transactions in requestPool, generate batches of the transactions
 		for rbft.batchMgr.requestPool.HasPendingRequestInPool() {
 			batches := rbft.batchMgr.requestPool.GenerateRequestBatch()
 			rbft.postBatches(batches)
+
+			// if we have just generated a config batch, we need to break the resubmit
 			if rbft.atomicIn(InConfChange) {
+				rbft.logger.Debug("Primary has just generated a config batch, break the resubmit")
 				break
 			}
 		}
