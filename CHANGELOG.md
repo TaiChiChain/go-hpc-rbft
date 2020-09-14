@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.2.11"></a>
+## [0.2.11](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.10...v0.2.11) (2020-09-14)
+
+
+### Bug Fixes
+
+* **rbft_impl.go:** priamry resubmit txs when normal checkpoint finished ([80ada6b](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/80ada6b)), closes [#flato-2257](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-2257)
+* **recovery_mgr.go:** restore pool in resetStateForRecovery when single node recovery from abnormal ([b42b32a](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/b42b32a)), closes [#flato-2308](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-2308)
+
+
+
 <a name="0.2.10"></a>
 ## [0.2.10](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.9...v0.2.10) (2020-09-03)
 
