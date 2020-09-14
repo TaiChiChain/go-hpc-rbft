@@ -21,6 +21,6 @@ replace github.com/ultramesh/flato-common => git.hyperchain.cn/ultramesh/flato-c
 
 replace github.com/ultramesh/flato-event => git.hyperchain.cn/ultramesh/flato-event.git v0.1.17
 
-replace github.com/ultramesh/flato-txpool => git.hyperchain.cn/ultramesh/flato-txpool.git v0.2.1
+replace github.com/ultramesh/flato-txpool => git.hyperchain.cn/ultramesh/flato-txpool.git v0.2.2
 
 replace github.com/ultramesh/fancylogger => git.hyperchain.cn/ultramesh/fancylogger.git v0.1.2
