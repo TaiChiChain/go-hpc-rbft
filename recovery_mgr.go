@@ -395,6 +395,14 @@ func (rbft *rbftImpl) resetStateForRecovery() consensusEvent {
 		}
 	}
 
+	// directly restore all batchedTxs back into non-batched txs and reset to batched status
+	// after fetchPQC if needed.
+	rbft.logger.Noticef("Replica %d restore txpool when reset state in recovery", rbft.peerPool.ID)
+	rbft.batchMgr.requestPool.RestorePool()
+
+	// clear cacheBatch as they are useless and all related batch have been restored in requestPool.
+	rbft.batchMgr.cacheBatch = nil
+
 	return &LocalEvent{
 		Service:   RecoveryService,
 		EventType: RecoveryDoneEvent,
