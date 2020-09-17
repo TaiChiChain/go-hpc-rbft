@@ -1599,7 +1599,14 @@ func (rbft *rbftImpl) finishNormalCheckpoint(chkpt *pb.Checkpoint) {
 	rbft.logger.Infof("Replica %d post stable checkpoint event for seqNo %d after "+
 		"executed to the height with the same digest", rbft.peerPool.ID, rbft.h)
 	rbft.external.SendFilterEvent(pb.InformType_FilterStableCheckpoint, rbft.h)
-	rbft.primaryResubmitTransactions()
+
+	// make sure node is in normal status before try to batch, as we may reach stable
+	// checkpoint in vc/recovery.
+	if rbft.isNormal() {
+		// for primary, we can try resubmit transactions after stable checkpoint as we
+		// may block pre-prepare before because of high watermark limit.
+		rbft.primaryResubmitTransactions()
+	}
 }
 
 // weakCheckpointSetOutOfRange checks if this node is fell behind or not. If we receive f+1 checkpoints whose seqNo > H (for example 150),
