@@ -265,13 +265,13 @@ func (rbft *rbftImpl) findNextCommitBatch(digest string, v uint64, n uint64) err
 	return rbft.sendCommit(digest, v, n)
 }
 
-// primaryResubmitTransactions handles the transactions put into requestPool during
-// viewChange and recovery if current node is new primary.
+// primaryResubmitTransactions tries to submit transactions for primary after abnormal
+// or stable checkpoint.
 func (rbft *rbftImpl) primaryResubmitTransactions() {
 	if rbft.isPrimary(rbft.peerPool.ID) && !rbft.atomicIn(InConfChange) {
 		rbft.logger.Debugf("======== Primary %d resubmit transactions", rbft.peerPool.ID)
 
-		// we need to send pre-prepare for the cached batches in primary
+		// try cached batches first if any.
 		if len(rbft.batchMgr.cacheBatch) > 0 {
 			rbft.restartBatchTimer()
 			rbft.timerMgr.stopTimer(nullRequestTimer)
