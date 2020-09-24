@@ -90,6 +90,8 @@ func (rbft *rbftImpl) sendInW(n uint64) bool {
 func (rbft *rbftImpl) cleanOutstandingAndCert() {
 	rbft.storeMgr.outstandingReqBatches = make(map[string]*pb.RequestBatch)
 	rbft.storeMgr.committedCert = make(map[msgID]string)
+
+	rbft.metrics.outstandingBatchesGauge.Set(float64(0))
 }
 
 // When N=3F+1, this should be 2F+1 (N-F)
@@ -777,6 +779,7 @@ func (rbft *rbftImpl) putBackRequestBatches(xset xset) {
 			deleteList = append(deleteList, digest)
 		}
 	}
+	rbft.metrics.batchesGauge.Set(float64(len(rbft.storeMgr.batchStore)))
 	rbft.batchMgr.requestPool.RemoveBatches(deleteList)
 
 	// directly restore all batchedTxs back into non-batched txs and re-arrange them by order when processNewView.
@@ -784,6 +787,8 @@ func (rbft *rbftImpl) putBackRequestBatches(xset xset) {
 
 	// clear cacheBatch as they are useless and all related batch have been restored in requestPool.
 	rbft.batchMgr.cacheBatch = nil
+
+	rbft.metrics.cacheBatchNumber.Set(float64(0))
 
 	hashListMap := make(map[string]bool)
 	for _, hash := range xset {

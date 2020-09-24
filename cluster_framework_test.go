@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ultramesh/fancylogger"
+	"github.com/ultramesh/flato-common/metrics/disabled"
 	"github.com/ultramesh/flato-event/inner/protos"
 	"github.com/ultramesh/flato-rbft/external"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
@@ -285,6 +286,7 @@ func (tf *testFramework) newNodeConfig(
 		Logger:      log,
 		External:    ext,
 		RequestPool: pool,
+		MetricsProv: &disabled.Provider{},
 	}
 }
 
@@ -340,6 +342,7 @@ func (tf *testFramework) newTestNode(id uint64, hostname string, cc chan *channe
 		BatchMemLimit: false,
 		BatchMaxMem:   999,
 		ToleranceTime: 999 * time.Millisecond,
+		MetricsProv:   &disabled.Provider{},
 		Logger:        log,
 	}
 	rlu := &defaultRequestLookupSmokeTest{}
@@ -585,6 +588,7 @@ func (tf *testFramework) frameworkAddNode(hostname string, loggerFile bool, vSet
 		BatchMemLimit: false,
 		BatchMaxMem:   999,
 		ToleranceTime: 999 * time.Millisecond,
+		MetricsProv:   &disabled.Provider{},
 		Logger:        log,
 	}
 	rlu := &defaultRequestLookupSmokeTest{}

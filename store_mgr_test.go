@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ultramesh/flato-common/metrics/disabled"
 	mockexternal "github.com/ultramesh/flato-rbft/mock/mock_external"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
 	txpoolmock "github.com/ultramesh/flato-txpool/mock"
@@ -42,6 +43,7 @@ func testNewStorage(ctrl *gomock.Controller) (*storeManager, Config) {
 		Logger:      log,
 		External:    external,
 		RequestPool: pool,
+		MetricsProv: &disabled.Provider{},
 
 		EpochInit:    uint64(0),
 		LatestConfig: nil,
