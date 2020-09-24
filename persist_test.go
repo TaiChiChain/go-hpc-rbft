@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ultramesh/flato-common/metrics/disabled"
 	"github.com/ultramesh/flato-rbft/external"
 	mockexternal "github.com/ultramesh/flato-rbft/mock/mock_external"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
@@ -43,6 +44,7 @@ func newPersistTestReplica(ctrl *gomock.Controller, pool txpool.TxPool, log Logg
 		Logger:      log,
 		External:    ext,
 		RequestPool: pool,
+		MetricsProv: &disabled.Provider{},
 
 		EpochInit:    uint64(0),
 		LatestConfig: nil,

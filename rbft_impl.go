@@ -20,6 +20,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ultramesh/flato-common/metrics"
 	"github.com/ultramesh/flato-event/inner/protos"
 	"github.com/ultramesh/flato-rbft/external"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
@@ -128,6 +129,9 @@ type Config struct {
 	// RequestSetMaxMem is the max memory size of one set of requests.
 	RequestSetMaxMem uint
 
+	// MetricsProv is the metrics Provider used to generate metrics instance.
+	MetricsProv metrics.Provider
+
 	// Logger is the logger used to record logger in RBFT.
 	Logger Logger
 }
@@ -170,8 +174,9 @@ type rbftImpl struct {
 	hLock     sync.RWMutex // mutex to set value of h
 	epochLock sync.RWMutex // mutex to set value of view
 
-	config Config // get configuration info
-	logger Logger // write logger to record some info
+	metrics *rbftMetrics // collect all metrics in rbft
+	config  Config       // get configuration info
+	logger  Logger       // write logger to record some info
 }
 
 var once sync.Once
@@ -277,6 +282,11 @@ func newRBFT(cpChan chan *pb.ServiceState, confC chan *pb.ReloadFinished, c Conf
 	// update viewChange seqNo after restore state which may update seqNo
 	rbft.updateViewChangeSeqNo(rbft.exec.lastExec, rbft.K)
 
+	rbft.metrics = newRBFTMetrics(c.MetricsProv)
+	rbft.metrics.epochGauge.Set(float64(rbft.epoch))
+	rbft.metrics.clusterSizeGauge.Set(float64(rbft.N))
+	rbft.metrics.quorumSizeGauge.Set(float64(rbft.commonCaseQuorum()))
+
 	rbft.logger.Infof("RBFT Max number of validating peers (N) = %v", rbft.N)
 	rbft.logger.Infof("RBFT Max number of failing peers (f) = %v", rbft.f)
 	rbft.logger.Infof("RBFT byzantine flag = %v", rbft.in(byzantine))
@@ -358,19 +368,8 @@ func (rbft *rbftImpl) step(msg *pb.ConsensusMessage) {
 		return
 	}
 
-	if msg.Type == pb.Type_REQUEST_SET {
-		set := &pb.RequestSet{}
-		err := proto.Unmarshal(msg.Payload, set)
-		if err != nil {
-			rbft.logger.Errorf("processConsensus, unmarshal error: %s", err)
-			return
-		}
-		set.Local = false
-		// nolint: errcheck
-		go rbft.postMsg(msg)
-	} else {
-		go rbft.postMsg(msg)
-	}
+	// nolint: errcheck
+	go rbft.postMsg(msg)
 }
 
 // reportStateUpdated informs RBFT stateUpdated event.
@@ -501,6 +500,8 @@ func (rbft *rbftImpl) processEvent(ee consensusEvent) consensusEvent {
 
 	case *pb.RequestSet:
 		if e.Local == true {
+			rbft.metrics.incomingLocalTxSets.Add(float64(1))
+			rbft.metrics.incomingLocalTxs.Add(float64(len(e.Requests)))
 			rbft.broadcastReqSet(e)
 		}
 
@@ -557,6 +558,8 @@ func (rbft *rbftImpl) consensusMessageFilter(msg *pb.ConsensusMessage) consensus
 			return nil
 		}
 		set.Local = false
+		rbft.metrics.incomingRemoteTxSets.Add(float64(1))
+		rbft.metrics.incomingRemoteTxs.Add(float64(len(set.Requests)))
 		return rbft.processReqSetEvent(set)
 	}
 
@@ -683,10 +686,12 @@ func (rbft *rbftImpl) processReqSetEvent(req *pb.RequestSet) consensusEvent {
 	if !rbft.isNormal() || rbft.atomicIn(InConfChange) {
 		// if nodes in skipInProgress, it cannot handle txs anymore
 		if rbft.in(SkipInProgress) {
+			rbft.rejectRequestSet(req)
 			return nil
 		}
 		// if pool already full, rejects the tx, unless it's from RPC because of time difference
 		if rbft.isPoolFull() && !req.Local {
+			rbft.rejectRequestSet(req)
 			return nil
 		}
 		for _, tx := range req.Requests {
@@ -694,6 +699,7 @@ func (rbft *rbftImpl) processReqSetEvent(req *pb.RequestSet) consensusEvent {
 				// if it's already in config change, reject another config tx
 				if rbft.atomicIn(InConfChange) {
 					rbft.logger.Debugf("Replica %d is processing a ctx, reject another one", rbft.peerPool.ID)
+					rbft.rejectRequestSet(req)
 					return nil
 				}
 			}
@@ -728,6 +734,14 @@ func (rbft *rbftImpl) processReqSetEvent(req *pb.RequestSet) consensusEvent {
 	}
 
 	return nil
+}
+
+func (rbft *rbftImpl) rejectRequestSet(req *pb.RequestSet) {
+	if req.Local {
+		rbft.metrics.rejectedLocalTxs.Add(float64(len(req.Requests)))
+	} else {
+		rbft.metrics.rejectedRemoteTxs.Add(float64(len(req.Requests)))
+	}
 }
 
 // processOutOfDateReqs process the out-of-date requests in requestPool, get the remained txs from pool,
@@ -792,6 +806,7 @@ func (rbft *rbftImpl) recvRequestBatch(reqBatch *txpool.RequestHashBatch) error 
 		rbft.timerMgr.stopTimer(nullRequestTimer)
 		if len(rbft.batchMgr.cacheBatch) > 0 {
 			rbft.batchMgr.cacheBatch = append(rbft.batchMgr.cacheBatch, batch)
+			rbft.metrics.cacheBatchNumber.Add(float64(1))
 			rbft.maybeSendPrePrepare(nil, true)
 			return nil
 		}
@@ -1110,6 +1125,7 @@ func (rbft *rbftImpl) fetchMissingTxs(prePrep *pb.PrePrepare, missingTxHashes ma
 		Epoch:   rbft.epoch,
 		Payload: payload,
 	}
+	rbft.metrics.fetchMissingTxsCounter.Add(float64(1))
 	rbft.peerPool.unicast(consensusMsg, prePrep.ReplicaId)
 	return nil
 }
@@ -1244,6 +1260,7 @@ func (rbft *rbftImpl) commitPendingBlocks() {
 	for hasTxToExec := true; hasTxToExec; {
 		if find, idx, cert := rbft.findNextCommitTx(); find {
 			rbft.logger.Noticef("======== Replica %d Call execute, view=%d/seqNo=%d", rbft.peerPool.ID, idx.v, idx.n)
+			rbft.metrics.committedBlockNumber.Add(float64(1))
 			rbft.persistCSet(idx.v, idx.n, idx.d)
 			// stop new view timer after one batch has been call executed
 			rbft.stopNewViewTimer()
@@ -1256,6 +1273,8 @@ func (rbft *rbftImpl) commitPendingBlocks() {
 				rbft.logger.Noticef("Replica %d try to execute a no-op", rbft.peerPool.ID)
 				txList := make([]*protos.Transaction, 0)
 				localList := make([]bool, 0)
+				rbft.metrics.committedEmptyBlockNumber.Add(float64(1))
+				rbft.metrics.txsPerBlock.Observe(float64(0))
 				rbft.external.Execute(txList, localList, idx.n, 0)
 			} else {
 				// find batch in batchStore rather than outstandingBatch as after viewChange
@@ -1266,11 +1285,17 @@ func (rbft *rbftImpl) commitPendingBlocks() {
 						rbft.peerPool.ID, idx.n)
 					rbft.setConfigBatchToExecute(idx.n)
 					rbft.atomicOn(InConfChange)
+					rbft.metrics.committedConfigBlockNumber.Add(float64(1))
 				}
 				txList, localList := rbft.filterExecutableTxs(idx.d, cert.prePrepare.HashBatch.DeDuplicateRequestHashList)
+				rbft.metrics.committedTxs.Add(float64(len(txList)))
+				rbft.metrics.txsPerBlock.Observe(float64(len(txList)))
+				batchToCommit := time.Duration(time.Now().UnixNano() - cert.prePrepare.HashBatch.Timestamp).Seconds()
+				rbft.metrics.batchToCommitDuration.Observe(batchToCommit)
 				rbft.external.Execute(txList, localList, idx.n, cert.prePrepare.HashBatch.Timestamp)
 			}
 			delete(rbft.storeMgr.outstandingReqBatches, idx.d)
+			rbft.metrics.outstandingBatchesGauge.Set(float64(len(rbft.storeMgr.outstandingReqBatches)))
 			cert.sentExecute = true
 
 			// if it is a config batch, start to wait for reload after the batch committed
@@ -1643,6 +1668,7 @@ func (rbft *rbftImpl) weakCheckpointSetOutOfRange(chkpt *pb.Checkpoint) bool {
 			if m := chkptSeqNumArray[len(chkptSeqNumArray)-rbft.oneCorrectQuorum()]; m > H {
 				rbft.logger.Warningf("Replica %d is out of date, f+1 nodes agree checkpoint with seqNo %d exists but our high water mark is %d", rbft.peerPool.ID, chkpt.SequenceNumber, H)
 				rbft.storeMgr.batchStore = make(map[string]*pb.RequestBatch)
+				rbft.metrics.batchesGauge.Set(float64(0))
 				rbft.persistDelAllBatches()
 				rbft.cleanOutstandingAndCert()
 				rbft.moveWatermarks(m)
@@ -1706,6 +1732,7 @@ func (rbft *rbftImpl) moveWatermarks(n uint64) {
 			rbft.persistDelQPCSet(idx.v, idx.n, idx.d)
 		}
 	}
+	rbft.metrics.outstandingBatchesGauge.Set(float64(len(rbft.storeMgr.outstandingReqBatches)))
 
 	// retain most recent 10 block info in txBatchStore cache as non-primary
 	// replicas may need to fetch those batches if they are lack of some txs
@@ -1727,6 +1754,7 @@ func (rbft *rbftImpl) moveWatermarks(n uint64) {
 			digestList = append(digestList, digest)
 		}
 	}
+	rbft.metrics.batchesGauge.Set(float64(len(rbft.storeMgr.batchStore)))
 	rbft.batchMgr.requestPool.RemoveBatches(digestList)
 
 	if !rbft.batchMgr.requestPool.IsPoolFull() {
@@ -1796,11 +1824,12 @@ func (rbft *rbftImpl) tryStateTransfer(target *pb.MetaState) {
 	// reset the status of PoolFull
 	rbft.setNotFull()
 
-	// clean cert with seqNo > lastExec before stateUpdate to avoid those cert with 'validated' flag influencing the
+	// clean cert with seqNo > lastExec before stateUpdate to avoid influencing the
 	// following progress
 	for idx := range rbft.storeMgr.certStore {
 		if idx.n > rbft.exec.lastExec && idx.n <= target.Applied {
-			rbft.logger.Debugf("Replica %d clean cert with seqNo %d > lastExec %d before state update", rbft.peerPool.ID, idx.n, rbft.exec.lastExec)
+			rbft.logger.Debugf("Replica %d clean cert with seqNo %d > lastExec %d "+
+				"before state update", rbft.peerPool.ID, idx.n, rbft.exec.lastExec)
 			delete(rbft.storeMgr.certStore, idx)
 			delete(rbft.storeMgr.outstandingReqBatches, idx.d)
 			delete(rbft.storeMgr.committedCert, idx)
@@ -1808,10 +1837,12 @@ func (rbft *rbftImpl) tryStateTransfer(target *pb.MetaState) {
 			rbft.persistDelQPCSet(idx.v, idx.n, idx.d)
 		}
 	}
+	rbft.metrics.outstandingBatchesGauge.Set(float64(len(rbft.storeMgr.outstandingReqBatches)))
 
 	rbft.logger.Infof("Replica %d try state update to %d", rbft.peerPool.ID, target.Applied)
 
 	// attempts to synchronize state to a particular target, implicitly calls rollback if needed
+	rbft.metrics.stateUpdateCounter.Add(float64(1))
 	rbft.external.StateUpdate(target.Applied, target.Digest, nil)
 }
 

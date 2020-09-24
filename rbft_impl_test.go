@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ultramesh/flato-common/metrics/disabled"
 	"github.com/ultramesh/flato-event/inner/protos"
 	mockexternal "github.com/ultramesh/flato-rbft/mock/mock_external"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
@@ -51,6 +52,7 @@ func TestRBFT_newRBFT(t *testing.T) {
 		Logger:      log,
 		External:    external,
 		RequestPool: pool,
+		MetricsProv: &disabled.Provider{},
 
 		EpochInit:    uint64(0),
 		LatestConfig: nil,

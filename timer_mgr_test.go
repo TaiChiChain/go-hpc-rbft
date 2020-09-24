@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ultramesh/flato-common/metrics/disabled"
 	mockexternal "github.com/ultramesh/flato-rbft/mock/mock_external"
 	txpoolmock "github.com/ultramesh/flato-txpool/mock"
 
@@ -61,6 +62,7 @@ func TestTimerMgr_stopTimer(t *testing.T) {
 		RequestPool:   tx,
 		K:             2,
 		LogMultiplier: 2,
+		MetricsProv:   &disabled.Provider{},
 	}
 	eventC := make(chan interface{})
 	timeMgr := newTimerMgr(eventC, conf)
@@ -96,6 +98,7 @@ func TestTimerMgr_getTimeoutValue(t *testing.T) {
 		RequestPool:   tx,
 		K:             2,
 		LogMultiplier: 2,
+		MetricsProv:   &disabled.Provider{},
 	}
 	eventC := make(chan interface{})
 	timeMgr := newTimerMgr(eventC, conf)
@@ -132,6 +135,7 @@ func TestTimerMgr_stopOneTimer(t *testing.T) {
 		RequestPool:   tx,
 		K:             2,
 		LogMultiplier: 2,
+		MetricsProv:   &disabled.Provider{},
 	}
 	eventC := make(chan interface{})
 	timeMgr := newTimerMgr(eventC, conf)
@@ -165,6 +169,7 @@ func TestTimerMgr_setTimeoutValue(t *testing.T) {
 		RequestPool:   tx,
 		K:             2,
 		LogMultiplier: 2,
+		MetricsProv:   &disabled.Provider{},
 	}
 	eventC := make(chan interface{})
 	timeMgr := newTimerMgr(eventC, conf)
@@ -200,6 +205,7 @@ func TestTimerMgr_makeNullRequestTimeoutLegal(t *testing.T) {
 		RequestPool:   tx,
 		K:             2,
 		LogMultiplier: 2,
+		MetricsProv:   &disabled.Provider{},
 	}
 	eventC := make(chan interface{})
 	timeMgr := newTimerMgr(eventC, conf)
@@ -234,6 +240,7 @@ func TestTimerMgr_makeCleanVcTimeoutLegal(t *testing.T) {
 		RequestPool:   tx,
 		K:             2,
 		LogMultiplier: 2,
+		MetricsProv:   &disabled.Provider{},
 	}
 	eventC := make(chan interface{})
 	timeMgr := newTimerMgr(eventC, conf)
@@ -268,6 +275,7 @@ func TestTimerMgr_makeSyncStateTimeoutLegal(t *testing.T) {
 		RequestPool:   tx,
 		K:             2,
 		LogMultiplier: 2,
+		MetricsProv:   &disabled.Provider{},
 	}
 	eventC := make(chan interface{})
 	timeMgr := newTimerMgr(eventC, conf)
