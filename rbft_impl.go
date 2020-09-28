@@ -326,22 +326,12 @@ func (rbft *rbftImpl) start() error {
 	go rbft.listenEvent()
 
 	// NOTE!!! must use goroutine to post the event to avoid blocking the rbft service.
-	if rbft.epochMgr.configBatchToCheck != nil {
-		rbft.on(initialCheck)
-		// we need to fetch checkpoint from others to check the config batch
-		initFetchCheckpointEvent := &LocalEvent{
-			Service:   EpochMgrService,
-			EventType: FetchCheckpointEvent,
-		}
-		go rbft.postMsg(initFetchCheckpointEvent)
-	} else {
-		// there is not a pending config batch, so that we will trigger recovery directly
-		initRecoveryEvent := &LocalEvent{
-			Service:   RecoveryService,
-			EventType: RecoveryInitEvent,
-		}
-		go rbft.postMsg(initRecoveryEvent)
+	// trigger recovery
+	initRecoveryEvent := &LocalEvent{
+		Service:   RecoveryService,
+		EventType: RecoveryInitEvent,
 	}
+	go rbft.postMsg(initRecoveryEvent)
 
 	return nil
 }
@@ -358,6 +348,8 @@ func (rbft *rbftImpl) stop() {
 
 	// stop all timer event
 	rbft.timerMgr.Stop()
+
+	// todo wgr deregister metrics
 
 	rbft.logger.Noticef("======== RBFT stopped!")
 }
@@ -594,10 +586,6 @@ func (rbft *rbftImpl) dispatchCoreRbftMsg(e consensusEvent) consensusEvent {
 //=============================================================================
 // processNullRequest process null request when it come
 func (rbft *rbftImpl) processNullRequest(msg *pb.NullRequest) consensusEvent {
-	if rbft.in(initialCheck) {
-		rbft.logger.Infof("Replica %d is in initialCheck, reject null request from replica %d", rbft.peerPool.ID, msg.ReplicaId)
-		return nil
-	}
 
 	if rbft.atomicIn(InRecovery) {
 		rbft.logger.Infof("Replica %d is in recovery, reject null request from replica %d", rbft.peerPool.ID, msg.ReplicaId)
@@ -627,11 +615,6 @@ func (rbft *rbftImpl) processNullRequest(msg *pb.NullRequest) consensusEvent {
 // handleNullRequestEvent triggered by null request timer, primary needs to send a null request
 // and replica needs to send view change
 func (rbft *rbftImpl) handleNullRequestTimerEvent() {
-
-	if rbft.in(initialCheck) {
-		rbft.logger.Infof("Replica %d try to nullRequestHandler, but it's in initialCheck", rbft.peerPool.ID)
-		return
-	}
 
 	if rbft.atomicIn(InRecovery) {
 		rbft.logger.Debugf("Replica %d try to nullRequestHandler, but it's in recovery", rbft.peerPool.ID)
@@ -1520,11 +1503,6 @@ func (rbft *rbftImpl) recvCheckpoint(chkpt *pb.Checkpoint) consensusEvent {
 	if !ok {
 		rbft.logger.Debugf("Replica %d found checkpoint quorum for seqNo %d, digest %s, but it has not reached this checkpoint itself yet",
 			rbft.peerPool.ID, chkpt.SequenceNumber, chkpt.Digest)
-		if rbft.in(initialCheck) {
-			rbft.off(initialCheck)
-			rbft.maybeSetNormal()
-			return rbft.initRecovery()
-		}
 		if rbft.in(SkipInProgress) {
 			// When this node started state update, it would set h to the target, and finally it would receive a StateUpdatedEvent whose seqNo is this h.
 			if rbft.atomicIn(InRecovery) {
@@ -1577,7 +1555,8 @@ func (rbft *rbftImpl) finishConfigCheckpoint(chkpt *pb.Checkpoint) {
 	ev := <-rbft.confChan
 	rbft.logger.Debugf("Replica %d received a commit-db finished target at height %d", rbft.peerPool.ID, ev.Height)
 	if ev.Height != chkpt.SequenceNumber {
-		rbft.logger.Warningf("Wrong commit-db height: %d", ev.Height)
+		rbft.logger.Errorf("Wrong commit-db height: %d", ev.Height)
+		// todo wgr safe stop
 	}
 
 	// two types of config transaction:
@@ -1585,18 +1564,11 @@ func (rbft *rbftImpl) finishConfigCheckpoint(chkpt *pb.Checkpoint) {
 	// 2. validator set not changed: do not start a new epoch
 	routerInfo := rbft.node.readReloadRouter()
 	if routerInfo != nil {
-		rbft.turnIntoEpoch(routerInfo, chkpt.SequenceNumber, true)
+		rbft.turnIntoEpoch(routerInfo, chkpt.SequenceNumber)
 	}
 
 	// move watermark for config batch
 	rbft.moveWatermarks(chkpt.SequenceNumber)
-
-	if rbft.in(initialCheck) {
-		rbft.off(initialCheck)
-		rbft.maybeSetNormal()
-		rbft.initRecovery()
-		return
-	}
 
 	// finish config change and restart consensus
 	rbft.atomicOff(InConfChange)
@@ -1709,7 +1681,7 @@ func (rbft *rbftImpl) witnessCheckpointWeakCert(chkpt *pb.Checkpoint) {
 		rbft.logger.Infof("Replica %d is catching up and witnessed a weak certificate for checkpoint %d, "+
 			"weak cert attested to by %d replicas of %d",
 			rbft.peerPool.ID, chkpt.SequenceNumber, i, rbft.N)
-		rbft.tryStateTransfer(target)
+		rbft.tryStateTransfer()
 	}
 }
 
@@ -1788,6 +1760,11 @@ func (rbft *rbftImpl) moveWatermarks(n uint64) {
 
 // updateHighStateTarget updates high state target
 func (rbft *rbftImpl) updateHighStateTarget(target *pb.MetaState) {
+	if target == nil {
+		rbft.logger.Warningf("Replica %d received a nil target", rbft.peerPool.ID)
+		return
+	}
+
 	if rbft.storeMgr.highStateTarget != nil && rbft.storeMgr.highStateTarget.Applied >= target.Applied {
 		rbft.logger.Infof("Replica %d not updating state target to seqNo %d, has target for seqNo %d",
 			rbft.peerPool.ID, target.Applied, rbft.storeMgr.highStateTarget.Applied)
@@ -1799,7 +1776,7 @@ func (rbft *rbftImpl) updateHighStateTarget(target *pb.MetaState) {
 }
 
 // tryStateTransfer sets system abnormal and stateTransferring, then skips to target
-func (rbft *rbftImpl) tryStateTransfer(target *pb.MetaState) {
+func (rbft *rbftImpl) tryStateTransfer() {
 	if !rbft.in(SkipInProgress) {
 		rbft.logger.Debugf("Replica %d is out of sync, pending tryStateTransfer", rbft.peerPool.ID)
 		rbft.on(SkipInProgress)
@@ -1812,14 +1789,13 @@ func (rbft *rbftImpl) tryStateTransfer(target *pb.MetaState) {
 		return
 	}
 
-	// if target is nil, set target to highStateTarget
-	if target == nil {
-		if rbft.storeMgr.highStateTarget == nil {
-			rbft.logger.Debugf("Replica %d has no targets to attempt tryStateTransfer to, delaying", rbft.peerPool.ID)
-			return
-		}
-		target = rbft.storeMgr.highStateTarget
+	// if high state targe is nil, we could not state update
+	if rbft.storeMgr.highStateTarget == nil {
+		rbft.logger.Debugf("Replica %d has no targets to attempt tryStateTransfer to, delaying", rbft.peerPool.ID)
+		return
 	}
+	target := rbft.storeMgr.highStateTarget
+
 	rbft.atomicOn(StateTransferring)
 	rbft.batchMgr.requestPool.Reset()
 	// clear cacheBatch as they are useless and all related batches have been reset in requestPool.
@@ -1851,8 +1827,19 @@ func (rbft *rbftImpl) tryStateTransfer(target *pb.MetaState) {
 }
 
 // recvStateUpdatedEvent processes StateUpdatedMessage.
+// functions:
+// 1) succeed or not
+// 2) update information about latest stable checkpoint
+// 3) update epoch info if it has been changed
+//
+// we need to check if the state update process is successful at first
+// as for that state update target is the latest stable checkpoint,
+// we need to move watermark and update our checkpoint storage for it
+// at last if the epoch info has been changed, we also need to update
+// self epoch-info and trigger another recovery process
 func (rbft *rbftImpl) recvStateUpdatedEvent(ss *pb.ServiceState) consensusEvent {
 	seqNo := ss.MetaState.Applied
+	b64Id := ss.MetaState.Digest
 
 	// If state transfer did not complete successfully, or if it did not reach our low watermark, do it again
 	// When this node moves watermark before this node receives StateUpdatedMessage, this would happen.
@@ -1864,7 +1851,7 @@ func (rbft *rbftImpl) recvStateUpdatedEvent(ss *pb.ServiceState) consensusEvent 
 			rbft.logger.Debugf("Replica %d has state target for %d, transferring", rbft.peerPool.ID, rbft.storeMgr.highStateTarget.Applied)
 			rbft.atomicOff(StateTransferring)
 			rbft.exec.setLastExec(seqNo)
-			rbft.tryStateTransfer(nil)
+			rbft.tryStateTransfer()
 		} else if seqNo == rbft.storeMgr.highStateTarget.Applied {
 			rbft.logger.Debugf("Replica %d recovered to seqNo %d and highest is %d, turn off stateTransferring", rbft.peerPool.ID, seqNo, rbft.storeMgr.highStateTarget.Applied)
 			rbft.exec.setLastExec(seqNo)
@@ -1873,19 +1860,24 @@ func (rbft *rbftImpl) recvStateUpdatedEvent(ss *pb.ServiceState) consensusEvent 
 		return nil
 	}
 
+	// 1. finished state update
 	rbft.logger.Infof("======== Replica %d finished stateUpdate, height: %d", rbft.peerPool.ID, seqNo)
 	finishMsg := fmt.Sprintf("======== Replica %d finished stateUpdate, height: %d", rbft.peerPool.ID, seqNo)
-
 	rbft.external.SendFilterEvent(pb.InformType_FilterFinishStateUpdate, finishMsg)
 	rbft.exec.setLastExec(seqNo)
 	rbft.batchMgr.setSeqNo(seqNo)
 	rbft.off(SkipInProgress)
 	rbft.atomicOff(StateTransferring)
 	rbft.maybeSetNormal()
+
+	// 2. process information about stable checkpoint
 	rbft.logger.Infof("Replica %d post stable checkpoint event for seqNo %d after state update to the height",
 		rbft.peerPool.ID, seqNo)
 	rbft.external.SendFilterEvent(pb.InformType_FilterStableCheckpoint, seqNo)
+	rbft.storeMgr.saveCheckpoint(seqNo, b64Id)
+	rbft.moveWatermarks(seqNo)
 
+	// 3. process epoch-info
 	changed := false
 	if ss.EpochInfo != nil {
 		changed = ss.EpochInfo.Epoch != rbft.epoch
@@ -1894,7 +1886,8 @@ func (rbft *rbftImpl) recvStateUpdatedEvent(ss *pb.ServiceState) consensusEvent 
 			ev := <-rbft.confChan
 			rbft.logger.Debugf("Replica %d received a commit-db finished target at height %d", rbft.peerPool.ID, ev.Height)
 			if ev.Height != seqNo {
-				rbft.logger.Warningf("Wrong commit-db height: %d", ev.Height)
+				rbft.logger.Errorf("Wrong commit-db height: %d", ev.Height)
+				// todo wgr safe stop
 			}
 		}
 	}
@@ -1910,12 +1903,12 @@ func (rbft *rbftImpl) recvStateUpdatedEvent(ss *pb.ServiceState) consensusEvent 
 		router := &pb.Router{
 			Peers: peers,
 		}
-		rbft.turnIntoEpoch(router, ss.EpochInfo.Epoch, !rbft.atomicIn(InRecovery))
-	}
+		rbft.turnIntoEpoch(router, ss.EpochInfo.Epoch)
 
-	if seqNo%rbft.K == 0 || seqNo == rbft.epoch {
-		state := rbft.node.getCurrentState()
-		rbft.checkpoint(state.MetaState)
+		// trigger another round of recovery to find correct view-number
+		rbft.logger.Noticef("======== Replica %d updated epoch, epoch=%d.", rbft.peerPool.ID, rbft.epoch)
+		rbft.timerMgr.stopTimer(recoveryRestartTimer)
+		return rbft.initRecovery()
 	}
 
 	if rbft.atomicIn(InRecovery) {
@@ -1930,10 +1923,6 @@ func (rbft *rbftImpl) recvStateUpdatedEvent(ss *pb.ServiceState) consensusEvent 
 			Service:   RecoveryService,
 			EventType: RecoveryDoneEvent,
 		}
-	}
-
-	if changed {
-		return rbft.initRecovery()
 	}
 
 	rbft.executeAfterStateUpdate()

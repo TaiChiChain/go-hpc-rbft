@@ -54,7 +54,7 @@ func (rbft *rbftImpl) msgToEvent(msg *pb.ConsensusMessage) (interface{}, error) 
 			Service:   CoreRbftService,
 			EventType: CoreResendFetchMissingEvent,
 		}
-		rbft.postMsg(localEvent)
+		go rbft.postMsg(localEvent)
 
 		return nil, err
 	}
@@ -98,8 +98,6 @@ func (rbft *rbftImpl) dispatchLocalEvent(e *LocalEvent) consensusEvent {
 		return rbft.handleViewChangeEvent(e)
 	case RecoveryService:
 		return rbft.handleRecoveryEvent(e)
-	case EpochMgrService:
-		return rbft.handleEpochMgrEvent(e)
 	default:
 		rbft.logger.Errorf("Not Supported event: %v", e)
 		return nil
@@ -186,6 +184,7 @@ func (rbft *rbftImpl) handleRecoveryEvent(e *LocalEvent) consensusEvent {
 		rbft.recoveryMgr.recoveryHandled = false
 		rbft.recoveryMgr.notificationStore = make(map[ntfIdx]*pb.Notification)
 		rbft.recoveryMgr.outOfElection = make(map[ntfIdx]*pb.NotificationResponse)
+		rbft.recoveryMgr.differentEpoch = make(map[ntfIde]*pb.NotificationResponse)
 		rbft.maybeSetNormal()
 		rbft.timerMgr.stopTimer(recoveryRestartTimer)
 		rbft.logger.Noticef("======== Replica %d finished recovery, epoch=%d/view=%d/height=%d.", rbft.peerPool.ID, rbft.epoch, rbft.view, rbft.exec.lastExec)
@@ -347,17 +346,6 @@ func (rbft *rbftImpl) handleViewChangeEvent(e *LocalEvent) consensusEvent {
 		return nil
 	}
 	return nil
-}
-
-func (rbft *rbftImpl) handleEpochMgrEvent(e *LocalEvent) consensusEvent {
-	switch e.EventType {
-	case FetchCheckpointEvent:
-		rbft.fetchCheckpoint()
-		return nil
-	default:
-		rbft.logger.Errorf("Invalid node manager event: %v", e)
-		return nil
-	}
 }
 
 // dispatchConsensusMsg dispatches consensus messages to corresponding handlers using its service type

@@ -159,18 +159,16 @@ func (rbft *rbftImpl) checkIfOutOfEpoch(msg *pb.ConsensusMessage) consensusEvent
 	return nil
 }
 
-func (rbft *rbftImpl) turnIntoEpoch(router *pb.Router, epoch uint64, resetView bool) {
+func (rbft *rbftImpl) turnIntoEpoch(router *pb.Router, epoch uint64) {
 	// validator set has been changed, start a new epoch and check new epoch
 	rbft.peerPool.updateRouter(router)
 
 	// set the latest epoch
 	rbft.setEpoch(epoch)
 
-	if resetView {
-		// initial the view, start from view=0
-		rbft.setView(uint64(0))
-		rbft.persistView(rbft.view)
-	}
+	// initial the view, start from view=0
+	rbft.setView(uint64(0))
+	rbft.persistView(rbft.view)
 
 	// update N/f
 	rbft.N = len(rbft.peerPool.routerMap.HashMap)
@@ -179,12 +177,6 @@ func (rbft *rbftImpl) turnIntoEpoch(router *pb.Router, epoch uint64, resetView b
 
 	rbft.metrics.clusterSizeGauge.Set(float64(rbft.N))
 	rbft.metrics.quorumSizeGauge.Set(float64(rbft.commonCaseQuorum()))
-
-	for key, value := range rbft.recoveryMgr.notificationStore {
-		if value.Epoch < rbft.epoch {
-			delete(rbft.recoveryMgr.notificationStore, key)
-		}
-	}
 
 	rbft.logger.Debugf("======== Replica %d turn into a new epoch, epoch=%d/view=%d/height=%d.",
 		rbft.peerPool.ID, rbft.epoch, rbft.view, rbft.exec.lastExec)

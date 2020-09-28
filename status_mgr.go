@@ -30,7 +30,6 @@ const (
 	SkipInProgress        // node try to state update
 	isNewNode             // node is a new node
 	byzantine             // byzantine
-	initialCheck          // node is checking state at start
 
 	// atomic status, which might be used by consensus service
 	InConfChange      // node is processing a config transaction
