@@ -550,7 +550,7 @@ func (rbft *rbftImpl) compareWholeStates(states wholeStates) consensusEvent {
 	if canFind {
 		// update view if needed
 		if rbft.view != quorumResp.view {
-			rbft.view = quorumResp.view
+			rbft.setView(quorumResp.view)
 		}
 
 		rbft.logger.Infof("Replica %d persist view=%d after found quorum same response.", rbft.peerPool.ID, rbft.view)
