@@ -400,8 +400,10 @@ func (rbft *rbftImpl) resetStateForRecovery() consensusEvent {
 	rbft.logger.Noticef("Replica %d restore txpool when reset state in recovery", rbft.peerPool.ID)
 	rbft.batchMgr.requestPool.RestorePool()
 
-	// clear cacheBatch as they are useless and all related batch have been restored in requestPool.
+	// clear cacheBatch as they are useless and all related batches have been restored in requestPool.
 	rbft.batchMgr.cacheBatch = nil
+
+	rbft.metrics.cacheBatchNumber.Set(float64(0))
 
 	return &LocalEvent{
 		Service:   RecoveryService,
