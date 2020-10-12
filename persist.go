@@ -429,7 +429,10 @@ func (rbft *rbftImpl) persistBatch(digest string) {
 		return
 	}
 	start := time.Now()
-	_ = rbft.storage.StoreState("batch."+digest, batchPacked)
+	err = rbft.storage.StoreState("batch."+digest, batchPacked)
+	if err != nil {
+		rbft.logger.Errorf("Persist batch failed with err: %s ", err)
+	}
 	duration := time.Now().Sub(start).Seconds()
 	rbft.metrics.batchPersistDuration.Observe(duration)
 }
@@ -466,7 +469,10 @@ func (rbft *rbftImpl) persistDelCheckpoint(seqNo uint64) {
 }
 
 func (rbft *rbftImpl) persistH(seqNo uint64) {
-	_ = rbft.storage.StoreState("rbft.h", []byte(strconv.FormatUint(seqNo, 10)))
+	err := rbft.storage.StoreState("rbft.h", []byte(strconv.FormatUint(seqNo, 10)))
+	if err != nil {
+		rbft.logger.Errorf("Persist h failed with err: %s ", err)
+	}
 }
 
 // persistView persists current view to database

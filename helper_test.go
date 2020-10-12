@@ -423,3 +423,13 @@ func TestHelper_RequestSet(t *testing.T) {
 	}
 	assert.Equal(t, consensusMsgSplit, reqEventSplit)
 }
+
+func TestHelper_stopNamespace(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	_, rbfts := newBasicClusterInstance()
+
+	close(rbfts[0].delFlag)
+	rbfts[0].stopNamespace()
+}

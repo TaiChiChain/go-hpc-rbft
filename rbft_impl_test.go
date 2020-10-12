@@ -53,6 +53,7 @@ func TestRBFT_newRBFT(t *testing.T) {
 		External:    external,
 		RequestPool: pool,
 		MetricsProv: &disabled.Provider{},
+		DelFlag:     make(chan bool),
 
 		EpochInit:    uint64(0),
 		LatestConfig: nil,
@@ -569,7 +570,7 @@ func TestRBFT_postConfState_NotExitInRouter(t *testing.T) {
 	cc := &pb.ConfState{
 		QuorumRouter: &r,
 	}
-	rbfts[0].postConfState(cc)
+	go rbfts[0].postConfState(cc)
 	assert.Equal(t, true, rbfts[0].atomicIn(Pending))
 }
 
