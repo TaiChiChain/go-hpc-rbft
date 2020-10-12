@@ -989,6 +989,12 @@ func (rbft *rbftImpl) processNewView(msgList xset) {
 				RequestHashList: []string{},
 			}
 		} else {
+			// put un-executed batch into outstandingReqBatches, if replica cannot execute this batch
+			// during that timeout, this replica which will trigger viewChange.
+			if n > rbft.exec.lastExec {
+				rbft.storeMgr.outstandingReqBatches[d] = batch
+			}
+
 			// rebuild prePrepare with batch recorded in batchStore
 			prePrep.HashBatch = &pb.HashBatch{
 				RequestHashList: batch.RequestHashList,
@@ -996,7 +1002,7 @@ func (rbft *rbftImpl) processNewView(msgList xset) {
 			}
 
 			// re-construct batches by order in xSet to de-duplicate txs during different batches in msgList which
-			// may be cause by 'different primary puts the same txs into different batches with different seqNo'
+			// may be cause by different primary puts the same txs into different batches with different seqNo'
 			oldBatch := &txpool.RequestHashBatch{
 				BatchHash:  batch.BatchHash,
 				TxHashList: batch.RequestHashList,
