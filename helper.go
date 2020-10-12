@@ -550,7 +550,7 @@ func (rbft *rbftImpl) compareWholeStates(states wholeStates) consensusEvent {
 	if canFind {
 		// update view if needed
 		if rbft.view != quorumResp.view {
-			rbft.view = quorumResp.view
+			rbft.setView(quorumResp.view)
 		}
 
 		rbft.logger.Infof("Replica %d persist view=%d after found quorum same response.", rbft.peerPool.ID, rbft.view)
@@ -785,7 +785,7 @@ func (rbft *rbftImpl) putBackRequestBatches(xset xset) {
 	// directly restore all batchedTxs back into non-batched txs and re-arrange them by order when processNewView.
 	rbft.batchMgr.requestPool.RestorePool()
 
-	// clear cacheBatch as they are useless and all related batch have been restored in requestPool.
+	// clear cacheBatch as they are useless and all related batches have been restored in requestPool.
 	rbft.batchMgr.cacheBatch = nil
 
 	rbft.metrics.cacheBatchNumber.Set(float64(0))

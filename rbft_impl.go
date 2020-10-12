@@ -1821,6 +1821,9 @@ func (rbft *rbftImpl) tryStateTransfer(target *pb.MetaState) {
 	}
 	rbft.atomicOn(StateTransferring)
 	rbft.batchMgr.requestPool.Reset()
+	// clear cacheBatch as they are useless and all related batches have been reset in requestPool.
+	rbft.batchMgr.cacheBatch = nil
+	rbft.metrics.cacheBatchNumber.Set(float64(0))
 	// reset the status of PoolFull
 	rbft.setNotFull()
 
