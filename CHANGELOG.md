@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.2.14"></a>
+## [0.2.14](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.13...v0.2.14) (2020-10-12)
+
+
+### Bug Fixes
+
+* reset cacheBatch and relates metrics before state update ([71a1e36](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/71a1e36)), closes [#flato-2502](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-2502)
+* **helper.go:** update metrics when set view ([4093dfc](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/4093dfc)), closes [#flato-2463](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-2463)
+* **viewchange_mgr.go:** put un-executed batch into outstandingReqBatches when processNewView to trig ([d03f492](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/d03f492)), closes [#flato-2514](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-2514)
+
+
+
 <a name="0.2.13"></a>
 ## [0.2.13](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.12...v0.2.13) (2020-09-24)
 
