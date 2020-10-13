@@ -180,6 +180,12 @@ func (rbft *rbftImpl) turnIntoEpoch(router *pb.Router, epoch uint64, resetView b
 	rbft.metrics.clusterSizeGauge.Set(float64(rbft.N))
 	rbft.metrics.quorumSizeGauge.Set(float64(rbft.commonCaseQuorum()))
 
+	for key, value := range rbft.recoveryMgr.notificationStore {
+		if value.Epoch < rbft.epoch {
+			delete(rbft.recoveryMgr.notificationStore, key)
+		}
+	}
+
 	rbft.logger.Debugf("======== Replica %d turn into a new epoch, epoch=%d/view=%d/height=%d.",
 		rbft.peerPool.ID, rbft.epoch, rbft.view, rbft.exec.lastExec)
 	rbft.logger.Notice(`
