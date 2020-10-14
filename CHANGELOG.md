@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.2.15"></a>
+## [0.2.15](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.14...v0.2.15) (2020-10-14)
+
+
+### Bug Fixes
+
+* **epoch_mgr.go:** clear the notification storage at the start of epoch ([941d579](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/941d579)), closes [#flato-2433](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-2433)
+
+
+
 <a name="0.2.14"></a>
 ## [0.2.14](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.13...v0.2.14) (2020-10-12)
 
