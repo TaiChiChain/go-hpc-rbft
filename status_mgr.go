@@ -36,7 +36,6 @@ const (
 	InConfChange      // node is processing a config transaction
 	InViewChange      // node is trying to change view
 	InRecovery        // node is trying to recover state
-	InEpochSync       // node is syncing epoch
 	StateTransferring // node is updating state
 	PoolFull          // node's txPool is full
 	Pending           // node cannot process consensus messages
@@ -182,7 +181,7 @@ func (rbft *rbftImpl) setNormal() {
 
 // maybeSetNormal checks if system is in normal or not, if in normal, set status to normal.
 func (rbft *rbftImpl) maybeSetNormal() {
-	if !rbft.atomicInOne(InRecovery, InViewChange, InEpochSync, Pending) && !rbft.inOne(SkipInProgress) {
+	if !rbft.atomicInOne(InRecovery, InViewChange, Pending) && !rbft.inOne(SkipInProgress) {
 		rbft.setNormal()
 		rbft.startCheckPoolTimer()
 	} else {
