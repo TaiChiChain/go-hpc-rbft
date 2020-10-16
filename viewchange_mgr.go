@@ -92,6 +92,8 @@ func (rbft *rbftImpl) setView(view uint64) {
 // Then it sends view change message to itself and jump to recvViewChange.
 func (rbft *rbftImpl) sendViewChange() consensusEvent {
 
+	rbft.atomicOff(InConfChange)
+
 	//Do some check and do some preparation
 	//such as stop nullRequest timer, clean vcMgr.viewChangeStore and so on.
 	err := rbft.beforeSendVC()
@@ -956,8 +958,6 @@ func (rbft *rbftImpl) processNewView(msgList xset) {
 
 	maxN := rbft.exec.lastExec
 
-	rbft.atomicOff(InConfChange)
-
 	for _, n := range orderedKeys {
 		d := msgList[n]
 
@@ -1026,6 +1026,14 @@ func (rbft *rbftImpl) processNewView(msgList xset) {
 
 		if n > maxN {
 			maxN = n
+		}
+
+		if rbft.batchMgr.requestPool.IsConfigBatch(d) && n > rbft.exec.lastExec {
+			rbft.logger.Infof("Replica %d is processing a config batch, reject the following", rbft.peerPool.ID)
+			if rbft.isPrimary(rbft.peerPool.ID) {
+				rbft.atomicOn(InConfChange)
+			}
+			break
 		}
 	}
 	// update seqNo as new primary needs to start prePrepare with a correct number.
