@@ -6,7 +6,7 @@ package mockexternal
 
 import (
 	gomock "github.com/golang/mock/gomock"
-	protos "github.com/ultramesh/flato-event/inner/protos"
+	protos "github.com/ultramesh/flato-common/types/protos"
 	rbftpb "github.com/ultramesh/flato-rbft/rbftpb"
 	reflect "reflect"
 )

@@ -2,9 +2,11 @@ package rbft
 
 import (
 	"fmt"
-	"github.com/ultramesh/flato-event/inner/protos"
-	pb "github.com/ultramesh/flato-rbft/rbftpb"
 	"testing"
+
+	"github.com/ultramesh/flato-common/types"
+	"github.com/ultramesh/flato-common/types/protos"
+	pb "github.com/ultramesh/flato-rbft/rbftpb"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
@@ -356,7 +358,7 @@ func executeExceptN(t *testing.T, rbfts []*rbftImpl, nodes []*testNode, tx *prot
 	retMessages[pb.Type_CHECKPOINT] = checkpointMsg
 
 	if checkpoint {
-		if protos.IsConfigTx(tx) {
+		if types.IsConfigTx(tx) {
 			for index := range rbfts {
 				if index == notExec {
 					continue

@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/ultramesh/flato-common/metrics/disabled"
-	"github.com/ultramesh/flato-event/inner/protos"
+	"github.com/ultramesh/flato-common/types/protos"
 	mockexternal "github.com/ultramesh/flato-rbft/mock/mock_external"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
 	txpoolmock "github.com/ultramesh/flato-txpool/mock"

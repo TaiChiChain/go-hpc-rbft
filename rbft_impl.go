@@ -21,7 +21,8 @@ import (
 	"time"
 
 	"github.com/ultramesh/flato-common/metrics"
-	"github.com/ultramesh/flato-event/inner/protos"
+	"github.com/ultramesh/flato-common/types"
+	"github.com/ultramesh/flato-common/types/protos"
 	"github.com/ultramesh/flato-rbft/external"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
 	txpool "github.com/ultramesh/flato-txpool"
@@ -695,7 +696,7 @@ func (rbft *rbftImpl) processReqSetEvent(req *pb.RequestSet) consensusEvent {
 			return nil
 		}
 		for _, tx := range req.Requests {
-			if protos.IsConfigTx(tx) {
+			if types.IsConfigTx(tx) {
 				// if it's already in config change, reject another config tx
 				if rbft.atomicIn(InConfChange) {
 					rbft.logger.Debugf("Replica %d is processing a ctx, reject another one", rbft.peerPool.ID)
