@@ -22,7 +22,8 @@ import (
 	"math"
 	"strconv"
 
-	"github.com/ultramesh/flato-event/inner/protos"
+	"github.com/ultramesh/flato-common/types"
+	"github.com/ultramesh/flato-common/types/protos"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
 
 	"github.com/gogo/protobuf/proto"
@@ -869,7 +870,7 @@ func (rbft *rbftImpl) equalMetaState(s1 *pb.MetaState, s2 *pb.MetaState) bool {
 }
 
 func requestHash(tx *protos.Transaction) string {
-	return protos.GetHash(tx).Hex()
+	return types.GetHash(tx).Hex()
 }
 
 // calculateMD5Hash calculate hash by MD5

@@ -10,7 +10,8 @@ import (
 
 	"github.com/ultramesh/fancylogger"
 	"github.com/ultramesh/flato-common/metrics/disabled"
-	"github.com/ultramesh/flato-event/inner/protos"
+	"github.com/ultramesh/flato-common/types"
+	"github.com/ultramesh/flato-common/types/protos"
 	"github.com/ultramesh/flato-rbft/external"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
 	"github.com/ultramesh/flato-txpool"
@@ -865,7 +866,7 @@ func (ext *testExternal) Execute(requests []*protos.Transaction, localList []boo
 		ext.testNode.n.logger.Debugf("Block Hash %s", state.MetaState.Digest)
 		//report latest validator set
 		if len(requests) != 0 {
-			if protos.IsConfigTx(requests[0]) {
+			if types.IsConfigTx(requests[0]) {
 				info := &pb.EpochInfo{}
 				_ = proto.Unmarshal(requests[0].Value, info)
 				var peers []*pb.Peer
@@ -895,7 +896,7 @@ func (ext *testExternal) Execute(requests []*protos.Transaction, localList []boo
 		}
 		go ext.testNode.N.ReportExecuted(state)
 
-		if !protos.IsConfigTx(requests[0]) && state.MetaState.Applied%10 != 0 {
+		if !types.IsConfigTx(requests[0]) && state.MetaState.Applied%10 != 0 {
 			success := make(chan bool)
 			go func() {
 				for {

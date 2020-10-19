@@ -6,8 +6,8 @@ package mocknode
 
 import (
 	gomock "github.com/golang/mock/gomock"
-	protos "github.com/ultramesh/flato-event/inner/protos"
-	flato_rbft "github.com/ultramesh/flato-rbft"
+	protos "github.com/ultramesh/flato-common/types/protos"
+	rbft "github.com/ultramesh/flato-rbft"
 	rbftpb "github.com/ultramesh/flato-rbft/rbftpb"
 	reflect "reflect"
 )
@@ -102,10 +102,10 @@ func (mr *MockNodeMockRecorder) ApplyConfChange(cc interface{}) *gomock.Call {
 }
 
 // Status mocks base method
-func (m *MockNode) Status() flato_rbft.NodeStatus {
+func (m *MockNode) Status() rbft.NodeStatus {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Status")
-	ret0, _ := ret[0].(flato_rbft.NodeStatus)
+	ret0, _ := ret[0].(rbft.NodeStatus)
 	return ret0
 }
 

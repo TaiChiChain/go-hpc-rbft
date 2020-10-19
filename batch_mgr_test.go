@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ultramesh/flato-event/inner/protos"
+	"github.com/ultramesh/flato-common/types/protos"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
 
 	"github.com/golang/mock/gomock"
