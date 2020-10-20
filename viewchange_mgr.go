@@ -93,6 +93,7 @@ func (rbft *rbftImpl) setView(view uint64) {
 func (rbft *rbftImpl) sendViewChange() consensusEvent {
 
 	rbft.atomicOff(InConfChange)
+	rbft.metrics.statusGaugeInConfChange.Set(0)
 
 	//Do some check and do some preparation
 	//such as stop nullRequest timer, clean vcMgr.viewChangeStore and so on.
@@ -227,7 +228,9 @@ func (rbft *rbftImpl) recvViewChange(vc *pb.ViewChange) consensusEvent {
 		if rbft.atomicIn(InRecovery) {
 			rbft.logger.Infof("Replica %d in recovery changes to viewChange status", rbft.peerPool.ID)
 			rbft.atomicOff(InRecovery)
+			rbft.metrics.statusGaugeInRecovery.Set(0)
 			rbft.atomicOn(InViewChange)
+			rbft.metrics.statusGaugeInViewChange.Set(InViewChange)
 			rbft.timerMgr.stopTimer(recoveryRestartTimer)
 		}
 
@@ -650,6 +653,7 @@ func (rbft *rbftImpl) beforeSendVC() error {
 	if rbft.atomicIn(InRecovery) {
 		rbft.logger.Infof("Replica %d in recovery changes to viewChange status", rbft.peerPool.ID)
 		rbft.atomicOff(InRecovery)
+		rbft.metrics.statusGaugeInRecovery.Set(0)
 		rbft.timerMgr.stopTimer(recoveryRestartTimer)
 	}
 
@@ -658,6 +662,7 @@ func (rbft *rbftImpl) beforeSendVC() error {
 	rbft.timerMgr.stopTimer(firstRequestTimer)
 
 	rbft.atomicOn(InViewChange)
+	rbft.metrics.statusGaugeInViewChange.Set(InViewChange)
 	rbft.setAbNormal()
 	rbft.vcMgr.vcHandled = false
 
@@ -1027,6 +1032,7 @@ func (rbft *rbftImpl) processNewView(msgList xset) {
 			rbft.logger.Infof("Replica %d is processing a config batch, reject the following", rbft.peerPool.ID)
 			if rbft.isPrimary(rbft.peerPool.ID) {
 				rbft.atomicOn(InConfChange)
+				rbft.metrics.statusGaugeInConfChange.Set(InConfChange)
 			}
 			break
 		}

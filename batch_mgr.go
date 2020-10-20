@@ -265,6 +265,7 @@ func (rbft *rbftImpl) findNextCommitBatch(digest string, v uint64, n uint64) err
 	if rbft.batchMgr.requestPool.IsConfigBatch(batch.BatchHash) {
 		rbft.logger.Debugf("Replica %d generate a config batch", rbft.peerPool.ID)
 		rbft.atomicOn(InConfChange)
+		rbft.metrics.statusGaugeInConfChange.Set(InConfChange)
 	}
 
 	rbft.logger.Debugf("Replica %d commit batch for view=%d/seqNo=%d, batch size: %d", rbft.peerPool.ID, v, n, len(txList))

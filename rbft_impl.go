@@ -242,6 +242,9 @@ func newRBFT(cpChan chan *pb.ServiceState, confC chan *pb.ReloadFinished, c Conf
 		}
 	}
 
+	// new metrics instance
+	rbft.metrics = newRBFTMetrics(c.MetricsProv)
+
 	// new timer manager
 	rbft.timerMgr = newTimerMgr(rbft.recvChan, c)
 	rbft.initTimers()
@@ -283,7 +286,7 @@ func newRBFT(cpChan chan *pb.ServiceState, confC chan *pb.ReloadFinished, c Conf
 	// update viewChange seqNo after restore state which may update seqNo
 	rbft.updateViewChangeSeqNo(rbft.exec.lastExec, rbft.K)
 
-	rbft.metrics = newRBFTMetrics(c.MetricsProv)
+	rbft.metrics.idGauge.Set(float64(rbft.peerPool.ID))
 	rbft.metrics.epochGauge.Set(float64(rbft.epoch))
 	rbft.metrics.clusterSizeGauge.Set(float64(rbft.N))
 	rbft.metrics.quorumSizeGauge.Set(float64(rbft.commonCaseQuorum()))
@@ -303,6 +306,7 @@ func newRBFT(cpChan chan *pb.ServiceState, confC chan *pb.ReloadFinished, c Conf
 func (rbft *rbftImpl) start() error {
 	// exit pending status after start rbft to avoid missing consensus messages from other nodes.
 	rbft.atomicOff(Pending)
+	rbft.metrics.statusGaugePending.Set(0)
 
 	rbft.logger.Noticef("--------RBFT starting, nodeID: %d--------", rbft.peerPool.ID)
 
@@ -393,6 +397,7 @@ func (rbft *rbftImpl) postBatches(batches []*txpool.RequestHashBatch) {
 		if rbft.batchMgr.requestPool.IsConfigBatch(batch.BatchHash) {
 			rbft.logger.Noticef("Primary %d has generated a config batch, start config change", rbft.peerPool.ID)
 			rbft.atomicOn(InConfChange)
+			rbft.metrics.statusGaugeInConfChange.Set(InConfChange)
 		}
 
 		_ = rbft.recvRequestBatch(batch)
@@ -410,9 +415,11 @@ func (rbft *rbftImpl) postConfState(cc *pb.ConfState) {
 	if !found {
 		rbft.logger.Criticalf("%s cannot find self id in quorum routers: %+v", rbft.peerPool.hash, cc.QuorumRouter.Peers)
 		rbft.atomicOn(Pending)
+		rbft.metrics.statusGaugePending.Set(Pending)
 		return
 	}
 	rbft.peerPool.initPeers(cc.QuorumRouter.Peers)
+	rbft.metrics.idGauge.Set(float64(rbft.peerPool.ID))
 	return
 }
 
@@ -1269,6 +1276,7 @@ func (rbft *rbftImpl) commitPendingBlocks() {
 						rbft.peerPool.ID, idx.n)
 					rbft.setConfigBatchToExecute(idx.n)
 					rbft.atomicOn(InConfChange)
+					rbft.metrics.statusGaugeInConfChange.Set(InConfChange)
 					rbft.metrics.committedConfigBlockNumber.Add(float64(1))
 				}
 				txList, localList := rbft.filterExecutableTxs(idx.d, cert.prePrepare.HashBatch.DeDuplicateRequestHashList)
@@ -1572,6 +1580,7 @@ func (rbft *rbftImpl) finishConfigCheckpoint(chkpt *pb.Checkpoint) {
 
 	// finish config change and restart consensus
 	rbft.atomicOff(InConfChange)
+	rbft.metrics.statusGaugeInConfChange.Set(0)
 	rbft.maybeSetNormal()
 	rbft.startTimerIfOutstandingRequests()
 	finishMsg := fmt.Sprintf("======== Replica %d finished config change, primary=%d, epoch=%d/n=%d/f=%d/view=%d/h=%d/lastExec=%d", rbft.peerPool.ID, rbft.primaryID(rbft.view), rbft.epoch, rbft.N, rbft.f, rbft.view, rbft.h, rbft.exec.lastExec)
@@ -1797,6 +1806,7 @@ func (rbft *rbftImpl) tryStateTransfer() {
 	target := rbft.storeMgr.highStateTarget
 
 	rbft.atomicOn(StateTransferring)
+	rbft.metrics.statusGaugeStateTransferring.Set(StateTransferring)
 	rbft.batchMgr.requestPool.Reset()
 	// clear cacheBatch as they are useless and all related batches have been reset in requestPool.
 	rbft.batchMgr.cacheBatch = nil
@@ -1850,12 +1860,14 @@ func (rbft *rbftImpl) recvStateUpdatedEvent(ss *pb.ServiceState) consensusEvent 
 		} else if seqNo < rbft.storeMgr.highStateTarget.Applied {
 			rbft.logger.Debugf("Replica %d has state target for %d, transferring", rbft.peerPool.ID, rbft.storeMgr.highStateTarget.Applied)
 			rbft.atomicOff(StateTransferring)
+			rbft.metrics.statusGaugeStateTransferring.Set(0)
 			rbft.exec.setLastExec(seqNo)
 			rbft.tryStateTransfer()
 		} else if seqNo == rbft.storeMgr.highStateTarget.Applied {
 			rbft.logger.Debugf("Replica %d recovered to seqNo %d and highest is %d, turn off stateTransferring", rbft.peerPool.ID, seqNo, rbft.storeMgr.highStateTarget.Applied)
 			rbft.exec.setLastExec(seqNo)
 			rbft.atomicOff(StateTransferring)
+			rbft.metrics.statusGaugeStateTransferring.Set(0)
 		}
 		return nil
 	}
@@ -1868,6 +1880,7 @@ func (rbft *rbftImpl) recvStateUpdatedEvent(ss *pb.ServiceState) consensusEvent 
 	rbft.batchMgr.setSeqNo(seqNo)
 	rbft.off(SkipInProgress)
 	rbft.atomicOff(StateTransferring)
+	rbft.metrics.statusGaugeStateTransferring.Set(0)
 	rbft.maybeSetNormal()
 
 	// 2. process information about stable checkpoint
