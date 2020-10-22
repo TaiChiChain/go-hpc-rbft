@@ -82,24 +82,6 @@ func TestRBFT_newRBFT(t *testing.T) {
 	assert.Equal(t, true, rbft.in(isNewNode))
 }
 
-func TestRBFT_start_Recovery(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	nodes, rbfts := newBasicClusterInstance()
-	rbfts[1].epochMgr.configBatchToCheck = &pb.MetaState{
-		Applied: uint64(1),
-		Digest:  "test-to-check",
-	}
-	err := rbfts[1].start()
-	close(rbfts[1].close)
-	assert.Nil(t, err)
-	msg := <-rbfts[1].recvChan
-	rbfts[1].processEvent(msg)
-	notificationMsg := nodes[1].broadcastMessageCache
-	assert.Equal(t, pb.Type_NOTIFICATION, notificationMsg.Type)
-}
-
 //============================================
 // Consensus Message Filter
 //============================================
@@ -223,24 +205,6 @@ func TestRBFT_reportStateUpdated(t *testing.T) {
 	rbfts[0].reportStateUpdated(state2)
 	obj := <-rbfts[0].recvChan
 	assert.Equal(t, event, obj)
-}
-
-func TestRBFT_postRequests(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	_, rbfts := newBasicClusterInstance()
-
-	txSet := []*protos.Transaction{newTx()}
-	rSet := &pb.RequestSet{
-		Requests: txSet,
-		Local:    true,
-	}
-
-	rbfts[0].postRequests(txSet)
-	obj := <-rbfts[0].recvChan
-
-	assert.Equal(t, rSet, obj)
 }
 
 func TestRBFT_postMsg(t *testing.T) {
