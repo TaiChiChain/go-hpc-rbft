@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.2.18"></a>
+## [0.2.18](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.17...v0.2.18) (2020-10-22)
+
+
+### Bug Fixes
+
+* remove goroutine when we post message to resolve oom ([886af16](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/886af16)), closes [#flato-1794](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-1794)
+* **recovery:** update the process of recovery and state-update ([5847ffb](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/5847ffb)), closes [#flato-2358](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-2358)
+
+
+### Features
+
+* add metrics for node ID and status ([716fec9](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/716fec9))
+
+
+
 <a name="0.2.17"></a>
 ## [0.2.17](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.16...v0.2.17) (2020-10-19)
 
