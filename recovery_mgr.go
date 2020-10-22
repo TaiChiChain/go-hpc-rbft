@@ -29,7 +29,9 @@ type recoveryManager struct {
 	syncRspStore      map[string]*pb.SyncStateResponse    // store sync state response
 	notificationStore map[ntfIdx]*pb.Notification         // track notification messages
 	outOfElection     map[ntfIdx]*pb.NotificationResponse // track out-of-election notification messages
+	differentEpoch    map[ntfIde]*pb.NotificationResponse // track notification messages from different epoch
 	recoveryHandled   bool                                // if we have process new view or not
+	needSyncEpoch     bool
 
 	logger Logger
 }
@@ -40,6 +42,7 @@ func newRecoveryMgr(c Config) *recoveryManager {
 		syncRspStore:      make(map[string]*pb.SyncStateResponse),
 		notificationStore: make(map[ntfIdx]*pb.Notification),
 		outOfElection:     make(map[ntfIdx]*pb.NotificationResponse),
+		differentEpoch:    make(map[ntfIde]*pb.NotificationResponse),
 		logger:            c.Logger,
 	}
 	return rm
@@ -98,6 +101,7 @@ func (rbft *rbftImpl) sendNotification(keepCurrentVote bool) consensusEvent {
 	if rbft.atomicIn(InViewChange) {
 		rbft.logger.Infof("Replica %d in viewChange changes to recovery status", rbft.peerPool.ID)
 		rbft.atomicOff(InViewChange)
+		rbft.metrics.statusGaugeInViewChange.Set(0)
 		rbft.timerMgr.stopTimer(vcResendTimer)
 	}
 
@@ -106,6 +110,7 @@ func (rbft *rbftImpl) sendNotification(keepCurrentVote bool) consensusEvent {
 	rbft.timerMgr.stopTimer(firstRequestTimer)
 
 	rbft.atomicOn(InRecovery)
+	rbft.metrics.statusGaugeInRecovery.Set(InRecovery)
 	rbft.recoveryMgr.recoveryHandled = false
 	rbft.setAbNormal()
 
@@ -116,13 +121,20 @@ func (rbft *rbftImpl) sendNotification(keepCurrentVote bool) consensusEvent {
 	}
 	delete(rbft.vcMgr.newViewStore, rbft.view)
 
-	// clear out messages
+	// clear out messages: from lower epoch or lower view
+	for key, value := range rbft.recoveryMgr.notificationStore {
+		if value.Epoch < rbft.epoch {
+			delete(rbft.recoveryMgr.notificationStore, key)
+		}
+	}
 	for idx := range rbft.recoveryMgr.notificationStore {
 		if idx.v < rbft.view {
 			delete(rbft.recoveryMgr.notificationStore, idx)
 		}
 	}
+	rbft.recoveryMgr.needSyncEpoch = false
 	rbft.recoveryMgr.outOfElection = make(map[ntfIdx]*pb.NotificationResponse)
+	rbft.recoveryMgr.differentEpoch = make(map[ntfIde]*pb.NotificationResponse)
 
 	n := &pb.Notification{
 		Epoch:    rbft.epoch,
@@ -182,11 +194,6 @@ func (rbft *rbftImpl) recvNotification(n *pb.Notification) consensusEvent {
 		return nil
 	}
 
-	if rbft.in(initialCheck) {
-		rbft.logger.Debugf("Node %d in initialCheck ignore notification", rbft.peerPool.ID)
-		return nil
-	}
-
 	if !rbft.inRouters(n.NodeInfo.ReplicaHash) {
 		return nil
 	}
@@ -196,13 +203,8 @@ func (rbft *rbftImpl) recvNotification(n *pb.Notification) consensusEvent {
 	}
 
 	if n.Epoch < rbft.epoch {
-		if rbft.isNormal() {
-			// directly return notification response when we are in normal.
-			return rbft.sendNotificationResponse(n.NodeInfo.ReplicaHash)
-		}
-		rbft.logger.Debugf("Replica %d ignore notification with a lower epoch %d than self "+
-			"epoch %d because we are in abnormal", rbft.peerPool.ID, n.Epoch, rbft.epoch)
-		return nil
+		// directly return notification response when our epoch is larger than the requester.
+		return rbft.sendNotificationResponse(n.NodeInfo.ReplicaHash)
 	}
 
 	if n.Basis.View < rbft.view {
@@ -319,18 +321,53 @@ func (rbft *rbftImpl) recvNotificationResponse(nr *pb.NotificationResponse) cons
 		return nil
 	}
 
-	// current is pending, sender is not pending, record to outOfElection and check
-	// quorum same notifications in outOfElection.
-	rbft.recoveryMgr.outOfElection[ntfIdx{v: nr.Basis.View, nodeID: nr.NodeInfo.ReplicaId}] = nr
-	quorum := 0
-	for idx := range rbft.recoveryMgr.outOfElection {
-		if idx.v == nr.Basis.View {
-			quorum++
+	// counter for response messages to sync epoch
+	eQuorum := 0
+
+	// counter for response messages in the same epoch
+	vQuorum := 0
+
+	if nr.Epoch > rbft.epoch {
+		// the response comes from a larger epoch, and we might need to sync epoch at first
+		// collect the notification response and check to find a quorum same set for epoch-sync
+		rbft.recoveryMgr.differentEpoch[ntfIde{e: nr.Epoch, nodeID: nr.NodeInfo.ReplicaId}] = nr
+		for ide := range rbft.recoveryMgr.differentEpoch {
+			if ide.e == nr.Epoch {
+				eQuorum++
+			}
 		}
+		rbft.logger.Debugf("Replica %d now has %d notification response from epoch %d, "+
+			"current epoch %d, need %d", rbft.peerPool.ID, eQuorum, nr.Epoch, rbft.epoch, rbft.commonCaseQuorum())
+	} else if nr.Epoch == rbft.epoch {
+		// current is pending, sender is not pending, record to outOfElection and check
+		// quorum same notifications in outOfElection.
+		rbft.recoveryMgr.outOfElection[ntfIdx{v: nr.Basis.View, nodeID: nr.NodeInfo.ReplicaId}] = nr
+		for idx := range rbft.recoveryMgr.outOfElection {
+			if idx.v == nr.Basis.View {
+				vQuorum++
+			}
+		}
+		rbft.logger.Debugf("Replica %d now has %d notification response in outOfElection for "+
+			"view %d, current view %d, need %d", rbft.peerPool.ID, vQuorum, nr.Basis.View, rbft.view, rbft.commonCaseQuorum())
+	} else {
+		rbft.logger.Debugf("Replica %d reject notification response from lower epoch", rbft.peerPool.ID)
+		return nil
 	}
-	rbft.logger.Debugf("Replica %d now has %d notification response in outOfElection for "+
-		"view %d, current view %d, need %d", rbft.peerPool.ID, quorum, nr.Basis.View, rbft.view, rbft.commonCaseQuorum())
-	if quorum >= rbft.commonCaseQuorum() {
+
+	if eQuorum >= rbft.commonCaseQuorum() {
+		states := make(wholeStates)
+		for _, nrs := range rbft.recoveryMgr.differentEpoch {
+			states[nrs.NodeInfo] = nodeState{
+				n:     nrs.N,
+				epoch: nrs.Epoch,
+			}
+		}
+		rbft.recoveryMgr.needSyncEpoch = true
+		rbft.logger.Debugf("Replica %d try to process whole states for epoch sync", rbft.peerPool.ID)
+		return rbft.compareWholeStates(states)
+	}
+
+	if vQuorum >= rbft.commonCaseQuorum() {
 		states := make(wholeStates)
 		for _, nrs := range rbft.recoveryMgr.outOfElection {
 			states[nrs.NodeInfo] = nodeState{
@@ -339,6 +376,7 @@ func (rbft *rbftImpl) recvNotificationResponse(nr *pb.NotificationResponse) cons
 				epoch: nrs.Epoch,
 			}
 		}
+		rbft.logger.Debugf("Replica %d try to process whole states for normal recovery", rbft.peerPool.ID)
 		return rbft.compareWholeStates(states)
 	}
 
@@ -350,7 +388,13 @@ func (rbft *rbftImpl) recvNotificationResponse(nr *pb.NotificationResponse) cons
 func (rbft *rbftImpl) resetStateForRecovery() consensusEvent {
 	rbft.logger.Debugf("Replica %d reset state in recovery for view=%d", rbft.peerPool.ID, rbft.view)
 
-	basis := rbft.getOutOfElectionBasis()
+	var basis []*pb.VcBasis
+	if rbft.recoveryMgr.needSyncEpoch {
+		basis = rbft.getDifferentEpochBasis()
+	} else {
+		basis = rbft.getOutOfElectionBasis()
+	}
+
 	cp, ok := rbft.selectInitialCheckpoint(basis)
 	if !ok {
 		rbft.logger.Infof("Replica %d could not find consistent checkpoint.", rbft.peerPool.ID)
@@ -542,6 +586,13 @@ func (rbft *rbftImpl) getNotificationBasis() (basis []*pb.VcBasis) {
 // getOutOfElectionBasis gets all the normal notification basis the replica stored in outOfElection.
 func (rbft *rbftImpl) getOutOfElectionBasis() (basis []*pb.VcBasis) {
 	for _, o := range rbft.recoveryMgr.outOfElection {
+		basis = append(basis, o.Basis)
+	}
+	return
+}
+
+func (rbft *rbftImpl) getDifferentEpochBasis() (basis []*pb.VcBasis) {
+	for _, o := range rbft.recoveryMgr.differentEpoch {
 		basis = append(basis, o.Basis)
 	}
 	return

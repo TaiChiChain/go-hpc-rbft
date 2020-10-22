@@ -120,92 +120,6 @@ func TestCluster_SyncSmallEpochWithCheckpoint(t *testing.T) {
 	assert.Equal(t, uint64(60), rbfts[2].exec.lastExec)
 }
 
-func TestCluster_FetchCheckpointAtRestart(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	nodes, rbfts := newBasicClusterInstance()
-	unlockCluster(rbfts)
-
-	ctx := newCTX(defaultValidatorSet)
-	executeExceptN(t, rbfts, nodes, ctx, true, 2)
-
-	var retMessageSet []map[pb.Type][]*pb.ConsensusMessage
-	for i := 0; i < 2; i++ {
-		tx := newTx()
-		seqValue := uint64(10 * (i + 1))
-		setClusterExecExcept(rbfts, nodes, seqValue-1, 2)
-		retMessages := executeExceptN(t, rbfts, nodes, tx, true, 2)
-		retMessageSet = append(retMessageSet, retMessages)
-	}
-
-	// just trigger the fetch checkpoint for restarting node
-	rbfts[2].epochMgr.configBatchToCheck = &pb.MetaState{
-		Applied: uint64(1),
-		Digest:  "tmp-hash",
-	}
-	_ = rbfts[2].start()
-	close(rbfts[2].close)
-	fetchEv := <-rbfts[2].recvChan
-	rbfts[2].processEvent(fetchEv)
-	fetchCheckpointMsg := nodes[2].broadcastMessageCache
-	assert.True(t, rbfts[2].in(initialCheck))
-	assert.Equal(t, pb.Type_FETCH_CHECKPOINT, fetchCheckpointMsg.Type)
-
-	fetchedCheckpoints := make([]*pb.ConsensusMessage, 4)
-	for index, rbft := range rbfts {
-		if index == 2 {
-			continue
-		}
-		rbft.processEvent(fetchCheckpointMsg)
-		fetchedCheckpoints[index] = nodes[index].unicastMessageCache
-		assert.Equal(t, pb.Type_CHECKPOINT, fetchedCheckpoints[index].Type)
-	}
-
-	for index, chkpt := range fetchedCheckpoints {
-		if index == 2 {
-			continue
-		}
-		rbfts[2].processEvent(chkpt)
-	}
-
-	recoveryMsg := nodes[2].broadcastMessageCache
-	assert.Equal(t, pb.Type_NOTIFICATION, recoveryMsg.Type)
-
-	notificationRsp := make([]*pb.ConsensusMessage, 4)
-	for index, rbft := range rbfts {
-		if index == 2 {
-			continue
-		}
-		rbft.processEvent(recoveryMsg)
-		notificationRsp[index] = nodes[index].unicastMessageCache
-		assert.Equal(t, pb.Type_NOTIFICATION_RESPONSE, notificationRsp[index].Type)
-	}
-
-	for index, rsp := range notificationRsp {
-		if index == 2 {
-			continue
-		}
-		rbfts[2].processEvent(rsp)
-	}
-
-	ev := <-rbfts[2].recvChan
-	done := rbfts[2].processEvent(ev)
-	expectEv := &LocalEvent{
-		Service:   RecoveryService,
-		EventType: RecoveryDoneEvent,
-	}
-	assert.Equal(t, expectEv, done)
-
-	rbfts[2].processEvent(done)
-
-	assert.Equal(t, uint64(1), rbfts[2].epoch)
-	assert.Equal(t, uint64(20), rbfts[2].exec.lastExec)
-
-	msg := nodes[2].broadcastMessageCache
-	assert.Equal(t, pb.Type_RECOVERY_FETCH_QPC, msg.Type)
-}
-
 func TestCluster_SyncLargeEpochWithCheckpoint(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -254,6 +168,15 @@ func unlockCluster(rbfts []*rbftImpl) {
 	for index := range rbfts {
 		rbfts[index].atomicOff(Pending)
 		rbfts[index].setNormal()
+	}
+}
+
+func setClusterViewExcept(rbfts []*rbftImpl, nodes []*testNode, view uint64, noSet int) {
+	for index := range rbfts {
+		if index == noSet {
+			continue
+		}
+		rbfts[index].setView(view)
 	}
 }
 

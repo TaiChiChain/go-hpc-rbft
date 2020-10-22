@@ -9,6 +9,26 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestEpoch_fetchCheckpoint_and_recv(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	nodes, rbfts := newBasicClusterInstance()
+
+	rbfts[0].epochMgr.configBatchToCheck = &pb.MetaState{
+		Applied: 10,
+		Digest:  "test-block-10",
+	}
+
+	rbfts[0].fetchCheckpoint()
+	msg := nodes[0].broadcastMessageCache
+	assert.Equal(t, pb.Type_FETCH_CHECKPOINT, msg.Type)
+
+	rbfts[1].processEvent(msg)
+	msg2 := nodes[1].unicastMessageCache
+	assert.Equal(t, pb.Type_CHECKPOINT, msg2.Type)
+}
+
 func TestEpoch_recvFetchCheckpoint_RouterNotExist(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -106,7 +126,7 @@ func TestEpoch_turnIntoEpoch(t *testing.T) {
 	addNode5 := append(defaultValidatorSet, "node5")
 	router := vSetToRouters(addNode5)
 
-	rbfts[0].turnIntoEpoch(&router, uint64(8), true)
+	rbfts[0].turnIntoEpoch(&router, uint64(8))
 
 	assert.Equal(t, uint64(8), rbfts[0].epoch)
 	assert.Equal(t, 5, rbfts[0].N)

@@ -318,10 +318,6 @@ func (rbft *rbftImpl) stopFirstRequestTimer() {
 // isPrePrepareLegal firstly checks if current status can receive pre-prepare or not, then checks pre-prepare message
 // itself is legal or not
 func (rbft *rbftImpl) isPrePrepareLegal(preprep *pb.PrePrepare) bool {
-	if rbft.in(initialCheck) {
-		rbft.logger.Debugf("Replica %d try to receive prePrepare, but it's in initialCheck", rbft.peerPool.ID)
-		return false
-	}
 
 	if rbft.atomicIn(InRecovery) {
 		rbft.logger.Debugf("Replica %d try to receive prePrepare, but it's in recovery", rbft.peerPool.ID)
@@ -471,6 +467,7 @@ func (rbft *rbftImpl) compareCheckpointWithWeakSet(chkpt *pb.Checkpoint) (bool, 
 			rbft.logger.Criticalf("Replica %d cannot find stable checkpoint with seqNo %d"+
 				"(%d different values observed already).", rbft.peerPool.ID, chkpt.SequenceNumber, len(diffValues))
 			rbft.atomicOn(Pending)
+			rbft.metrics.statusGaugePending.Set(Pending)
 			rbft.setAbNormal()
 			return false, 0
 		}
@@ -491,6 +488,7 @@ func (rbft *rbftImpl) compareCheckpointWithWeakSet(chkpt *pb.Checkpoint) (bool, 
 	if len(correctValues) > 1 {
 		rbft.logger.Criticalf("Replica %d finds several weak certs for checkpoint %d, values: %v", rbft.peerPool.ID, chkpt.SequenceNumber, correctValues)
 		rbft.atomicOn(Pending)
+		rbft.metrics.statusGaugePending.Set(Pending)
 		rbft.setAbNormal()
 		return false, 0
 	}
@@ -510,7 +508,7 @@ func (rbft *rbftImpl) compareCheckpointWithWeakSet(chkpt *pb.Checkpoint) (bool, 
 			Digest:  correctID,
 		}
 		rbft.updateHighStateTarget(target)
-		rbft.tryStateTransfer(target)
+		rbft.tryStateTransfer()
 		return false, 0
 	}
 
@@ -520,8 +518,8 @@ func (rbft *rbftImpl) compareCheckpointWithWeakSet(chkpt *pb.Checkpoint) (bool, 
 // compareWholeStates compares whole networks' current status during recovery or sync state
 // Those status including :
 // 1. N: current consensus nodes number
-// 2. view: current view of bft network
-// 3. routerHash: current consensus network's router info which contains all nodes' hostname et al...
+// 2. epoch: current epoch of bft network
+// 3. view: current view of bft network
 // 4. applied(only compared in sync state): current latest blockChain height
 // 5. digest(only compared in sync state): current latest blockChain hash
 func (rbft *rbftImpl) compareWholeStates(states wholeStates) consensusEvent {
@@ -540,6 +538,7 @@ func (rbft *rbftImpl) compareWholeStates(states wholeStates) consensusEvent {
 		// As for quorum will be changed according to validator set, and we cannot be sure that router info of
 		// the node is correct, we should calculate the commonCaseQuorum with the N of state.
 		if len(sameRespCount[state]) >= rbft.commonCaseQuorum() {
+			rbft.logger.Debugf("Replica %d find quorum states, try to process", rbft.peerPool.ID)
 			quorumResp = state
 			canFind = true
 			break
@@ -549,20 +548,24 @@ func (rbft *rbftImpl) compareWholeStates(states wholeStates) consensusEvent {
 	// we can find the quorum nodeState with the same N and view, judge if the response.view equals to the
 	// current view, if so, just update N and view, else update N, view and then re-constructs certStore
 	if canFind {
-		// update view if needed
-		if rbft.view != quorumResp.view {
+		// update view if we need it and we needn't sync epoch
+		if rbft.view != quorumResp.view && !rbft.recoveryMgr.needSyncEpoch {
 			rbft.setView(quorumResp.view)
+			rbft.logger.Infof("Replica %d persist view=%d after found quorum same response.", rbft.peerPool.ID, rbft.view)
+			rbft.persistView(rbft.view)
 		}
 
-		rbft.logger.Infof("Replica %d persist view=%d after found quorum same response.", rbft.peerPool.ID, rbft.view)
-		// always persist view and N to consensus database no matter we need to update view or not.
-		rbft.persistView(rbft.view)
-
 		if rbft.in(InSyncState) {
+			// get self-state to compare
 			state := rbft.node.getCurrentState()
 
+			// we could stop sync-state timer here as we has already found quorum sync-state-response
 			rbft.timerMgr.stopTimer(syncStateRspTimer)
 			rbft.off(InSyncState)
+
+			// case 1) wrong epoch [sync]:
+			// self epoch is lower than the others and we need to find correct epoch-info at first
+			// trigger state-update
 			if quorumResp.epoch > rbft.epoch {
 				rbft.logger.Warningf("Replica %d finds quorum same epoch %d, which is lager than self epoch %d, "+
 					"need to state update", rbft.peerPool.ID, quorumResp.epoch, rbft.epoch)
@@ -572,9 +575,30 @@ func (rbft *rbftImpl) compareWholeStates(states wholeStates) consensusEvent {
 					Digest:  quorumResp.digest,
 				}
 				rbft.updateHighStateTarget(target)
-				rbft.tryStateTransfer(target)
+				rbft.tryStateTransfer()
 				return nil
 			}
+
+			// case 2) wrong height [sync]:
+			// self height of blocks is lower than others
+			// trigger recovery
+			if state.MetaState.Applied != quorumResp.applied {
+				rbft.logger.Noticef("Replica %d finds quorum same block state which is different from self,"+
+					"self height: %d, quorum height: %d",
+					rbft.peerPool.ID, state.MetaState.Applied, quorumResp.applied)
+
+				// node in lower height cannot become a primary node
+				if rbft.isPrimary(rbft.peerPool.ID) {
+					rbft.logger.Warningf("Primary %d finds itself not sync with quorum replicas, sending viewChange", rbft.peerPool.ID)
+					return rbft.sendViewChange()
+				}
+				rbft.logger.Infof("Replica %d finds itself not sync with quorum replicas, try to recovery", rbft.peerPool.ID)
+				return rbft.initRecovery()
+			}
+
+			// case 3) wrong block hash [error]:
+			// we have correct epoch and block-height, but the hash of latest block is wrong
+			// trigger state-update
 			if state.MetaState.Applied == quorumResp.applied && state.MetaState.Digest != quorumResp.digest {
 				rbft.logger.Errorf("Replica %d finds quorum same block state whose hash is different from self,"+
 					"in height: %d, selfHash: %s, quorumDigest: %s, need to state update",
@@ -585,21 +609,10 @@ func (rbft *rbftImpl) compareWholeStates(states wholeStates) consensusEvent {
 					Digest:  quorumResp.digest,
 				}
 				rbft.updateHighStateTarget(target)
-				rbft.tryStateTransfer(target)
+				rbft.tryStateTransfer()
 				return nil
 			}
-			if state.MetaState.Applied != quorumResp.applied {
-				rbft.logger.Noticef("Replica %d finds quorum same block state which is different from self,"+
-					"self height: %d, quorum height: %d",
-					rbft.peerPool.ID, state.MetaState.Applied, quorumResp.applied)
 
-				if rbft.isPrimary(rbft.peerPool.ID) {
-					rbft.logger.Warningf("Primary %d finds itself not sync with quorum replicas, sending viewChange", rbft.peerPool.ID)
-					return rbft.sendViewChange()
-				}
-				rbft.logger.Infof("Replica %d finds itself not sync with quorum replicas, try to recovery", rbft.peerPool.ID)
-				return rbft.initRecovery()
-			}
 			rbft.logger.Infof("======== Replica %d finished sync state for height: %d, current epoch: %d, current view %d",
 				rbft.peerPool.ID, state.MetaState.Applied, rbft.epoch, rbft.view)
 			return nil
@@ -613,6 +626,7 @@ func (rbft *rbftImpl) compareWholeStates(states wholeStates) consensusEvent {
 				rbft.logger.Warningf("Replica %d become primary after sync view, sending viewChange", rbft.peerPool.ID)
 				rbft.timerMgr.stopTimer(recoveryRestartTimer)
 				rbft.atomicOff(InRecovery)
+				rbft.metrics.statusGaugeInRecovery.Set(0)
 				rbft.sendViewChange()
 				return nil
 			}
@@ -809,12 +823,30 @@ func (rbft *rbftImpl) putBackRequestBatches(xset xset) {
 func (rbft *rbftImpl) checkIfNeedStateUpdate(initialCp pb.Vc_C) (bool, error) {
 
 	lastExec := rbft.exec.lastExec
+	seq := initialCp.SequenceNumber
+	dig := initialCp.Digest
+
 	if rbft.exec.currentExec != nil {
 		lastExec = *rbft.exec.currentExec
 	}
 
-	if rbft.h < initialCp.SequenceNumber {
-		rbft.moveWatermarks(initialCp.SequenceNumber)
+	if rbft.h < seq {
+		if rbft.storeMgr.chkpts[seq] == dig {
+			rbft.moveWatermarks(seq)
+			rbft.external.SendFilterEvent(pb.InformType_FilterStableCheckpoint, seq)
+		}
+
+		if rbft.epochMgr.configBatchToCheck != nil {
+			if seq == rbft.epochMgr.configBatchToCheck.Applied {
+				rbft.logger.Noticef("Replica %d sent a config checkpoint, waiting for commit-db finished...", rbft.peerPool.ID)
+				ev := <-rbft.confChan
+				if ev.Height != seq {
+					rbft.logger.Errorf("Wrong commit-db height: %d", ev.Height)
+					// todo wgr safe stop
+				}
+				rbft.epochMgr.configBatchToCheck = nil
+			}
+		}
 	}
 
 	// If replica's lastExec < initial checkpoint, replica is out of date
@@ -827,7 +859,7 @@ func (rbft *rbftImpl) checkIfNeedStateUpdate(initialCp pb.Vc_C) (bool, error) {
 		}
 
 		rbft.updateHighStateTarget(target)
-		rbft.tryStateTransfer(target)
+		rbft.tryStateTransfer()
 		return true, nil
 	}
 

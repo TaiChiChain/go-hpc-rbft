@@ -5,6 +5,8 @@ import "github.com/ultramesh/flato-common/metrics"
 // rbftMetrics helps collect all metrics in rbft
 type rbftMetrics struct {
 	// ========================== metrics related to basic RBFT info ==========================
+	// track the current node ID.
+	idGauge metrics.Gauge
 	// track the current epoch number.
 	epochGauge metrics.Gauge
 	// track the current view number.
@@ -13,6 +15,20 @@ type rbftMetrics struct {
 	clusterSizeGauge metrics.Gauge
 	// track the current quorum size.
 	quorumSizeGauge metrics.Gauge
+	// track if current node is in normal.
+	statusGaugeInNormal metrics.Gauge
+	// track if current node is in conf change.
+	statusGaugeInConfChange metrics.Gauge
+	// track if current node is in view change.
+	statusGaugeInViewChange metrics.Gauge
+	// track if current node is in recovery.
+	statusGaugeInRecovery metrics.Gauge
+	// track if current node is in state transferring.
+	statusGaugeStateTransferring metrics.Gauge
+	// track if current node is pool full.
+	statusGaugePoolFull metrics.Gauge
+	// track if current node is in pending.
+	statusGaugePending metrics.Gauge
 
 	// ========================== metrics related to commit info ==========================
 	// monitor the totally committed block number by RBFT.
@@ -76,6 +92,13 @@ type rbftMetrics struct {
 func newRBFTMetrics(metricsProv metrics.Provider) *rbftMetrics {
 	m := &rbftMetrics{}
 
+	m.idGauge, _ = metricsProv.NewGauge(
+		metrics.GaugeOpts{
+			Name: "ID",
+			Help: "rbft node ID",
+		},
+	)
+
 	m.epochGauge, _ = metricsProv.NewGauge(
 		metrics.GaugeOpts{
 			Name: "epoch",
@@ -101,6 +124,55 @@ func newRBFTMetrics(metricsProv metrics.Provider) *rbftMetrics {
 		metrics.GaugeOpts{
 			Name: "quorum_size",
 			Help: "rbft quorum size",
+		},
+	)
+
+	m.statusGaugeInNormal, _ = metricsProv.NewGauge(
+		metrics.GaugeOpts{
+			Name: "status_normal",
+			Help: "rbft is in normal or not",
+		},
+	)
+
+	m.statusGaugeInConfChange, _ = metricsProv.NewGauge(
+		metrics.GaugeOpts{
+			Name: "status_conf_change",
+			Help: "rbft is in conf change or not",
+		},
+	)
+
+	m.statusGaugeInViewChange, _ = metricsProv.NewGauge(
+		metrics.GaugeOpts{
+			Name: "status_viewchange",
+			Help: "rbft is in view change or not",
+		},
+	)
+
+	m.statusGaugeInRecovery, _ = metricsProv.NewGauge(
+		metrics.GaugeOpts{
+			Name: "status_recovery",
+			Help: "rbft is in recovery or not",
+		},
+	)
+
+	m.statusGaugeStateTransferring, _ = metricsProv.NewGauge(
+		metrics.GaugeOpts{
+			Name: "status_state_update",
+			Help: "rbft is in state transferring or not",
+		},
+	)
+
+	m.statusGaugePoolFull, _ = metricsProv.NewGauge(
+		metrics.GaugeOpts{
+			Name: "status_pool_full",
+			Help: "rbft is pool full or not",
+		},
+	)
+
+	m.statusGaugePending, _ = metricsProv.NewGauge(
+		metrics.GaugeOpts{
+			Name: "status_pending",
+			Help: "rbft is in pending or not",
 		},
 	)
 

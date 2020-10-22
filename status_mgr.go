@@ -24,13 +24,7 @@ type StatusType int
 // consensus status type.
 const (
 	// normal status, which will only be used in rbft
-	Normal         = iota // normal consensus state
-	InSyncState           // node is syncing state
-	NeedSyncState         // node need to sync state
-	SkipInProgress        // node try to state update
-	isNewNode             // node is a new node
-	byzantine             // byzantine
-	initialCheck          // node is checking state at start
+	Normal = iota + 1 // normal consensus state
 
 	// atomic status, which might be used by consensus service
 	InConfChange      // node is processing a config transaction
@@ -39,6 +33,13 @@ const (
 	StateTransferring // node is updating state
 	PoolFull          // node's txPool is full
 	Pending           // node cannot process consensus messages
+
+	// internal status
+	InSyncState    // node is syncing state
+	NeedSyncState  // node need to sync state
+	SkipInProgress // node try to state update
+	isNewNode      // node is a new node
+	byzantine      // byzantine
 )
 
 // NodeStatus reflects the internal consensus status.
@@ -177,6 +178,7 @@ func (rbft *rbftImpl) inOne(poss ...uint32) bool {
 // setNormal sets system to normal.
 func (rbft *rbftImpl) setNormal() {
 	rbft.on(Normal)
+	rbft.metrics.statusGaugeInNormal.Set(Normal)
 }
 
 // maybeSetNormal checks if system is in normal or not, if in normal, set status to normal.
@@ -200,16 +202,19 @@ func (rbft *rbftImpl) setAbNormal() {
 		rbft.stopBatchTimer()
 	}
 	rbft.off(Normal)
+	rbft.metrics.statusGaugeInNormal.Set(0)
 }
 
 // setFull means tx pool has reached the pool size.
 func (rbft *rbftImpl) setFull() {
 	rbft.atomicOn(PoolFull)
+	rbft.metrics.statusGaugePoolFull.Set(PoolFull)
 }
 
 // setNotFull means tx pool hasn't reached the pool size.
 func (rbft *rbftImpl) setNotFull() {
 	rbft.atomicOff(PoolFull)
+	rbft.metrics.statusGaugePoolFull.Set(0)
 }
 
 // isNormal checks setNormal and returns if system is normal or not.
@@ -228,5 +233,6 @@ func (rbft *rbftImpl) initStatus() {
 	// set consensus status to pending to avoid process consensus messages
 	// until RBFT starts recovery
 	rbft.atomicOn(Pending)
+	rbft.metrics.statusGaugePending.Set(Pending)
 	rbft.setNotFull()
 }

@@ -17,8 +17,8 @@ replace github.com/ultramesh/crypto-gm => git.hyperchain.cn/ultramesh/crypto-gm.
 
 replace github.com/ultramesh/crypto-standard => git.hyperchain.cn/ultramesh/crypto-standard.git v0.1.13
 
-replace github.com/ultramesh/flato-common => git.hyperchain.cn/ultramesh/flato-common.git v0.1.14
+replace github.com/ultramesh/flato-common => git.hyperchain.cn/ultramesh/flato-common.git v0.1.15
 
-replace github.com/ultramesh/flato-txpool => git.hyperchain.cn/ultramesh/flato-txpool.git v0.2.5
+replace github.com/ultramesh/flato-txpool => git.hyperchain.cn/ultramesh/flato-txpool.git v0.2.6
 
 replace github.com/ultramesh/fancylogger => git.hyperchain.cn/ultramesh/fancylogger.git v0.1.2
