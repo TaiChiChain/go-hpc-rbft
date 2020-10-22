@@ -148,26 +148,28 @@ func TestCluster_FetchCheckpointAtRestart(t *testing.T) {
 	close(rbfts[2].close)
 	fetchEv := <-rbfts[2].recvChan
 	rbfts[2].processEvent(fetchEv)
-	fetchCheckpointMsg := nodes[2].broadcastMessageCache
-	assert.True(t, rbfts[2].in(initialCheck))
-	assert.Equal(t, pb.Type_FETCH_CHECKPOINT, fetchCheckpointMsg.Type)
+	preRecoveryMsg := nodes[2].broadcastMessageCache
+	assert.Equal(t, pb.Type_NOTIFICATION, preRecoveryMsg.Type)
 
-	fetchedCheckpoints := make([]*pb.ConsensusMessage, 4)
+	preNotificationRsp := make([]*pb.ConsensusMessage, 4)
 	for index, rbft := range rbfts {
 		if index == 2 {
 			continue
 		}
-		rbft.processEvent(fetchCheckpointMsg)
-		fetchedCheckpoints[index] = nodes[index].unicastMessageCache
-		assert.Equal(t, pb.Type_CHECKPOINT, fetchedCheckpoints[index].Type)
+		rbft.processEvent(preRecoveryMsg)
+		preNotificationRsp[index] = nodes[index].unicastMessageCache
+		assert.Equal(t, pb.Type_NOTIFICATION_RESPONSE, preNotificationRsp[index].Type)
 	}
 
-	for index, chkpt := range fetchedCheckpoints {
+	for index, rsp := range preNotificationRsp {
 		if index == 2 {
 			continue
 		}
-		rbfts[2].processEvent(chkpt)
+		rbfts[2].processEvent(rsp)
 	}
+
+	ev1 := <-rbfts[2].recvChan
+	rbfts[2].processEvent(ev1)
 
 	recoveryMsg := nodes[2].broadcastMessageCache
 	assert.Equal(t, pb.Type_NOTIFICATION, recoveryMsg.Type)
@@ -182,22 +184,25 @@ func TestCluster_FetchCheckpointAtRestart(t *testing.T) {
 		assert.Equal(t, pb.Type_NOTIFICATION_RESPONSE, notificationRsp[index].Type)
 	}
 
+	done := false
+	recoveryDoneEv := &LocalEvent{
+		Service:   RecoveryService,
+		EventType: RecoveryDoneEvent,
+	}
 	for index, rsp := range notificationRsp {
 		if index == 2 {
 			continue
 		}
-		rbfts[2].processEvent(rsp)
+		retEv := rbfts[2].processEvent(rsp)
+		if retEv != nil {
+			assert.Equal(t, recoveryDoneEv, retEv)
+			done = true
+			break
+		}
 	}
 
-	ev := <-rbfts[2].recvChan
-	done := rbfts[2].processEvent(ev)
-	expectEv := &LocalEvent{
-		Service:   RecoveryService,
-		EventType: RecoveryDoneEvent,
-	}
-	assert.Equal(t, expectEv, done)
-
-	rbfts[2].processEvent(done)
+	assert.True(t, done)
+	rbfts[2].processEvent(recoveryDoneEv)
 
 	assert.Equal(t, uint64(1), rbfts[2].epoch)
 	assert.Equal(t, uint64(20), rbfts[2].exec.lastExec)
@@ -254,6 +259,15 @@ func unlockCluster(rbfts []*rbftImpl) {
 	for index := range rbfts {
 		rbfts[index].atomicOff(Pending)
 		rbfts[index].setNormal()
+	}
+}
+
+func setClusterViewExcept(rbfts []*rbftImpl, nodes []*testNode, view uint64, noSet int) {
+	for index := range rbfts {
+		if index == noSet {
+			continue
+		}
+		rbfts[index].setView(view)
 	}
 }
 

@@ -143,6 +143,11 @@ type ntfIdx struct {
 	nodeID uint64
 }
 
+type ntfIde struct {
+	e      uint64
+	nodeID uint64
+}
+
 // -----------router struct-----------------
 type routerMap struct {
 	//IDMap   map[uint64]string
@@ -153,8 +158,8 @@ type routerMap struct {
 // ledger status(block number, hash and seqNo)
 type nodeState struct {
 	n       uint64
-	view    uint64
 	epoch   uint64
+	view    uint64
 	applied uint64
 	digest  string
 }

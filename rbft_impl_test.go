@@ -82,7 +82,7 @@ func TestRBFT_newRBFT(t *testing.T) {
 	assert.Equal(t, true, rbft.in(isNewNode))
 }
 
-func TestRBFT_start_FetchCheckpoint(t *testing.T) {
+func TestRBFT_start_Recovery(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -96,8 +96,8 @@ func TestRBFT_start_FetchCheckpoint(t *testing.T) {
 	assert.Nil(t, err)
 	msg := <-rbfts[1].recvChan
 	rbfts[1].processEvent(msg)
-	fetchCheckpoint := nodes[1].broadcastMessageCache
-	assert.Equal(t, pb.Type_FETCH_CHECKPOINT, fetchCheckpoint.Type)
+	notificationMsg := nodes[1].broadcastMessageCache
+	assert.Equal(t, pb.Type_NOTIFICATION, notificationMsg.Type)
 }
 
 //============================================
@@ -309,29 +309,35 @@ func TestRBFT_processNullRequset(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	_, rbfts := newBasicClusterInstance()
+	nodes, rbfts := newBasicClusterInstance()
+	nullRequestEvent := &LocalEvent{
+		Service:   CoreRbftService,
+		EventType: CoreNullRequestTimerEvent,
+	}
 
-	msg := &pb.NullRequest{ReplicaId: uint64(1)}
+	rbfts[0].processEvent(nullRequestEvent)
+	nullRequestMsg := nodes[0].broadcastMessageCache
+	assert.Equal(t, pb.Type_NULL_REQUEST, nullRequestMsg.Type)
 
 	// If success process it, mode NeedSyncState will on
 	rbfts[0].on(Normal)
 
 	rbfts[0].atomicOn(InRecovery)
-	rbfts[0].processNullRequest(msg)
+	rbfts[0].processEvent(nullRequestMsg)
 	assert.Equal(t, false, rbfts[0].in(NeedSyncState))
 	rbfts[0].atomicOff(InRecovery)
 
 	rbfts[0].atomicOn(InViewChange)
-	rbfts[0].processNullRequest(msg)
+	rbfts[0].processEvent(nullRequestMsg)
 	assert.Equal(t, false, rbfts[0].in(NeedSyncState))
 	rbfts[0].atomicOff(InViewChange)
 
-	rbfts[0].processNullRequest(msg)
+	rbfts[0].processEvent(nullRequestMsg)
 	assert.Equal(t, true, rbfts[0].in(NeedSyncState))
 
 	// not primary
 	rbfts[1].on(NeedSyncState)
-	rbfts[1].processNullRequest(msg)
+	rbfts[0].processEvent(nullRequestMsg)
 	event := &LocalEvent{
 		Service:   CoreRbftService,
 		EventType: CoreFirstRequestTimerEvent,
@@ -427,73 +433,6 @@ func TestRBFT_updateHighStateTarget(t *testing.T) {
 	target.Applied = uint64(6)
 	rbfts[0].updateHighStateTarget(target)
 	assert.Equal(t, uint64(6), rbfts[0].storeMgr.highStateTarget.Applied)
-}
-
-func TestRBFT_tryStateTransfer(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	_, rbfts := newBasicClusterInstance()
-
-	target := &pb.MetaState{
-		Applied: uint64(5),
-		Digest:  "msg",
-	}
-	rbfts[0].off(SkipInProgress)
-	rbfts[0].atomicOff(StateTransferring)
-	prePrepareTmp := &pb.PrePrepare{
-		ReplicaId:      1,
-		View:           0,
-		SequenceNumber: 2,
-		BatchDigest:    "msg",
-		HashBatch:      &pb.HashBatch{Timestamp: 10086},
-	}
-	prePareTmp := pb.Prepare{
-		ReplicaId:      1,
-		View:           0,
-		SequenceNumber: 2,
-		BatchDigest:    "msg",
-	}
-	commitTmp := pb.Commit{
-		ReplicaId:      1,
-		View:           0,
-		SequenceNumber: 2,
-		BatchDigest:    "msg",
-	}
-	msgIDTmp := msgID{
-		v: 0,
-		n: 2,
-		d: "msg",
-	}
-	certTmp := &msgCert{
-		prePrepare:  prePrepareTmp,
-		sentPrepare: false,
-		prepare:     map[pb.Prepare]bool{prePareTmp: true},
-		sentCommit:  false,
-		commit:      map[pb.Commit]bool{commitTmp: true},
-		sentExecute: false,
-	}
-
-	// To The End and clean cert with seqNo>lastExec
-	rbfts[0].storeMgr.certStore[msgIDTmp] = certTmp
-	rbfts[0].exec.setLastExec(uint64(1))
-	rbfts[0].tryStateTransfer(target)
-	assert.Equal(t, (*msgCert)(nil), rbfts[0].storeMgr.certStore[msgIDTmp])
-
-	// if rbft.atomicIn(StateTransferring)
-	rbfts[0].storeMgr.certStore[msgIDTmp] = certTmp
-	rbfts[0].exec.setLastExec(uint64(1))
-	rbfts[0].atomicOn(StateTransferring)
-	rbfts[0].tryStateTransfer(target)
-	assert.Equal(t, certTmp, rbfts[0].storeMgr.certStore[msgIDTmp])
-
-	// if target == nil
-	// if rbft.storeMgr.highStateTarget == nil
-	rbfts[0].atomicOff(StateTransferring)
-	target = nil
-	rbfts[0].storeMgr.highStateTarget = nil
-	rbfts[0].tryStateTransfer(target)
-	assert.Equal(t, certTmp, rbfts[0].storeMgr.certStore[msgIDTmp])
 }
 
 func TestRBFT_recvCheckpoint1(t *testing.T) {
@@ -880,41 +819,42 @@ func TestRBFT_recvStateUpdatedEvent_updateEpoch(t *testing.T) {
 	assert.Equal(t, 5, len(rbfts[0].peerPool.routerMap.HashMap))
 }
 
-func TestRBFT_recvStateUpdatedEvent_RecoveryDone(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	nodes, rbfts := newBasicClusterInstance()
-
-	metaS := &pb.MetaState{
-		Applied: uint64(10),
-		Digest:  "block-number-10",
-	}
-
-	addNode5 := append(defaultValidatorSet, "node5")
-	epochInfo := &pb.EpochInfo{
-		Epoch: uint64(3),
-		VSet:  addNode5,
-	}
-
-	ss := &pb.ServiceState{
-		MetaState: metaS,
-		EpochInfo: epochInfo,
-	}
-
-	rbfts[1].atomicOn(InRecovery)
-	ret := rbfts[1].recvStateUpdatedEvent(ss)
-	exp := &LocalEvent{
-		Service:   RecoveryService,
-		EventType: RecoveryDoneEvent,
-	}
-	assert.Equal(t, exp, ret)
-
-	// Primary in recovery
-	rbfts[0].atomicOn(InRecovery)
-	rbfts[0].recvStateUpdatedEvent(ss)
-	assert.Equal(t, pb.Type_NOTIFICATION, nodes[0].broadcastMessageCache.Type)
-}
+//
+//func TestRBFT_recvStateUpdatedEvent_RecoveryDone(t *testing.T) {
+//	ctrl := gomock.NewController(t)
+//	defer ctrl.Finish()
+//
+//	nodes, rbfts := newBasicClusterInstance()
+//
+//	metaS := &pb.MetaState{
+//		Applied: uint64(10),
+//		Digest:  "block-number-10",
+//	}
+//
+//	addNode5 := append(defaultValidatorSet, "node5")
+//	epochInfo := &pb.EpochInfo{
+//		Epoch: uint64(3),
+//		VSet:  addNode5,
+//	}
+//
+//	ss := &pb.ServiceState{
+//		MetaState: metaS,
+//		EpochInfo: epochInfo,
+//	}
+//
+//	rbfts[1].atomicOn(InRecovery)
+//	ret := rbfts[1].recvStateUpdatedEvent(ss)
+//	exp := &LocalEvent{
+//		Service:   RecoveryService,
+//		EventType: RecoveryDoneEvent,
+//	}
+//	assert.Equal(t, exp, ret)
+//
+//	// Primary in recovery
+//	rbfts[0].atomicOn(InRecovery)
+//	rbfts[0].recvStateUpdatedEvent(ss)
+//	assert.Equal(t, pb.Type_NOTIFICATION, nodes[0].broadcastMessageCache.Type)
+//}
 
 func TestRBFT_recvStateUpdatedEvent_lowSeqNo(t *testing.T) {
 	ctrl := gomock.NewController(t)

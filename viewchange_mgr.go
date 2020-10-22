@@ -142,11 +142,6 @@ func (rbft *rbftImpl) recvViewChange(vc *pb.ViewChange) consensusEvent {
 
 	// TODO(DH): verify vc signature
 
-	if rbft.in(initialCheck) {
-		rbft.logger.Debugf("Replica %d is in initialCheck, cannot process viewChange messages", rbft.peerPool.ID)
-		return nil
-	}
-
 	if vc.Basis.View < rbft.view {
 		rbft.logger.Warningf("Replica %d found viewChange message for old view from replica %d: self view=%d, vc view=%d",
 			rbft.peerPool.ID, vc.Basis.ReplicaId, rbft.view, vc.Basis.View)
