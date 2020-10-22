@@ -181,6 +181,7 @@ func (rbft *rbftImpl) handleRecoveryEvent(e *LocalEvent) consensusEvent {
 			rbft.off(isNewNode)
 		}
 		rbft.atomicOff(InRecovery)
+		rbft.metrics.statusGaugeInRecovery.Set(0)
 		rbft.recoveryMgr.recoveryHandled = false
 		rbft.recoveryMgr.notificationStore = make(map[ntfIdx]*pb.Notification)
 		rbft.recoveryMgr.outOfElection = make(map[ntfIdx]*pb.NotificationResponse)
@@ -299,6 +300,7 @@ func (rbft *rbftImpl) handleViewChangeEvent(e *LocalEvent) consensusEvent {
 
 		// set normal to 1 which indicates system comes into normal status after viewchange
 		rbft.atomicOff(InViewChange)
+		rbft.metrics.statusGaugeInViewChange.Set(0)
 		rbft.maybeSetNormal()
 		rbft.logger.Noticef("======== Replica %d finished viewChange, primary=%d, view=%d/height=%d", rbft.peerPool.ID, primaryID, rbft.view, rbft.exec.lastExec)
 		finishMsg := fmt.Sprintf("Replica %d finished viewChange, primary=%d, view=%d/height=%d", rbft.peerPool.ID, primaryID, rbft.view, rbft.exec.lastExec)
@@ -317,6 +319,7 @@ func (rbft *rbftImpl) handleViewChangeEvent(e *LocalEvent) consensusEvent {
 
 		rbft.timerMgr.stopTimer(newViewTimer)
 		rbft.atomicOff(InViewChange)
+		rbft.metrics.statusGaugeInViewChange.Set(0)
 
 		// if viewChange resend timer expired, directly enter recovery status,
 		// decrease view first as we may increase view when send notification.

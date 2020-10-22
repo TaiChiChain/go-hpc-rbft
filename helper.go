@@ -467,6 +467,7 @@ func (rbft *rbftImpl) compareCheckpointWithWeakSet(chkpt *pb.Checkpoint) (bool, 
 			rbft.logger.Criticalf("Replica %d cannot find stable checkpoint with seqNo %d"+
 				"(%d different values observed already).", rbft.peerPool.ID, chkpt.SequenceNumber, len(diffValues))
 			rbft.atomicOn(Pending)
+			rbft.metrics.statusGaugePending.Set(Pending)
 			rbft.setAbNormal()
 			return false, 0
 		}
@@ -487,6 +488,7 @@ func (rbft *rbftImpl) compareCheckpointWithWeakSet(chkpt *pb.Checkpoint) (bool, 
 	if len(correctValues) > 1 {
 		rbft.logger.Criticalf("Replica %d finds several weak certs for checkpoint %d, values: %v", rbft.peerPool.ID, chkpt.SequenceNumber, correctValues)
 		rbft.atomicOn(Pending)
+		rbft.metrics.statusGaugePending.Set(Pending)
 		rbft.setAbNormal()
 		return false, 0
 	}
@@ -624,6 +626,7 @@ func (rbft *rbftImpl) compareWholeStates(states wholeStates) consensusEvent {
 				rbft.logger.Warningf("Replica %d become primary after sync view, sending viewChange", rbft.peerPool.ID)
 				rbft.timerMgr.stopTimer(recoveryRestartTimer)
 				rbft.atomicOff(InRecovery)
+				rbft.metrics.statusGaugeInRecovery.Set(0)
 				rbft.sendViewChange()
 				return nil
 			}

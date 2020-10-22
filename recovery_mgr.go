@@ -101,6 +101,7 @@ func (rbft *rbftImpl) sendNotification(keepCurrentVote bool) consensusEvent {
 	if rbft.atomicIn(InViewChange) {
 		rbft.logger.Infof("Replica %d in viewChange changes to recovery status", rbft.peerPool.ID)
 		rbft.atomicOff(InViewChange)
+		rbft.metrics.statusGaugeInViewChange.Set(0)
 		rbft.timerMgr.stopTimer(vcResendTimer)
 	}
 
@@ -109,6 +110,7 @@ func (rbft *rbftImpl) sendNotification(keepCurrentVote bool) consensusEvent {
 	rbft.timerMgr.stopTimer(firstRequestTimer)
 
 	rbft.atomicOn(InRecovery)
+	rbft.metrics.statusGaugeInRecovery.Set(InRecovery)
 	rbft.recoveryMgr.recoveryHandled = false
 	rbft.setAbNormal()
 
