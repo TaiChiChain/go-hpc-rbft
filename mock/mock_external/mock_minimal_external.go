@@ -17,7 +17,7 @@ func NewMockMinimalExternal(ctrl *gomock.Controller) *MockExternalStack {
 
 	mock.EXPECT().ReadState(gomock.Any()).Return(nil, errors.New("ReadState Error")).AnyTimes()
 	mock.EXPECT().ReadStateSet(gomock.Any()).Return(nil, nil).AnyTimes()
-	mock.EXPECT().Destroy().Return(nil).AnyTimes()
+	mock.EXPECT().Destroy(gomock.Any()).Return(nil).AnyTimes()
 
 	mock.EXPECT().Broadcast(gomock.Any()).Return(nil).AnyTimes()
 	mock.EXPECT().Unicast(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()

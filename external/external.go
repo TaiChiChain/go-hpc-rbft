@@ -31,7 +31,7 @@ type Storage interface {
 	// ReadState retrieves data with specified key prefix from non-volatile memory.
 	ReadStateSet(key string) (map[string][]byte, error)
 	// Destroy clears the non-volatile memory.
-	Destroy() error
+	Destroy(key string) error
 }
 
 // Network is used to send p2p messages between nodes.

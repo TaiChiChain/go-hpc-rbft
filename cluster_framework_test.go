@@ -63,6 +63,9 @@ type testFramework struct {
 	// Channel to receive messages sent from nodes in cluster.
 	clusterChan chan *channelMsg
 
+	// delFlag
+	delFlag chan bool
+
 	// Write logger to record some info.
 	log Logger
 }
@@ -206,12 +209,15 @@ func newTestFramework(account int, loggerFile bool) *testFramework {
 
 	cc := make(chan *channelMsg, 1)
 	// Init Framework
+	delFlag := make(chan bool)
 	tf := &testFramework{
 		TestNode: nil,
 		Router:   routers,
 
 		close:       make(chan bool),
 		clusterChan: cc,
+
+		delFlag: delFlag,
 
 		log: FrameworkNewRawLogger(),
 	}
@@ -288,6 +294,7 @@ func (tf *testFramework) newNodeConfig(
 		External:    ext,
 		RequestPool: pool,
 		MetricsProv: &disabled.Provider{},
+		DelFlag:     make(chan bool),
 	}
 }
 
@@ -761,7 +768,7 @@ func (ext *testExternal) ReadStateSet(key string) (map[string][]byte, error) {
 
 	return nil, errors.New("empty")
 }
-func (ext *testExternal) Destroy() error {
+func (ext *testExternal) Destroy(key string) error {
 	return nil
 }
 
@@ -975,6 +982,7 @@ func newBasicClusterInstance() ([]*testNode, []*rbftImpl) {
 	for _, tn := range tf.TestNode {
 		nodes = append(nodes, tn)
 		rbfts = append(rbfts, tn.n.rbft)
+		_ = tn.n.rbft.batchMgr.requestPool.Start()
 	}
 
 	return nodes, rbfts

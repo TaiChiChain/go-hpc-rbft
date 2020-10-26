@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func testNewStorage(ctrl *gomock.Controller) (*storeManager, Config) {
+func newStorageTestNode(ctrl *gomock.Controller) (*storeManager, Config) {
 	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
 	log := FrameworkNewRawLogger()
 	external := mockexternal.NewMockMinimalExternal(ctrl)
@@ -44,6 +44,7 @@ func testNewStorage(ctrl *gomock.Controller) (*storeManager, Config) {
 		External:    external,
 		RequestPool: pool,
 		MetricsProv: &disabled.Provider{},
+		DelFlag:     make(chan bool),
 
 		EpochInit:    uint64(0),
 		LatestConfig: nil,
@@ -55,7 +56,7 @@ func testNewStorage(ctrl *gomock.Controller) (*storeManager, Config) {
 func TestStoreMgr_newStoreMgr(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	s, _ := testNewStorage(ctrl)
+	s, _ := newStorageTestNode(ctrl)
 
 	structName, nilElems, err := checkNilElems(s)
 	if err == nil {
@@ -69,7 +70,7 @@ func TestStoreMgr_moveWatermarks(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	s, conf := testNewStorage(ctrl)
+	s, conf := newStorageTestNode(ctrl)
 	cpChan := make(chan *pb.ServiceState)
 	confC := make(chan *pb.ReloadFinished)
 	rbft, _ := newRBFT(cpChan, confC, conf)
@@ -97,7 +98,7 @@ func TestStoreMgr_moveWatermarks(t *testing.T) {
 func TestStoreMgr_saveCheckpoint(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	s, _ := testNewStorage(ctrl)
+	s, _ := newStorageTestNode(ctrl)
 	s.saveCheckpoint(uint64(10), "base64")
 
 	assert.Equal(t, "base64", s.chkpts[uint64(10)])
@@ -107,7 +108,7 @@ func TestStoreMgr_getCert(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	s, _ := testNewStorage(ctrl)
+	s, _ := newStorageTestNode(ctrl)
 
 	var retCert *msgCert
 	// get default cert
@@ -145,7 +146,7 @@ func TestStoreMgr_existedDigest(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	s, _ := testNewStorage(ctrl)
+	s, _ := newStorageTestNode(ctrl)
 
 	msgIDTmp := msgID{
 		v: 1,

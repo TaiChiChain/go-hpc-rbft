@@ -18,6 +18,7 @@ import (
 	"crypto/md5"
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"math"
 	"strconv"
@@ -172,7 +173,6 @@ func (rbft *rbftImpl) committed(digest string, v uint64, n uint64) bool {
 // =============================================================================
 // helper functions for transfer message
 // =============================================================================
-//TODO(wgr): multiplexing functions tx-pool
 
 // broadcastReqSet helps broadcast requestSet to others.
 func (rbft *rbftImpl) broadcastReqSet(set *pb.RequestSet) {
@@ -469,6 +469,7 @@ func (rbft *rbftImpl) compareCheckpointWithWeakSet(chkpt *pb.Checkpoint) (bool, 
 			rbft.atomicOn(Pending)
 			rbft.metrics.statusGaugePending.Set(Pending)
 			rbft.setAbNormal()
+			rbft.stopNamespace()
 			return false, 0
 		}
 
@@ -490,6 +491,7 @@ func (rbft *rbftImpl) compareCheckpointWithWeakSet(chkpt *pb.Checkpoint) (bool, 
 		rbft.atomicOn(Pending)
 		rbft.metrics.statusGaugePending.Set(Pending)
 		rbft.setAbNormal()
+		rbft.stopNamespace()
 		return false, 0
 	}
 
@@ -841,8 +843,10 @@ func (rbft *rbftImpl) checkIfNeedStateUpdate(initialCp pb.Vc_C) (bool, error) {
 				rbft.logger.Noticef("Replica %d sent a config checkpoint, waiting for commit-db finished...", rbft.peerPool.ID)
 				ev := <-rbft.confChan
 				if ev.Height != seq {
+					err := errors.New("wrong commit-db height")
 					rbft.logger.Errorf("Wrong commit-db height: %d", ev.Height)
-					// todo wgr safe stop
+					rbft.stopNamespace()
+					return false, err
 				}
 				rbft.epochMgr.configBatchToCheck = nil
 			}
@@ -899,6 +903,19 @@ func (rbft *rbftImpl) equalMetaState(s1 *pb.MetaState, s2 *pb.MetaState) bool {
 		return false
 	}
 	return true
+}
+
+func (rbft *rbftImpl) stopNamespace() {
+	defer func() {
+		// delFlag channel might be closed by other modules at the same time
+		// consensus requests to stop namespace
+		if err := recover(); err != nil {
+			rbft.logger.Warningf("Replica %d stops namespace error: %s", rbft.peerPool.ID, err)
+		}
+	}()
+
+	rbft.logger.Criticalf("Replica %d requests to stop namespace", rbft.peerPool.ID)
+	rbft.delFlag <- true
 }
 
 func requestHash(tx *protos.Transaction) string {
