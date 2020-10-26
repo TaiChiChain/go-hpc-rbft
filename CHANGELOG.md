@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.2.19"></a>
+## [0.2.19](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.18...v0.2.19) (2020-10-26)
+
+
+### Bug Fixes
+
+* fix oom caused by destroy minifile ([49f1506](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/49f1506))
+
+
+### Features
+
+* inform to stop namespace with delFlag channel if there is a non-recoverable error ([a20dac7](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/a20dac7)), closes [#flato-2446](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-2446)
+
+
+
 <a name="0.2.18"></a>
 ## [0.2.18](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.17...v0.2.18) (2020-10-22)
 
