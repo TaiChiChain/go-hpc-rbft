@@ -761,7 +761,7 @@ func (ext *testExternal) ReadStateSet(key string) (map[string][]byte, error) {
 
 	return nil, errors.New("empty")
 }
-func (ext *testExternal) Destroy() error {
+func (ext *testExternal) Destroy(key string) error {
 	return nil
 }
 
