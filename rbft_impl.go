@@ -133,6 +133,9 @@ type Config struct {
 	// MetricsProv is the metrics Provider used to generate metrics instance.
 	MetricsProv metrics.Provider
 
+	// DelFlag is a channel to stop namespace when there is a non-recoverable error
+	DelFlag chan bool
+
 	// Logger is the logger used to record logger in RBFT.
 	Logger Logger
 }
@@ -166,6 +169,7 @@ type rbftImpl struct {
 	recvChan chan interface{}        // channel to receive ordered consensus messages and local events
 	cpChan   chan *pb.ServiceState   // channel to wait for local checkpoint event
 	confChan chan *pb.ReloadFinished // channel to track config transaction execute
+	delFlag  chan bool               // channel to stop namespace when there is a non-recoverable error
 	close    chan bool               // channel to close this event process
 
 	requestSethMemLimit bool // whether limit requests set mem size or not
@@ -184,6 +188,7 @@ var once sync.Once
 
 // newRBFT init the RBFT instance
 func newRBFT(cpChan chan *pb.ServiceState, confC chan *pb.ReloadFinished, c Config) (*rbftImpl, error) {
+	var err error
 
 	// init message event converter
 	once.Do(initMsgEventMap)
@@ -200,6 +205,7 @@ func newRBFT(cpChan chan *pb.ServiceState, confC chan *pb.ReloadFinished, c Conf
 		cpChan:              cpChan,
 		confChan:            confC,
 		close:               make(chan bool),
+		delFlag:             c.DelFlag,
 		requestSethMemLimit: c.RequestSethMemLimit,
 		requestSetMaxMem:    int(c.RequestSetMaxMem),
 	}
@@ -243,7 +249,12 @@ func newRBFT(cpChan chan *pb.ServiceState, confC chan *pb.ReloadFinished, c Conf
 	}
 
 	// new metrics instance
-	rbft.metrics = newRBFTMetrics(c.MetricsProv)
+	rbft.metrics, err = newRBFTMetrics(c.MetricsProv)
+	if err != nil {
+		rbft.metrics.unregisterMetrics()
+		rbft.metrics = nil
+		return nil, err
+	}
 
 	// new timer manager
 	rbft.timerMgr = newTimerMgr(rbft.recvChan, c)
@@ -304,6 +315,12 @@ func newRBFT(cpChan chan *pb.ServiceState, confC chan *pb.ReloadFinished, c Conf
 
 // start initializes and starts the consensus service
 func (rbft *rbftImpl) start() error {
+	var err error
+	err = rbft.batchMgr.requestPool.Start()
+	if err != nil {
+		return err
+	}
+
 	// exit pending status after start rbft to avoid missing consensus messages from other nodes.
 	rbft.atomicOff(Pending)
 	rbft.metrics.statusGaugePending.Set(0)
@@ -353,7 +370,13 @@ func (rbft *rbftImpl) stop() {
 	// stop all timer event
 	rbft.timerMgr.Stop()
 
-	// todo wgr deregister metrics
+	// stop txPool
+	rbft.batchMgr.requestPool.Stop()
+
+	// unregister metrics
+	if rbft.metrics != nil {
+		rbft.metrics.unregisterMetrics()
+	}
 
 	rbft.logger.Noticef("======== RBFT stopped!")
 }
@@ -416,6 +439,7 @@ func (rbft *rbftImpl) postConfState(cc *pb.ConfState) {
 		rbft.logger.Criticalf("%s cannot find self id in quorum routers: %+v", rbft.peerPool.hash, cc.QuorumRouter.Peers)
 		rbft.atomicOn(Pending)
 		rbft.metrics.statusGaugePending.Set(Pending)
+		rbft.stopNamespace()
 		return
 	}
 	rbft.peerPool.initPeers(cc.QuorumRouter.Peers)
@@ -481,6 +505,7 @@ func (rbft *rbftImpl) listenEvent() {
 			var ok bool
 			if next, ok = obj.(consensusEvent); !ok {
 				rbft.logger.Error("Can't recognize event type")
+				rbft.stopNamespace()
 				return
 			}
 			for {
@@ -1564,7 +1589,8 @@ func (rbft *rbftImpl) finishConfigCheckpoint(chkpt *pb.Checkpoint) {
 	rbft.logger.Debugf("Replica %d received a commit-db finished target at height %d", rbft.peerPool.ID, ev.Height)
 	if ev.Height != chkpt.SequenceNumber {
 		rbft.logger.Errorf("Wrong commit-db height: %d", ev.Height)
-		// todo wgr safe stop
+		rbft.stopNamespace()
+		return
 	}
 
 	// two types of config transaction:
@@ -1900,7 +1926,8 @@ func (rbft *rbftImpl) recvStateUpdatedEvent(ss *pb.ServiceState) consensusEvent 
 			rbft.logger.Debugf("Replica %d received a commit-db finished target at height %d", rbft.peerPool.ID, ev.Height)
 			if ev.Height != seqNo {
 				rbft.logger.Errorf("Wrong commit-db height: %d", ev.Height)
-				// todo wgr safe stop
+				rbft.stopNamespace()
+				return nil
 			}
 		}
 	}

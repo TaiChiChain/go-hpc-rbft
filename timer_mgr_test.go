@@ -13,6 +13,27 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func newTestTimerMgr(ctrl *gomock.Controller) *timerManager {
+	log := FrameworkNewRawLogger()
+	external := mockexternal.NewMockMinimalExternal(ctrl)
+	tx := txpoolmock.NewMockMinimalTxPool(ctrl)
+	conf := Config{
+		ID:            1,
+		IsNew:         false,
+		Peers:         peerSet,
+		Logger:        log,
+		External:      external,
+		RequestPool:   tx,
+		K:             2,
+		LogMultiplier: 2,
+		MetricsProv:   &disabled.Provider{},
+		DelFlag:       make(chan bool),
+	}
+	eventC := make(chan interface{})
+
+	return newTimerMgr(eventC, conf)
+}
+
 func TestTimerMgr_store(t *testing.T) {
 	tt := titleTimer{
 		timerName: "test timer",
@@ -49,23 +70,8 @@ func TestTimerMgr_count(t *testing.T) {
 func TestTimerMgr_stopTimer(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	log := FrameworkNewRawLogger()
-	external := mockexternal.NewMockMinimalExternal(ctrl)
-	tx := txpoolmock.NewMockMinimalTxPool(ctrl)
 
-	conf := Config{
-		ID:            1,
-		IsNew:         false,
-		Peers:         peerSet,
-		Logger:        log,
-		External:      external,
-		RequestPool:   tx,
-		K:             2,
-		LogMultiplier: 2,
-		MetricsProv:   &disabled.Provider{},
-	}
-	eventC := make(chan interface{})
-	timeMgr := newTimerMgr(eventC, conf)
+	timeMgr := newTestTimerMgr(ctrl)
 
 	tt := titleTimer{
 		timerName: "test timer",
@@ -85,23 +91,8 @@ func TestTimerMgr_stopTimer(t *testing.T) {
 func TestTimerMgr_getTimeoutValue(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	log := FrameworkNewRawLogger()
-	external := mockexternal.NewMockMinimalExternal(ctrl)
-	tx := txpoolmock.NewMockMinimalTxPool(ctrl)
 
-	conf := Config{
-		ID:            1,
-		IsNew:         false,
-		Peers:         peerSet,
-		Logger:        log,
-		External:      external,
-		RequestPool:   tx,
-		K:             2,
-		LogMultiplier: 2,
-		MetricsProv:   &disabled.Provider{},
-	}
-	eventC := make(chan interface{})
-	timeMgr := newTimerMgr(eventC, conf)
+	timeMgr := newTestTimerMgr(ctrl)
 
 	tt := titleTimer{
 		timerName: "test timer",
@@ -122,23 +113,8 @@ func TestTimerMgr_getTimeoutValue(t *testing.T) {
 func TestTimerMgr_stopOneTimer(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	log := FrameworkNewRawLogger()
-	external := mockexternal.NewMockMinimalExternal(ctrl)
-	tx := txpoolmock.NewMockMinimalTxPool(ctrl)
 
-	conf := Config{
-		ID:            1,
-		IsNew:         false,
-		Peers:         peerSet,
-		Logger:        log,
-		External:      external,
-		RequestPool:   tx,
-		K:             2,
-		LogMultiplier: 2,
-		MetricsProv:   &disabled.Provider{},
-	}
-	eventC := make(chan interface{})
-	timeMgr := newTimerMgr(eventC, conf)
+	timeMgr := newTestTimerMgr(ctrl)
 
 	tt := titleTimer{
 		timerName: "test timer",
@@ -156,23 +132,8 @@ func TestTimerMgr_stopOneTimer(t *testing.T) {
 func TestTimerMgr_setTimeoutValue(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	log := FrameworkNewRawLogger()
-	external := mockexternal.NewMockMinimalExternal(ctrl)
-	tx := txpoolmock.NewMockMinimalTxPool(ctrl)
 
-	conf := Config{
-		ID:            1,
-		IsNew:         false,
-		Peers:         peerSet,
-		Logger:        log,
-		External:      external,
-		RequestPool:   tx,
-		K:             2,
-		LogMultiplier: 2,
-		MetricsProv:   &disabled.Provider{},
-	}
-	eventC := make(chan interface{})
-	timeMgr := newTimerMgr(eventC, conf)
+	timeMgr := newTestTimerMgr(ctrl)
 
 	tt := titleTimer{
 		timerName: "test timer",
@@ -192,23 +153,8 @@ func TestTimerMgr_setTimeoutValue(t *testing.T) {
 func TestTimerMgr_makeNullRequestTimeoutLegal(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	log := FrameworkNewRawLogger()
-	external := mockexternal.NewMockMinimalExternal(ctrl)
-	tx := txpoolmock.NewMockMinimalTxPool(ctrl)
 
-	conf := Config{
-		ID:            1,
-		IsNew:         false,
-		Peers:         peerSet,
-		Logger:        log,
-		External:      external,
-		RequestPool:   tx,
-		K:             2,
-		LogMultiplier: 2,
-		MetricsProv:   &disabled.Provider{},
-	}
-	eventC := make(chan interface{})
-	timeMgr := newTimerMgr(eventC, conf)
+	timeMgr := newTestTimerMgr(ctrl)
 
 	tt := titleTimer{
 		timerName: "test timer",
@@ -227,23 +173,8 @@ func TestTimerMgr_makeNullRequestTimeoutLegal(t *testing.T) {
 func TestTimerMgr_makeCleanVcTimeoutLegal(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	log := FrameworkNewRawLogger()
-	external := mockexternal.NewMockMinimalExternal(ctrl)
-	tx := txpoolmock.NewMockMinimalTxPool(ctrl)
 
-	conf := Config{
-		ID:            1,
-		IsNew:         false,
-		Peers:         peerSet,
-		Logger:        log,
-		External:      external,
-		RequestPool:   tx,
-		K:             2,
-		LogMultiplier: 2,
-		MetricsProv:   &disabled.Provider{},
-	}
-	eventC := make(chan interface{})
-	timeMgr := newTimerMgr(eventC, conf)
+	timeMgr := newTestTimerMgr(ctrl)
 
 	tt := titleTimer{
 		timerName: "test timer",
@@ -262,23 +193,8 @@ func TestTimerMgr_makeCleanVcTimeoutLegal(t *testing.T) {
 func TestTimerMgr_makeSyncStateTimeoutLegal(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	log := FrameworkNewRawLogger()
-	external := mockexternal.NewMockMinimalExternal(ctrl)
-	tx := txpoolmock.NewMockMinimalTxPool(ctrl)
 
-	conf := Config{
-		ID:            1,
-		IsNew:         false,
-		Peers:         peerSet,
-		Logger:        log,
-		External:      external,
-		RequestPool:   tx,
-		K:             2,
-		LogMultiplier: 2,
-		MetricsProv:   &disabled.Provider{},
-	}
-	eventC := make(chan interface{})
-	timeMgr := newTimerMgr(eventC, conf)
+	timeMgr := newTestTimerMgr(ctrl)
 
 	tt := titleTimer{
 		timerName: "test timer",
@@ -297,22 +213,8 @@ func TestTimerMgr_makeSyncStateTimeoutLegal(t *testing.T) {
 func TestTimerMgr_newTimer(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	log := FrameworkNewRawLogger()
-	external := mockexternal.NewMockMinimalExternal(ctrl)
-	tx := txpoolmock.NewMockMinimalTxPool(ctrl)
 
-	conf := Config{
-		ID:            1,
-		IsNew:         false,
-		Peers:         peerSet,
-		Logger:        log,
-		External:      external,
-		RequestPool:   tx,
-		K:             2,
-		LogMultiplier: 2,
-	}
-	eventC := make(chan interface{})
-	timeMgr := newTimerMgr(eventC, conf)
+	timeMgr := newTestTimerMgr(ctrl)
 
 	timeMgr.newTimer(requestTimer, 0)
 	timeMgr.newTimer(batchTimer, 0)

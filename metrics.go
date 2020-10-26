@@ -89,228 +89,419 @@ type rbftMetrics struct {
 	rejectedRemoteTxs metrics.Counter
 }
 
-func newRBFTMetrics(metricsProv metrics.Provider) *rbftMetrics {
+func newRBFTMetrics(metricsProv metrics.Provider) (*rbftMetrics, error) {
+	var err error
 	m := &rbftMetrics{}
 
-	m.idGauge, _ = metricsProv.NewGauge(
+	m.idGauge, err = metricsProv.NewGauge(
 		metrics.GaugeOpts{
 			Name: "ID",
 			Help: "rbft node ID",
 		},
 	)
+	if err != nil {
+		return m, err
+	}
 
-	m.epochGauge, _ = metricsProv.NewGauge(
+	m.epochGauge, err = metricsProv.NewGauge(
 		metrics.GaugeOpts{
 			Name: "epoch",
 			Help: "rbft epoch number",
 		},
 	)
+	if err != nil {
+		return m, err
+	}
 
-	m.viewGauge, _ = metricsProv.NewGauge(
+	m.viewGauge, err = metricsProv.NewGauge(
 		metrics.GaugeOpts{
 			Name: "view",
 			Help: "rbft view number",
 		},
 	)
+	if err != nil {
+		return m, err
+	}
 
-	m.clusterSizeGauge, _ = metricsProv.NewGauge(
+	m.clusterSizeGauge, err = metricsProv.NewGauge(
 		metrics.GaugeOpts{
 			Name: "cluster_size",
 			Help: "rbft cluster size",
 		},
 	)
+	if err != nil {
+		return m, err
+	}
 
-	m.quorumSizeGauge, _ = metricsProv.NewGauge(
+	m.quorumSizeGauge, err = metricsProv.NewGauge(
 		metrics.GaugeOpts{
 			Name: "quorum_size",
 			Help: "rbft quorum size",
 		},
 	)
+	if err != nil {
+		return m, err
+	}
 
-	m.statusGaugeInNormal, _ = metricsProv.NewGauge(
+	m.statusGaugeInNormal, err = metricsProv.NewGauge(
 		metrics.GaugeOpts{
 			Name: "status_normal",
 			Help: "rbft is in normal or not",
 		},
 	)
+	if err != nil {
+		return m, err
+	}
 
-	m.statusGaugeInConfChange, _ = metricsProv.NewGauge(
+	m.statusGaugeInConfChange, err = metricsProv.NewGauge(
 		metrics.GaugeOpts{
 			Name: "status_conf_change",
 			Help: "rbft is in conf change or not",
 		},
 	)
+	if err != nil {
+		return m, err
+	}
 
-	m.statusGaugeInViewChange, _ = metricsProv.NewGauge(
+	m.statusGaugeInViewChange, err = metricsProv.NewGauge(
 		metrics.GaugeOpts{
 			Name: "status_viewchange",
 			Help: "rbft is in view change or not",
 		},
 	)
+	if err != nil {
+		return m, err
+	}
 
-	m.statusGaugeInRecovery, _ = metricsProv.NewGauge(
+	m.statusGaugeInRecovery, err = metricsProv.NewGauge(
 		metrics.GaugeOpts{
 			Name: "status_recovery",
 			Help: "rbft is in recovery or not",
 		},
 	)
+	if err != nil {
+		return m, err
+	}
 
-	m.statusGaugeStateTransferring, _ = metricsProv.NewGauge(
+	m.statusGaugeStateTransferring, err = metricsProv.NewGauge(
 		metrics.GaugeOpts{
 			Name: "status_state_update",
 			Help: "rbft is in state transferring or not",
 		},
 	)
+	if err != nil {
+		return m, err
+	}
 
-	m.statusGaugePoolFull, _ = metricsProv.NewGauge(
+	m.statusGaugePoolFull, err = metricsProv.NewGauge(
 		metrics.GaugeOpts{
 			Name: "status_pool_full",
 			Help: "rbft is pool full or not",
 		},
 	)
+	if err != nil {
+		return m, err
+	}
 
-	m.statusGaugePending, _ = metricsProv.NewGauge(
+	m.statusGaugePending, err = metricsProv.NewGauge(
 		metrics.GaugeOpts{
 			Name: "status_pending",
 			Help: "rbft is in pending or not",
 		},
 	)
+	if err != nil {
+		return m, err
+	}
 
-	m.committedBlockNumber, _ = metricsProv.NewCounter(
+	m.committedBlockNumber, err = metricsProv.NewCounter(
 		metrics.CounterOpts{
 			Name: "committed_block_number",
 			Help: "rbft committed block number",
 		},
 	)
+	if err != nil {
+		return m, err
+	}
 
-	m.committedConfigBlockNumber, _ = metricsProv.NewCounter(
+	m.committedConfigBlockNumber, err = metricsProv.NewCounter(
 		metrics.CounterOpts{
 			Name: "committed_config_block_number",
 			Help: "rbft committed config block number",
 		},
 	)
+	if err != nil {
+		return m, err
+	}
 
-	m.committedEmptyBlockNumber, _ = metricsProv.NewCounter(
+	m.committedEmptyBlockNumber, err = metricsProv.NewCounter(
 		metrics.CounterOpts{
 			Name: "committed_empty_block_number",
 			Help: "rbft committed empty block number",
 		},
 	)
+	if err != nil {
+		return m, err
+	}
 
-	m.committedTxs, _ = metricsProv.NewCounter(
+	m.committedTxs, err = metricsProv.NewCounter(
 		metrics.CounterOpts{
 			Name: "committed_txs",
 			Help: "rbft committed tx number",
 		},
 	)
+	if err != nil {
+		return m, err
+	}
 
-	m.txsPerBlock, _ = metricsProv.NewHistogram(
+	m.txsPerBlock, err = metricsProv.NewHistogram(
 		metrics.HistogramOpts{
 			Name:    "committed_txs_per_block",
 			Help:    "rbft committed tx number per block",
 			Buckets: []float64{0, 10, 50, 100, 200, 300, 400, 500},
 		},
 	)
+	if err != nil {
+		return m, err
+	}
 
-	m.batchPersistDuration, _ = metricsProv.NewHistogram(
+	m.batchPersistDuration, err = metricsProv.NewHistogram(
 		metrics.HistogramOpts{
 			Name:    "batch_persist_duration",
 			Help:    "persist duration of batch",
 			Buckets: []float64{0.001, 0.003, 0.005, 0.008, 0.01, 0.02, 0.1},
 		},
 	)
+	if err != nil {
+		return m, err
+	}
 
-	m.batchToCommitDuration, _ = metricsProv.NewHistogram(
+	m.batchToCommitDuration, err = metricsProv.NewHistogram(
 		metrics.HistogramOpts{
 			Name:    "batch_to_commit_duration",
 			Help:    "duration from batch to commit",
 			Buckets: []float64{0.001, 0.005, 0.01, 0.03, 0.05, 0.1, 0.3, 0.5, 1, 3, 5, 10},
 		},
 	)
+	if err != nil {
+		return m, err
+	}
 
-	m.batchesGauge, _ = metricsProv.NewGauge(
+	m.batchesGauge, err = metricsProv.NewGauge(
 		metrics.GaugeOpts{
 			Name: "batch_number",
 			Help: "rbft batch number cached in batchStore",
 		},
 	)
+	if err != nil {
+		return m, err
+	}
 
-	m.outstandingBatchesGauge, _ = metricsProv.NewGauge(
+	m.outstandingBatchesGauge, err = metricsProv.NewGauge(
 		metrics.GaugeOpts{
 			Name: "outstanding_batch_number",
 			Help: "rbft outstanding batch number",
 		},
 	)
+	if err != nil {
+		return m, err
+	}
 
-	m.cacheBatchNumber, _ = metricsProv.NewGauge(
+	m.cacheBatchNumber, err = metricsProv.NewGauge(
 		metrics.GaugeOpts{
 			Name: "cache_batch_number",
 			Help: "rbft cache batch number",
 		},
 	)
+	if err != nil {
+		return m, err
+	}
 
-	m.stateUpdateCounter, _ = metricsProv.NewCounter(
+	m.stateUpdateCounter, err = metricsProv.NewCounter(
 		metrics.CounterOpts{
 			Name: "state_update_times",
 			Help: "rbft state update times",
 		},
 	)
+	if err != nil {
+		return m, err
+	}
 
-	m.fetchMissingTxsCounter, _ = metricsProv.NewCounter(
+	m.fetchMissingTxsCounter, err = metricsProv.NewCounter(
 		metrics.CounterOpts{
 			Name: "fetch_missing_txs_times",
 			Help: "rbft fetch missing txs times",
 		},
 	)
+	if err != nil {
+		return m, err
+	}
 
-	m.fetchRequestBatchCounter, _ = metricsProv.NewCounter(
+	m.fetchRequestBatchCounter, err = metricsProv.NewCounter(
 		metrics.CounterOpts{
 			Name: "fetch_request_batch_times",
 			Help: "rbft fetch request batch times",
 		},
 	)
+	if err != nil {
+		return m, err
+	}
 
-	m.incomingLocalTxSets, _ = metricsProv.NewCounter(
+	m.incomingLocalTxSets, err = metricsProv.NewCounter(
 		metrics.CounterOpts{
 			Name: "incoming_local_tx_sets",
 			Help: "rbft incoming local tx sets from API or NVP",
 		},
 	)
+	if err != nil {
+		return m, err
+	}
 
-	m.incomingLocalTxs, _ = metricsProv.NewCounter(
+	m.incomingLocalTxs, err = metricsProv.NewCounter(
 		metrics.CounterOpts{
 			Name: "incoming_local_txs",
 			Help: "rbft incoming local txs from API or NVP",
 		},
 	)
+	if err != nil {
+		return m, err
+	}
 
-	m.rejectedLocalTxs, _ = metricsProv.NewCounter(
+	m.rejectedLocalTxs, err = metricsProv.NewCounter(
 		metrics.CounterOpts{
 			Name: "rejected_local_txs",
 			Help: "rbft rejected local txs from API or NVP",
 		},
 	)
+	if err != nil {
+		return m, err
+	}
 
-	m.incomingRemoteTxSets, _ = metricsProv.NewCounter(
+	m.incomingRemoteTxSets, err = metricsProv.NewCounter(
 		metrics.CounterOpts{
 			Name: "incoming_remote_tx_sets",
 			Help: "rbft incoming remote tx sets from other VP",
 		},
 	)
+	if err != nil {
+		return m, err
+	}
 
-	m.incomingRemoteTxs, _ = metricsProv.NewCounter(
+	m.incomingRemoteTxs, err = metricsProv.NewCounter(
 		metrics.CounterOpts{
 			Name: "incoming_remote_txs",
 			Help: "rbft incoming remote txs from other VP",
 		},
 	)
+	if err != nil {
+		return m, err
+	}
 
-	m.rejectedRemoteTxs, _ = metricsProv.NewCounter(
+	m.rejectedRemoteTxs, err = metricsProv.NewCounter(
 		metrics.CounterOpts{
 			Name: "rejected_remote_txs",
 			Help: "rbft rejected remote txs from other VP",
 		},
 	)
+	if err != nil {
+		return m, err
+	}
 
-	return m
+	return m, nil
+}
+
+func (rm *rbftMetrics) unregisterMetrics() {
+	if rm.idGauge != nil {
+		rm.idGauge.Unregister()
+	}
+	if rm.epochGauge != nil {
+		rm.epochGauge.Unregister()
+	}
+	if rm.viewGauge != nil {
+		rm.viewGauge.Unregister()
+	}
+	if rm.clusterSizeGauge != nil {
+		rm.clusterSizeGauge.Unregister()
+	}
+	if rm.quorumSizeGauge != nil {
+		rm.quorumSizeGauge.Unregister()
+	}
+	if rm.committedBlockNumber != nil {
+		rm.committedBlockNumber.Unregister()
+	}
+	if rm.statusGaugeInNormal != nil {
+		rm.statusGaugeInNormal.Unregister()
+	}
+	if rm.statusGaugeInConfChange != nil {
+		rm.statusGaugeInConfChange.Unregister()
+	}
+	if rm.statusGaugeInViewChange != nil {
+		rm.statusGaugeInViewChange.Unregister()
+	}
+	if rm.statusGaugeInRecovery != nil {
+		rm.statusGaugeInRecovery.Unregister()
+	}
+	if rm.statusGaugeStateTransferring != nil {
+		rm.statusGaugeStateTransferring.Unregister()
+	}
+	if rm.statusGaugePoolFull != nil {
+		rm.statusGaugePoolFull.Unregister()
+	}
+	if rm.statusGaugePending != nil {
+		rm.statusGaugePending.Unregister()
+	}
+
+	if rm.committedConfigBlockNumber != nil {
+		rm.committedConfigBlockNumber.Unregister()
+	}
+	if rm.committedEmptyBlockNumber != nil {
+		rm.committedEmptyBlockNumber.Unregister()
+	}
+	if rm.committedTxs != nil {
+		rm.committedTxs.Unregister()
+	}
+	if rm.txsPerBlock != nil {
+		rm.txsPerBlock.Unregister()
+	}
+	if rm.batchPersistDuration != nil {
+		rm.batchPersistDuration.Unregister()
+	}
+	if rm.batchToCommitDuration != nil {
+		rm.batchToCommitDuration.Unregister()
+	}
+	if rm.batchesGauge != nil {
+		rm.batchesGauge.Unregister()
+	}
+	if rm.outstandingBatchesGauge != nil {
+		rm.outstandingBatchesGauge.Unregister()
+	}
+	if rm.cacheBatchNumber != nil {
+		rm.cacheBatchNumber.Unregister()
+	}
+	if rm.stateUpdateCounter != nil {
+		rm.stateUpdateCounter.Unregister()
+	}
+	if rm.fetchMissingTxsCounter != nil {
+		rm.fetchMissingTxsCounter.Unregister()
+	}
+	if rm.fetchRequestBatchCounter != nil {
+		rm.fetchRequestBatchCounter.Unregister()
+	}
+	if rm.incomingLocalTxSets != nil {
+		rm.incomingLocalTxSets.Unregister()
+	}
+	if rm.incomingLocalTxs != nil {
+		rm.incomingLocalTxs.Unregister()
+	}
+	if rm.rejectedLocalTxs != nil {
+		rm.rejectedLocalTxs.Unregister()
+	}
+	if rm.incomingRemoteTxSets != nil {
+		rm.incomingRemoteTxSets.Unregister()
+	}
+	if rm.incomingRemoteTxs != nil {
+		rm.incomingRemoteTxs.Unregister()
+	}
+	if rm.rejectedRemoteTxs != nil {
+		rm.rejectedRemoteTxs.Unregister()
+	}
 }

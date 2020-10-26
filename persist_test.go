@@ -45,6 +45,7 @@ func newPersistTestReplica(ctrl *gomock.Controller, pool txpool.TxPool, log Logg
 		External:    ext,
 		RequestPool: pool,
 		MetricsProv: &disabled.Provider{},
+		DelFlag:     make(chan bool),
 
 		EpochInit:    uint64(0),
 		LatestConfig: nil,
