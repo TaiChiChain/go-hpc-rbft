@@ -439,6 +439,19 @@ func (rbft *rbftImpl) resetStateForRecovery() consensusEvent {
 		}
 	}
 
+	// remove all the batches that smaller than initial checkpoint.
+	var deleteList []string
+	for digest, batch := range rbft.storeMgr.batchStore {
+		if batch.SeqNo <= rbft.h {
+			rbft.logger.Debugf("Replica %d clear batch %s with seqNo %d <= initial checkpoint %d", rbft.peerPool.ID, digest, batch.SeqNo, rbft.h)
+			delete(rbft.storeMgr.batchStore, digest)
+			rbft.persistDelBatch(digest)
+			deleteList = append(deleteList, digest)
+		}
+	}
+	rbft.metrics.batchesGauge.Set(float64(len(rbft.storeMgr.batchStore)))
+	rbft.batchMgr.requestPool.RemoveBatches(deleteList)
+
 	// directly restore all batchedTxs back into non-batched txs and reset to batched status
 	// after fetchPQC if needed.
 	rbft.logger.Noticef("Replica %d restore txpool when reset state in recovery", rbft.peerPool.ID)
