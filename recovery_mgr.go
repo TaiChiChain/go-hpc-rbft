@@ -132,6 +132,7 @@ func (rbft *rbftImpl) sendNotification(keepCurrentVote bool) consensusEvent {
 			delete(rbft.recoveryMgr.notificationStore, idx)
 		}
 	}
+
 	rbft.recoveryMgr.needSyncEpoch = false
 	rbft.recoveryMgr.outOfElection = make(map[ntfIdx]*pb.NotificationResponse)
 	rbft.recoveryMgr.differentEpoch = make(map[ntfIde]*pb.NotificationResponse)
@@ -438,6 +439,19 @@ func (rbft *rbftImpl) resetStateForRecovery() consensusEvent {
 			rbft.persistDelQPCSet(idx.v, idx.n, idx.d)
 		}
 	}
+
+	// remove all the batches that smaller than initial checkpoint.
+	var deleteList []string
+	for digest, batch := range rbft.storeMgr.batchStore {
+		if batch.SeqNo <= rbft.h {
+			rbft.logger.Debugf("Replica %d clear batch %s with seqNo %d <= initial checkpoint %d", rbft.peerPool.ID, digest, batch.SeqNo, rbft.h)
+			delete(rbft.storeMgr.batchStore, digest)
+			rbft.persistDelBatch(digest)
+			deleteList = append(deleteList, digest)
+		}
+	}
+	rbft.metrics.batchesGauge.Set(float64(len(rbft.storeMgr.batchStore)))
+	rbft.batchMgr.requestPool.RemoveBatches(deleteList)
 
 	// directly restore all batchedTxs back into non-batched txs and reset to batched status
 	// after fetchPQC if needed.

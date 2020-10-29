@@ -695,31 +695,37 @@ func (rbft *rbftImpl) sendNullRequest() {
 // process request set and batch methods
 //=============================================================================
 
-//processReqSetEvent process received requestSet event
+// processReqSetEvent process received requestSet event, reject txs in following situations:
+// 1. pool is full, reject txs relayed from other nodes
+// 2. node is in config change, reject another config tx
+// 3. node is in skipInProgress, rejects any txs from other nodes or API
 func (rbft *rbftImpl) processReqSetEvent(req *pb.RequestSet) consensusEvent {
-	// if current node is in abnormal or in config change, add normal txs into txPool without generate batches.
-	// besides, reject ctx if it is processing a ctx at the moment
-	if !rbft.isNormal() || rbft.atomicIn(InConfChange) {
-		// if nodes in skipInProgress, it cannot handle txs anymore
-		if rbft.in(SkipInProgress) {
-			rbft.rejectRequestSet(req)
-			return nil
-		}
-		// if pool already full, rejects the tx, unless it's from RPC because of time difference
-		if rbft.isPoolFull() && !req.Local {
-			rbft.rejectRequestSet(req)
-			return nil
-		}
+	// if pool already full, rejects the tx, unless it's from RPC because of time difference
+	if rbft.isPoolFull() && !req.Local {
+		rbft.rejectRequestSet(req)
+		return nil
+	}
+
+	// if current node is in config change, reject another config tx
+	if rbft.atomicIn(InConfChange) {
 		for _, tx := range req.Requests {
 			if types.IsConfigTx(tx) {
-				// if it's already in config change, reject another config tx
-				if rbft.atomicIn(InConfChange) {
-					rbft.logger.Debugf("Replica %d is processing a ctx, reject another one", rbft.peerPool.ID)
-					rbft.rejectRequestSet(req)
-					return nil
-				}
+				rbft.logger.Debugf("Replica %d is processing a ctx, reject another one", rbft.peerPool.ID)
+				rbft.rejectRequestSet(req)
+				return nil
 			}
-			// for nodes in abnormal status, add requests to requestPool without generate batch.
+		}
+	}
+
+	// if current node is in skipInProgress, it cannot handle txs anymore
+	if rbft.in(SkipInProgress) {
+		rbft.rejectRequestSet(req)
+		return nil
+	}
+
+	// if current node is in abnormal, add normal txs into txPool without generate batches.
+	if !rbft.isNormal() {
+		for _, tx := range req.Requests {
 			rbft.batchMgr.requestPool.AddNewRequest(tx, false, req.Local)
 		}
 	} else {
@@ -752,6 +758,7 @@ func (rbft *rbftImpl) processReqSetEvent(req *pb.RequestSet) consensusEvent {
 	return nil
 }
 
+// rejectRequestSet rejects tx set and update related metrics.
 func (rbft *rbftImpl) rejectRequestSet(req *pb.RequestSet) {
 	if req.Local {
 		rbft.metrics.rejectedLocalTxs.Add(float64(len(req.Requests)))

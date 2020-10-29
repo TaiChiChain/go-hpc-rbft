@@ -166,9 +166,19 @@ func (rbft *rbftImpl) turnIntoEpoch(router *pb.Router, epoch uint64) {
 	// set the latest epoch
 	rbft.setEpoch(epoch)
 
+	// clear notification storage from lower epoch
+	for key, value := range rbft.recoveryMgr.notificationStore {
+		if value.Epoch < rbft.epoch {
+			delete(rbft.recoveryMgr.notificationStore, key)
+		}
+	}
+
 	// initial the view, start from view=0
 	rbft.setView(uint64(0))
 	rbft.persistView(rbft.view)
+
+	// clear view change store
+	rbft.vcMgr.viewChangeStore = make(map[vcIdx]*pb.ViewChange)
 
 	// update N/f
 	rbft.N = len(rbft.peerPool.routerMap.HashMap)
