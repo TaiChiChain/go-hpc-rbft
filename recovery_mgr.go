@@ -132,6 +132,7 @@ func (rbft *rbftImpl) sendNotification(keepCurrentVote bool) consensusEvent {
 			delete(rbft.recoveryMgr.notificationStore, idx)
 		}
 	}
+
 	rbft.recoveryMgr.needSyncEpoch = false
 	rbft.recoveryMgr.outOfElection = make(map[ntfIdx]*pb.NotificationResponse)
 	rbft.recoveryMgr.differentEpoch = make(map[ntfIde]*pb.NotificationResponse)

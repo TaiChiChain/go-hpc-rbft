@@ -186,6 +186,7 @@ func (rbft *rbftImpl) handleRecoveryEvent(e *LocalEvent) consensusEvent {
 		rbft.recoveryMgr.notificationStore = make(map[ntfIdx]*pb.Notification)
 		rbft.recoveryMgr.outOfElection = make(map[ntfIdx]*pb.NotificationResponse)
 		rbft.recoveryMgr.differentEpoch = make(map[ntfIde]*pb.NotificationResponse)
+		rbft.vcMgr.viewChangeStore = make(map[vcIdx]*pb.ViewChange)
 		rbft.maybeSetNormal()
 		rbft.timerMgr.stopTimer(recoveryRestartTimer)
 		rbft.logger.Noticef("======== Replica %d finished recovery, epoch=%d/view=%d/height=%d.", rbft.peerPool.ID, rbft.epoch, rbft.view, rbft.exec.lastExec)
@@ -304,6 +305,18 @@ func (rbft *rbftImpl) handleViewChangeEvent(e *LocalEvent) consensusEvent {
 		rbft.maybeSetNormal()
 		rbft.logger.Noticef("======== Replica %d finished viewChange, primary=%d, view=%d/height=%d", rbft.peerPool.ID, primaryID, rbft.view, rbft.exec.lastExec)
 		finishMsg := fmt.Sprintf("Replica %d finished viewChange, primary=%d, view=%d/height=%d", rbft.peerPool.ID, primaryID, rbft.view, rbft.exec.lastExec)
+
+		// clear storage from lower view
+		for idx := range rbft.recoveryMgr.notificationStore {
+			if idx.v < rbft.view {
+				delete(rbft.recoveryMgr.notificationStore, idx)
+			}
+		}
+		for idx := range rbft.vcMgr.viewChangeStore {
+			if idx.v < rbft.view {
+				delete(rbft.vcMgr.viewChangeStore, idx)
+			}
+		}
 
 		// send viewchange result to web socket API
 		rbft.external.SendFilterEvent(pb.InformType_FilterFinishViewChange, finishMsg)
