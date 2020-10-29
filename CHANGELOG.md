@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.2.20"></a>
+## [0.2.20](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.19...v0.2.20) (2020-10-29)
+
+
+### Bug Fixes
+
+* change the place where to remove notification from lower view and epoch ([9c72794](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/9c72794)), closes [#flato-2643](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-2643)
+* remove batches smaller than initial checkpoint in recovery ([7c024f4](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/7c024f4)), closes [#flato-2644](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-2644)
+* **rbft_impl.go:** reject txs directly when node's pool is full ([e49b508](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/e49b508)), closes [#flato-2648](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-2648)
+
+
+
 <a name="0.2.19"></a>
 ## [0.2.19](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.18...v0.2.19) (2020-10-26)
 
