@@ -1263,6 +1263,11 @@ func (rbft *rbftImpl) recvSendMissingTxs(re *pb.SendMissingRequests) consensusEv
 		return nil
 	}
 
+	// set pool full status if received txs fill up the txpool.
+	if rbft.batchMgr.requestPool.IsPoolFull() {
+		rbft.setFull()
+	}
+
 	_ = rbft.findNextCommitBatch(re.BatchDigest, re.View, re.SequenceNumber)
 	return nil
 }
