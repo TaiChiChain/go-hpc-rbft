@@ -94,8 +94,8 @@ const (
 	CoreRbftService = iota
 	ViewChangeService
 	RecoveryService
-	NotSupportService
 	EpochMgrService
+	NotSupportService
 )
 
 const (

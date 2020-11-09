@@ -453,6 +453,10 @@ func (rbft *rbftImpl) resetStateForRecovery() consensusEvent {
 	rbft.metrics.batchesGauge.Set(float64(len(rbft.storeMgr.batchStore)))
 	rbft.batchMgr.requestPool.RemoveBatches(deleteList)
 
+	if !rbft.batchMgr.requestPool.IsPoolFull() {
+		rbft.setNotFull()
+	}
+
 	// directly restore all batchedTxs back into non-batched txs and reset to batched status
 	// after fetchPQC if needed.
 	rbft.logger.Noticef("Replica %d restore txpool when reset state in recovery", rbft.peerPool.ID)

@@ -1263,6 +1263,11 @@ func (rbft *rbftImpl) recvSendMissingTxs(re *pb.SendMissingRequests) consensusEv
 		return nil
 	}
 
+	// set pool full status if received txs fill up the txpool.
+	if rbft.batchMgr.requestPool.IsPoolFull() {
+		rbft.setFull()
+	}
+
 	_ = rbft.findNextCommitBatch(re.BatchDigest, re.View, re.SequenceNumber)
 	return nil
 }
@@ -1478,6 +1483,14 @@ func (rbft *rbftImpl) checkpoint(state *pb.MetaState) {
 		}
 		// use fetchCheckpointTimer to fetch the missing checkpoint
 		rbft.timerMgr.startTimer(fetchCheckpointTimer, event)
+	} else {
+		// if our lastExec is equal to high watermark, it means there is something wrong with checkpoint procedure, so that
+		// we need to start a new-view timer for checkpoint, and trigger view-change when new-view timer expired
+		if rbft.exec.lastExec == rbft.h+rbft.L {
+			rbft.logger.Warningf("Replica %d try to send checkpoint equal to high watermark, "+
+				"there may be something wrong with checkpoint", rbft.peerPool.ID)
+			rbft.softStartNewViewTimer(rbft.timerMgr.getTimeoutValue(requestTimer), "high watermark", false)
+		}
 	}
 	payload, err := proto.Marshal(chkpt)
 	if err != nil {
@@ -1631,6 +1644,7 @@ func (rbft *rbftImpl) finishConfigCheckpoint(chkpt *pb.Checkpoint) {
 
 func (rbft *rbftImpl) finishNormalCheckpoint(chkpt *pb.Checkpoint) {
 	rbft.timerMgr.stopTimer(fetchCheckpointTimer)
+	rbft.stopNewViewTimer()
 
 	rbft.logger.Infof("Replica %d found normal checkpoint quorum for seqNo %d, digest %s",
 		rbft.peerPool.ID, chkpt.SequenceNumber, chkpt.Digest)

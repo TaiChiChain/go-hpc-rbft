@@ -584,11 +584,10 @@ func (rbft *rbftImpl) recvSendRequestBatch(batch *pb.SendRequestBatch) consensus
 	rbft.persistBatch(digest)
 	rbft.metrics.batchesGauge.Add(float64(1))
 
-	//delete missingReqBatches in this batch
+	// delete missingReqBatches in this batch
 	delete(rbft.storeMgr.missingReqBatches, digest)
 
-	//if receive all request batch
-	//if InUpdatingN jump to processReqInUpdate
+	// if receive all request batch, try to process new view
 	if len(rbft.storeMgr.missingReqBatches) == 0 {
 		if rbft.atomicInOne(InViewChange, InRecovery) {
 			_, ok := rbft.vcMgr.newViewStore[rbft.view]
