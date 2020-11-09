@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.2.21"></a>
+## [0.2.21](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.20...v0.2.21) (2020-11-09)
+
+
+### Bug Fixes
+
+* add fetch checkpoint timer event ([9f05b60](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/9f05b60))
+* set poll full status whenever add/remove txs from pool ([7645de7](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/7645de7))
+* start new view timer to ensure consensus progress ([75844ac](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/75844ac)), closes [#flato-2706](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-2706)
+
+
+
 <a name="0.2.20"></a>
 ## [0.2.20](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.19...v0.2.20) (2020-10-29)
 
