@@ -98,6 +98,8 @@ func (rbft *rbftImpl) dispatchLocalEvent(e *LocalEvent) consensusEvent {
 		return rbft.handleViewChangeEvent(e)
 	case RecoveryService:
 		return rbft.handleRecoveryEvent(e)
+	case EpochMgrService:
+		return rbft.handleEpochMgrEvent(e)
 	default:
 		rbft.logger.Errorf("Not Supported event: %v", e)
 		return nil
@@ -356,6 +358,21 @@ func (rbft *rbftImpl) handleViewChangeEvent(e *LocalEvent) consensusEvent {
 			return rbft.sendNewView(false)
 		}
 		return rbft.replicaCheckNewView()
+
+	default:
+		rbft.logger.Errorf("Invalid viewChange event: %v", e)
+		return nil
+	}
+	return nil
+}
+
+// handleViewChangeEvent handles epoch service related events.
+func (rbft *rbftImpl) handleEpochMgrEvent(e *LocalEvent) consensusEvent {
+	switch e.EventType {
+	case FetchCheckpointEvent:
+		rbft.logger.Debugf("Replica %d fetch checkpoint timer expired", rbft.peerPool.ID)
+		rbft.timerMgr.stopTimer(fetchCheckpointTimer)
+		rbft.fetchCheckpoint()
 
 	default:
 		rbft.logger.Errorf("Invalid viewChange event: %v", e)
