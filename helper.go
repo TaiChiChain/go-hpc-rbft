@@ -839,7 +839,7 @@ func (rbft *rbftImpl) checkIfNeedStateUpdate(initialCp pb.Vc_C) (bool, error) {
 	if rbft.h < seq {
 		if rbft.storeMgr.chkpts[seq] == dig {
 			rbft.moveWatermarks(seq)
-			rbft.external.SendFilterEvent(pb.InformType_FilterStableCheckpoint, seq)
+			rbft.external.SendFilterEvent(pb.InformType_FilterStableCheckpoint, seq, dig)
 		}
 
 		if rbft.epochMgr.configBatchToCheck != nil {

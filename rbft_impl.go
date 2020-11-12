@@ -1465,7 +1465,7 @@ func (rbft *rbftImpl) checkpoint(state *pb.MetaState) {
 	digest := state.Digest
 	seqNo := state.Applied
 
-	rbft.logger.Infof("Replica %d sending checkpoint for view=%d/seqNo=%d and b64Id=%s",
+	rbft.logger.Infof("Replica %d sending checkpoint for view=%d/seqNo=%d and digest=%s",
 		rbft.peerPool.ID, rbft.view, seqNo, digest)
 
 	chkpt := &pb.Checkpoint{
@@ -1600,7 +1600,7 @@ func (rbft *rbftImpl) finishConfigCheckpoint(chkpt *pb.Checkpoint) {
 
 	rbft.logger.Infof("Replica %d post stable checkpoint event for seqNo %d after "+
 		"executed to the height with the same digest", rbft.peerPool.ID, chkpt.SequenceNumber)
-	rbft.external.SendFilterEvent(pb.InformType_FilterStableCheckpoint, chkpt.SequenceNumber)
+	rbft.external.SendFilterEvent(pb.InformType_FilterStableCheckpoint, chkpt.SequenceNumber, chkpt.Digest)
 	rbft.epochMgr.configBatchToCheck = nil
 
 	// waiting for commit db finish the reload
@@ -1652,7 +1652,7 @@ func (rbft *rbftImpl) finishNormalCheckpoint(chkpt *pb.Checkpoint) {
 	rbft.moveWatermarks(chkpt.SequenceNumber)
 	rbft.logger.Infof("Replica %d post stable checkpoint event for seqNo %d after "+
 		"executed to the height with the same digest", rbft.peerPool.ID, rbft.h)
-	rbft.external.SendFilterEvent(pb.InformType_FilterStableCheckpoint, rbft.h)
+	rbft.external.SendFilterEvent(pb.InformType_FilterStableCheckpoint, chkpt.SequenceNumber, chkpt.Digest)
 
 	// make sure node is in normal status before try to batch, as we may reach stable
 	// checkpoint in vc/recovery.
@@ -1798,7 +1798,7 @@ func (rbft *rbftImpl) moveWatermarks(n uint64) {
 
 	for testChkpt := range rbft.storeMgr.checkpointStore {
 		if testChkpt.SequenceNumber <= h {
-			rbft.logger.Debugf("Replica %d cleaning checkpoint message from replica %d, seqNo %d, b64 snapshot no %s",
+			rbft.logger.Debugf("Replica %d cleaning checkpoint message from replica %d, seqNo %d, digest %s",
 				rbft.peerPool.ID, testChkpt.ReplicaId, testChkpt.SequenceNumber, testChkpt.Digest)
 			delete(rbft.storeMgr.checkpointStore, testChkpt)
 		}
@@ -1896,7 +1896,7 @@ func (rbft *rbftImpl) tryStateTransfer() {
 // self epoch-info and trigger another recovery process
 func (rbft *rbftImpl) recvStateUpdatedEvent(ss *pb.ServiceState) consensusEvent {
 	seqNo := ss.MetaState.Applied
-	b64Id := ss.MetaState.Digest
+	digest := ss.MetaState.Digest
 
 	// If state transfer did not complete successfully, or if it did not reach our low watermark, do it again
 	// When this node moves watermark before this node receives StateUpdatedMessage, this would happen.
@@ -1933,8 +1933,8 @@ func (rbft *rbftImpl) recvStateUpdatedEvent(ss *pb.ServiceState) consensusEvent 
 	// 2. process information about stable checkpoint
 	rbft.logger.Infof("Replica %d post stable checkpoint event for seqNo %d after state update to the height",
 		rbft.peerPool.ID, seqNo)
-	rbft.external.SendFilterEvent(pb.InformType_FilterStableCheckpoint, seqNo)
-	rbft.storeMgr.saveCheckpoint(seqNo, b64Id)
+	rbft.external.SendFilterEvent(pb.InformType_FilterStableCheckpoint, seqNo, digest)
+	rbft.storeMgr.saveCheckpoint(seqNo, digest)
 	rbft.moveWatermarks(seqNo)
 
 	// 3. process epoch-info
