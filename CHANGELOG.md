@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.2.22"></a>
+## [0.2.22](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.21...v0.2.22) (2020-11-12)
+
+
+### Bug Fixes
+
+* post checkpoint digest in filter event ([ad77590](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/ad77590))
+
+
+
 <a name="0.2.21"></a>
 ## [0.2.21](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.20...v0.2.21) (2020-11-09)
 
