@@ -371,7 +371,7 @@ func (rbft *rbftImpl) handleEpochMgrEvent(e *LocalEvent) consensusEvent {
 	switch e.EventType {
 	case FetchCheckpointEvent:
 		rbft.logger.Debugf("Replica %d fetch checkpoint timer expired", rbft.peerPool.ID)
-		rbft.timerMgr.stopTimer(fetchCheckpointTimer)
+		rbft.stopFetchCheckpointTimer()
 		rbft.fetchCheckpoint()
 
 	default:
