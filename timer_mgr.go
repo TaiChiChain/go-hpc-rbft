@@ -238,6 +238,23 @@ func (rbft *rbftImpl) initTimers() {
 	rbft.timerMgr.makeRequestTimeoutLegal()
 	rbft.timerMgr.makeCleanVcTimeoutLegal()
 	rbft.timerMgr.makeSyncStateTimeoutLegal()
+
+	// we know that a quorum set of nodes have already executed a block of high-watermark, but some of them missed the
+	// checkpoint message. now, we can wait for another nodes' execution or just trigger view-change. as the view-change
+	// process may take too long time to harm the throughput, we would like to wait for others' execution at first.
+	// here, they should increase their watermark for a K-interval. as one block's consensus timeout is equal to
+	// requestTimer, the high-watermark timer should be at least K*requestTimer. but checkpoint message should be sent
+	// after executed, we have to take the latency of executor into thought. so that we would like to set high-watermark
+	// timer 2*k*requestTimer
+	k := rbft.config.K
+	if k <= uint64(0) {
+		k = DefaultK
+	}
+	// here, the timer value must be legal, so that k*requestTimer cannot be zero
+	reqT := rbft.timerMgr.getTimeoutValue(requestTimer)
+	hwT := time.Duration(2 * k * uint64(reqT))
+	rbft.timerMgr.newTimer(highWatermarkTimer, hwT)
+	rbft.logger.Infof("RBFT high watermark timeout = %v", rbft.timerMgr.getTimeoutValue(highWatermarkTimer))
 }
 
 // makeNullRequestTimeoutLegal checks if nullrequestTimeout is legal or not, if not, make it
@@ -303,4 +320,27 @@ func (tm *timerManager) makeSyncStateTimeoutLegal() {
 
 	tm.logger.Infof("RBFT sync state response timeout = %v", tm.getTimeoutValue(syncStateRspTimer))
 	tm.logger.Infof("RBFT sync state restart timeout = %v", tm.getTimeoutValue(syncStateRestartTimer))
+}
+
+// startHighWatermarkTimer starts a high-watermark timer:
+// we prefer to start a high-watermark timer when we try to send a checkpoint equal to our high-watermark,
+// which means the previous checkpoints were failed and the garbage collecting mechanism is abnormal.
+func (rbft *rbftImpl) startHighWatermarkTimer() {
+	rbft.logger.Debugf("Replica %d start high-watermark timer, current low-watermark is %d", rbft.peerPool.ID, rbft.h)
+
+	// stop the previous high-watermark timer
+	rbft.timerMgr.stopTimer(highWatermarkTimer)
+
+	event := &LocalEvent{
+		Service:   CoreRbftService,
+		EventType: CoreHighWatermarkEvent,
+		Event:     rbft.h,
+	}
+	rbft.timerMgr.startTimer(highWatermarkTimer, event)
+}
+
+// stopHighWatermarkTimer stops a high-watermark timer
+func (rbft *rbftImpl) stopHighWatermarkTimer() {
+	rbft.logger.Debugf("Replica %d stop high-watermark timer", rbft.peerPool.ID)
+	rbft.timerMgr.stopTimer(highWatermarkTimer)
 }

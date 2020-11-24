@@ -659,6 +659,8 @@ func (rbft *rbftImpl) beforeSendVC() error {
 	rbft.stopNewViewTimer()
 	rbft.timerMgr.stopTimer(nullRequestTimer)
 	rbft.timerMgr.stopTimer(firstRequestTimer)
+	rbft.stopFetchCheckpointTimer()
+	rbft.stopHighWatermarkTimer()
 
 	rbft.atomicOn(InViewChange)
 	rbft.metrics.statusGaugeInViewChange.Set(InViewChange)

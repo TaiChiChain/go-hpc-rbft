@@ -784,43 +784,6 @@ func TestRBFT_recvStateUpdatedEvent_updateEpoch(t *testing.T) {
 	assert.Equal(t, 5, len(rbfts[0].peerPool.routerMap.HashMap))
 }
 
-//
-//func TestRBFT_recvStateUpdatedEvent_RecoveryDone(t *testing.T) {
-//	ctrl := gomock.NewController(t)
-//	defer ctrl.Finish()
-//
-//	nodes, rbfts := newBasicClusterInstance()
-//
-//	metaS := &pb.MetaState{
-//		Applied: uint64(10),
-//		Digest:  "block-number-10",
-//	}
-//
-//	addNode5 := append(defaultValidatorSet, "node5")
-//	epochInfo := &pb.EpochInfo{
-//		Epoch: uint64(3),
-//		VSet:  addNode5,
-//	}
-//
-//	ss := &pb.ServiceState{
-//		MetaState: metaS,
-//		EpochInfo: epochInfo,
-//	}
-//
-//	rbfts[1].atomicOn(InRecovery)
-//	ret := rbfts[1].recvStateUpdatedEvent(ss)
-//	exp := &LocalEvent{
-//		Service:   RecoveryService,
-//		EventType: RecoveryDoneEvent,
-//	}
-//	assert.Equal(t, exp, ret)
-//
-//	// Primary in recovery
-//	rbfts[0].atomicOn(InRecovery)
-//	rbfts[0].recvStateUpdatedEvent(ss)
-//	assert.Equal(t, pb.Type_NOTIFICATION, nodes[0].broadcastMessageCache.Type)
-//}
-
 func TestRBFT_recvStateUpdatedEvent_lowSeqNo(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()

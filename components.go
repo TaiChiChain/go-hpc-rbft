@@ -38,6 +38,7 @@ const (
 	cleanViewChangeTimer  = "cleanViewChangeTimer"  // timer track how long a viewchange msg will store in memory
 	checkPoolTimer        = "checkPoolTimer"        // timer track timeout for check pool interval
 	fetchCheckpointTimer  = "fetchCheckpointTimer"  // timer for nodes to trigger fetch checkpoint when we are processing config transaction
+	highWatermarkTimer    = "highWatermarkTimer"    // timer for nodes to find the problem of missing too much checkpoint
 )
 
 // constant default
@@ -70,6 +71,7 @@ const (
 	CoreStateUpdatedEvent
 	CoreResendMissingTxsEvent
 	CoreResendFetchMissingEvent
+	CoreHighWatermarkEvent
 
 	// 2.view change
 	ViewChangeTimerEvent

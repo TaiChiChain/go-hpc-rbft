@@ -158,13 +158,39 @@ func (rbft *rbftImpl) handleCoreRbftEvent(e *LocalEvent) consensusEvent {
 		return rbft.recvStateUpdatedEvent(e.Event.(*pb.ServiceState))
 
 	case CoreResendMissingTxsEvent:
-		ev := e.Event.(*pb.FetchMissingRequests)
+		ev, ok := e.Event.(*pb.FetchMissingRequests)
+		if !ok {
+			rbft.logger.Error("FetchMissingRequests parsing error")
+			return nil
+		}
 		_ = rbft.recvFetchMissingTxs(ev)
 		return nil
 
 	case CoreResendFetchMissingEvent:
 		rbft.executeAfterStateUpdate()
 		return nil
+
+	case CoreHighWatermarkEvent:
+		rbft.logger.Debugf("Replica %d high-watermark timer expired, try to send viewChange", rbft.peerPool.ID)
+
+		if rbft.atomicInOne(InViewChange, InRecovery) {
+			rbft.logger.Debugf("Replica %d is in viewChange/recovery, ignore the high-watermark event")
+			return nil
+		}
+
+		// get the previous low-watermark from event
+		preLowWatermark, ok := e.Event.(uint64)
+		if !ok {
+			rbft.logger.Error("previous low-watermark parsing error")
+			return nil
+		}
+
+		// if the watermark has already been updated, just finish the timeout process
+		if preLowWatermark < rbft.h {
+			rbft.logger.Debugf("Replica %d has already updated low-watermark to %d, just return", rbft.peerPool.ID, rbft.h)
+			return nil
+		}
+		return rbft.sendViewChange()
 
 	default:
 		rbft.logger.Errorf("Invalid core RBFT event: %v", e)
