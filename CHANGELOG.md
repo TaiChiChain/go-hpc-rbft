@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.2.23"></a>
+## [0.2.23](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.22...v0.2.23) (2020-11-24)
+
+
+### Bug Fixes
+
+* change the timeout mechanism of high-watermark ([00093ff](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/00093ff)), closes [#flato-2834](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-2834)
+* fix checkpoint ([3f135ff](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/3f135ff)), closes [#flato-2827](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-2827)
+* **helper.go:** post stable checkpoint when finish sync state ([af39656](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/af39656))
+
+
+
 <a name="0.2.22"></a>
 ## [0.2.22](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.21...v0.2.22) (2020-11-12)
 
