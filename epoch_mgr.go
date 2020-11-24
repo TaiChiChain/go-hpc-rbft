@@ -75,12 +75,7 @@ func (rbft *rbftImpl) fetchCheckpoint() consensusEvent {
 		ReplicaHash:    rbft.peerPool.hash,
 		SequenceNumber: rbft.epochMgr.configBatchToCheck.Applied,
 	}
-	event := &LocalEvent{
-		Service:   EpochMgrService,
-		EventType: FetchCheckpointEvent,
-	}
-	// use fetchCheckpointTimer to fetch the missing checkpoint
-	rbft.timerMgr.startTimer(fetchCheckpointTimer, event)
+	rbft.startFetchCheckpointTimer()
 
 	payload, err := proto.Marshal(fetch)
 	if err != nil {
@@ -97,6 +92,19 @@ func (rbft *rbftImpl) fetchCheckpoint() consensusEvent {
 	rbft.logger.Debugf("Replica %d is fetching checkpoint %d", rbft.peerPool.ID, fetch.SequenceNumber)
 	rbft.peerPool.broadcast(consensusMsg)
 	return nil
+}
+
+func (rbft *rbftImpl) startFetchCheckpointTimer() {
+	event := &LocalEvent{
+		Service:   EpochMgrService,
+		EventType: FetchCheckpointEvent,
+	}
+	// use fetchCheckpointTimer to fetch the missing checkpoint
+	rbft.timerMgr.startTimer(fetchCheckpointTimer, event)
+}
+
+func (rbft *rbftImpl) stopFetchCheckpointTimer() {
+	rbft.timerMgr.stopTimer(fetchCheckpointTimer)
 }
 
 func (rbft *rbftImpl) recvFetchCheckpoint(fetch *pb.FetchCheckpoint) consensusEvent {
