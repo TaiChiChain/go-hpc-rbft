@@ -1477,19 +1477,15 @@ func (rbft *rbftImpl) checkpoint(state *pb.MetaState) {
 	rbft.persistCheckpoint(seqNo, []byte(digest))
 
 	if rbft.epochMgr.configBatchToCheck != nil {
-		event := &LocalEvent{
-			Service:   EpochMgrService,
-			EventType: FetchCheckpointEvent,
-		}
 		// use fetchCheckpointTimer to fetch the missing checkpoint
-		rbft.timerMgr.startTimer(fetchCheckpointTimer, event)
+		rbft.startFetchCheckpointTimer()
 	} else {
 		// if our lastExec is equal to high watermark, it means there is something wrong with checkpoint procedure, so that
-		// we need to start a new-view timer for checkpoint, and trigger view-change when new-view timer expired
+		// we need to start a high-watermark timer for checkpoint, and trigger view-change when high-watermark timer expired
 		if rbft.exec.lastExec == rbft.h+rbft.L {
 			rbft.logger.Warningf("Replica %d try to send checkpoint equal to high watermark, "+
 				"there may be something wrong with checkpoint", rbft.peerPool.ID)
-			rbft.softStartNewViewTimer(rbft.timerMgr.getTimeoutValue(requestTimer), "high watermark", false)
+			rbft.startHighWatermarkTimer()
 		}
 	}
 	payload, err := proto.Marshal(chkpt)
@@ -1593,7 +1589,7 @@ func (rbft *rbftImpl) recvCheckpoint(chkpt *pb.Checkpoint) consensusEvent {
 }
 
 func (rbft *rbftImpl) finishConfigCheckpoint(chkpt *pb.Checkpoint) {
-	rbft.timerMgr.stopTimer(fetchCheckpointTimer)
+	rbft.stopFetchCheckpointTimer()
 
 	rbft.logger.Infof("Replica %d found config checkpoint quorum for seqNo %d, digest %s",
 		rbft.peerPool.ID, chkpt.SequenceNumber, chkpt.Digest)
@@ -1643,8 +1639,8 @@ func (rbft *rbftImpl) finishConfigCheckpoint(chkpt *pb.Checkpoint) {
 }
 
 func (rbft *rbftImpl) finishNormalCheckpoint(chkpt *pb.Checkpoint) {
-	rbft.timerMgr.stopTimer(fetchCheckpointTimer)
-	rbft.stopNewViewTimer()
+	rbft.stopFetchCheckpointTimer()
+	rbft.stopHighWatermarkTimer()
 
 	rbft.logger.Infof("Replica %d found normal checkpoint quorum for seqNo %d, digest %s",
 		rbft.peerPool.ID, chkpt.SequenceNumber, chkpt.Digest)
@@ -1851,6 +1847,20 @@ func (rbft *rbftImpl) tryStateTransfer() {
 		return
 	}
 	target := rbft.storeMgr.highStateTarget
+
+	// when we start to state update, it means we will find a correct checkpoint eventually,
+	// so that we need to stop fetchCheckpointTimer here
+	rbft.stopFetchCheckpointTimer()
+
+	// besides, a node trying to state update will find a correct epoch at last,
+	// so that, we need to reset the storage for config change and close config-change state here
+	rbft.epochMgr.configBatchToCheck = nil
+	rbft.atomicOff(InConfChange)
+
+	// just stop high-watermark timer:
+	// a primary who has started a high-watermark timer because of missing of checkpoint may find
+	// quorum checkpoint with different digest and trigger state-update
+	rbft.stopHighWatermarkTimer()
 
 	rbft.atomicOn(StateTransferring)
 	rbft.metrics.statusGaugeStateTransferring.Set(StateTransferring)

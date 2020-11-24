@@ -617,6 +617,7 @@ func (rbft *rbftImpl) compareWholeStates(states wholeStates) consensusEvent {
 
 			rbft.logger.Infof("======== Replica %d finished sync state for height: %d, current epoch: %d, current view %d",
 				rbft.peerPool.ID, state.MetaState.Applied, rbft.epoch, rbft.view)
+			rbft.external.SendFilterEvent(pb.InformType_FilterStableCheckpoint, quorumResp.applied, quorumResp.digest)
 			return nil
 		}
 
@@ -837,6 +838,10 @@ func (rbft *rbftImpl) checkIfNeedStateUpdate(initialCp pb.Vc_C) (bool, error) {
 	}
 
 	if rbft.h < seq {
+		// if we have reached this checkpoint height locally but haven't move h to
+		// this height(may be caused by missing checkpoint msg from other nodes),
+		// directly move watermarks to this checkpoint height as we have reached
+		// this stable checkpoint normally.
 		if rbft.storeMgr.chkpts[seq] == dig {
 			rbft.moveWatermarks(seq)
 			rbft.external.SendFilterEvent(pb.InformType_FilterStableCheckpoint, seq, dig)

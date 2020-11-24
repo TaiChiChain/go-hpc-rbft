@@ -108,6 +108,8 @@ func (rbft *rbftImpl) sendNotification(keepCurrentVote bool) consensusEvent {
 	rbft.stopNewViewTimer()
 	rbft.timerMgr.stopTimer(nullRequestTimer)
 	rbft.timerMgr.stopTimer(firstRequestTimer)
+	rbft.stopFetchCheckpointTimer()
+	rbft.stopHighWatermarkTimer()
 
 	rbft.atomicOn(InRecovery)
 	rbft.metrics.statusGaugeInRecovery.Set(InRecovery)

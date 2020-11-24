@@ -163,6 +163,62 @@ func TestCluster_SyncLargeEpochWithCheckpoint(t *testing.T) {
 	assert.Equal(t, uint64(51), rbfts[2].exec.lastExec)
 }
 
+func TestCluster_MissingCheckpoint(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	nodes, rbfts := newBasicClusterInstance()
+	unlockCluster(rbfts)
+	var retMessageSet []map[pb.Type][]*pb.ConsensusMessage
+	for i := 0; i < 40; i++ {
+		tx := newTx()
+		retMessages := execute(t, rbfts, nodes, tx, false)
+		retMessageSet = append(retMessageSet, retMessages)
+	}
+
+	var vcEvents []*pb.ConsensusMessage
+	for index := range rbfts {
+		event := &LocalEvent{
+			Service:   CoreRbftService,
+			EventType: CoreHighWatermarkEvent,
+			Event:     rbfts[index].h,
+		}
+		rbfts[index].processEvent(event)
+		vc := nodes[index].broadcastMessageCache
+		assert.Equal(t, pb.Type_VIEW_CHANGE, vc.Type)
+		vcEvents = append(vcEvents, vc)
+	}
+	for index := range rbfts {
+		for j := range vcEvents {
+			if j == index {
+				continue
+			}
+			quorumVC := rbfts[index].processEvent(vcEvents[j])
+			if quorumVC != nil {
+				done := &LocalEvent{
+					Service:   ViewChangeService,
+					EventType: ViewChangeQuorumEvent,
+				}
+				assert.Equal(t, done, quorumVC)
+				rbfts[index].processEvent(quorumVC)
+				break
+			}
+		}
+	}
+	nv := nodes[1].broadcastMessageCache
+	assert.Equal(t, pb.Type_NEW_VIEW, nv.Type)
+	for index := range rbfts {
+		rbfts[index].processEvent(nv)
+	}
+
+	for index := range rbfts {
+		assert.Equal(t, uint64(40), rbfts[index].h)
+	}
+}
+
+//******************************************************************************************************************
+// some tools for unit tests
+//******************************************************************************************************************
 func unlockCluster(rbfts []*rbftImpl) {
 	for index := range rbfts {
 		rbfts[index].atomicOff(Pending)
