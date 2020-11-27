@@ -1945,6 +1945,7 @@ func (rbft *rbftImpl) recvStateUpdatedEvent(ss *pb.ServiceState) consensusEvent 
 		rbft.peerPool.ID, seqNo)
 	rbft.external.SendFilterEvent(pb.InformType_FilterStableCheckpoint, seqNo, digest)
 	rbft.storeMgr.saveCheckpoint(seqNo, digest)
+	rbft.persistCheckpoint(seqNo, []byte(digest))
 	rbft.moveWatermarks(seqNo)
 
 	// 3. process epoch-info
