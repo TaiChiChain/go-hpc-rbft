@@ -92,9 +92,6 @@ func (rbft *rbftImpl) setView(view uint64) {
 // Then it sends view change message to itself and jump to recvViewChange.
 func (rbft *rbftImpl) sendViewChange() consensusEvent {
 
-	rbft.atomicOff(InConfChange)
-	rbft.metrics.statusGaugeInConfChange.Set(0)
-
 	//Do some check and do some preparation
 	//such as stop nullRequest timer, clean vcMgr.viewChangeStore and so on.
 	err := rbft.beforeSendVC()
@@ -666,6 +663,12 @@ func (rbft *rbftImpl) beforeSendVC() error {
 	rbft.metrics.statusGaugeInViewChange.Set(InViewChange)
 	rbft.setAbNormal()
 	rbft.vcMgr.vcHandled = false
+
+	// as we try to view-change, current node should close config-change status as we will
+	// reach a correct state after view-change
+	rbft.epochMgr.configBatchToCheck = nil
+	rbft.atomicOff(InConfChange)
+	rbft.metrics.statusGaugeInConfChange.Set(0)
 
 	newView := rbft.view + uint64(1)
 	rbft.setView(newView)

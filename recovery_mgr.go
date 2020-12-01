@@ -116,6 +116,12 @@ func (rbft *rbftImpl) sendNotification(keepCurrentVote bool) consensusEvent {
 	rbft.recoveryMgr.recoveryHandled = false
 	rbft.setAbNormal()
 
+	// as we try to recovery, current node should close config-change status as we will
+	// reach a correct state after recovery
+	rbft.epochMgr.configBatchToCheck = nil
+	rbft.atomicOff(InConfChange)
+	rbft.metrics.statusGaugeInConfChange.Set(0)
+
 	// increase view according to what we predicate as next primary.
 	if !keepCurrentVote {
 		newView := rbft.view + uint64(1)

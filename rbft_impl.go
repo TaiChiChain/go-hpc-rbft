@@ -1600,13 +1600,17 @@ func (rbft *rbftImpl) finishConfigCheckpoint(chkpt *pb.Checkpoint) {
 	rbft.epochMgr.configBatchToCheck = nil
 
 	// waiting for commit db finish the reload
-	rbft.logger.Noticef("Replica %d is waiting for commit-db finished...", rbft.peerPool.ID)
-	ev := <-rbft.confChan
-	rbft.logger.Debugf("Replica %d received a commit-db finished target at height %d", rbft.peerPool.ID, ev.Height)
-	if ev.Height != chkpt.SequenceNumber {
-		rbft.logger.Errorf("Wrong commit-db height: %d", ev.Height)
-		rbft.stopNamespace()
-		return
+	if rbft.atomicIn(InConfChange) {
+		rbft.logger.Noticef("Replica %d is waiting for commit-db finished...", rbft.peerPool.ID)
+		ev := <-rbft.confChan
+		rbft.logger.Debugf("Replica %d received a commit-db finished target at height %d", rbft.peerPool.ID, ev.Height)
+		if ev.Height != chkpt.SequenceNumber {
+			rbft.logger.Errorf("Wrong commit-db height: %d", ev.Height)
+			rbft.stopNamespace()
+			return
+		}
+	} else {
+		rbft.logger.Warningf("Replica %d isn't in config-change", rbft.peerPool.ID)
 	}
 
 	// two types of config transaction:
@@ -1856,6 +1860,7 @@ func (rbft *rbftImpl) tryStateTransfer() {
 	// so that, we need to reset the storage for config change and close config-change state here
 	rbft.epochMgr.configBatchToCheck = nil
 	rbft.atomicOff(InConfChange)
+	rbft.metrics.statusGaugeInConfChange.Set(0)
 
 	// just stop high-watermark timer:
 	// a primary who has started a high-watermark timer because of missing of checkpoint may find
@@ -1952,16 +1957,6 @@ func (rbft *rbftImpl) recvStateUpdatedEvent(ss *pb.ServiceState) consensusEvent 
 	changed := false
 	if ss.EpochInfo != nil {
 		changed = ss.EpochInfo.Epoch != rbft.epoch
-		if seqNo == ss.EpochInfo.LastConfig {
-			rbft.logger.Noticef("Replica %d is waiting for commit-db finished...", rbft.peerPool.ID)
-			ev := <-rbft.confChan
-			rbft.logger.Debugf("Replica %d received a commit-db finished target at height %d", rbft.peerPool.ID, ev.Height)
-			if ev.Height != seqNo {
-				rbft.logger.Errorf("Wrong commit-db height: %d", ev.Height)
-				rbft.stopNamespace()
-				return nil
-			}
-		}
 	}
 	if changed {
 		var peers []*pb.Peer
