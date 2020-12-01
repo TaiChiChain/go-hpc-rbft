@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.2.25"></a>
+## [0.2.25](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.24...v0.2.25) (2020-12-01)
+
+
+### Bug Fixes
+
+* modify the process of config-change ([5336783](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/5336783)), closes [#flato-2647](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-2647)
+
+
+
 <a name="0.2.24"></a>
 ## [0.2.24](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.23...v0.2.24) (2020-11-27)
 
