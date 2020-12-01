@@ -217,9 +217,13 @@ func (n *node) ReportReloadFinished(reload *pb.ReloadMessage) {
 		n.logger.Noticef("Consensus-Reload finished, recv router: %+v", reload.Router)
 		n.setReloadRouter(reload.Router)
 	case pb.ReloadType_FinishReloadCommitDB:
-		rf := &pb.ReloadFinished{Height: reload.Height}
 		n.logger.Noticef("Commit-DB finished, recv height: %d", reload.Height)
-		n.confChan <- rf
+		if n.rbft.atomicIn(InConfChange) {
+			rf := &pb.ReloadFinished{Height: reload.Height}
+			n.confChan <- rf
+		} else {
+			n.logger.Info("Current node isn't in config-change")
+		}
 	}
 
 }
