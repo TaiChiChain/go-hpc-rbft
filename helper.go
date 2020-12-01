@@ -18,7 +18,6 @@ import (
 	"crypto/md5"
 	"encoding/binary"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"math"
 	"strconv"
@@ -849,14 +848,6 @@ func (rbft *rbftImpl) checkIfNeedStateUpdate(initialCp pb.Vc_C) (bool, error) {
 
 		if rbft.epochMgr.configBatchToCheck != nil {
 			if seq == rbft.epochMgr.configBatchToCheck.Applied {
-				rbft.logger.Noticef("Replica %d sent a config checkpoint, waiting for commit-db finished...", rbft.peerPool.ID)
-				ev := <-rbft.confChan
-				if ev.Height != seq {
-					err := errors.New("wrong commit-db height")
-					rbft.logger.Errorf("Wrong commit-db height: %d", ev.Height)
-					rbft.stopNamespace()
-					return false, err
-				}
 				rbft.epochMgr.configBatchToCheck = nil
 			}
 		}
