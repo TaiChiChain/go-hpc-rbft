@@ -46,16 +46,26 @@ func (e *executor) setCurrentExec(c *uint64) {
 
 // msgToEvent converts ConsensusMessage to the corresponding consensus event.
 func (rbft *rbftImpl) msgToEvent(msg *pb.ConsensusMessage) (interface{}, error) {
+	// reuse SendRequestBatch to avoid too many useless SendRequestBatch message caused by
+	// broadcast fetch.
+	if msg.Type == pb.Type_SEND_REQUEST_BATCH {
+		err := proto.Unmarshal(msg.Payload, rbft.reusableRequestBatch)
+		if err != nil {
+			rbft.logger.Errorf("Unmarshal error, can not unmarshal %v, error: %v", msg.Type, err)
+			return nil, err
+		}
+		digest := rbft.reusableRequestBatch.BatchDigest
+		if _, ok := rbft.storeMgr.missingReqBatches[digest]; !ok {
+			// either the wrong digest, or we got it already from someone else
+			rbft.logger.Debugf("Replica %d received missing request: %s, but we don't miss this request, ignore it", rbft.peerPool.ID, digest)
+			return nil, fmt.Errorf("useless request batch with %s", digest)
+		}
+	}
+
 	event := eventCreators[msg.Type]().(proto.Message)
 	err := proto.Unmarshal(msg.Payload, event)
 	if err != nil {
 		rbft.logger.Errorf("Unmarshal error, can not unmarshal %v, error: %v", msg.Type, err)
-		localEvent := &LocalEvent{
-			Service:   CoreRbftService,
-			EventType: CoreResendFetchMissingEvent,
-		}
-		go rbft.postMsg(localEvent)
-
 		return nil, err
 	}
 
@@ -166,10 +176,6 @@ func (rbft *rbftImpl) handleCoreRbftEvent(e *LocalEvent) consensusEvent {
 		_ = rbft.recvFetchMissingTxs(ev)
 		return nil
 
-	case CoreResendFetchMissingEvent:
-		rbft.executeAfterStateUpdate()
-		return nil
-
 	case CoreHighWatermarkEvent:
 		rbft.logger.Debugf("Replica %d high-watermark timer expired, try to send viewChange", rbft.peerPool.ID)
 
@@ -210,7 +216,6 @@ func (rbft *rbftImpl) handleRecoveryEvent(e *LocalEvent) consensusEvent {
 		}
 		rbft.atomicOff(InRecovery)
 		rbft.metrics.statusGaugeInRecovery.Set(0)
-		rbft.recoveryMgr.recoveryHandled = false
 		rbft.recoveryMgr.notificationStore = make(map[ntfIdx]*pb.Notification)
 		rbft.recoveryMgr.outOfElection = make(map[ntfIdx]*pb.NotificationResponse)
 		rbft.recoveryMgr.differentEpoch = make(map[ntfIde]*pb.NotificationResponse)
@@ -321,10 +326,8 @@ func (rbft *rbftImpl) handleViewChangeEvent(e *LocalEvent) consensusEvent {
 		// set a viewChangeSeqNo if needed
 		rbft.updateViewChangeSeqNo(rbft.exec.lastExec, rbft.K)
 		delete(rbft.vcMgr.newViewStore, rbft.view)
-		rbft.vcMgr.vcHandled = false
 
 		rbft.startTimerIfOutstandingRequests()
-		rbft.storeMgr.missingReqBatches = make(map[string]bool)
 		primaryID := rbft.primaryID(rbft.view)
 
 		// set normal to 1 which indicates system comes into normal status after viewchange

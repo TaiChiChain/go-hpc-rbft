@@ -70,7 +70,6 @@ const (
 	CoreCheckPoolTimerEvent
 	CoreStateUpdatedEvent
 	CoreResendMissingTxsEvent
-	CoreResendFetchMissingEvent
 	CoreHighWatermarkEvent
 
 	// 2.view change
