@@ -695,6 +695,10 @@ func (rbft *rbftImpl) initSyncState() consensusEvent {
 
 	// post the sync state response message event to myself
 	state := rbft.node.getCurrentState()
+	if state == nil {
+		rbft.logger.Warningf("Replica %d has a nil node state", rbft.peerPool.ID)
+		return nil
+	}
 	syncStateRsp := &pb.SyncStateResponse{
 		NodeInfo:     rbft.getNodeInfo(),
 		Epoch:        rbft.epoch,
@@ -752,6 +756,10 @@ func (rbft *rbftImpl) sendSyncStateRsp(to string, needSyncEpoch bool) consensusE
 	} else {
 		// for normal case, send current state
 		state := rbft.node.getCurrentState()
+		if state == nil {
+			rbft.logger.Warningf("Replica %d has a nil state", rbft.peerPool.ID)
+			return nil
+		}
 		syncStateRsp.InitialState = state.MetaState
 	}
 

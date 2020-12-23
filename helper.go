@@ -559,6 +559,10 @@ func (rbft *rbftImpl) compareWholeStates(states wholeStates) consensusEvent {
 		if rbft.in(InSyncState) {
 			// get self-state to compare
 			state := rbft.node.getCurrentState()
+			if state == nil {
+				rbft.logger.Warningf("Replica %d has a nil state", rbft.peerPool.ID)
+				return nil
+			}
 
 			// we could stop sync-state timer here as we has already found quorum sync-state-response
 			rbft.timerMgr.stopTimer(syncStateRspTimer)
