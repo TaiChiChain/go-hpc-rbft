@@ -1663,6 +1663,7 @@ func (rbft *rbftImpl) finishNormalCheckpoint(chkpt *pb.Checkpoint) {
 	}
 }
 
+// TODO(wgr): simplify the process to deal with checkpoint in v1.0.6
 // weakCheckpointSetOutOfRange checks if this node is fell behind or not. If we receive f+1 checkpoints whose seqNo > H (for example 150),
 // move watermark to the smallest seqNo (150) among these checkpoints, because this node is fell behind 5 blocks at least.
 func (rbft *rbftImpl) weakCheckpointSetOutOfRange(chkpt *pb.Checkpoint) bool {
@@ -1673,6 +1674,14 @@ func (rbft *rbftImpl) weakCheckpointSetOutOfRange(chkpt *pb.Checkpoint) bool {
 		// For non-byzantine nodes, the checkpoint sequence number increases monotonically
 		delete(rbft.storeMgr.hChkpts, chkpt.ReplicaId)
 	} else {
+		base64Id, ok := rbft.storeMgr.chkpts[chkpt.SequenceNumber]
+		if ok {
+			if base64Id == chkpt.Digest {
+				rbft.logger.Warningf("Replica %d received a checkpoint %d out of high watermark, "+
+					"but we has already executed this block", rbft.peerPool.ID, chkpt.SequenceNumber)
+				return true
+			}
+		}
 		// We do not track the highest one, as a byzantine node could pick an arbitrarily high sequence number
 		// and even if it recovered to be non-byzantine, we would still believe it to be far ahead
 		rbft.storeMgr.hChkpts[chkpt.ReplicaId] = chkpt.SequenceNumber
