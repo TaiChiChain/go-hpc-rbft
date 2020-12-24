@@ -175,6 +175,8 @@ type rbftImpl struct {
 	requestSethMemLimit bool // whether limit requests set mem size or not
 	requestSetMaxMem    int  // max memory size of one set of requests
 
+	reusableRequestBatch *pb.SendRequestBatch // special struct to reuse the biggest message in rbft.
+
 	viewLock  sync.RWMutex // mutex to set value of view
 	hLock     sync.RWMutex // mutex to set value of h
 	epochLock sync.RWMutex // mutex to set value of view
@@ -195,19 +197,20 @@ func newRBFT(cpChan chan *pb.ServiceState, confC chan *pb.ReloadFinished, c Conf
 
 	recvC := make(chan interface{})
 	rbft := &rbftImpl{
-		K:                   c.K,
-		epoch:               c.EpochInit,
-		config:              c,
-		logger:              c.Logger,
-		external:            c.External,
-		storage:             c.External,
-		recvChan:            recvC,
-		cpChan:              cpChan,
-		confChan:            confC,
-		close:               make(chan bool),
-		delFlag:             c.DelFlag,
-		requestSethMemLimit: c.RequestSethMemLimit,
-		requestSetMaxMem:    int(c.RequestSetMaxMem),
+		K:                    c.K,
+		epoch:                c.EpochInit,
+		config:               c,
+		logger:               c.Logger,
+		external:             c.External,
+		storage:              c.External,
+		recvChan:             recvC,
+		cpChan:               cpChan,
+		confChan:             confC,
+		close:                make(chan bool),
+		delFlag:              c.DelFlag,
+		requestSethMemLimit:  c.RequestSethMemLimit,
+		requestSetMaxMem:     int(c.RequestSetMaxMem),
+		reusableRequestBatch: &pb.SendRequestBatch{},
 	}
 
 	if rbft.K == 0 {
@@ -588,7 +591,10 @@ func (rbft *rbftImpl) consensusMessageFilter(msg *pb.ConsensusMessage) consensus
 		return rbft.processReqSetEvent(set)
 	}
 
-	next, _ := rbft.msgToEvent(msg)
+	next, err := rbft.msgToEvent(msg)
+	if err != nil {
+		return nil
+	}
 	return rbft.dispatchConsensusMsg(next)
 }
 

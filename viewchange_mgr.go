@@ -366,7 +366,7 @@ func (rbft *rbftImpl) primaryCheckNewView(xSet xset) consensusEvent {
 	if len(rbft.storeMgr.missingReqBatches) == 0 {
 		return rbft.resetStateForNewView()
 	} else if newReqBatchMissing {
-		// if received all batches, jump into resetStateForNewView
+		// try to fetch missing batches, if received all batches, jump into resetStateForNewView
 		rbft.fetchRequestBatches()
 	}
 
@@ -386,6 +386,18 @@ func (rbft *rbftImpl) replicaCheckNewView() consensusEvent {
 
 	if !rbft.atomicInOne(InViewChange, InRecovery) {
 		rbft.logger.Debugf("Replica %d reject newView as we are not in viewChange or recovery", rbft.peerPool.ID)
+		return nil
+	}
+
+	// avoid check new view again because of repeat ViewChangeQuorumEvent.
+	if rbft.atomicIn(InViewChange) && rbft.vcMgr.vcHandled {
+		rbft.logger.Debugf("Replica %d enter check new view in viewchange again, ignore it", rbft.peerPool.ID)
+		return nil
+	}
+
+	// avoid check new view again because of repeat NotificationQuorumEvent.
+	if rbft.atomicIn(InRecovery) && rbft.recoveryMgr.recoveryHandled {
+		rbft.logger.Debugf("Replica %d enter check new view again in recovery, ignore it", rbft.peerPool.ID)
 		return nil
 	}
 
@@ -413,6 +425,16 @@ func (rbft *rbftImpl) replicaCheckNewView() consensusEvent {
 		return rbft.sendViewChange()
 	}
 
+	// after checked new view in viewchange, set vcHandled active to avoid check new view again.
+	if rbft.atomicIn(InViewChange) {
+		rbft.vcMgr.vcHandled = true
+	}
+
+	// after checked new view in recovery, set recoveryHandled active to avoid check new view again.
+	if rbft.atomicIn(InRecovery) {
+		rbft.recoveryMgr.recoveryHandled = true
+	}
+
 	// Check if replica need state update
 	need, err := rbft.checkIfNeedStateUpdate(cp)
 	if err != nil {
@@ -429,7 +451,7 @@ func (rbft *rbftImpl) replicaCheckNewView() consensusEvent {
 	if len(rbft.storeMgr.missingReqBatches) == 0 {
 		return rbft.resetStateForNewView()
 	} else if newReqBatchMissing {
-		// if received all batches, jump into resetStateForNewView
+		// try to fetch missing batches, if received all batches, jump into resetStateForNewView
 		rbft.fetchRequestBatches()
 	}
 
@@ -449,20 +471,6 @@ func (rbft *rbftImpl) resetStateForNewView() consensusEvent {
 		rbft.logger.Debugf("Replica %d is not in viewChange or recovery, not process new view", rbft.peerPool.ID)
 		return nil
 	}
-
-	// if vcHandled active, return nil, else set vcHandled active
-	if rbft.atomicIn(InViewChange) && rbft.vcMgr.vcHandled {
-		rbft.logger.Debugf("Replica %d enter resetStateForNewView again, ignore it", rbft.peerPool.ID)
-		return nil
-	}
-	rbft.vcMgr.vcHandled = true
-
-	// if recoveryHandled active, return nil, else set recoveryHandled active
-	if rbft.atomicIn(InRecovery) && rbft.recoveryMgr.recoveryHandled {
-		rbft.logger.Debugf("Replica %d enter resetStateForNewView again, ignore it", rbft.peerPool.ID)
-		return nil
-	}
-	rbft.recoveryMgr.recoveryHandled = true
 
 	rbft.logger.Debugf("Replica %d accept newView to view %d", rbft.peerPool.ID, rbft.view)
 
@@ -508,7 +516,7 @@ func (rbft *rbftImpl) fetchRequestBatches() {
 		}
 		payload, err := proto.Marshal(frb)
 		if err != nil {
-			rbft.logger.Errorf("ConsensusMessage_FRTCH_REQUEST_BATCH Marshal Error: %s", err)
+			rbft.logger.Errorf("ConsensusMessage_FETCH_REQUEST_BATCH Marshal Error: %s", err)
 			return
 		}
 		consensusMsg := &pb.ConsensusMessage{
@@ -915,6 +923,7 @@ func (rbft *rbftImpl) updateViewChangeSeqNo(seqNo, K uint64) {
 // doesn't have all reqBatch in xset.
 func (rbft *rbftImpl) feedMissingReqBatchIfNeeded(xset xset) (newReqBatchMissing bool) {
 
+	// clear missingReqBatches to ensure it's only valid in one recovery round.
 	rbft.storeMgr.missingReqBatches = make(map[string]bool)
 	newReqBatchMissing = false
 	for n, d := range xset {

@@ -113,8 +113,8 @@ func (rbft *rbftImpl) sendNotification(keepCurrentVote bool) consensusEvent {
 
 	rbft.atomicOn(InRecovery)
 	rbft.metrics.statusGaugeInRecovery.Set(InRecovery)
-	rbft.recoveryMgr.recoveryHandled = false
 	rbft.setAbNormal()
+	rbft.recoveryMgr.recoveryHandled = false
 
 	// as we try to recovery, current node should close config-change status as we will
 	// reach a correct state after recovery
@@ -410,6 +410,13 @@ func (rbft *rbftImpl) resetStateForRecovery() consensusEvent {
 		return nil
 	}
 	rbft.logger.Debugf("initial checkpoint: %+v", cp)
+
+	// after checked initial checkpoint, set recoveryHandled active to avoid resetStateForRecovery again.
+	if rbft.recoveryMgr.recoveryHandled {
+		rbft.logger.Debugf("Replica %d enter resetStateForRecovery again, ignore it", rbft.peerPool.ID)
+		return nil
+	}
+	rbft.recoveryMgr.recoveryHandled = true
 	// check if need state update
 	need, err := rbft.checkIfNeedStateUpdate(cp)
 	if err != nil {
@@ -424,14 +431,6 @@ func (rbft *rbftImpl) resetStateForRecovery() consensusEvent {
 		rbft.cleanOutstandingAndCert()
 		return nil
 	}
-
-	// if recoveryHandled active, return nil, else set recoveryHandled active to avoid enter
-	// RecoveryDoneEvent again.
-	if rbft.recoveryMgr.recoveryHandled {
-		rbft.logger.Debugf("Replica %d enter resetStateForRecovery again, ignore it", rbft.peerPool.ID)
-		return nil
-	}
-	rbft.recoveryMgr.recoveryHandled = true
 
 	rbft.cleanOutstandingAndCert()
 

@@ -1,7 +1,6 @@
 package rbft
 
 import (
-	"errors"
 	"testing"
 
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
@@ -287,25 +286,4 @@ func TestExec_handleViewChangeEvent_ViewChangeResendTimerEvent(t *testing.T) {
 	rbfts[1].atomicOn(InViewChange)
 	rbfts[1].handleViewChangeEvent(ev)
 	assert.Equal(t, pb.Type_NOTIFICATION, nodes[1].broadcastMessageCache.Type)
-}
-
-func TestExec_msgToEventErr(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	_, rbfts := newBasicClusterInstance()
-
-	errMarshal := []byte("err")
-	con := &pb.ConsensusMessage{Payload: errMarshal}
-
-	ret, err := rbfts[0].msgToEvent(con)
-	assert.Nil(t, ret)
-	expErr := errors.New("unexpected EOF")
-	assert.Equal(t, expErr, err)
-	event := <-rbfts[0].recvChan
-	expLocalEvent := &LocalEvent{
-		Service:   CoreRbftService,
-		EventType: CoreResendFetchMissingEvent,
-	}
-	assert.Equal(t, expLocalEvent, event)
 }
