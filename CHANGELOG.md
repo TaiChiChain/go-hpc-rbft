@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.2.25-1"></a>
+## [0.2.25-1](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.25...v0.2.25-1) (2020-12-25)
+
+
+### Bug Fixes
+
+* avoid fetchRequestBatch repeatly in one vc/recovery ([5cb2ab9](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/5cb2ab9))
+* change the method to deal with checkpoint out of range ([da1cef8](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/da1cef8)), closes [#flato-2997](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-2997)
+* modity the order to stop rbft core ([59f425f](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/59f425f)), closes [#flato-2996](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-2996)
+
+
+
 <a name="0.2.25"></a>
 ## [0.2.25](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.24...v0.2.25) (2020-12-01)
 
