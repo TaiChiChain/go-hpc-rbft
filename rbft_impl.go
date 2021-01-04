@@ -1687,7 +1687,7 @@ func (rbft *rbftImpl) weakCheckpointSetOutOfRange(chkpt *pb.Checkpoint) bool {
 			if base64Id == chkpt.Digest {
 				rbft.logger.Warningf("Replica %d received a checkpoint %d out of high watermark, "+
 					"but we has already executed this block", rbft.peerPool.ID, chkpt.SequenceNumber)
-				return true
+				return false
 			}
 		}
 		// We do not track the highest one, as a byzantine node could pick an arbitrarily high sequence number
