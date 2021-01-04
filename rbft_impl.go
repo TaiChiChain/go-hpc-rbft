@@ -1645,6 +1645,8 @@ func (rbft *rbftImpl) finishConfigCheckpoint(chkpt *pb.Checkpoint) {
 
 		// resubmit transactions
 		rbft.primaryResubmitTransactions()
+	} else {
+		rbft.fetchRecoveryPQC()
 	}
 }
 

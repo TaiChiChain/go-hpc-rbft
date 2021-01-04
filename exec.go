@@ -354,6 +354,10 @@ func (rbft *rbftImpl) handleViewChangeEvent(e *LocalEvent) consensusEvent {
 
 		rbft.primaryResubmitTransactions()
 
+		if !rbft.isPrimary(rbft.peerPool.ID) {
+			rbft.fetchRecoveryPQC()
+		}
+
 	case ViewChangeResendTimerEvent:
 		if !rbft.atomicIn(InViewChange) {
 			rbft.logger.Warningf("Replica %d had its viewChange resend timer expired but it's not in viewChange,ignore it", rbft.peerPool.ID)
