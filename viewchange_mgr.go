@@ -351,6 +351,14 @@ func (rbft *rbftImpl) recvNewView(nv *pb.NewView) consensusEvent {
 	// TODO(DH): verify vc/notification signature
 
 	rbft.vcMgr.newViewStore[nv.View] = nv
+	// after we ensure the validity of current newView,
+	// delete newView msg in old view to avoid OOM.
+	for v := range rbft.vcMgr.newViewStore {
+		if v < nv.View {
+			rbft.logger.Debugf("Replica %d delete old newView msg in view %d", rbft.peerPool.ID, v)
+			delete(rbft.vcMgr.newViewStore, v)
+		}
+	}
 
 	return rbft.replicaCheckNewView()
 }
