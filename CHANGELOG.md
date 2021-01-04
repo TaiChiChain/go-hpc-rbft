@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.2.25-2"></a>
+## [0.2.25-2](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.25-1...v0.2.25-2) (2021-01-04)
+
+
+### Bug Fixes
+
+* fetch pqc after config change and view change ([20260ad](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/20260ad)), closes [#flato-3020](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-3020)
+* receive the checkpoints from replicas with h>low-watermark ([80acddd](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/80acddd)), closes [#flato-2987](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-2987)
+* **viewchange_mgr.go:** delete old neweView msg when received a new valid newView msg ([5181fb2](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/5181fb2))
+
+
+
 <a name="0.2.25-1"></a>
 ## [0.2.25-1](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.25...v0.2.25-1) (2020-12-25)
 
