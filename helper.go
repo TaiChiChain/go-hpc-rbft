@@ -860,18 +860,25 @@ func (rbft *rbftImpl) checkIfNeedStateUpdate(initialCp pb.Vc_C) (bool, error) {
 	// If replica's lastExec < initial checkpoint, replica is out of date
 	if lastExec < initialCp.SequenceNumber {
 		rbft.logger.Warningf("Replica %d missing base checkpoint %d (%s), our most recent execution %d", rbft.peerPool.ID, initialCp.SequenceNumber, initialCp.Digest, lastExec)
-
 		target := &pb.MetaState{
 			Applied: initialCp.SequenceNumber,
 			Digest:  initialCp.Digest,
 		}
-
 		rbft.updateHighStateTarget(target)
 		rbft.tryStateTransfer()
 		return true, nil
+	} else if rbft.atomicIn(InRecovery) && rbft.recoveryMgr.needSyncEpoch {
+		rbft.logger.Infof("Replica %d in wrong epoch %d needs to state update", rbft.peerPool.ID, rbft.epoch)
+		target := &pb.MetaState{
+			Applied: initialCp.SequenceNumber,
+			Digest:  initialCp.Digest,
+		}
+		rbft.updateHighStateTarget(target)
+		rbft.tryStateTransfer()
+		return true, nil
+	} else {
+		return false, nil
 	}
-
-	return false, nil
 }
 
 func (rbft *rbftImpl) getNodeInfo() *pb.NodeInfo {
