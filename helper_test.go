@@ -7,7 +7,6 @@ import (
 	"github.com/ultramesh/flato-common/types/protos"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
 
-	"github.com/gogo/protobuf/proto"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 )
@@ -376,52 +375,6 @@ func TestRBFT_startTimerIfOutstandingRequests(t *testing.T) {
 	assert.False(t, rbfts[0].timerMgr.getTimer(newViewTimer))
 	rbfts[0].startTimerIfOutstandingRequests()
 	assert.True(t, rbfts[0].timerMgr.getTimer(newViewTimer))
-}
-
-func TestHelper_RequestSet(t *testing.T) {
-	tx1 := newTx()
-	tx2 := newTx()
-	tx3 := newTx()
-	tx4 := newTx()
-	tx5 := newTx()
-
-	req := &pb.RequestSet{
-		Local:    true,
-		Requests: []*protos.Transaction{tx1, tx2, tx3, tx4, tx5},
-	}
-
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	nodes, rbfts := newBasicClusterInstance()
-
-	rbfts[0].processEvent(req)
-	reqEventNormal := nodes[0].broadcastMessageCache
-	payload, _ := proto.Marshal(req)
-	consensusMsgNormal := &pb.ConsensusMessage{
-		Type:    pb.Type_REQUEST_SET,
-		From:    rbfts[0].peerPool.ID,
-		Epoch:   rbfts[0].epoch,
-		Payload: payload,
-	}
-	assert.Equal(t, consensusMsgNormal, reqEventNormal)
-
-	rbfts[1].requestSethMemLimit = true
-	rbfts[1].requestSetMaxMem = 1
-	rbfts[1].processEvent(req)
-	reqEventSplit := nodes[1].broadcastMessageCache
-	lastSplitSet := &pb.RequestSet{
-		Local:    true,
-		Requests: []*protos.Transaction{tx5},
-	}
-	payload, _ = proto.Marshal(lastSplitSet)
-	consensusMsgSplit := &pb.ConsensusMessage{
-		Type:    pb.Type_REQUEST_SET,
-		From:    rbfts[1].peerPool.ID,
-		Epoch:   rbfts[1].epoch,
-		Payload: payload,
-	}
-	assert.Equal(t, consensusMsgSplit, reqEventSplit)
 }
 
 func TestHelper_stopNamespace(t *testing.T) {
