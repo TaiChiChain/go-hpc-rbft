@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.2.25-3"></a>
+## [0.2.25-3](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.25-2...v0.2.25-3) (2021-01-06)
+
+
+### Bug Fixes
+
+* update the process to sync epoch ([cef9c00](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/cef9c00)), closes [#flato-3050](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-3050)
+
+
+
 <a name="0.2.25-2"></a>
 ## [0.2.25-2](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.25-1...v0.2.25-2) (2021-01-04)
 
