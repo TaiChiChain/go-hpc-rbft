@@ -683,7 +683,7 @@ func (tf *testFramework) sendTx(no int, sender uint64) {
 		sender = uint64(rand.Int()%tf.N + 1)
 	}
 
-	str3 := "tx" + string(no)
+	str3 := "tx" + string(rune(no))
 	tx3 := &protos.Transaction{Value: []byte(str3)}
 	txs3 := []*protos.Transaction{tx3}
 	_ = tf.TestNode[sender-1].N.Propose(txs3)
@@ -691,7 +691,7 @@ func (tf *testFramework) sendTx(no int, sender uint64) {
 
 func newTx() *protos.Transaction {
 	return &protos.Transaction{
-		Value: []byte(string(rand.Int())),
+		Value: []byte(string(rune(rand.Int()))),
 		Nonce: int64(rand.Int()),
 	}
 }
