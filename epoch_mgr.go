@@ -156,6 +156,12 @@ func (rbft *rbftImpl) checkIfOutOfEpoch(msg *pb.ConsensusMessage) consensusEvent
 		return nil
 	}
 
+	// as current node has already executed the block no less than epoch number and it is possible that
+	// current node will finish the epoch change later, so that we needn't to check epoch here
+	if rbft.exec.lastExec >= msg.Epoch {
+		return nil
+	}
+
 	rbft.epochMgr.checkOutOfEpoch[msg.From] = msg.Epoch
 	rbft.logger.Debugf("Replica %d in epoch %d received message from epoch %d, now %d messages with larger epoch",
 		rbft.peerPool.ID, rbft.epoch, msg.Epoch, len(rbft.epochMgr.checkOutOfEpoch))

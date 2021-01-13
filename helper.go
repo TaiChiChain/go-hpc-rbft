@@ -559,6 +559,10 @@ func (rbft *rbftImpl) compareWholeStates(states wholeStates) consensusEvent {
 		if rbft.in(InSyncState) {
 			// get self-state to compare
 			state := rbft.node.getCurrentState()
+			if state == nil {
+				rbft.logger.Warningf("Replica %d has a nil state", rbft.peerPool.ID)
+				return nil
+			}
 
 			// we could stop sync-state timer here as we has already found quorum sync-state-response
 			rbft.timerMgr.stopTimer(syncStateRspTimer)
@@ -856,18 +860,25 @@ func (rbft *rbftImpl) checkIfNeedStateUpdate(initialCp pb.Vc_C) (bool, error) {
 	// If replica's lastExec < initial checkpoint, replica is out of date
 	if lastExec < initialCp.SequenceNumber {
 		rbft.logger.Warningf("Replica %d missing base checkpoint %d (%s), our most recent execution %d", rbft.peerPool.ID, initialCp.SequenceNumber, initialCp.Digest, lastExec)
-
 		target := &pb.MetaState{
 			Applied: initialCp.SequenceNumber,
 			Digest:  initialCp.Digest,
 		}
-
 		rbft.updateHighStateTarget(target)
 		rbft.tryStateTransfer()
 		return true, nil
+	} else if rbft.atomicIn(InRecovery) && rbft.recoveryMgr.needSyncEpoch {
+		rbft.logger.Infof("Replica %d in wrong epoch %d needs to state update", rbft.peerPool.ID, rbft.epoch)
+		target := &pb.MetaState{
+			Applied: initialCp.SequenceNumber,
+			Digest:  initialCp.Digest,
+		}
+		rbft.updateHighStateTarget(target)
+		rbft.tryStateTransfer()
+		return true, nil
+	} else {
+		return false, nil
 	}
-
-	return false, nil
 }
 
 func (rbft *rbftImpl) getNodeInfo() *pb.NodeInfo {
