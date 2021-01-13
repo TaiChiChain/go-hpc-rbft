@@ -175,6 +175,8 @@ type rbftImpl struct {
 	requestSethMemLimit bool // whether limit requests set mem size or not
 	requestSetMaxMem    int  // max memory size of one set of requests
 
+	reusableRequestBatch *pb.SendRequestBatch // special struct to reuse the biggest message in rbft.
+
 	viewLock  sync.RWMutex // mutex to set value of view
 	hLock     sync.RWMutex // mutex to set value of h
 	epochLock sync.RWMutex // mutex to set value of view
@@ -195,19 +197,20 @@ func newRBFT(cpChan chan *pb.ServiceState, confC chan *pb.ReloadFinished, c Conf
 
 	recvC := make(chan interface{})
 	rbft := &rbftImpl{
-		K:                   c.K,
-		epoch:               c.EpochInit,
-		config:              c,
-		logger:              c.Logger,
-		external:            c.External,
-		storage:             c.External,
-		recvChan:            recvC,
-		cpChan:              cpChan,
-		confChan:            confC,
-		close:               make(chan bool),
-		delFlag:             c.DelFlag,
-		requestSethMemLimit: c.RequestSethMemLimit,
-		requestSetMaxMem:    int(c.RequestSetMaxMem),
+		K:                    c.K,
+		epoch:                c.EpochInit,
+		config:               c,
+		logger:               c.Logger,
+		external:             c.External,
+		storage:              c.External,
+		recvChan:             recvC,
+		cpChan:               cpChan,
+		confChan:             confC,
+		close:                make(chan bool),
+		delFlag:              c.DelFlag,
+		requestSethMemLimit:  c.RequestSethMemLimit,
+		requestSetMaxMem:     int(c.RequestSetMaxMem),
+		reusableRequestBatch: &pb.SendRequestBatch{},
 	}
 
 	if rbft.K == 0 {
@@ -588,7 +591,10 @@ func (rbft *rbftImpl) consensusMessageFilter(msg *pb.ConsensusMessage) consensus
 		return rbft.processReqSetEvent(set)
 	}
 
-	next, _ := rbft.msgToEvent(msg)
+	next, err := rbft.msgToEvent(msg)
+	if err != nil {
+		return nil
+	}
 	return rbft.dispatchConsensusMsg(next)
 }
 
@@ -1639,6 +1645,8 @@ func (rbft *rbftImpl) finishConfigCheckpoint(chkpt *pb.Checkpoint) {
 
 		// resubmit transactions
 		rbft.primaryResubmitTransactions()
+	} else {
+		rbft.fetchRecoveryPQC()
 	}
 }
 
@@ -1663,6 +1671,7 @@ func (rbft *rbftImpl) finishNormalCheckpoint(chkpt *pb.Checkpoint) {
 	}
 }
 
+// TODO(wgr): simplify the process to deal with checkpoint in v1.0.6
 // weakCheckpointSetOutOfRange checks if this node is fell behind or not. If we receive f+1 checkpoints whose seqNo > H (for example 150),
 // move watermark to the smallest seqNo (150) among these checkpoints, because this node is fell behind 5 blocks at least.
 func (rbft *rbftImpl) weakCheckpointSetOutOfRange(chkpt *pb.Checkpoint) bool {
@@ -1673,6 +1682,14 @@ func (rbft *rbftImpl) weakCheckpointSetOutOfRange(chkpt *pb.Checkpoint) bool {
 		// For non-byzantine nodes, the checkpoint sequence number increases monotonically
 		delete(rbft.storeMgr.hChkpts, chkpt.ReplicaId)
 	} else {
+		base64Id, ok := rbft.storeMgr.chkpts[chkpt.SequenceNumber]
+		if ok {
+			if base64Id == chkpt.Digest {
+				rbft.logger.Warningf("Replica %d received a checkpoint %d out of high watermark, "+
+					"but we has already executed this block", rbft.peerPool.ID, chkpt.SequenceNumber)
+				return false
+			}
+		}
 		// We do not track the highest one, as a byzantine node could pick an arbitrarily high sequence number
 		// and even if it recovered to be non-byzantine, we would still believe it to be far ahead
 		rbft.storeMgr.hChkpts[chkpt.ReplicaId] = chkpt.SequenceNumber

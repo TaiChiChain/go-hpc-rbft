@@ -2,6 +2,40 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.2.25-3"></a>
+## [0.2.25-3](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.25-2...v0.2.25-3) (2021-01-06)
+
+
+### Bug Fixes
+
+* update the process to sync epoch ([cef9c00](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/cef9c00)), closes [#flato-3050](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-3050)
+
+
+
+<a name="0.2.25-2"></a>
+## [0.2.25-2](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.25-1...v0.2.25-2) (2021-01-04)
+
+
+### Bug Fixes
+
+* fetch pqc after config change and view change ([20260ad](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/20260ad)), closes [#flato-3020](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-3020)
+* receive the checkpoints from replicas with h>low-watermark ([80acddd](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/80acddd)), closes [#flato-2987](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-2987)
+* **viewchange_mgr.go:** delete old neweView msg when received a new valid newView msg ([5181fb2](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/5181fb2))
+
+
+
+<a name="0.2.25-1"></a>
+## [0.2.25-1](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.25...v0.2.25-1) (2020-12-25)
+
+
+### Bug Fixes
+
+* avoid fetchRequestBatch repeatly in one vc/recovery ([5cb2ab9](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/5cb2ab9))
+* change the method to deal with checkpoint out of range ([da1cef8](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/da1cef8)), closes [#flato-2997](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-2997)
+* modity the order to stop rbft core ([59f425f](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/59f425f)), closes [#flato-2996](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-2996)
+
+
+
 <a name="0.2.25"></a>
 ## [0.2.25](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.24...v0.2.25) (2020-12-01)
 

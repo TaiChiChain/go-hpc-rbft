@@ -138,10 +138,9 @@ func (n *node) Start() error {
 func (n *node) Stop() {
 	n.stateLock.Lock()
 	defer n.stateLock.Unlock()
+	n.rbft.stop()
 	n.currentState = nil
 	n.cpChan = make(chan *pb.ServiceState)
-
-	n.rbft.stop()
 }
 
 // Propose proposes requests to RBFT core, requests are ensured to be eventually
