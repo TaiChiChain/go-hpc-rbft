@@ -322,14 +322,16 @@ func (tm *timerManager) makeSyncStateTimeoutLegal() {
 	tm.logger.Infof("RBFT sync state restart timeout = %v", tm.getTimeoutValue(syncStateRestartTimer))
 }
 
-// startHighWatermarkTimer starts a high-watermark timer:
+// softStartHighWatermarkTimer starts a high-watermark timer:
 // we prefer to start a high-watermark timer when we try to send a checkpoint equal to our high-watermark,
 // which means the previous checkpoints were failed and the garbage collecting mechanism is abnormal.
-func (rbft *rbftImpl) startHighWatermarkTimer() {
+func (rbft *rbftImpl) softStartHighWatermarkTimer() {
 	rbft.logger.Debugf("Replica %d start high-watermark timer, current low-watermark is %d", rbft.peerPool.ID, rbft.h)
 
-	// stop the previous high-watermark timer
-	rbft.timerMgr.stopTimer(highWatermarkTimer)
+	if rbft.timerMgr.tTimers[highWatermarkTimer].count() != 0 {
+		rbft.logger.Debugf("Replica %d has already started high-watermark timer", rbft.peerPool.ID)
+		return
+	}
 
 	event := &LocalEvent{
 		Service:   CoreRbftService,
