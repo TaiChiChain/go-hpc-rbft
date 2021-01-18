@@ -163,6 +163,7 @@ func (rbft *rbftImpl) maybeSendPrePrepare(batch *pb.RequestBatch, findCache bool
 		}
 		rbft.logger.Debugf("Replica %d is primary, not sending prePrepare for request batch in cache because "+
 			"next seqNo is out of high watermark %d", rbft.peerPool.ID, rbft.h+rbft.L)
+		rbft.softStartHighWatermarkTimer()
 		return
 	}
 

@@ -913,6 +913,11 @@ func (rbft *rbftImpl) recvPrePrepare(preprep *pb.PrePrepare) error {
 		}
 	}
 
+	if !rbft.inW(preprep.SequenceNumber) {
+		rbft.logger.Debugf("Replica %d received a pre-prepare out of high-watermark", rbft.peerPool.ID)
+		rbft.softStartHighWatermarkTimer()
+	}
+
 	if preprep.BatchDigest == "" {
 		if len(preprep.HashBatch.RequestHashList) != 0 {
 			rbft.logger.Warningf("Replica %d received a prePrepare with an empty digest but batch is "+
@@ -1491,7 +1496,7 @@ func (rbft *rbftImpl) checkpoint(state *pb.MetaState) {
 		if rbft.exec.lastExec == rbft.h+rbft.L {
 			rbft.logger.Warningf("Replica %d try to send checkpoint equal to high watermark, "+
 				"there may be something wrong with checkpoint", rbft.peerPool.ID)
-			rbft.startHighWatermarkTimer()
+			rbft.softStartHighWatermarkTimer()
 		}
 	}
 	payload, err := proto.Marshal(chkpt)
