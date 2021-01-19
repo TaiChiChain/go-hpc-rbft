@@ -445,10 +445,18 @@ func (rbft *rbftImpl) compareCheckpointWithWeakSet(chkpt *pb.Checkpoint) (bool, 
 
 	// track totally matching checkpoints.
 	matching := 0
+	checkedReplica := make(map[uint64]bool)
 	for cp := range rbft.storeMgr.checkpointStore {
 		if cp.SequenceNumber != chkpt.SequenceNumber {
 			continue
 		}
+
+		// for one sequence number, a certain replica would be compared only once
+		if checkedReplica[cp.ReplicaId] {
+			rbft.logger.Warningf("Replica %d has received redundant checkpoint from replica %d", rbft.peerPool.ID)
+			continue
+		}
+		checkedReplica[cp.ReplicaId] = true
 
 		if cp.Digest == chkpt.Digest {
 			matching++
