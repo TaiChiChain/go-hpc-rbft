@@ -87,6 +87,11 @@ func (rbft *rbftImpl) sendInW(n uint64) bool {
 	return n > rbft.h && n <= rbft.h+rbft.L
 }
 
+// beyondRange is used to check the given seqNo is out of high-watermark or not
+func (rbft *rbftImpl) beyondRange(n uint64) bool {
+	return n > rbft.h+rbft.L
+}
+
 // cleanAllBatchAndCert cleans all outstandingReqBatches and committedCert
 func (rbft *rbftImpl) cleanOutstandingAndCert() {
 	rbft.storeMgr.outstandingReqBatches = make(map[string]*pb.RequestBatch)
@@ -432,32 +437,37 @@ func (rbft *rbftImpl) compareCheckpointWithWeakSet(chkpt *pb.Checkpoint) (bool, 
 		return false, 0
 	}
 
-	if rbft.storeMgr.checkpointStore[*chkpt] {
-		rbft.logger.Warningf("Replica %d ignore duplicate checkpoint from replica %d, seqNo=%d", rbft.peerPool.ID, chkpt.ReplicaId, chkpt.SequenceNumber)
-		return false, 0
+	cID := chkptID{
+		nodeHash: chkpt.NodeInfo.ReplicaHash,
+		sequence: chkpt.SequenceNumber,
 	}
-	rbft.storeMgr.checkpointStore[*chkpt] = true
+
+	_, ok := rbft.storeMgr.checkpointStore[cID]
+	if ok {
+		rbft.logger.Warningf("Replica %d received duplicate checkpoint from replica %s for seqNo %d, update storage", rbft.peerPool.ID, cID.nodeHash, cID.sequence)
+	}
+	rbft.storeMgr.checkpointStore[cID] = chkpt.Digest
 
 	// track how many different checkpoint values we have for the seqNo.
-	diffValues := make(map[string][]uint64)
+	diffValues := make(map[string][]string)
 	// track how many "correct"(more than f + 1) checkpoint values we have for the seqNo.
 	var correctValues []string
 
 	// track totally matching checkpoints.
 	matching := 0
-	for cp := range rbft.storeMgr.checkpointStore {
-		if cp.SequenceNumber != chkpt.SequenceNumber {
+	for cp, digest := range rbft.storeMgr.checkpointStore {
+		if cp.sequence != chkpt.SequenceNumber {
 			continue
 		}
 
-		if cp.Digest == chkpt.Digest {
+		if digest == chkpt.Digest {
 			matching++
 		}
 
-		if _, ok := diffValues[cp.Digest]; !ok {
-			diffValues[cp.Digest] = []uint64{cp.ReplicaId}
+		if _, exist := diffValues[digest]; !exist {
+			diffValues[digest] = []string{cp.nodeHash}
 		} else {
-			diffValues[cp.Digest] = append(diffValues[cp.Digest], cp.ReplicaId)
+			diffValues[digest] = append(diffValues[digest], cp.nodeHash)
 		}
 
 		// if current network contains more than f + 1 checkpoints with the same seqNo
@@ -473,8 +483,8 @@ func (rbft *rbftImpl) compareCheckpointWithWeakSet(chkpt *pb.Checkpoint) (bool, 
 		}
 
 		// record all correct checkpoint(weak cert) values.
-		if len(diffValues[cp.Digest]) == rbft.f+1 {
-			correctValues = append(correctValues, cp.Digest)
+		if len(diffValues[digest]) == rbft.f+1 {
+			correctValues = append(correctValues, digest)
 		}
 	}
 

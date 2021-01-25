@@ -66,35 +66,6 @@ func TestStoreMgr_newStoreMgr(t *testing.T) {
 	assert.Equal(t, "XXX GENESIS", s.chkpts[0])
 }
 
-func TestStoreMgr_moveWatermarks(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	s, conf := newStorageTestNode(ctrl)
-	cpChan := make(chan *pb.ServiceState)
-	confC := make(chan *pb.ReloadFinished)
-	rbft, _ := newRBFT(cpChan, confC, conf)
-
-	QID := qidx{
-		d: "useless",
-		n: 20,
-	}
-	PQ := &pb.Vc_PQ{
-		SequenceNumber: 20,
-		BatchDigest:    "useless",
-		View:           1,
-	}
-	s.chkpts[uint64(20)] = "base64"
-	rbft.vcMgr.qlist[QID] = PQ
-	rbft.vcMgr.plist[uint64(20)] = PQ
-
-	// h is 30, delete them
-	s.moveWatermarks(rbft, uint64(30))
-	assert.Equal(t, map[uint64]string{}, s.chkpts)
-	assert.Equal(t, map[qidx]*pb.Vc_PQ{}, rbft.vcMgr.qlist)
-	assert.Equal(t, map[uint64]*pb.Vc_PQ{}, rbft.vcMgr.plist)
-}
-
 func TestStoreMgr_saveCheckpoint(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()

@@ -58,18 +58,18 @@ type storeManager struct {
 	// checkpoint numbers received from others which are bigger than our
 	// H(=h+L); map replicaHash to the last checkpoint number received from
 	// that replica bigger than H
-	hChkpts map[uint64]uint64
+	hChkpts map[string]uint64
 
 	// track all non-repeating checkpoints
-	checkpointStore map[pb.Checkpoint]bool
+	checkpointStore map[chkptID]string
 }
 
 // newStoreMgr news an instance of storeManager
 func newStoreMgr(c Config) *storeManager {
 	sm := &storeManager{
 		chkpts:                make(map[uint64]string),
-		hChkpts:               make(map[uint64]uint64),
-		checkpointStore:       make(map[pb.Checkpoint]bool),
+		hChkpts:               make(map[string]uint64),
+		checkpointStore:       make(map[chkptID]string),
 		certStore:             make(map[msgID]*msgCert),
 		committedCert:         make(map[msgID]string),
 		seqMap:                make(map[uint64]string),
@@ -104,7 +104,7 @@ func (sm *storeManager) moveWatermarks(rbft *rbftImpl, h uint64) {
 	}
 }
 
-// saveCheckpoint saves checkpoint information to chkpts, whose key is lastExec, value is the global hash of current
+// saveCheckpoint saves checkpoint information to chkpts, whose key is lastExec, value is the global nodeHash of current
 // BlockchainInfo
 func (sm *storeManager) saveCheckpoint(l uint64, gh string) {
 	sm.chkpts[l] = gh

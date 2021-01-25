@@ -149,6 +149,12 @@ type ntfIde struct {
 	nodeID uint64
 }
 
+// ----------checkpoint related structs------------------
+type chkptID struct {
+	nodeHash string
+	sequence uint64
+}
+
 // -----------router struct-----------------
 type routerMap struct {
 	//IDMap   map[uint64]string
