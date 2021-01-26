@@ -465,8 +465,8 @@ func (rbft *rbftImpl) compareCheckpointWithWeakSet(chkpt *pb.Checkpoint) (bool, 
 		if len(diffValues) > rbft.f+1 {
 			rbft.logger.Criticalf("Replica %d cannot find stable checkpoint with seqNo %d"+
 				"(%d different values observed already).", rbft.peerPool.ID, chkpt.SequenceNumber, len(diffValues))
-			rbft.atomicOn(Pending)
-			rbft.metrics.statusGaugePending.Set(Pending)
+			rbft.on(Inconsistent)
+			rbft.metrics.statusGaugeInconsistent.Set(Inconsistent)
 			rbft.setAbNormal()
 			rbft.stopNamespace()
 			return false, 0
@@ -487,8 +487,8 @@ func (rbft *rbftImpl) compareCheckpointWithWeakSet(chkpt *pb.Checkpoint) (bool, 
 	// consensus state.
 	if len(correctValues) > 1 {
 		rbft.logger.Criticalf("Replica %d finds several weak certs for checkpoint %d, values: %v", rbft.peerPool.ID, chkpt.SequenceNumber, correctValues)
-		rbft.atomicOn(Pending)
-		rbft.metrics.statusGaugePending.Set(Pending)
+		rbft.on(Inconsistent)
+		rbft.metrics.statusGaugeInconsistent.Set(Inconsistent)
 		rbft.setAbNormal()
 		rbft.stopNamespace()
 		return false, 0
