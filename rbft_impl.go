@@ -124,11 +124,11 @@ type Config struct {
 	// RequestPool helps managing the requests, detect and discover duplicate requests.
 	RequestPool txpool.TxPool
 
-	// RequestSetMemLimit indicates whether limit requests set mem size or not.
-	RequestSethMemLimit bool
+	// FlowControl indicates whether flow control has been opened.
+	FlowControl bool
 
-	// RequestSetMaxMem is the max memory size of one set of requests.
-	RequestSetMaxMem uint
+	// FlowControlMaxMem indicates the max memory size of txs in request set
+	FlowControlMaxMem int
 
 	// MetricsProv is the metrics Provider used to generate metrics instance.
 	MetricsProv metrics.Provider
@@ -172,8 +172,8 @@ type rbftImpl struct {
 	delFlag  chan bool               // channel to stop namespace when there is a non-recoverable error
 	close    chan bool               // channel to close this event process
 
-	requestSethMemLimit bool // whether limit requests set mem size or not
-	requestSetMaxMem    int  // max memory size of one set of requests
+	flowControl       bool // whether limit flow or not
+	flowControlMaxMem int  // the max memory size of txs in request set
 
 	reusableRequestBatch *pb.SendRequestBatch // special struct to reuse the biggest message in rbft.
 
@@ -208,17 +208,13 @@ func newRBFT(cpChan chan *pb.ServiceState, confC chan *pb.ReloadFinished, c Conf
 		confChan:             confC,
 		close:                make(chan bool),
 		delFlag:              c.DelFlag,
-		requestSethMemLimit:  c.RequestSethMemLimit,
-		requestSetMaxMem:     int(c.RequestSetMaxMem),
+		flowControl:          c.FlowControl,
+		flowControlMaxMem:    c.FlowControlMaxMem,
 		reusableRequestBatch: &pb.SendRequestBatch{},
 	}
 
 	if rbft.K == 0 {
 		rbft.K = uint64(DefaultK)
-	}
-
-	if rbft.requestSetMaxMem <= 0 {
-		rbft.requestSetMaxMem = DefaultRequestSetMaxMem
 	}
 
 	N := len(c.Peers)
@@ -706,8 +702,8 @@ func (rbft *rbftImpl) sendNullRequest() {
 // 2. node is in config change, reject another config tx
 // 3. node is in skipInProgress, rejects any txs from other nodes or API
 func (rbft *rbftImpl) processReqSetEvent(req *pb.RequestSet) consensusEvent {
-	// if pool already full, rejects the tx, unless it's from RPC because of time difference
-	if rbft.isPoolFull() && !req.Local {
+	// if pool already full, rejects the tx, unless it's from RPC because of time difference or we have opened flow control
+	if rbft.isPoolFull() && !req.Local && !rbft.flowControl {
 		rbft.rejectRequestSet(req)
 		return nil
 	}
@@ -801,15 +797,37 @@ func (rbft *rbftImpl) processOutOfDateReqs() {
 	setSize := rbft.config.SetSize
 	rbft.logger.Debugf("Replica %d in normal finds %d remained reqs, broadcast to others split by setSize %d if needed", rbft.peerPool.ID, reqLen, setSize)
 
+	// limit TransactionSet Max Mem by flowControlMaxMem before re-broadcast reqs
+	if rbft.flowControl {
+		var txs []*protos.Transaction
+		memLen := 0
+		for _, tx := range reqs {
+			txMem := tx.Size()
+			if memLen+txMem >= rbft.flowControlMaxMem && len(txs) > 0 {
+				set := &pb.RequestSet{Requests: txs}
+				rbft.broadcastReqSet(set)
+				txs = nil
+				memLen = 0
+			}
+			txs = append(txs, tx)
+			memLen += txMem
+		}
+		if len(txs) > 0 {
+			set := &pb.RequestSet{Requests: txs}
+			rbft.broadcastReqSet(set)
+		}
+		return
+	}
+
 	// limit TransactionSet size by setSize before re-broadcast reqs
 	for reqLen > 0 {
 		if reqLen <= setSize {
-			set := &pb.RequestSet{Requests: reqs, Local: true}
+			set := &pb.RequestSet{Requests: reqs}
 			rbft.broadcastReqSet(set)
 			reqLen = 0
 		} else {
 			bTxs := reqs[0:setSize]
-			set := &pb.RequestSet{Requests: bTxs, Local: true}
+			set := &pb.RequestSet{Requests: bTxs}
 			rbft.broadcastReqSet(set)
 			reqs = reqs[setSize:]
 			reqLen -= setSize
