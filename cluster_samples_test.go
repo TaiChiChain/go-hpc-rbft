@@ -60,24 +60,6 @@ func TestCluster_SendTx_InitCtx(t *testing.T) {
 	assert.Equal(t, uint64(60), rbfts[3].exec.lastExec)
 }
 
-func TestCluster_TFStart_TFStop(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	tf := newTestFramework(4, false)
-
-	tf.frameworkStart()
-	for _, tn := range tf.TestNode {
-		flag := tn.close == nil
-		assert.False(t, flag)
-	}
-
-	tf.frameworkStop()
-	for _, tn := range tf.TestNode {
-		flag := tn.close == nil
-		assert.True(t, flag)
-	}
-}
-
 func TestCluster_SyncSmallEpochWithCheckpoint(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()

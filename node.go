@@ -138,9 +138,23 @@ func (n *node) Start() error {
 func (n *node) Stop() {
 	n.stateLock.Lock()
 	defer n.stateLock.Unlock()
+
+	select {
+	case <-n.cpChan:
+	default:
+		n.logger.Notice("close channel: checkpoint")
+		close(n.cpChan)
+	}
+
+	select {
+	case <-n.confChan:
+	default:
+		n.logger.Notice("close channel: config")
+		close(n.confChan)
+	}
+
 	n.rbft.stop()
 	n.currentState = nil
-	n.cpChan = make(chan *pb.ServiceState)
 }
 
 // Propose proposes requests to RBFT core, requests are ensured to be eventually
@@ -188,7 +202,7 @@ func (n *node) ReportExecuted(state *pb.ServiceState) {
 	n.currentState = state
 
 	// a config transaction executed or checkpoint, send state to checkpoint channel
-	if n.rbft.readConfigBatchToExecute() == state.MetaState.Applied || state.MetaState.Applied%n.config.K == 0 {
+	if !n.rbft.atomicIn(Pending) && n.rbft.readConfigBatchToExecute() == state.MetaState.Applied || state.MetaState.Applied%n.config.K == 0 && n.cpChan != nil {
 		n.logger.Debugf("Report checkpoint: {%d, %s} to RBFT core", state.MetaState.Applied, state.MetaState.Digest)
 		n.cpChan <- state
 	}
@@ -217,7 +231,7 @@ func (n *node) ReportReloadFinished(reload *pb.ReloadMessage) {
 		n.setReloadRouter(reload.Router)
 	case pb.ReloadType_FinishReloadCommitDB:
 		n.logger.Noticef("Commit-DB finished, recv height: %d", reload.Height)
-		if n.rbft.atomicIn(InConfChange) {
+		if n.rbft.atomicIn(InConfChange) && n.confChan != nil {
 			rf := &pb.ReloadFinished{Height: reload.Height}
 			n.confChan <- rf
 		} else {

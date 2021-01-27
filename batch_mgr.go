@@ -278,6 +278,11 @@ func (rbft *rbftImpl) primaryResubmitTransactions() {
 	if rbft.isPrimary(rbft.peerPool.ID) && !rbft.atomicIn(InConfChange) {
 		rbft.logger.Debugf("======== Primary %d resubmit transactions", rbft.peerPool.ID)
 
+		if !rbft.isNormal() {
+			rbft.logger.Debugf("Primary %d is in abnormal, reject resubmit", rbft.peerPool.ID)
+			return
+		}
+
 		// try cached batches first if any.
 		if len(rbft.batchMgr.cacheBatch) > 0 {
 			rbft.restartBatchTimer()
@@ -287,6 +292,11 @@ func (rbft *rbftImpl) primaryResubmitTransactions() {
 
 		// if primary has transactions in requestPool, generate batches of the transactions
 		for rbft.batchMgr.requestPool.HasPendingRequestInPool() {
+			if !rbft.isNormal() {
+				rbft.logger.Debugf("Primary %d is in abnormal, reject resubmit", rbft.peerPool.ID)
+				return
+			}
+
 			batches := rbft.batchMgr.requestPool.GenerateRequestBatch()
 			rbft.postBatches(batches)
 

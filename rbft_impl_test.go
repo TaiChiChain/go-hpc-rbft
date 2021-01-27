@@ -191,6 +191,8 @@ func TestRBFT_reportStateUpdated(t *testing.T) {
 
 	_, rbfts := newBasicClusterInstance()
 
+	unlockCluster(rbfts)
+
 	state2 := &pb.ServiceState{}
 	state2.MetaState = &pb.MetaState{
 		Applied: 20,
@@ -213,8 +215,9 @@ func TestRBFT_postMsg(t *testing.T) {
 	defer ctrl.Finish()
 
 	_, rbfts := newBasicClusterInstance()
+	unlockCluster(rbfts)
 
-	go rbfts[0].postMsg([]byte("postMsg"))
+	rbfts[0].postMsg([]byte("postMsg"))
 	obj := <-rbfts[0].recvChan
 	assert.Equal(t, []byte("postMsg"), obj)
 }
@@ -228,6 +231,7 @@ func TestRBFT_getStatus(t *testing.T) {
 	defer ctrl.Finish()
 
 	_, rbfts := newBasicClusterInstance()
+	unlockCluster(rbfts)
 
 	var status NodeStatus
 
