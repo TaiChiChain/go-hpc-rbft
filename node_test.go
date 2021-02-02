@@ -85,18 +85,17 @@ func TestNode_Propose(t *testing.T) {
 	defer ctrl.Finish()
 
 	_, rbfts := newBasicClusterInstance()
-	n := rbfts[0].node
+	unlockCluster(rbfts)
 
-	go func() {
-		requestsTmp := []*protos.Transaction{newTx()}
-		_ = n.Propose(requestsTmp)
-		obj := <-n.rbft.recvChan
-		rSet := &pb.RequestSet{
-			Requests: requestsTmp,
-			Local:    true,
-		}
-		assert.Equal(t, rSet, obj)
-	}()
+	n := rbfts[0].node
+	requestsTmp := []*protos.Transaction{newTx()}
+	_ = n.Propose(requestsTmp)
+	obj := <-n.rbft.recvChan
+	rSet := &pb.RequestSet{
+		Requests: requestsTmp,
+		Local:    true,
+	}
+	assert.Equal(t, rSet, obj)
 }
 
 func TestNode_Step(t *testing.T) {

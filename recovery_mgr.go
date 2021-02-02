@@ -15,6 +15,8 @@
 package rbft
 
 import (
+	"sync"
+
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
 
 	"github.com/gogo/protobuf/proto"
@@ -32,6 +34,10 @@ type recoveryManager struct {
 	differentEpoch    map[ntfIde]*pb.NotificationResponse // track notification messages from different epoch
 	recoveryHandled   bool                                // if we have process new view or not
 	needSyncEpoch     bool
+
+	highWatermarkTimerReason string
+
+	syncReceiver sync.Map
 
 	logger Logger
 }
@@ -853,4 +859,22 @@ func (rbft *rbftImpl) exitSyncState() {
 	rbft.off(NeedSyncState)
 	rbft.timerMgr.stopTimer(syncStateRspTimer)
 	rbft.timerMgr.stopTimer(syncStateRestartTimer)
+}
+
+func (rbft *rbftImpl) readMap(k, v interface{}) bool {
+	id, ok := k.(ntfIdx)
+	if !ok {
+		rbft.logger.Error("ntf idx parsing error")
+		return false
+	}
+	n, ok := v.(*pb.Notification)
+	if !ok {
+		rbft.logger.Error("notification parsing error")
+		return false
+	}
+	rbft.logger.Debugf("Replica %d received notification from replica %d, e:%d, v:%d, h:%d, |C|:%d, |P|:%d, |Q|:%d",
+		rbft.peerPool.ID, n.NodeInfo.ReplicaId, n.Epoch, n.Basis.View, n.Basis.H, len(n.Basis.Cset), len(n.Basis.Pset), len(n.Basis.Qset))
+	rbft.recoveryMgr.notificationStore[id] = n
+	rbft.recoveryMgr.syncReceiver.Delete(k)
+	return true
 }

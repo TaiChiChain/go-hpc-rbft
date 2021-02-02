@@ -54,7 +54,7 @@ func TestEpoch_recvFetchCheckpoint_SendBackNormal(t *testing.T) {
 	}
 	rbfts[0].storeMgr.saveCheckpoint(uint64(12), "block-number-12")
 	chkpt := &pb.Checkpoint{
-		ReplicaId:      rbfts[0].peerPool.ID,
+		NodeInfo:       rbfts[0].getNodeInfo(),
 		SequenceNumber: uint64(12),
 		Digest:         "block-number-12",
 	}
@@ -76,7 +76,7 @@ func TestEpoch_recvFetchCheckpoint_SendBackStableCheckpoint(t *testing.T) {
 	rbfts[0].h = uint64(50)
 	rbfts[0].storeMgr.saveCheckpoint(uint64(50), "block-number-50")
 	chkpt := &pb.Checkpoint{
-		ReplicaId:      rbfts[0].peerPool.ID,
+		NodeInfo:       rbfts[0].getNodeInfo(),
 		SequenceNumber: uint64(50),
 		Digest:         "block-number-50",
 	}
