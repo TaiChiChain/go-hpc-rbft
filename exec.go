@@ -177,8 +177,6 @@ func (rbft *rbftImpl) handleCoreRbftEvent(e *LocalEvent) consensusEvent {
 		return nil
 
 	case CoreHighWatermarkEvent:
-		rbft.logger.Debugf("Replica %d high-watermark timer expired, try to send viewChange", rbft.peerPool.ID)
-
 		if rbft.atomicInOne(InViewChange, InRecovery) {
 			rbft.logger.Debugf("Replica %d is in viewChange/recovery, ignore the high-watermark event")
 			return nil
@@ -196,7 +194,9 @@ func (rbft *rbftImpl) handleCoreRbftEvent(e *LocalEvent) consensusEvent {
 			rbft.logger.Debugf("Replica %d has already updated low-watermark to %d, just return", rbft.peerPool.ID, rbft.h)
 			return nil
 		}
-		return rbft.sendViewChange()
+
+		rbft.logger.Infof("Replica %d high-watermark timer expired, init recovery: %s", rbft.peerPool.ID, rbft.recoveryMgr.highWatermarkTimerReason)
+		return rbft.initRecovery()
 
 	default:
 		rbft.logger.Errorf("Invalid core RBFT event: %v", e)

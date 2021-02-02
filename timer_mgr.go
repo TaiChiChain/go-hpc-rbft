@@ -322,21 +322,27 @@ func (tm *timerManager) makeSyncStateTimeoutLegal() {
 	tm.logger.Infof("RBFT sync state restart timeout = %v", tm.getTimeoutValue(syncStateRestartTimer))
 }
 
-// startHighWatermarkTimer starts a high-watermark timer:
-// we prefer to start a high-watermark timer when we try to send a checkpoint equal to our high-watermark,
-// which means the previous checkpoints were failed and the garbage collecting mechanism is abnormal.
-func (rbft *rbftImpl) startHighWatermarkTimer() {
-	rbft.logger.Debugf("Replica %d start high-watermark timer, current low-watermark is %d", rbft.peerPool.ID, rbft.h)
+// softStartHighWatermarkTimer starts a high-watermark timer to get latest stable checkpoint, in following conditions:
+// 1) primary is trying to send pre-prepare out of range
+// 2) replica received pre-prepare out of range
+// 3) replica is trying to send checkpoint equal to high-watermark
+// 4) replica received f+1 checkpoints out of range but it has already executed blocks larger than thesr checkpoints
+func (rbft *rbftImpl) softStartHighWatermarkTimer(reason string) {
 
-	// stop the previous high-watermark timer
-	rbft.timerMgr.stopTimer(highWatermarkTimer)
+	rbft.logger.Debugf("Replica %d soft start high-watermark timer, current low-watermark is %d, reason: %s", rbft.peerPool.ID, rbft.h, reason)
 
 	event := &LocalEvent{
 		Service:   CoreRbftService,
 		EventType: CoreHighWatermarkEvent,
 		Event:     rbft.h,
 	}
-	rbft.timerMgr.startTimer(highWatermarkTimer, event)
+
+	hasStarted, _ := rbft.timerMgr.softStartTimerWithNewTT(highWatermarkTimer, rbft.timerMgr.getTimeoutValue(highWatermarkTimer), event)
+	if hasStarted {
+		rbft.logger.Debugf("Replica %d has started new view timer before", rbft.peerPool.ID)
+	} else {
+		rbft.recoveryMgr.highWatermarkTimerReason = reason
+	}
 }
 
 // stopHighWatermarkTimer stops a high-watermark timer

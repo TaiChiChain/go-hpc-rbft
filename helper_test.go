@@ -7,7 +7,6 @@ import (
 	"github.com/ultramesh/flato-common/types/protos"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
 
-	"github.com/gogo/protobuf/proto"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 )
@@ -274,87 +273,6 @@ func TestHelper_isCommitLegal(t *testing.T) {
 	assert.False(t, rbfts[0].isCommitLegal(commit))
 }
 
-func TestHelper_compareCheckpointWithWeakSet(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	_, rbfts := newBasicClusterInstance()
-
-	var (
-		flag bool
-		val  int
-	)
-
-	chkpt := &pb.Checkpoint{
-		ReplicaId:      1,
-		SequenceNumber: 50,
-		Digest:         "msg",
-	}
-	chkptR1 := &pb.Checkpoint{
-		ReplicaId:      3,
-		SequenceNumber: 50,
-		Digest:         "msgR1",
-	}
-	chkptR2 := &pb.Checkpoint{
-		ReplicaId:      4,
-		SequenceNumber: 50,
-		Digest:         "msgR2",
-	}
-
-	// if !rbft.inW(chkpt.SequenceNumber)
-	// if chkpt.SequenceNumber != rbft.h && !rbft.in(SkipInProgress)
-	rbfts[0].h = 70
-	rbfts[0].on(SkipInProgress)
-	flag, val = rbfts[0].compareCheckpointWithWeakSet(chkpt)
-	assert.Equal(t, false, flag)
-	assert.Equal(t, 0, val)
-
-	rbfts[0].off(SkipInProgress)
-	flag, val = rbfts[0].compareCheckpointWithWeakSet(chkpt)
-	assert.Equal(t, false, flag)
-	assert.Equal(t, 0, val)
-
-	// if len(diffValues) > rbft.f+1
-	rbfts[0].h = 20
-	rbfts[0].storeMgr.checkpointStore[*chkpt] = true
-	rbfts[0].storeMgr.checkpointStore[*chkptR1] = true
-	rbfts[0].storeMgr.checkpointStore[*chkptR2] = true
-	flag, val = rbfts[0].compareCheckpointWithWeakSet(chkpt)
-	assert.Equal(t, false, flag)
-	assert.Equal(t, 0, val)
-
-	// if len(correctValues) == 0
-	delete(rbfts[0].storeMgr.checkpointStore, *chkpt)
-	delete(rbfts[0].storeMgr.checkpointStore, *chkptR1)
-	delete(rbfts[0].storeMgr.checkpointStore, *chkptR2)
-	rbfts[0].storeMgr.checkpointStore[*chkpt] = true
-	flag, val = rbfts[0].compareCheckpointWithWeakSet(chkpt)
-	assert.Equal(t, false, flag)
-	assert.Equal(t, 0, val)
-
-	// if len(correctValues) > 1
-	rbfts[0].atomicOff(Pending)
-	rbfts[0].setNormal()
-	chkpt.Digest = "msg"
-	chkptR1.Digest = "msg"
-	chkptR2.Digest = "msg"
-	rbfts[0].storeMgr.checkpointStore[*chkpt] = true
-	rbfts[0].storeMgr.checkpointStore[*chkptR1] = true
-	rbfts[0].storeMgr.checkpointStore[*chkptR2] = true
-	chkpt.Digest = "msgR1"
-	chkptR1.Digest = "msgR1"
-	chkptR2.Digest = "msgR1"
-	rbfts[0].storeMgr.checkpointStore[*chkpt] = true
-	rbfts[0].storeMgr.checkpointStore[*chkptR1] = true
-	rbfts[0].storeMgr.checkpointStore[*chkptR2] = true
-	delete(rbfts[0].storeMgr.checkpointStore, *chkptR2)
-	flag, val = rbfts[0].compareCheckpointWithWeakSet(chkpt)
-	assert.Equal(t, false, flag)
-	assert.Equal(t, 0, val)
-	assert.Equal(t, false, rbfts[0].atomicIn(Pending))
-	assert.Equal(t, true, rbfts[0].in(Normal))
-}
-
 func TestRBFT_startTimerIfOutstandingRequests(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -376,52 +294,6 @@ func TestRBFT_startTimerIfOutstandingRequests(t *testing.T) {
 	assert.False(t, rbfts[0].timerMgr.getTimer(newViewTimer))
 	rbfts[0].startTimerIfOutstandingRequests()
 	assert.True(t, rbfts[0].timerMgr.getTimer(newViewTimer))
-}
-
-func TestHelper_RequestSet(t *testing.T) {
-	tx1 := newTx()
-	tx2 := newTx()
-	tx3 := newTx()
-	tx4 := newTx()
-	tx5 := newTx()
-
-	req := &pb.RequestSet{
-		Local:    true,
-		Requests: []*protos.Transaction{tx1, tx2, tx3, tx4, tx5},
-	}
-
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	nodes, rbfts := newBasicClusterInstance()
-
-	rbfts[0].processEvent(req)
-	reqEventNormal := nodes[0].broadcastMessageCache
-	payload, _ := proto.Marshal(req)
-	consensusMsgNormal := &pb.ConsensusMessage{
-		Type:    pb.Type_REQUEST_SET,
-		From:    rbfts[0].peerPool.ID,
-		Epoch:   rbfts[0].epoch,
-		Payload: payload,
-	}
-	assert.Equal(t, consensusMsgNormal, reqEventNormal)
-
-	rbfts[1].requestSethMemLimit = true
-	rbfts[1].requestSetMaxMem = 1
-	rbfts[1].processEvent(req)
-	reqEventSplit := nodes[1].broadcastMessageCache
-	lastSplitSet := &pb.RequestSet{
-		Local:    true,
-		Requests: []*protos.Transaction{tx5},
-	}
-	payload, _ = proto.Marshal(lastSplitSet)
-	consensusMsgSplit := &pb.ConsensusMessage{
-		Type:    pb.Type_REQUEST_SET,
-		From:    rbfts[1].peerPool.ID,
-		Epoch:   rbfts[1].epoch,
-		Payload: payload,
-	}
-	assert.Equal(t, consensusMsgSplit, reqEventSplit)
 }
 
 func TestHelper_stopNamespace(t *testing.T) {

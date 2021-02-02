@@ -99,11 +99,6 @@ const (
 	NotSupportService
 )
 
-const (
-	// DefaultRequestSetMaxMem is the default memory size of request set
-	DefaultRequestSetMaxMem = 45 * 1024 * 1024 // 45MB
-)
-
 // LocalEvent represents event sent by local modules
 type LocalEvent struct {
 	Service   int // service type range from {CoreRbftService, ViewChangeService, RecoveryService, NodeMgrService}
@@ -147,6 +142,12 @@ type ntfIdx struct {
 type ntfIde struct {
 	e      uint64
 	nodeID uint64
+}
+
+// ----------checkpoint related structs------------------
+type chkptID struct {
+	nodeHash string
+	sequence uint64
 }
 
 // -----------router struct-----------------

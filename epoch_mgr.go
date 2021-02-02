@@ -113,7 +113,7 @@ func (rbft *rbftImpl) recvFetchCheckpoint(fetch *pb.FetchCheckpoint) consensusEv
 	}
 
 	chkpt := &pb.Checkpoint{
-		ReplicaId: rbft.peerPool.ID,
+		NodeInfo: rbft.getNodeInfo(),
 	}
 
 	digest, ok := rbft.storeMgr.chkpts[fetch.SequenceNumber]

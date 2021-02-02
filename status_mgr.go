@@ -26,15 +26,17 @@ const (
 	// normal status, which will only be used in rbft
 	Normal = iota + 1 // normal consensus state
 
-	// atomic status, which might be used by consensus service
+	// atomic status, which might be used by outer service
 	InConfChange      // node is processing a config transaction
 	InViewChange      // node is trying to change view
 	InRecovery        // node is trying to recover state
 	StateTransferring // node is updating state
 	PoolFull          // node's txPool is full
 	Pending           // node cannot process consensus messages
+	Stopped           // node has stopped and cannot process consensus messages
 
 	// internal status
+	Inconsistent   // inconsistent cluster status, e.g inconsistent checkpoint
 	InSyncState    // node is syncing state
 	NeedSyncState  // node need to sync state
 	SkipInProgress // node try to state update

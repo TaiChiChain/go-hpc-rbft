@@ -154,7 +154,7 @@ func (rbft *rbftImpl) maybeSendPrePrepare(batch *pb.RequestBatch, findCache bool
 
 	nextSeqNo = rbft.batchMgr.getSeqNo() + 1
 	// restrict the speed of sending prePrepare.
-	if !rbft.sendInW(nextSeqNo) {
+	if rbft.beyondRange(nextSeqNo) {
 		if !findCache {
 			rbft.logger.Debugf("Replica %d is primary, not sending prePrepare for request batch %s because "+
 				"next seqNo is out of high watermark %d", rbft.peerPool.ID, batch.BatchHash, rbft.h+rbft.L)
@@ -163,6 +163,10 @@ func (rbft *rbftImpl) maybeSendPrePrepare(batch *pb.RequestBatch, findCache bool
 		}
 		rbft.logger.Debugf("Replica %d is primary, not sending prePrepare for request batch in cache because "+
 			"next seqNo is out of high watermark %d", rbft.peerPool.ID, rbft.h+rbft.L)
+		// the cluster needs to generate a stable checkpoint every K blocks to collect the garbage.
+		// here, the primary is trying to send a pre-prepare out of high-watermark, we need to start a timer for it
+		// in order to generate the stable checkpoint
+		rbft.softStartHighWatermarkTimer("primary send pre-prepare out of range")
 		return
 	}
 
@@ -278,6 +282,11 @@ func (rbft *rbftImpl) primaryResubmitTransactions() {
 	if rbft.isPrimary(rbft.peerPool.ID) && !rbft.atomicIn(InConfChange) {
 		rbft.logger.Debugf("======== Primary %d resubmit transactions", rbft.peerPool.ID)
 
+		if !rbft.isNormal() {
+			rbft.logger.Debugf("Primary %d is in abnormal, reject resubmit", rbft.peerPool.ID)
+			return
+		}
+
 		// try cached batches first if any.
 		if len(rbft.batchMgr.cacheBatch) > 0 {
 			rbft.restartBatchTimer()
@@ -287,6 +296,11 @@ func (rbft *rbftImpl) primaryResubmitTransactions() {
 
 		// if primary has transactions in requestPool, generate batches of the transactions
 		for rbft.batchMgr.requestPool.HasPendingRequestInPool() {
+			if !rbft.isNormal() {
+				rbft.logger.Debugf("Primary %d is in abnormal, reject resubmit", rbft.peerPool.ID)
+				return
+			}
+
 			batches := rbft.batchMgr.requestPool.GenerateRequestBatch()
 			rbft.postBatches(batches)
 

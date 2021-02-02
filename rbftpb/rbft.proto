@@ -118,7 +118,7 @@ message commit {
 }
 
 message checkpoint {
-     uint64 replica_id = 1;
+     node_info node_info = 1;
      uint64 sequence_number = 2;
      string digest = 3;
 }

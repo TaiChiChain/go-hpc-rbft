@@ -20,7 +20,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math"
-	"strconv"
 
 	"github.com/ultramesh/flato-common/types"
 	"github.com/ultramesh/flato-common/types/protos"
@@ -85,6 +84,11 @@ func (rbft *rbftImpl) inWV(v uint64, n uint64) bool {
 // watermark and high watermark or not.
 func (rbft *rbftImpl) sendInW(n uint64) bool {
 	return n > rbft.h && n <= rbft.h+rbft.L
+}
+
+// beyondRange is used to check the given seqNo is out of high-watermark or not
+func (rbft *rbftImpl) beyondRange(n uint64) bool {
+	return n > rbft.h+rbft.L
 }
 
 // cleanAllBatchAndCert cleans all outstandingReqBatches and committedCert
@@ -175,14 +179,7 @@ func (rbft *rbftImpl) committed(digest string, v uint64, n uint64) bool {
 
 // broadcastReqSet helps broadcast requestSet to others.
 func (rbft *rbftImpl) broadcastReqSet(set *pb.RequestSet) {
-	if rbft.requestSethMemLimit {
-		rbft.limitRequestSet(set)
-	} else {
-		rbft.normalRequestSet(set)
-	}
-}
-
-func (rbft *rbftImpl) normalRequestSet(set *pb.RequestSet) {
+	set.Local = false
 	payload, err := proto.Marshal(set)
 	if err != nil {
 		rbft.logger.Errorf("ConsensusMessage_TRANSACTION_SET Marshal Error: %s", err)
@@ -195,67 +192,6 @@ func (rbft *rbftImpl) normalRequestSet(set *pb.RequestSet) {
 		Payload: payload,
 	}
 	rbft.peerPool.broadcast(consensusMsg)
-}
-
-func (rbft *rbftImpl) limitRequestSet(set *pb.RequestSet) {
-	rbft.logger.Debugf("Replica %d broadcast request set with memory limit", rbft.peerPool.ID)
-	var newTxList []*protos.Transaction
-	var requestSet *pb.RequestSet
-	txList := set.Requests
-	local := set.Local
-	for len(txList) != 0 {
-		if ok, rate := rbft.checkRequestSetMemCap(txList); ok {
-			rbft.logger.Debugf("rate: %f, len txList: %d", rate, len(txList))
-			newTxList = rbft.splitTxFromRequestSet(rate, txList)
-		} else {
-			newTxList = txList
-		}
-		requestSet = &pb.RequestSet{
-			Requests: newTxList,
-			Local:    local,
-		}
-		txList = txList[len(newTxList):]
-		rbft.normalRequestSet(requestSet)
-		rbft.logger.Debugf("Replica %d broadcast a request batch with %d transactions, memCap %d, %d transactions remain",
-			rbft.peerPool.ID, len(newTxList), proto.Size(requestSet), len(txList))
-	}
-}
-
-// checkRequestSetMemCap checks if mem size of given request set has exceeded the "requestSetMaxMem",
-// if so return the exceed rate.
-func (rbft *rbftImpl) checkRequestSetMemCap(txList []*protos.Transaction) (bool, float64) {
-	set := &pb.RequestSet{
-		Requests: txList,
-		Local:    true,
-	}
-	memCap := proto.Size(set)
-	if memCap > rbft.requestSetMaxMem {
-		rate, _ := strconv.ParseFloat(fmt.Sprintf("%.2f", float64(memCap)/float64(rbft.requestSetMaxMem)), 64)
-		return true, rate
-	}
-	return false, 0
-}
-
-// splitTxFromBatch split the element from txList until the batch memory size less than
-// "batchMaxMem" or there is only one remained transaction.
-func (rbft *rbftImpl) splitTxFromRequestSet(rate float64, txList []*protos.Transaction) []*protos.Transaction {
-	var newTxList []*protos.Transaction
-
-	if len(txList) == 1 {
-		return txList
-	}
-
-	surplus := int(float64(len(txList)) / rate)
-
-	if surplus == 0 || surplus == 1 {
-		return txList[0:1]
-	}
-	newTxList = txList[0:surplus]
-	if ok, rate := rbft.checkRequestSetMemCap(newTxList); ok {
-		newTxList = rbft.splitTxFromRequestSet(rate, newTxList)
-	}
-
-	return newTxList
 }
 
 // =============================================================================
@@ -432,32 +368,37 @@ func (rbft *rbftImpl) compareCheckpointWithWeakSet(chkpt *pb.Checkpoint) (bool, 
 		return false, 0
 	}
 
-	if rbft.storeMgr.checkpointStore[*chkpt] {
-		rbft.logger.Warningf("Replica %d ignore duplicate checkpoint from replica %d, seqNo=%d", rbft.peerPool.ID, chkpt.ReplicaId, chkpt.SequenceNumber)
-		return false, 0
+	cID := chkptID{
+		nodeHash: chkpt.NodeInfo.ReplicaHash,
+		sequence: chkpt.SequenceNumber,
 	}
-	rbft.storeMgr.checkpointStore[*chkpt] = true
+
+	_, ok := rbft.storeMgr.checkpointStore[cID]
+	if ok {
+		rbft.logger.Warningf("Replica %d received duplicate checkpoint from replica %s for seqNo %d, update storage", rbft.peerPool.ID, cID.nodeHash, cID.sequence)
+	}
+	rbft.storeMgr.checkpointStore[cID] = chkpt.Digest
 
 	// track how many different checkpoint values we have for the seqNo.
-	diffValues := make(map[string][]uint64)
+	diffValues := make(map[string][]string)
 	// track how many "correct"(more than f + 1) checkpoint values we have for the seqNo.
 	var correctValues []string
 
 	// track totally matching checkpoints.
 	matching := 0
-	for cp := range rbft.storeMgr.checkpointStore {
-		if cp.SequenceNumber != chkpt.SequenceNumber {
+	for cp, digest := range rbft.storeMgr.checkpointStore {
+		if cp.sequence != chkpt.SequenceNumber {
 			continue
 		}
 
-		if cp.Digest == chkpt.Digest {
+		if digest == chkpt.Digest {
 			matching++
 		}
 
-		if _, ok := diffValues[cp.Digest]; !ok {
-			diffValues[cp.Digest] = []uint64{cp.ReplicaId}
+		if _, exist := diffValues[digest]; !exist {
+			diffValues[digest] = []string{cp.nodeHash}
 		} else {
-			diffValues[cp.Digest] = append(diffValues[cp.Digest], cp.ReplicaId)
+			diffValues[digest] = append(diffValues[digest], cp.nodeHash)
 		}
 
 		// if current network contains more than f + 1 checkpoints with the same seqNo
@@ -465,16 +406,16 @@ func (rbft *rbftImpl) compareCheckpointWithWeakSet(chkpt *pb.Checkpoint) (bool, 
 		if len(diffValues) > rbft.f+1 {
 			rbft.logger.Criticalf("Replica %d cannot find stable checkpoint with seqNo %d"+
 				"(%d different values observed already).", rbft.peerPool.ID, chkpt.SequenceNumber, len(diffValues))
-			rbft.atomicOn(Pending)
-			rbft.metrics.statusGaugePending.Set(Pending)
+			rbft.on(Inconsistent)
+			rbft.metrics.statusGaugeInconsistent.Set(Inconsistent)
 			rbft.setAbNormal()
 			rbft.stopNamespace()
 			return false, 0
 		}
 
 		// record all correct checkpoint(weak cert) values.
-		if len(diffValues[cp.Digest]) == rbft.f+1 {
-			correctValues = append(correctValues, cp.Digest)
+		if len(diffValues[digest]) == rbft.f+1 {
+			correctValues = append(correctValues, digest)
 		}
 	}
 
@@ -487,8 +428,8 @@ func (rbft *rbftImpl) compareCheckpointWithWeakSet(chkpt *pb.Checkpoint) (bool, 
 	// consensus state.
 	if len(correctValues) > 1 {
 		rbft.logger.Criticalf("Replica %d finds several weak certs for checkpoint %d, values: %v", rbft.peerPool.ID, chkpt.SequenceNumber, correctValues)
-		rbft.atomicOn(Pending)
-		rbft.metrics.statusGaugePending.Set(Pending)
+		rbft.on(Inconsistent)
+		rbft.metrics.statusGaugeInconsistent.Set(Inconsistent)
 		rbft.setAbNormal()
 		rbft.stopNamespace()
 		return false, 0
@@ -945,4 +886,15 @@ func calculateMD5Hash(list []string, timestamp int64) string {
 		_, _ = h.Write(b)
 	}
 	return hex.EncodeToString(h.Sum(nil))
+}
+
+func drainChannel(ch chan interface{}) {
+DrainLoop:
+	for {
+		select {
+		case <-ch:
+		default:
+			break DrainLoop
+		}
+	}
 }
