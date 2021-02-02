@@ -181,6 +181,8 @@ type rbftImpl struct {
 	hLock     sync.RWMutex // mutex to set value of h
 	epochLock sync.RWMutex // mutex to set value of view
 
+	wg sync.WaitGroup // make sure the listener has been closed
+
 	metrics *rbftMetrics // collect all metrics in rbft
 	config  Config       // get configuration info
 	logger  Logger       // write logger to record some info
@@ -195,7 +197,7 @@ func newRBFT(cpChan chan *pb.ServiceState, confC chan *pb.ReloadFinished, c Conf
 	// init message event converter
 	once.Do(initMsgEventMap)
 
-	recvC := make(chan interface{})
+	recvC := make(chan interface{}, 1)
 	rbft := &rbftImpl{
 		K:                    c.K,
 		epoch:                c.EpochInit,
@@ -364,33 +366,42 @@ func (rbft *rbftImpl) start() error {
 func (rbft *rbftImpl) stop() {
 	rbft.logger.Notice("RBFT stopping...")
 
+	rbft.atomicOn(Pending)
+	rbft.atomicOn(Stopped)
+	rbft.metrics.statusGaugePending.Set(Pending)
+	rbft.setAbNormal()
+	drainChannel(rbft.recvChan)
+
 	// stop listen consensus event
-	if rbft.close != nil {
+	select {
+	case <-rbft.close:
+	default:
+		rbft.logger.Notice("close RBFT event listener")
 		close(rbft.close)
-		rbft.close = nil
 	}
 
 	// stop all timer event
 	rbft.timerMgr.Stop()
+	rbft.logger.Notice("close RBFT timer manager")
 
 	// stop txPool
-	rbft.batchMgr.requestPool.Stop()
+	if rbft.batchMgr.requestPool != nil {
+		rbft.batchMgr.requestPool.Stop()
+	}
+	rbft.logger.Notice("close TxPool")
 
 	// unregister metrics
 	if rbft.metrics != nil {
 		rbft.metrics.unregisterMetrics()
 	}
 
-	rbft.logger.Noticef("======== RBFT stopped!")
+	rbft.logger.Notice("Waiting...")
+	rbft.wg.Wait()
+	rbft.logger.Noticef("RBFT stopped!")
 }
 
 // RecvMsg receives and processes messages from other peers
 func (rbft *rbftImpl) step(msg *pb.ConsensusMessage) {
-	if rbft.atomicIn(Pending) {
-		rbft.logger.Debugf("Replica %d is in pending status, reject consensus messages", rbft.peerPool.ID)
-		return
-	}
-
 	// nolint: errcheck
 	rbft.postMsg(msg)
 }
@@ -452,6 +463,16 @@ func (rbft *rbftImpl) postConfState(cc *pb.ConfState) {
 
 // postMsg posts messages to main loop.
 func (rbft *rbftImpl) postMsg(msg interface{}) {
+	if rbft.atomicIn(Stopped) {
+		rbft.logger.Debugf("Replica %d is stopped, reject every consensus messages", rbft.peerPool.ID)
+		return
+	}
+
+	if rbft.atomicIn(Pending) {
+		rbft.logger.Debugf("Replica %d is in pending status, reject consensus messages", rbft.peerPool.ID)
+		return
+	}
+
 	rbft.recvChan <- msg
 }
 
@@ -499,9 +520,12 @@ func (rbft *rbftImpl) getStatus() (status NodeStatus) {
 // =============================================================================
 // listenEvent listens and dispatches messages according to their types
 func (rbft *rbftImpl) listenEvent() {
+	rbft.wg.Add(1)
+	defer rbft.wg.Done()
 	for {
 		select {
 		case <-rbft.close:
+			rbft.logger.Notice("exit RBFT event listener")
 			return
 		case obj := <-rbft.recvChan:
 			var next consensusEvent
@@ -512,6 +536,13 @@ func (rbft *rbftImpl) listenEvent() {
 				return
 			}
 			for {
+				select {
+				case <-rbft.close:
+					rbft.logger.Notice("exit RBFT event listener")
+					return
+				default:
+					break
+				}
 				next = rbft.processEvent(next)
 				if next == nil {
 					break
@@ -1430,7 +1461,12 @@ func (rbft *rbftImpl) afterCommitBlock(idx msgID, isConfig bool) {
 		// 2. a normal transaction in checkpoint: waiting for checkpoint channel and turn into checkpoint process
 		// 3. a normal transaction not in checkpoint: finish directly
 		if isConfig {
-			state := <-rbft.cpChan
+			state, ok := <-rbft.cpChan
+			if !ok {
+				rbft.logger.Info("checkpoint channel closed")
+				return
+			}
+
 			// reset config transaction to execute
 			rbft.resetConfigBatchToExecute()
 
@@ -1444,7 +1480,12 @@ func (rbft *rbftImpl) afterCommitBlock(idx msgID, isConfig bool) {
 			}
 
 		} else if rbft.exec.lastExec%rbft.K == 0 {
-			state := <-rbft.cpChan
+			state, ok := <-rbft.cpChan
+			if !ok {
+				rbft.logger.Info("checkpoint channel closed")
+				return
+			}
+
 			if state.MetaState.Applied == rbft.exec.lastExec {
 				rbft.logger.Debugf("Call the checkpoint for normal, seqNo=%d", rbft.exec.lastExec)
 				rbft.checkpoint(state.MetaState)
@@ -1608,7 +1649,11 @@ func (rbft *rbftImpl) finishConfigCheckpoint(chkpt *pb.Checkpoint) {
 	// waiting for commit db finish the reload
 	if rbft.atomicIn(InConfChange) {
 		rbft.logger.Noticef("Replica %d is waiting for commit-db finished...", rbft.peerPool.ID)
-		ev := <-rbft.confChan
+		ev, ok := <-rbft.confChan
+		if !ok {
+			rbft.logger.Info("Config Channel Closed")
+			return
+		}
 		rbft.logger.Debugf("Replica %d received a commit-db finished target at height %d", rbft.peerPool.ID, ev.Height)
 		if ev.Height != chkpt.SequenceNumber {
 			rbft.logger.Errorf("Wrong commit-db height: %d", ev.Height)

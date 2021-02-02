@@ -1,6 +1,7 @@
 package rbft
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/ultramesh/flato-common/types/protos"
@@ -36,14 +37,46 @@ func TestNode_Stop(t *testing.T) {
 
 	_, rbfts := newBasicClusterInstance()
 	n := rbfts[0].node
+	r := rbfts[0]
 	n.currentState = &pb.ServiceState{
 		MetaState: &pb.MetaState{
 			Applied: uint64(0),
 			Digest:  "GENESIS XXX",
 		},
 	}
+	_ = n.Start()
+
+	var wg sync.WaitGroup
+	go func() {
+		wg.Add(1)
+		for i := 1; i < 100; i++ {
+			txs := []*protos.Transaction{newTx(), newTx()}
+			_ = n.Propose(txs)
+		}
+		wg.Done()
+	}()
+	go func() {
+		wg.Add(1)
+		for i := 1; i < 100; i++ {
+			con := &pb.ConsensusMessage{}
+			n.Step(con)
+		}
+		wg.Done()
+	}()
+	go func() {
+		wg.Add(1)
+		<-r.cpChan
+		wg.Done()
+	}()
+	go func() {
+		wg.Add(1)
+		<-r.confChan
+		wg.Done()
+	}()
 
 	n.Stop()
+	wg.Wait()
+
 	assert.Nil(t, n.currentState)
 }
 

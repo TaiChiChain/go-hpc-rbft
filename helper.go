@@ -946,3 +946,14 @@ func calculateMD5Hash(list []string, timestamp int64) string {
 	}
 	return hex.EncodeToString(h.Sum(nil))
 }
+
+func drainChannel(ch chan interface{}) {
+DrainLoop:
+	for {
+		select {
+		case <-ch:
+		default:
+			break DrainLoop
+		}
+	}
+}

@@ -33,6 +33,7 @@ const (
 	StateTransferring // node is updating state
 	PoolFull          // node's txPool is full
 	Pending           // node cannot process consensus messages
+	Stopped           // node has stopped and cannot process consensus messages
 
 	// internal status
 	Inconsistent   // inconsistent cluster status, e.g inconsistent checkpoint
