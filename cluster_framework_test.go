@@ -245,8 +245,7 @@ func (tf *testFramework) newNodeConfig(
 		RecoveryTimeout:         10 * time.Second,
 		FetchCheckpointTimeout:  5 * time.Second,
 		CheckPoolTimeout:        3 * time.Minute,
-		RequestSethMemLimit:     true,
-		RequestSetMaxMem:        DefaultRequestSetMaxMem,
+		FlowControl:             false,
 
 		Logger:      log,
 		External:    ext,

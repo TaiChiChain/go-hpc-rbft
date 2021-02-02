@@ -99,11 +99,6 @@ const (
 	NotSupportService
 )
 
-const (
-	// DefaultRequestSetMaxMem is the default memory size of request set
-	DefaultRequestSetMaxMem = 45 * 1024 * 1024 // 45MB
-)
-
 // LocalEvent represents event sent by local modules
 type LocalEvent struct {
 	Service   int // service type range from {CoreRbftService, ViewChangeService, RecoveryService, NodeMgrService}

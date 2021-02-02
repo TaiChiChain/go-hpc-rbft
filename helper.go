@@ -20,7 +20,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math"
-	"strconv"
 
 	"github.com/ultramesh/flato-common/types"
 	"github.com/ultramesh/flato-common/types/protos"
@@ -180,14 +179,7 @@ func (rbft *rbftImpl) committed(digest string, v uint64, n uint64) bool {
 
 // broadcastReqSet helps broadcast requestSet to others.
 func (rbft *rbftImpl) broadcastReqSet(set *pb.RequestSet) {
-	if rbft.requestSethMemLimit {
-		rbft.limitRequestSet(set)
-	} else {
-		rbft.normalRequestSet(set)
-	}
-}
-
-func (rbft *rbftImpl) normalRequestSet(set *pb.RequestSet) {
+	set.Local = false
 	payload, err := proto.Marshal(set)
 	if err != nil {
 		rbft.logger.Errorf("ConsensusMessage_TRANSACTION_SET Marshal Error: %s", err)
@@ -200,67 +192,6 @@ func (rbft *rbftImpl) normalRequestSet(set *pb.RequestSet) {
 		Payload: payload,
 	}
 	rbft.peerPool.broadcast(consensusMsg)
-}
-
-func (rbft *rbftImpl) limitRequestSet(set *pb.RequestSet) {
-	rbft.logger.Debugf("Replica %d broadcast request set with memory limit", rbft.peerPool.ID)
-	var newTxList []*protos.Transaction
-	var requestSet *pb.RequestSet
-	txList := set.Requests
-	local := set.Local
-	for len(txList) != 0 {
-		if ok, rate := rbft.checkRequestSetMemCap(txList); ok {
-			rbft.logger.Debugf("rate: %f, len txList: %d", rate, len(txList))
-			newTxList = rbft.splitTxFromRequestSet(rate, txList)
-		} else {
-			newTxList = txList
-		}
-		requestSet = &pb.RequestSet{
-			Requests: newTxList,
-			Local:    local,
-		}
-		txList = txList[len(newTxList):]
-		rbft.normalRequestSet(requestSet)
-		rbft.logger.Debugf("Replica %d broadcast a request batch with %d transactions, memCap %d, %d transactions remain",
-			rbft.peerPool.ID, len(newTxList), proto.Size(requestSet), len(txList))
-	}
-}
-
-// checkRequestSetMemCap checks if mem size of given request set has exceeded the "requestSetMaxMem",
-// if so return the exceed rate.
-func (rbft *rbftImpl) checkRequestSetMemCap(txList []*protos.Transaction) (bool, float64) {
-	set := &pb.RequestSet{
-		Requests: txList,
-		Local:    true,
-	}
-	memCap := proto.Size(set)
-	if memCap > rbft.requestSetMaxMem {
-		rate, _ := strconv.ParseFloat(fmt.Sprintf("%.2f", float64(memCap)/float64(rbft.requestSetMaxMem)), 64)
-		return true, rate
-	}
-	return false, 0
-}
-
-// splitTxFromBatch split the element from txList until the batch memory size less than
-// "batchMaxMem" or there is only one remained transaction.
-func (rbft *rbftImpl) splitTxFromRequestSet(rate float64, txList []*protos.Transaction) []*protos.Transaction {
-	var newTxList []*protos.Transaction
-
-	if len(txList) == 1 {
-		return txList
-	}
-
-	surplus := int(float64(len(txList)) / rate)
-
-	if surplus == 0 || surplus == 1 {
-		return txList[0:1]
-	}
-	newTxList = txList[0:surplus]
-	if ok, rate := rbft.checkRequestSetMemCap(newTxList); ok {
-		newTxList = rbft.splitTxFromRequestSet(rate, newTxList)
-	}
-
-	return newTxList
 }
 
 // =============================================================================

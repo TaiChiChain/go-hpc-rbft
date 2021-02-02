@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.2.26-3"></a>
+## [0.2.26-3](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.26-2...v0.2.26-3) (2021-01-27)
+
+
+### Features
+
+* do not split the request set before broadcast ([66dc408](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/66dc408)), closes [#flato-2874](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-2874)
+
+
+
+<a name="0.2.26-2"></a>
+## [0.2.26-2](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.26-1...v0.2.26-2) (2021-01-20)
+
+
+### Bug Fixes
+
+* method to compare the checkpoints ([7fa428d](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/7fa428d)), closes [#flato-3123](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-3123)
+
+
+
+<a name="0.2.26-1"></a>
+## [0.2.26-1](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.26...v0.2.26-1) (2021-01-18)
+
+
+### Bug Fixes
+
+* we need to start high watermark for abnormal pre-prepare ([c67af06](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/c67af06)), closes [#flato-3119](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-3119)
+
+
+
 <a name="0.2.26"></a>
 ## [0.2.26](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.25-3...v0.2.26) (2021-01-13)
 
