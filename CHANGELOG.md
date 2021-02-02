@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.2.27"></a>
+## [0.2.27](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.26-3...v0.2.27) (2021-02-02)
+
+
+### Bug Fixes
+
+* the process to stop node ([57f7eb7](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/57f7eb7)), closes [#flato-3135](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-3135)
+
+
+### Features
+
+* update the process of checkpoint ([80b9a67](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/80b9a67)), closes [#flato-2998](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-2998)
+* **status_mgr.go:** add special status(Inconsistent) to indicate inconsistent checkpoint rather tha ([186d982](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/186d982)), closes [#flato-3129](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-3129)
+
+
+
 <a name="0.2.26-3"></a>
 ## [0.2.26-3](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.26-2...v0.2.26-3) (2021-01-27)
 
