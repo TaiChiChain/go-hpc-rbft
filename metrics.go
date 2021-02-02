@@ -29,6 +29,8 @@ type rbftMetrics struct {
 	statusGaugePoolFull metrics.Gauge
 	// track if current node is in pending.
 	statusGaugePending metrics.Gauge
+	// track if current node is in inconsistent.
+	statusGaugeInconsistent metrics.Gauge
 
 	// ========================== metrics related to commit info ==========================
 	// monitor the totally committed block number by RBFT.
@@ -207,6 +209,16 @@ func newRBFTMetrics(metricsProv metrics.Provider) (*rbftMetrics, error) {
 		metrics.GaugeOpts{
 			Name: "status_pending",
 			Help: "rbft is in pending or not",
+		},
+	)
+	if err != nil {
+		return m, err
+	}
+
+	m.statusGaugeInconsistent, err = metricsProv.NewGauge(
+		metrics.GaugeOpts{
+			Name: "status_inconsistent",
+			Help: "rbft is in inconsistent or not",
 		},
 	)
 	if err != nil {
@@ -448,6 +460,9 @@ func (rm *rbftMetrics) unregisterMetrics() {
 	}
 	if rm.statusGaugePending != nil {
 		rm.statusGaugePending.Unregister()
+	}
+	if rm.statusGaugeInconsistent != nil {
+		rm.statusGaugeInconsistent.Unregister()
 	}
 
 	if rm.committedConfigBlockNumber != nil {
