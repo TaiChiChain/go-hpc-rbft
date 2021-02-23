@@ -1613,7 +1613,7 @@ func (rbft *rbftImpl) recvCheckpoint(chkpt *pb.Checkpoint) consensusEvent {
 	}
 
 	if rbft.weakCheckpointSetOutOfRange(chkpt) {
-		return rbft.initRecovery()
+		return rbft.restartRecovery()
 	}
 
 	legal, matching := rbft.compareCheckpointWithWeakSet(chkpt)

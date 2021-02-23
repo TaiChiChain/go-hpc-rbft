@@ -92,6 +92,14 @@ func (rbft *rbftImpl) setView(view uint64) {
 // Then it sends view change message to itself and jump to recvViewChange.
 func (rbft *rbftImpl) sendViewChange() consensusEvent {
 
+	// reject view change when current node is in StateTransferring to avoid other (quorum-1) replicas
+	// finish view change but cannot reach consensus later if there are only quorum active replicas
+	// consisting of (quorum-1) normal replicas + 1 lagging replica.
+	if rbft.atomicIn(StateTransferring) {
+		rbft.logger.Warningf("Replica %d is in state transferring, not sending view change", rbft.peerPool.ID)
+		return nil
+	}
+
 	//Do some check and do some preparation
 	//such as stop nullRequest timer, clean vcMgr.viewChangeStore and so on.
 	err := rbft.beforeSendVC()
