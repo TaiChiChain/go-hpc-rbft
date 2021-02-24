@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.2.27-1"></a>
+## [0.2.27-1](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.27...v0.2.27-1) (2021-02-24)
+
+
+### Bug Fixes
+
+* **viewchange_mgr.go:** reject viewchange/recovery when node is in state transfer ([1397eab](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/1397eab))
+
+
+
 <a name="0.2.27"></a>
 ## [0.2.27](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.26-3...v0.2.27) (2021-02-02)
 
