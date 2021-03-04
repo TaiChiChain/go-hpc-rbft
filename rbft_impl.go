@@ -2042,6 +2042,20 @@ func (rbft *rbftImpl) recvStateUpdatedEvent(ss *pb.ServiceState) consensusEvent 
 		}
 	}
 
+	if rbft.atomicIn(InViewChange) {
+		if rbft.isPrimary(rbft.peerPool.ID) {
+			// view may not be changed after state-update, current node mistakes itself for primary
+			// so send view change to step into the new view
+			rbft.logger.Debugf("Primary %d send view-change after state update", rbft.peerPool.ID)
+			return rbft.sendViewChange()
+		}
+
+		return &LocalEvent{
+			Service:   ViewChangeService,
+			EventType: ViewChangedEvent,
+		}
+	}
+
 	rbft.executeAfterStateUpdate()
 	return nil
 }

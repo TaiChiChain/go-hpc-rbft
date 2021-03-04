@@ -275,3 +275,212 @@ func TestCluster_ReceiveNotificationBeforeStart(t *testing.T) {
 		assert.True(t, rbfts[index].isNormal())
 	}
 }
+
+func TestCluster_ViewChange_StateUpdate_Timeout_StateUpdated_Replica(t *testing.T) {
+	// test sample 1 for flato-3235
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	nodes, rbfts := newBasicClusterInstance()
+	unlockCluster(rbfts)
+
+	for i := 0; i < 40; i++ {
+		tx := newTx()
+		checkpoint := (i+1)%10 == 0
+		if i < 30 {
+			execute(t, rbfts, nodes, tx, checkpoint)
+		} else {
+			executeExceptN(t, rbfts, nodes, tx, checkpoint, 2)
+		}
+	}
+	assert.Equal(t, uint64(40), rbfts[0].h)
+	assert.Equal(t, uint64(40), rbfts[1].h)
+	assert.Equal(t, uint64(30), rbfts[2].h)
+	assert.Equal(t, uint64(40), rbfts[3].h)
+
+	var vcMsgs []*pb.ConsensusMessage
+	for index := range rbfts {
+		rbfts[index].sendViewChange()
+		vcMsg := nodes[index].broadcastMessageCache
+		assert.Equal(t, pb.Type_VIEW_CHANGE, vcMsg.Type)
+		vcMsgs = append(vcMsgs, vcMsg)
+	}
+
+	vcQuorum := &LocalEvent{
+		Service:   ViewChangeService,
+		EventType: ViewChangeQuorumEvent,
+	}
+
+	for index := range rbfts {
+		for j := range vcMsgs {
+			if index == j {
+				continue
+			}
+			qe := rbfts[index].processEvent(vcMsgs[j])
+			if qe != nil {
+				assert.Equal(t, vcQuorum, qe)
+				break
+			}
+		}
+	}
+
+	for index := range rbfts {
+		rbfts[index].processEvent(vcQuorum)
+	}
+	nvMsg := nodes[1].broadcastMessageCache
+	assert.Equal(t, pb.Type_NEW_VIEW, nvMsg.Type)
+
+	vcDone := &LocalEvent{
+		Service:   ViewChangeService,
+		EventType: ViewChangedEvent,
+	}
+	for index := range rbfts {
+		if index == 1 {
+			continue
+		}
+		vd := rbfts[index].processEvent(nvMsg)
+		if index != 2 {
+			assert.Equal(t, vcDone, vd)
+		} else {
+			assert.Nil(t, vd)
+		}
+	}
+	msg := <-rbfts[2].recvChan
+	event := msg.(*LocalEvent)
+	vd := rbfts[2].processEvent(event)
+	assert.Equal(t, vcDone, vd)
+
+	for index := range rbfts {
+		rbfts[index].processEvent(vd)
+	}
+	assert.True(t, rbfts[0].isNormal())
+	assert.True(t, rbfts[1].isNormal())
+	assert.True(t, rbfts[2].isNormal())
+	assert.True(t, rbfts[3].isNormal())
+}
+
+func TestCluster_ViewChange_StateUpdate_Timeout_StateUpdated_Primary(t *testing.T) {
+	// test sample 2 for flato-3235
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	nodes, rbfts := newBasicClusterInstance()
+	unlockCluster(rbfts)
+
+	for i := 0; i < 40; i++ {
+		tx := newTx()
+		checkpoint := (i+1)%10 == 0
+		if i < 30 {
+			execute(t, rbfts, nodes, tx, checkpoint)
+		} else {
+			executeExceptN(t, rbfts, nodes, tx, checkpoint, 1)
+		}
+	}
+	assert.Equal(t, uint64(40), rbfts[0].h)
+	assert.Equal(t, uint64(30), rbfts[1].h)
+	assert.Equal(t, uint64(40), rbfts[2].h)
+	assert.Equal(t, uint64(40), rbfts[3].h)
+
+	var vcMsgs []*pb.ConsensusMessage
+	for index := range rbfts {
+		rbfts[index].sendViewChange()
+		vcMsg := nodes[index].broadcastMessageCache
+		assert.Equal(t, pb.Type_VIEW_CHANGE, vcMsg.Type)
+		vcMsgs = append(vcMsgs, vcMsg)
+	}
+
+	vcQuorum := &LocalEvent{
+		Service:   ViewChangeService,
+		EventType: ViewChangeQuorumEvent,
+	}
+
+	for index := range rbfts {
+		for j := range vcMsgs {
+			if index == j {
+				continue
+			}
+			qe := rbfts[index].processEvent(vcMsgs[j])
+			if qe != nil {
+				assert.Equal(t, vcQuorum, qe)
+				break
+			}
+		}
+	}
+
+	for index := range rbfts {
+		nodes[index].broadcastMessageCache = nil
+		rbfts[index].processEvent(vcQuorum)
+	}
+	assert.Nil(t, nodes[1].broadcastMessageCache)
+
+	nvTimeoutEvent := &LocalEvent{
+		Service:   ViewChangeService,
+		EventType: ViewChangeTimerEvent,
+		Event:     nextDemandNewView(1),
+	}
+	// node 3 crash
+	rbfts[0].processEvent(nvTimeoutEvent)
+	newVCNode1 := nodes[0].broadcastMessageCache
+	assert.Equal(t, pb.Type_VIEW_CHANGE, newVCNode1.Type)
+
+	rbfts[2].processEvent(nvTimeoutEvent)
+	newVCNode3 := nodes[2].broadcastMessageCache
+	assert.Equal(t, pb.Type_VIEW_CHANGE, newVCNode3.Type)
+
+	rbfts[0].processEvent(newVCNode3)
+	rbfts[2].processEvent(newVCNode1)
+
+	nodes[1].broadcastMessageCache = nil
+	rbfts[1].processEvent(newVCNode1)
+	rbfts[1].processEvent(newVCNode3)
+	assert.Nil(t, nodes[1].broadcastMessageCache)
+
+	msg := <-rbfts[1].recvChan
+	event := msg.(*LocalEvent)
+	retNode2 := rbfts[1].processEvent(event)
+	assert.Equal(t, vcQuorum, retNode2)
+	newVCNode2 := nodes[1].broadcastMessageCache
+	assert.Equal(t, pb.Type_VIEW_CHANGE, newVCNode2.Type)
+
+	retNode1 := rbfts[0].processEvent(newVCNode2)
+	assert.Equal(t, vcQuorum, retNode1)
+	retNode3 := rbfts[2].processEvent(newVCNode2)
+	assert.Equal(t, vcQuorum, retNode3)
+
+	vcDone := &LocalEvent{
+		Service:   ViewChangeService,
+		EventType: ViewChangedEvent,
+	}
+	for index := range rbfts {
+		if index == 3 {
+			// node 3 crash
+			continue
+		}
+		done := rbfts[index].processEvent(vcQuorum)
+		if index == 2 {
+			assert.Equal(t, vcDone, done)
+		}
+	}
+	newNVMsg := nodes[2].broadcastMessageCache
+	assert.Equal(t, pb.Type_NEW_VIEW, newNVMsg.Type)
+
+	for index := range rbfts {
+		if index == 2 || index == 3 {
+			continue
+		}
+		done := rbfts[index].processEvent(newNVMsg)
+		assert.Equal(t, vcDone, done)
+	}
+
+	for index := range rbfts {
+		if index == 3 {
+			continue
+			// node 3 crash
+		}
+		rbfts[index].processEvent(vcDone)
+	}
+
+	assert.True(t, rbfts[0].isNormal())
+	assert.True(t, rbfts[1].isNormal())
+	assert.True(t, rbfts[2].isNormal())
+}
