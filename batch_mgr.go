@@ -28,6 +28,7 @@ type batchManager struct {
 	seqNo            uint64             // track the prePrepare batch seqNo
 	cacheBatch       []*pb.RequestBatch // cache batches wait for prePreparing
 	batchTimerActive bool               // track the batch timer event, true means there exists an undergoing batch timer event
+	lastBatchTime    int64              // track last batch time [only used by primary], reset when become primary.
 	requestPool      txpool.TxPool
 }
 
@@ -280,6 +281,8 @@ func (rbft *rbftImpl) findNextCommitBatch(digest string, v uint64, n uint64) err
 // or stable checkpoint.
 func (rbft *rbftImpl) primaryResubmitTransactions() {
 	if rbft.isPrimary(rbft.peerPool.ID) && !rbft.atomicIn(InConfChange) {
+		// reset lastBatchTime for primary.
+		rbft.batchMgr.lastBatchTime = 0
 		rbft.logger.Debugf("======== Primary %d resubmit transactions", rbft.peerPool.ID)
 
 		if !rbft.isNormal() {

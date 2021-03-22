@@ -11,7 +11,6 @@ import (
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
 	txpoolmock "github.com/ultramesh/flato-txpool/mock"
 
-	"github.com/gogo/protobuf/proto"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 )
@@ -113,22 +112,6 @@ func TestRBFT_consensusMessageFilter(t *testing.T) {
 	preprepMsg.Epoch = uint64(5)
 	rbfts[1].consensusMessageFilter(preprepMsg)
 	assert.Equal(t, 1, len(rbfts[1].epochMgr.checkOutOfEpoch))
-
-	// test for request set
-	req := &pb.RequestSet{
-		Local:    true,
-		Requests: []*protos.Transaction{tx},
-	}
-	payload, _ := proto.Marshal(req)
-	reqMsg := &pb.ConsensusMessage{
-		Type:    pb.Type_REQUEST_SET,
-		From:    rbfts[0].peerPool.ID,
-		Epoch:   rbfts[0].epoch,
-		Payload: payload,
-	}
-	rbfts[1].consensusMessageFilter(reqMsg)
-	batch := rbfts[1].batchMgr.requestPool.GenerateRequestBatch()
-	assert.Equal(t, tx, batch[0].TxList[0])
 }
 
 //============================================
