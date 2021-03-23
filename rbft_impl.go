@@ -1947,18 +1947,34 @@ func (rbft *rbftImpl) tryStateTransfer() {
 
 	// clean cert with seqNo > lastExec before stateUpdate to avoid influencing the
 	// following progress
+	// TODO(DH): do we need to save certs with seqNo <= lastExec?
 	for idx := range rbft.storeMgr.certStore {
-		if idx.n > rbft.exec.lastExec && idx.n <= target.Applied {
-			rbft.logger.Debugf("Replica %d clean cert with seqNo %d > lastExec %d "+
-				"before state update", rbft.peerPool.ID, idx.n, rbft.exec.lastExec)
+		if idx.n > rbft.exec.lastExec {
+			rbft.logger.Debugf("Replica %d clean cert with seqNo %d > lastExec %d, "+
+				"digest=%s, before state update", rbft.peerPool.ID, idx.n, rbft.exec.lastExec, idx.d)
 			delete(rbft.storeMgr.certStore, idx)
-			delete(rbft.storeMgr.outstandingReqBatches, idx.d)
 			delete(rbft.storeMgr.committedCert, idx)
 			delete(rbft.storeMgr.seqMap, idx.n)
 			rbft.persistDelQPCSet(idx.v, idx.n, idx.d)
 		}
 	}
+	for d, batch := range rbft.storeMgr.outstandingReqBatches {
+		if batch.SeqNo > rbft.exec.lastExec {
+			rbft.logger.Debugf("Replica %d clean outstanding batch with seqNo %d > lastExec %d, "+
+				"digest=%s, before state update", rbft.peerPool.ID, batch.SeqNo, rbft.exec.lastExec, d)
+			delete(rbft.storeMgr.outstandingReqBatches, d)
+		}
+	}
 	rbft.metrics.outstandingBatchesGauge.Set(float64(len(rbft.storeMgr.outstandingReqBatches)))
+	for d, batch := range rbft.storeMgr.batchStore {
+		if batch.SeqNo > rbft.exec.lastExec {
+			rbft.logger.Debugf("Replica %d clean batch with seqNo %d > lastExec %d, "+
+				"digest=%s, before state update", rbft.peerPool.ID, batch.SeqNo, rbft.exec.lastExec, d)
+			delete(rbft.storeMgr.batchStore, d)
+			rbft.persistDelBatch(d)
+		}
+	}
+	rbft.metrics.batchesGauge.Set(float64(len(rbft.storeMgr.batchStore)))
 
 	rbft.logger.Infof("Replica %d try state update to %d", rbft.peerPool.ID, target.Applied)
 
