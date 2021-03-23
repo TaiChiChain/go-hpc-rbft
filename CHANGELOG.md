@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.2.28"></a>
+## [0.2.28](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.27...v0.2.28) (2021-03-23)
+
+
+### Performance Improvements
+
+* add detailed metrics to analyze consensus time ([e94b20d](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/e94b20d))
+
+
+
 <a name="0.2.27"></a>
 ## [0.2.27](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.26-3...v0.2.27) (2021-02-02)
 
