@@ -486,7 +486,10 @@ func (tf *testFramework) frameworkDelNode(hostname string) {
 			Value:  info,
 			TxType: protos.Transaction_CTX,
 		}
-		txSet := []*protos.Transaction{tx}
+		txSet := &pb.RequestSet{
+			Requests: []*protos.Transaction{tx},
+			Local:    true,
+		}
 		_ = tf.TestNode[senderIndex].N.Propose(txSet)
 	}()
 }
@@ -598,7 +601,10 @@ func (tf *testFramework) frameworkAddNode(hostname string, loggerFile bool, vSet
 			Value:  info,
 			TxType: protos.Transaction_CTX,
 		}
-		txSet := []*protos.Transaction{tx}
+		txSet := &pb.RequestSet{
+			Requests: []*protos.Transaction{tx},
+			Local:    true,
+		}
 		_ = tf.TestNode[senderIndex].N.Propose(txSet)
 	}()
 
@@ -616,7 +622,10 @@ func (tf *testFramework) sendTx(no int, sender uint64) {
 
 	str3 := "tx" + string(rune(no))
 	tx3 := &protos.Transaction{Value: []byte(str3)}
-	txs3 := []*protos.Transaction{tx3}
+	txs3 := &pb.RequestSet{
+		Requests: []*protos.Transaction{tx3},
+		Local:    true,
+	}
 	_ = tf.TestNode[sender-1].N.Propose(txs3)
 }
 
@@ -659,7 +668,10 @@ func (tf *testFramework) sendInitCtx() {
 		Value:  info,
 		TxType: protos.Transaction_CTX,
 	}
-	txSet := []*protos.Transaction{tx}
+	txSet := &pb.RequestSet{
+		Requests: []*protos.Transaction{tx},
+		Local:    true,
+	}
 	_ = tf.TestNode[senderID3-1].N.Propose(txSet)
 }
 

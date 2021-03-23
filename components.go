@@ -125,12 +125,15 @@ type msgID struct {
 
 // cached consensus msgs related to batch
 type msgCert struct {
-	prePrepare  *pb.PrePrepare      // pre-prepare msg
-	sentPrepare bool                // track whether broadcast prepare for this batch before or not
-	prepare     map[pb.Prepare]bool // prepare msgs received from other nodes
-	sentCommit  bool                // track whether broadcast commit for this batch before or not
-	commit      map[pb.Commit]bool  // commit msgs received from other nodes
-	sentExecute bool                // track whether sent execute event to executor module before or not
+	prePrepare      *pb.PrePrepare      // pre-prepare msg
+	prePreparedTime int64               // pre-prepared time
+	sentPrepare     bool                // track whether broadcast prepare for this batch before or not
+	prepare         map[pb.Prepare]bool // prepare msgs received from other nodes
+	preparedTime    int64               // prepared time
+	sentCommit      bool                // track whether broadcast commit for this batch before or not
+	commit          map[pb.Commit]bool  // commit msgs received from other nodes
+	committedTime   int64               // committed time
+	sentExecute     bool                // track whether sent execute event to executor module before or not
 }
 
 // -----------recovery related structs-----------------

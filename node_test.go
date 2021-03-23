@@ -50,7 +50,10 @@ func TestNode_Stop(t *testing.T) {
 	go func() {
 		wg.Add(1)
 		for i := 1; i < 100; i++ {
-			txs := []*protos.Transaction{newTx(), newTx()}
+			txs := &pb.RequestSet{
+				Requests: []*protos.Transaction{newTx(), newTx()},
+				Local:    true,
+			}
 			_ = n.Propose(txs)
 		}
 		wg.Done()
@@ -88,14 +91,13 @@ func TestNode_Propose(t *testing.T) {
 	unlockCluster(rbfts)
 
 	n := rbfts[0].node
-	requestsTmp := []*protos.Transaction{newTx()}
-	_ = n.Propose(requestsTmp)
-	obj := <-n.rbft.recvChan
-	rSet := &pb.RequestSet{
-		Requests: requestsTmp,
+	requestsTmp := &pb.RequestSet{
+		Requests: []*protos.Transaction{newTx()},
 		Local:    true,
 	}
-	assert.Equal(t, rSet, obj)
+	_ = n.Propose(requestsTmp)
+	obj := <-n.rbft.recvChan
+	assert.Equal(t, requestsTmp, obj)
 }
 
 func TestNode_Step(t *testing.T) {
