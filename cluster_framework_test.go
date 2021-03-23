@@ -140,11 +140,15 @@ type channelMsg struct {
 	msg *pb.ConsensusMessage
 }
 
-// defaultRequestLookupSmokeTest
-type defaultRequestLookupSmokeTest struct{}
+// defaultTxpoolSupportSmokeTest
+type defaultTxpoolSupportSmokeTest struct{}
 
-func (lookup *defaultRequestLookupSmokeTest) IsRequestExist(tx *protos.Transaction) bool {
+func (lookup *defaultTxpoolSupportSmokeTest) IsRequestExist(tx *protos.Transaction) bool {
 	return false
+}
+
+func (lookup *defaultTxpoolSupportSmokeTest) CheckSigns(txs []*protos.Transaction) {
+	return
 }
 
 //=============================================================================
@@ -284,9 +288,9 @@ func (tf *testFramework) newTestNode(id uint64, hostname string, cc chan *channe
 		MetricsProv:   &disabled.Provider{},
 		Logger:        log,
 	}
-	rlu := &defaultRequestLookupSmokeTest{}
+	dtps := &defaultTxpoolSupportSmokeTest{}
 	namespace := "global"
-	pool := txpool.NewTxPool(namespace, rlu, confTxPool)
+	pool := txpool.NewTxPool(namespace, dtps, confTxPool)
 
 	epochInfo := &pb.EpochInfo{
 		Epoch: uint64(0),
@@ -533,9 +537,9 @@ func (tf *testFramework) frameworkAddNode(hostname string, loggerFile bool, vSet
 		MetricsProv:   &disabled.Provider{},
 		Logger:        log,
 	}
-	rlu := &defaultRequestLookupSmokeTest{}
+	dtps := &defaultTxpoolSupportSmokeTest{}
 	namespace := "global"
-	pool := txpool.NewTxPool(namespace, rlu, confTxPool)
+	pool := txpool.NewTxPool(namespace, dtps, confTxPool)
 
 	// new peer
 	hash := calHash(hostname)
