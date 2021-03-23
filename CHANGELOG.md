@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.2.29"></a>
+## [0.2.29](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.28...v0.2.29) (2021-03-23)
+
+
+### Bug Fixes
+
+* **rbft_impl.go:** clean useless batch cache before stateupdate to avoid inconsistent state of tx's ([da32d15](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/da32d15))
+
+
+
 <a name="0.2.28"></a>
 ## [0.2.28](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.27...v0.2.28) (2021-03-23)
 
