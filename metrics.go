@@ -47,11 +47,13 @@ type rbftMetrics struct {
 	txsPerBlock metrics.Histogram
 
 	// ========================== metrics related to batch duration info ==========================
+	// monitor the batch generation interval for primary.
+	batchInterval metrics.Summary
 	// monitor the batch persist time.
-	batchPersistDuration metrics.Histogram
+	batchPersistDuration metrics.Summary
 	// monitor the time from batch[primary] to commit.
 	// may be negative due to the time difference between primary and replica.
-	batchToCommitDuration metrics.Histogram
+	batchToCommitDuration metrics.Summary
 
 	// ========================== metrics related to batch number info ==========================
 	// monitor the batch number in batchStore, including the batches that cached to help
@@ -70,6 +72,9 @@ type rbftMetrics struct {
 	stateUpdateCounter metrics.Counter
 	// monitor the times of fetch missing txs which is caused by missing txs before commit.
 	fetchMissingTxsCounter metrics.Counter
+	// monitor the times of return fetch missing txs which is caused by backup node missing
+	// txs before commit.
+	returnFetchMissingTxsCounter metrics.Counter
 	// monitor the times of fetch request batch which is caused by missing batches after
 	// vc/recovery.
 	fetchRequestBatchCounter metrics.Counter
@@ -89,6 +94,14 @@ type rbftMetrics struct {
 	// monitor part of rejected txs due to consensus abnormal status, including txs relayed
 	// from other VP.
 	rejectedRemoteTxs metrics.Counter
+
+	// ========================== metrics related to consensus progress time ==========================
+	// monitor the duration from batch to prePrepared
+	batchToPrePrepared metrics.Summary
+	// monitor the duration from prePrepared to prepared
+	prePreparedToPrepared metrics.Summary
+	// monitor the duration from prepared to committed
+	preparedToCommitted metrics.Summary
 }
 
 func newRBFTMetrics(metricsProv metrics.Provider) (*rbftMetrics, error) {
@@ -276,22 +289,33 @@ func newRBFTMetrics(metricsProv metrics.Provider) (*rbftMetrics, error) {
 		return m, err
 	}
 
-	m.batchPersistDuration, err = metricsProv.NewHistogram(
-		metrics.HistogramOpts{
-			Name:    "batch_persist_duration",
-			Help:    "persist duration of batch",
-			Buckets: []float64{0.001, 0.003, 0.005, 0.008, 0.01, 0.02, 0.1},
+	m.batchInterval, err = metricsProv.NewSummary(
+		metrics.SummaryOpts{
+			Name:       "batch_interval_duration",
+			Help:       "interval duration of batch",
+			Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
 		},
 	)
 	if err != nil {
 		return m, err
 	}
 
-	m.batchToCommitDuration, err = metricsProv.NewHistogram(
-		metrics.HistogramOpts{
-			Name:    "batch_to_commit_duration",
-			Help:    "duration from batch to commit",
-			Buckets: []float64{0.001, 0.005, 0.01, 0.03, 0.05, 0.1, 0.3, 0.5, 1, 3, 5, 10},
+	m.batchPersistDuration, err = metricsProv.NewSummary(
+		metrics.SummaryOpts{
+			Name:       "batch_persist_duration",
+			Help:       "persist duration of batch",
+			Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
+		},
+	)
+	if err != nil {
+		return m, err
+	}
+
+	m.batchToCommitDuration, err = metricsProv.NewSummary(
+		metrics.SummaryOpts{
+			Name:       "batch_to_commit_duration",
+			Help:       "duration from batch to commit",
+			Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
 		},
 	)
 	if err != nil {
@@ -342,6 +366,17 @@ func newRBFTMetrics(metricsProv metrics.Provider) (*rbftMetrics, error) {
 		metrics.CounterOpts{
 			Name: "fetch_missing_txs_times",
 			Help: "rbft fetch missing txs times",
+		},
+	)
+	if err != nil {
+		return m, err
+	}
+
+	m.returnFetchMissingTxsCounter, err = metricsProv.NewCounter(
+		metrics.CounterOpts{
+			Name:       "return_fetch_missing_txs_times",
+			Help:       "rbft return fetch missing txs times",
+			LabelNames: []string{"node"},
 		},
 	)
 	if err != nil {
@@ -418,6 +453,39 @@ func newRBFTMetrics(metricsProv metrics.Provider) (*rbftMetrics, error) {
 		return m, err
 	}
 
+	m.batchToPrePrepared, err = metricsProv.NewSummary(
+		metrics.SummaryOpts{
+			Name:       "batch_to_prePrepared",
+			Help:       "interval from batch to prePrepared",
+			Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
+		},
+	)
+	if err != nil {
+		return m, err
+	}
+
+	m.prePreparedToPrepared, err = metricsProv.NewSummary(
+		metrics.SummaryOpts{
+			Name:       "prePrepared_to_prepared",
+			Help:       "interval from prePrepared to prepared",
+			Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
+		},
+	)
+	if err != nil {
+		return m, err
+	}
+
+	m.preparedToCommitted, err = metricsProv.NewSummary(
+		metrics.SummaryOpts{
+			Name:       "prepared_to_committed",
+			Help:       "interval from prepared to committed",
+			Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
+		},
+	)
+	if err != nil {
+		return m, err
+	}
+
 	return m, nil
 }
 
@@ -477,6 +545,9 @@ func (rm *rbftMetrics) unregisterMetrics() {
 	if rm.txsPerBlock != nil {
 		rm.txsPerBlock.Unregister()
 	}
+	if rm.batchInterval != nil {
+		rm.batchInterval.Unregister()
+	}
 	if rm.batchPersistDuration != nil {
 		rm.batchPersistDuration.Unregister()
 	}
@@ -498,6 +569,9 @@ func (rm *rbftMetrics) unregisterMetrics() {
 	if rm.fetchMissingTxsCounter != nil {
 		rm.fetchMissingTxsCounter.Unregister()
 	}
+	if rm.returnFetchMissingTxsCounter != nil {
+		rm.returnFetchMissingTxsCounter.Unregister()
+	}
 	if rm.fetchRequestBatchCounter != nil {
 		rm.fetchRequestBatchCounter.Unregister()
 	}
@@ -518,5 +592,14 @@ func (rm *rbftMetrics) unregisterMetrics() {
 	}
 	if rm.rejectedRemoteTxs != nil {
 		rm.rejectedRemoteTxs.Unregister()
+	}
+	if rm.batchToPrePrepared != nil {
+		rm.batchToPrePrepared.Unregister()
+	}
+	if rm.prePreparedToPrepared != nil {
+		rm.prePreparedToPrepared.Unregister()
+	}
+	if rm.preparedToCommitted != nil {
+		rm.preparedToCommitted.Unregister()
 	}
 }

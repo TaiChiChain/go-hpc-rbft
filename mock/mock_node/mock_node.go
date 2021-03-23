@@ -6,7 +6,6 @@ package mocknode
 
 import (
 	gomock "github.com/golang/mock/gomock"
-	protos "github.com/ultramesh/flato-common/types/protos"
 	rbft "github.com/ultramesh/flato-rbft"
 	rbftpb "github.com/ultramesh/flato-rbft/rbftpb"
 	reflect "reflect"
@@ -50,7 +49,7 @@ func (mr *MockNodeMockRecorder) Start() *gomock.Call {
 }
 
 // Propose mocks base method
-func (m *MockNode) Propose(requests []*protos.Transaction) error {
+func (m *MockNode) Propose(requests *rbftpb.RequestSet) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Propose", requests)
 	ret0, _ := ret[0].(error)
