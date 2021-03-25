@@ -1632,7 +1632,7 @@ func (rbft *rbftImpl) recvCheckpoint(chkpt *pb.Checkpoint) consensusEvent {
 	}
 
 	if rbft.weakCheckpointSetOutOfRange(chkpt) {
-		return rbft.initRecovery()
+		return rbft.restartRecovery()
 	}
 
 	legal, matching := rbft.compareCheckpointWithWeakSet(chkpt)
@@ -2074,6 +2074,20 @@ func (rbft *rbftImpl) recvStateUpdatedEvent(ss *pb.ServiceState) consensusEvent 
 		return &LocalEvent{
 			Service:   RecoveryService,
 			EventType: RecoveryDoneEvent,
+		}
+	}
+
+	if rbft.atomicIn(InViewChange) {
+		if rbft.isPrimary(rbft.peerPool.ID) {
+			// view may not be changed after state-update, current node mistakes itself for primary
+			// so send view change to step into the new view
+			rbft.logger.Debugf("Primary %d send view-change after state update", rbft.peerPool.ID)
+			return rbft.sendViewChange()
+		}
+
+		return &LocalEvent{
+			Service:   ViewChangeService,
+			EventType: ViewChangedEvent,
 		}
 	}
 
