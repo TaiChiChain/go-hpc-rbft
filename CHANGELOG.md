@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.2.30"></a>
+## [0.2.30](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.29...v0.2.30) (2021-03-25)
+
+
+
+<a name="0.2.27-2"></a>
+## [0.2.27-2](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.27-1...v0.2.27-2) (2021-03-04)
+
+
+### Bug Fixes
+
+* don't set local before broadcast ([68167ae](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/68167ae)), closes [#flato-3234](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-3234)
+* we need extra process for view change when we finished state update ([f5392cb](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/f5392cb)), closes [#flato-3235](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-3235)
+
+
+
+<a name="0.2.27-1"></a>
+## [0.2.27-1](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.27...v0.2.27-1) (2021-02-24)
+
+
+### Bug Fixes
+
+* **viewchange_mgr.go:** reject viewchange/recovery when node is in state transfer ([1397eab](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/1397eab))
+
+
+
 <a name="0.2.29"></a>
 ## [0.2.29](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.28...v0.2.29) (2021-03-23)
 
