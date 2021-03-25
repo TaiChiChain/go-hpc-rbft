@@ -102,6 +102,14 @@ func (rbft *rbftImpl) restartRecovery() consensusEvent {
 // flag keepCurrentVote means if we still vote for current primary or not.
 func (rbft *rbftImpl) sendNotification(keepCurrentVote bool) consensusEvent {
 
+	// reject recovery when current node is in StateTransferring to avoid other (quorum-1) replicas
+	// finish recovery but cannot reach consensus later if there are only quorum active replicas
+	// consisting of (quorum-1) normal replicas + 1 lagging replica.
+	if rbft.atomicIn(StateTransferring) {
+		rbft.logger.Warningf("Replica %d is in state transferring, not sending recovery", rbft.peerPool.ID)
+		return nil
+	}
+
 	if rbft.in(InSyncState) {
 		rbft.logger.Debugf("Replica %d cannot recovery, it is trying to sync state", rbft.peerPool.ID)
 		return nil

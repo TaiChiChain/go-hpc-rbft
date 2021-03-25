@@ -179,7 +179,6 @@ func (rbft *rbftImpl) committed(digest string, v uint64, n uint64) bool {
 
 // broadcastReqSet helps broadcast requestSet to others.
 func (rbft *rbftImpl) broadcastReqSet(set *pb.RequestSet) {
-	set.Local = false
 	payload, err := proto.Marshal(set)
 	if err != nil {
 		rbft.logger.Errorf("ConsensusMessage_TRANSACTION_SET Marshal Error: %s", err)
