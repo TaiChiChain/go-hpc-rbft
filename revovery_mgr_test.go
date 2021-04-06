@@ -255,7 +255,7 @@ func TestRecovery_NormalCheckpointFailing_Recovery(t *testing.T) {
 		}
 		rbfts[3].processEvent(returnRecoveryPQC[index])
 	}
-	assert.Equal(t, uint64(10), rbfts[3].exec.lastExec)
+	assert.Equal(t, uint64(13), rbfts[3].exec.lastExec)
 }
 
 func TestRecovery_EpochCheckpointFailing_Recovery(t *testing.T) {
