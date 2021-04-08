@@ -70,10 +70,10 @@ func executeExceptN(t *testing.T, rbfts []*rbftImpl, nodes []*testNode, tx *prot
 
 	retMessages := make(map[pb.Type][]*pb.ConsensusMessage)
 
-	rbfts[0].batchMgr.requestPool.AddNewRequest(tx, false, true)
-	rbfts[1].batchMgr.requestPool.AddNewRequest(tx, false, true)
-	rbfts[2].batchMgr.requestPool.AddNewRequest(tx, false, true)
-	rbfts[3].batchMgr.requestPool.AddNewRequest(tx, false, true)
+	rbfts[0].batchMgr.requestPool.AddNewRequests([]*protos.Transaction{tx}, false, true)
+	rbfts[1].batchMgr.requestPool.AddNewRequests([]*protos.Transaction{tx}, false, true)
+	rbfts[2].batchMgr.requestPool.AddNewRequests([]*protos.Transaction{tx}, false, true)
+	rbfts[3].batchMgr.requestPool.AddNewRequests([]*protos.Transaction{tx}, false, true)
 
 	batchTimerEvent := &LocalEvent{
 		Service:   CoreRbftService,

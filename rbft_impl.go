@@ -768,9 +768,7 @@ func (rbft *rbftImpl) processReqSetEvent(req *pb.RequestSet) consensusEvent {
 
 	// if current node is in abnormal, add normal txs into txPool without generate batches.
 	if !rbft.isNormal() {
-		for _, tx := range req.Requests {
-			rbft.batchMgr.requestPool.AddNewRequest(tx, false, req.Local)
-		}
+		rbft.batchMgr.requestPool.AddNewRequests(req.Requests, false, req.Local)
 	} else {
 		// primary nodes would check if this transaction triggered generating a batch or not
 		if rbft.isPrimary(rbft.peerPool.ID) {
@@ -778,25 +776,20 @@ func (rbft *rbftImpl) processReqSetEvent(req *pb.RequestSet) consensusEvent {
 			if !rbft.batchMgr.isBatchTimerActive() {
 				rbft.startBatchTimer()
 			}
-			for _, tx := range req.Requests {
-				batches := rbft.batchMgr.requestPool.AddNewRequest(tx, true, req.Local)
-
-				// If this transaction triggers generating a batch, stop batch timer
-				if len(batches) != 0 {
-					rbft.stopBatchTimer()
-					now := time.Now().UnixNano()
-					if rbft.batchMgr.lastBatchTime != 0 {
-						interval := time.Duration(now - rbft.batchMgr.lastBatchTime).Seconds()
-						rbft.metrics.batchInterval.Observe(interval)
-					}
-					rbft.batchMgr.lastBatchTime = now
-					rbft.postBatches(batches)
+			batches := rbft.batchMgr.requestPool.AddNewRequests(req.Requests, true, req.Local)
+			// If these transactions triggers generating a batch, stop batch timer
+			if len(batches) != 0 {
+				rbft.stopBatchTimer()
+				now := time.Now().UnixNano()
+				if rbft.batchMgr.lastBatchTime != 0 {
+					interval := time.Duration(now - rbft.batchMgr.lastBatchTime).Seconds()
+					rbft.metrics.batchInterval.Observe(interval)
 				}
+				rbft.batchMgr.lastBatchTime = now
+				rbft.postBatches(batches)
 			}
 		} else {
-			for _, tx := range req.Requests {
-				rbft.batchMgr.requestPool.AddNewRequest(tx, false, req.Local)
-			}
+			rbft.batchMgr.requestPool.AddNewRequests(req.Requests, false, req.Local)
 		}
 	}
 
@@ -1347,8 +1340,8 @@ func (rbft *rbftImpl) recvSendMissingTxs(re *pb.SendMissingRequests) consensusEv
 	}
 
 	if !rbft.inV(re.View) {
-		rbft.logger.Debugf("Replica %d received return missing transactions which has a different view=%d,"+
-			"expected.View %d, ignore it", rbft.peerPool.ID, re.View, rbft.view)
+		rbft.logger.Debugf("Replica %d received return missing transactions which has a different view=%d, "+
+			"expected view=%d, ignore it", rbft.peerPool.ID, re.View, rbft.view)
 		return nil
 	}
 
@@ -1785,7 +1778,7 @@ func (rbft *rbftImpl) weakCheckpointSetOutOfRange(chkpt *pb.Checkpoint) bool {
 		if len(rbft.storeMgr.hChkpts) >= rbft.oneCorrectQuorum() {
 			outCount := 0
 			for replicaHash, hChkpt := range rbft.storeMgr.hChkpts {
-				if hChkpt < H {
+				if hChkpt <= H {
 					delete(rbft.storeMgr.hChkpts, replicaHash)
 					continue
 				}
