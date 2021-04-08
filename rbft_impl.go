@@ -576,7 +576,7 @@ func (rbft *rbftImpl) processEvent(ee consensusEvent) consensusEvent {
 	switch e := ee.(type) {
 
 	case *pb.RequestSet:
-		// e.Local indicates whether this RequestSet was generated locally or reveived
+		// e.Local indicates whether this RequestSet was generated locally or received
 		// from remote nodes.
 		if e.Local {
 			rbft.metrics.incomingLocalTxSets.Add(float64(1))
@@ -1395,7 +1395,6 @@ func (rbft *rbftImpl) commitPendingBlocks() {
 
 	for hasTxToExec := true; hasTxToExec; {
 		if find, idx, cert := rbft.findNextCommitTx(); find {
-			rbft.logger.Noticef("======== Replica %d Call execute, view=%d/seqNo=%d", rbft.peerPool.ID, idx.v, idx.n)
 			rbft.metrics.committedBlockNumber.Add(float64(1))
 			rbft.persistCSet(idx.v, idx.n, idx.d)
 			// stop new view timer after one batch has been call executed
@@ -1406,11 +1405,12 @@ func (rbft *rbftImpl) commitPendingBlocks() {
 
 			isConfig := rbft.batchMgr.requestPool.IsConfigBatch(idx.d)
 			if idx.d == "" {
-				rbft.logger.Noticef("Replica %d try to execute a no-op", rbft.peerPool.ID)
 				txList := make([]*protos.Transaction, 0)
 				localList := make([]bool, 0)
 				rbft.metrics.committedEmptyBlockNumber.Add(float64(1))
 				rbft.metrics.txsPerBlock.Observe(float64(0))
+				rbft.logger.Noticef("======== Replica %d Call execute a no-nop, view=%d/seqNo=%d",
+					rbft.peerPool.ID, idx.v, idx.n)
 				rbft.external.Execute(txList, localList, idx.n, 0)
 			} else {
 				// find batch in batchStore rather than outstandingBatch as after viewChange
@@ -1429,6 +1429,8 @@ func (rbft *rbftImpl) commitPendingBlocks() {
 				rbft.metrics.txsPerBlock.Observe(float64(len(txList)))
 				batchToCommit := time.Duration(time.Now().UnixNano() - cert.prePrepare.HashBatch.Timestamp).Seconds()
 				rbft.metrics.batchToCommitDuration.Observe(batchToCommit)
+				rbft.logger.Noticef("======== Replica %d Call execute, view=%d/seqNo=%d/txCount=%d/digest=%s",
+					rbft.peerPool.ID, idx.v, idx.n, len(txList), idx.d)
 				rbft.external.Execute(txList, localList, idx.n, cert.prePrepare.HashBatch.Timestamp)
 			}
 			delete(rbft.storeMgr.outstandingReqBatches, idx.d)
@@ -1938,20 +1940,13 @@ func (rbft *rbftImpl) tryStateTransfer() {
 
 	rbft.atomicOn(StateTransferring)
 	rbft.metrics.statusGaugeStateTransferring.Set(StateTransferring)
-	rbft.batchMgr.requestPool.Reset()
-	// clear cacheBatch as they are useless and all related batches have been reset in requestPool.
-	rbft.batchMgr.cacheBatch = nil
-	rbft.metrics.cacheBatchNumber.Set(float64(0))
-	// reset the status of PoolFull
-	rbft.setNotFull()
 
-	// clean cert with seqNo > lastExec before stateUpdate to avoid influencing the
+	// clean cert with seqNo <= target before stateUpdate to avoid influencing the
 	// following progress
-	// TODO(DH): do we need to save certs with seqNo <= lastExec?
 	for idx := range rbft.storeMgr.certStore {
-		if idx.n > rbft.exec.lastExec {
-			rbft.logger.Debugf("Replica %d clean cert with seqNo %d > lastExec %d, "+
-				"digest=%s, before state update", rbft.peerPool.ID, idx.n, rbft.exec.lastExec, idx.d)
+		if idx.n <= target.Applied {
+			rbft.logger.Debugf("Replica %d clean cert with seqNo %d <= target %d, "+
+				"digest=%s, before state update", rbft.peerPool.ID, idx.n, target.Applied, idx.d)
 			delete(rbft.storeMgr.certStore, idx)
 			delete(rbft.storeMgr.committedCert, idx)
 			delete(rbft.storeMgr.seqMap, idx.n)
@@ -1959,24 +1954,40 @@ func (rbft *rbftImpl) tryStateTransfer() {
 		}
 	}
 	for d, batch := range rbft.storeMgr.outstandingReqBatches {
-		if batch.SeqNo > rbft.exec.lastExec {
-			rbft.logger.Debugf("Replica %d clean outstanding batch with seqNo %d > lastExec %d, "+
-				"digest=%s, before state update", rbft.peerPool.ID, batch.SeqNo, rbft.exec.lastExec, d)
+		if batch.SeqNo <= target.Applied {
+			rbft.logger.Debugf("Replica %d clean outstanding batch with seqNo %d <= target %d, "+
+				"digest=%s, before state update", rbft.peerPool.ID, batch.SeqNo, target.Applied, d)
 			delete(rbft.storeMgr.outstandingReqBatches, d)
 		}
 	}
 	rbft.metrics.outstandingBatchesGauge.Set(float64(len(rbft.storeMgr.outstandingReqBatches)))
 	for d, batch := range rbft.storeMgr.batchStore {
-		if batch.SeqNo > rbft.exec.lastExec {
-			rbft.logger.Debugf("Replica %d clean batch with seqNo %d > lastExec %d, "+
-				"digest=%s, before state update", rbft.peerPool.ID, batch.SeqNo, rbft.exec.lastExec, d)
+		if batch.SeqNo <= target.Applied {
+			rbft.logger.Debugf("Replica %d clean batch with seqNo %d <= target %d, "+
+				"digest=%s, before state update", rbft.peerPool.ID, batch.SeqNo, target.Applied, d)
 			delete(rbft.storeMgr.batchStore, d)
 			rbft.persistDelBatch(d)
 		}
 	}
 	rbft.metrics.batchesGauge.Set(float64(len(rbft.storeMgr.batchStore)))
+	// NOTE!!! save batches with seqNo larger than target height because those
+	// batches may be useful in PQList.
+	var saveBatches []string
+	for digest := range rbft.storeMgr.batchStore {
+		saveBatches = append(saveBatches, digest)
+	}
 
-	rbft.logger.Infof("Replica %d try state update to %d", rbft.peerPool.ID, target.Applied)
+	rbft.batchMgr.requestPool.Reset(saveBatches)
+	// reset the status of PoolFull
+	if !rbft.batchMgr.requestPool.IsPoolFull() {
+		rbft.setNotFull()
+	}
+
+	// clear cacheBatch as they are useless and all related batches have been reset in requestPool.
+	rbft.batchMgr.cacheBatch = nil
+	rbft.metrics.cacheBatchNumber.Set(float64(0))
+
+	rbft.logger.Noticef("Replica %d try state update to %d", rbft.peerPool.ID, target.Applied)
 
 	// attempts to synchronize state to a particular target, implicitly calls rollback if needed
 	rbft.metrics.stateUpdateCounter.Add(float64(1))
@@ -2020,7 +2031,7 @@ func (rbft *rbftImpl) recvStateUpdatedEvent(ss *pb.ServiceState) consensusEvent 
 	}
 
 	// 1. finished state update
-	rbft.logger.Infof("======== Replica %d finished stateUpdate, height: %d", rbft.peerPool.ID, seqNo)
+	rbft.logger.Noticef("======== Replica %d finished stateUpdate, height: %d", rbft.peerPool.ID, seqNo)
 	finishMsg := fmt.Sprintf("======== Replica %d finished stateUpdate, height: %d", rbft.peerPool.ID, seqNo)
 	rbft.external.SendFilterEvent(pb.InformType_FilterFinishStateUpdate, finishMsg)
 	rbft.exec.setLastExec(seqNo)
