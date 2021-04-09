@@ -1,6 +1,6 @@
 module github.com/ultramesh/flato-rbft
 
-go 1.12
+go 1.15
 
 require (
 	github.com/gogo/protobuf v1.3.1
@@ -15,6 +15,6 @@ replace github.com/ultramesh/crypto-standard => git.hyperchain.cn/ultramesh/cryp
 
 replace github.com/ultramesh/flato-common => git.hyperchain.cn/ultramesh/flato-common.git v0.2.4
 
-replace github.com/ultramesh/flato-txpool => git.hyperchain.cn/ultramesh/flato-txpool.git v0.2.12
+replace github.com/ultramesh/flato-txpool => git.hyperchain.cn/ultramesh/flato-txpool.git v0.2.12-1
 
 replace github.com/ultramesh/fancylogger => git.hyperchain.cn/ultramesh/fancylogger.git v0.1.2
