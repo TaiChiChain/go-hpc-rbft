@@ -143,8 +143,12 @@ type channelMsg struct {
 // defaultTxpoolSupportSmokeTest
 type defaultTxpoolSupportSmokeTest struct{}
 
-func (lookup *defaultTxpoolSupportSmokeTest) IsRequestExist(tx *protos.Transaction) bool {
-	return false
+func (lookup *defaultTxpoolSupportSmokeTest) IsRequestsExist(txs []*protos.Transaction) []bool {
+	results := make([]bool, len(txs))
+	for i := range results {
+		results[i] = false
+	}
+	return results
 }
 
 func (lookup *defaultTxpoolSupportSmokeTest) CheckSigns(txs []*protos.Transaction) {

@@ -3,6 +3,7 @@ package rbft
 import (
 	"testing"
 
+	"github.com/ultramesh/flato-common/types/protos"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
 
 	"github.com/golang/mock/gomock"
@@ -34,7 +35,7 @@ func TestExec_handleCoreRbftEvent_batchTimerEvent(t *testing.T) {
 	rbfts[0].atomicOff(InConfChange)
 
 	tx := newTx()
-	rbfts[0].batchMgr.requestPool.AddNewRequest(tx, false, true)
+	rbfts[0].batchMgr.requestPool.AddNewRequests([]*protos.Transaction{tx}, false, true)
 	reqBatch := rbfts[0].batchMgr.requestPool.GenerateRequestBatch()
 	batch := &pb.RequestBatch{
 		RequestHashList: reqBatch[0].TxHashList,
@@ -150,7 +151,7 @@ func TestExec_handleCoreRbftEvent_ResendMissingTxsEvent(t *testing.T) {
 
 	// create batch
 	tx := newTx()
-	rbfts[0].batchMgr.requestPool.AddNewRequest(tx, false, true)
+	rbfts[0].batchMgr.requestPool.AddNewRequests([]*protos.Transaction{tx}, false, true)
 	reqBatch := rbfts[0].batchMgr.requestPool.GenerateRequestBatch()
 	batch := &pb.RequestBatch{
 		RequestHashList: reqBatch[0].TxHashList,

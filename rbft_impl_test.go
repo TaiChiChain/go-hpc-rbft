@@ -101,7 +101,7 @@ func TestRBFT_consensusMessageFilter(t *testing.T) {
 	assert.Equal(t, 0, len(rbfts[1].epochMgr.checkOutOfEpoch))
 
 	tx := newTx()
-	rbfts[0].batchMgr.requestPool.AddNewRequest(tx, false, true)
+	rbfts[0].batchMgr.requestPool.AddNewRequests([]*protos.Transaction{tx}, false, true)
 	batchTimerEvent := &LocalEvent{
 		Service:   CoreRbftService,
 		EventType: CoreBatchTimerEvent,
@@ -399,7 +399,7 @@ func TestRBFT_processOutOfDateReqs(t *testing.T) {
 	_, rbfts := newBasicClusterInstance()
 	tx := newTx()
 
-	rbfts[1].batchMgr.requestPool.AddNewRequest(tx, false, true)
+	rbfts[1].batchMgr.requestPool.AddNewRequests([]*protos.Transaction{tx}, false, true)
 	rbfts[1].setFull()
 	rbfts[1].processOutOfDateReqs()
 	assert.Equal(t, true, rbfts[1].isPoolFull())

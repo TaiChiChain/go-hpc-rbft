@@ -19,7 +19,7 @@ func TestVC_FullProcess(t *testing.T) {
 	unlockCluster(rbfts)
 
 	tx := newTx()
-	rbfts[1].batchMgr.requestPool.AddNewRequest(tx, false, true)
+	rbfts[1].batchMgr.requestPool.AddNewRequests([]*protos.Transaction{tx}, false, true)
 
 	rbfts[2].sendViewChange()
 	vcNode3 := nodes[2].broadcastMessageCache
@@ -289,7 +289,7 @@ func TestVC_processNewView_AfterViewChanged_PrimaryNormal(t *testing.T) {
 	nodes, rbfts := newBasicClusterInstance()
 
 	tx := newTx()
-	rbfts[0].batchMgr.requestPool.AddNewRequest(tx, false, true)
+	rbfts[0].batchMgr.requestPool.AddNewRequests([]*protos.Transaction{tx}, false, true)
 	batch := rbfts[0].batchMgr.requestPool.GenerateRequestBatch()
 
 	// a message list
@@ -322,7 +322,7 @@ func TestVC_processNewView_AfterViewChanged_ReplicaNormal(t *testing.T) {
 	nodes, rbfts := newBasicClusterInstance()
 
 	tx := newTx()
-	rbfts[0].batchMgr.requestPool.AddNewRequest(tx, false, true)
+	rbfts[0].batchMgr.requestPool.AddNewRequests([]*protos.Transaction{tx}, false, true)
 	batch := rbfts[0].batchMgr.requestPool.GenerateRequestBatch()
 
 	// a message list
@@ -357,7 +357,7 @@ func TestVC_feedMissingReqBatchIfNeeded(t *testing.T) {
 	_, rbfts := newBasicClusterInstance()
 
 	tx := newTx()
-	rbfts[0].batchMgr.requestPool.AddNewRequest(tx, false, true)
+	rbfts[0].batchMgr.requestPool.AddNewRequests([]*protos.Transaction{tx}, false, true)
 	batch := rbfts[0].batchMgr.requestPool.GenerateRequestBatch()
 
 	// a message list
