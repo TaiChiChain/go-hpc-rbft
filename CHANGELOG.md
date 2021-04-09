@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.2.30-2"></a>
+## [0.2.30-2](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.30-1...v0.2.30-2) (2021-04-09)
+
+
+### Performance Improvements
+
+* **rbft_impl.go:** batch add requests into txpool to improve the performance of look up bloom_filte ([0c367b2](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/0c367b2)), closes [#flato-3340](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-3340)
+
+
+
 <a name="0.2.30-1"></a>
 ## [0.2.30-1](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.30...v0.2.30-1) (2021-04-08)
 
