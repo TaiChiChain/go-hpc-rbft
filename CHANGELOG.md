@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.2.31-1"></a>
+## [0.2.31-1](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.31...v0.2.31-1) (2021-04-15)
+
+
+### Performance Improvements
+
+* **rbft:** eliminate missing batch when txpool received all missing txs of certain batch ([65ea86e](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/65ea86e))
+
+
+
 <a name="0.2.31"></a>
 ## [0.2.31](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.30-2...v0.2.31) (2021-04-09)
 
