@@ -605,9 +605,8 @@ func (rbft *rbftImpl) processEvent(ee consensusEvent) consensusEvent {
 func (rbft *rbftImpl) consensusMessageFilter(msg *pb.ConsensusMessage) consensusEvent {
 
 	// A node in different epoch or in epoch sync will reject normal consensus messages, except:
-	// For epoch check:  {EpochCheck, EpochCheckResponse},
-	// For sync state:   {SyncState, SyncStateResponse},
-	// For checkpoint:   {Checkpoint, FetchCheckpoint},
+	// For sync state: {SyncState, SyncStateResponse},
+	// For checkpoint: {Checkpoint, FetchCheckpoint},
 	if msg.Epoch != rbft.epoch {
 		switch msg.Type {
 		case pb.Type_NOTIFICATION,

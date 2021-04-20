@@ -140,7 +140,7 @@ func (rbft *rbftImpl) sendViewChange() consensusEvent {
 
 // recvViewChange processes ViewChange message from itself or other peers
 // If the number of ViewChange message for equal view reach on
-// allCorrectReplicasQuorum, return ViewChangeQuorumEvent.
+// commonCaseQuorum, return ViewChangeQuorumEvent.
 // Else peers may resend vc or wait more vc message arrived.
 func (rbft *rbftImpl) recvViewChange(vc *pb.ViewChange) consensusEvent {
 	rbft.logger.Infof("Replica %d received viewChange from replica %d, v:%d, h:%d, |C|:%d, |P|:%d, |Q|:%d",
@@ -225,9 +225,9 @@ func (rbft *rbftImpl) recvViewChange(vc *pb.ViewChange) consensusEvent {
 	rbft.logger.Debugf("Replica %d now has %d viewChange requests for view %d",
 		rbft.peerPool.ID, quorum, rbft.view)
 
-	// if in viewChange/recovery and vc.view = rbft.view and quorum > allCorrectReplicasQuorum
+	// if in viewChange/recovery and vc.view = rbft.view and quorum > commonCaseQuorum
 	// rbft find new view success and jump into ViewChangeQuorumEvent
-	if rbft.atomicInOne(InViewChange, InRecovery) && vc.Basis.View == rbft.view && quorum >= rbft.allCorrectReplicasQuorum() {
+	if rbft.atomicInOne(InViewChange, InRecovery) && vc.Basis.View == rbft.view && quorum >= rbft.commonCaseQuorum() {
 		// as viewChange and recovery are mutually exclusive, we need to ensure
 		// we have totally exit recovery before we jump into ViewChangeQuorumEvent
 		if rbft.atomicIn(InRecovery) {
@@ -269,7 +269,7 @@ func (rbft *rbftImpl) recvViewChange(vc *pb.ViewChange) consensusEvent {
 
 // sendNewView select suitable pqc from viewChangeStore as a new view message and
 // broadcast to replica peers when peer is primary and it receives
-// allCorrectReplicasQuorum for new view.
+// commonCaseQuorum for new view.
 // Then jump into primaryProcessNewView.
 func (rbft *rbftImpl) sendNewView(notification bool) consensusEvent {
 
