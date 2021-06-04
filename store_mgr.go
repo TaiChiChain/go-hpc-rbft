@@ -42,6 +42,11 @@ type storeManager struct {
 	// some transactions in some batches, record batch no
 	missingReqBatches map[string]bool
 
+	// used by backup node to record all missing tx batches which are in fetching
+	// to avoid fetch the same batch repeatedly.
+	// map missing batch digest to batch seqNo.
+	missingBatchesInFetching map[string]msgID
+
 	// a pre-prepare sequence map,
 	// there need to be a one-to-one correspondence between sequence number and digest
 	seqMap map[uint64]string
@@ -67,16 +72,17 @@ type storeManager struct {
 // newStoreMgr news an instance of storeManager
 func newStoreMgr(c Config) *storeManager {
 	sm := &storeManager{
-		chkpts:                make(map[uint64]string),
-		hChkpts:               make(map[string]uint64),
-		checkpointStore:       make(map[chkptID]string),
-		certStore:             make(map[msgID]*msgCert),
-		committedCert:         make(map[msgID]string),
-		seqMap:                make(map[uint64]string),
-		outstandingReqBatches: make(map[string]*pb.RequestBatch),
-		batchStore:            make(map[string]*pb.RequestBatch),
-		missingReqBatches:     make(map[string]bool),
-		logger:                c.Logger,
+		chkpts:                   make(map[uint64]string),
+		hChkpts:                  make(map[string]uint64),
+		checkpointStore:          make(map[chkptID]string),
+		certStore:                make(map[msgID]*msgCert),
+		committedCert:            make(map[msgID]string),
+		seqMap:                   make(map[uint64]string),
+		outstandingReqBatches:    make(map[string]*pb.RequestBatch),
+		batchStore:               make(map[string]*pb.RequestBatch),
+		missingReqBatches:        make(map[string]bool),
+		missingBatchesInFetching: make(map[string]msgID),
+		logger:                   c.Logger,
 	}
 	sm.chkpts[0] = "XXX GENESIS"
 	return sm

@@ -214,6 +214,12 @@ func (rbft *rbftImpl) turnIntoEpoch(router *pb.Router, epoch uint64) {
 
 `)
 
+	// close the new node target
+	if rbft.in(isNewNode) {
+		rbft.logger.Infof("Replica %d has found a stable epoch info, close the new-node target", rbft.peerPool.ID)
+		rbft.off(isNewNode)
+	}
+
 	// reset reload router cache
 	rbft.node.setReloadRouter(nil)
 }
