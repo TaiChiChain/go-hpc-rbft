@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.2.32"></a>
+## [0.2.32](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.31-3...v0.2.32) (2021-06-04)
+
+
+### Features
+
+* **go.mod:** update reference ([5bd9eca](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/5bd9eca))
+
+
+
 <a name="0.2.31-3"></a>
 ## [0.2.31-3](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.31-2...v0.2.31-3) (2021-04-26)
 
