@@ -195,8 +195,6 @@ func (rbft *rbftImpl) sendNotification(keepCurrentVote bool) consensusEvent {
 	// use recoveryRestartTimer to track resend of notification.
 	rbft.timerMgr.startTimer(recoveryRestartTimer, event)
 
-	// use epoch sync when fetch the latest epoch
-
 	if rbft.in(isNewNode) {
 		rbft.logger.Debugf("New node %d doesn't send notification to itself", rbft.peerPool.ID)
 		return nil
@@ -217,8 +215,8 @@ func (rbft *rbftImpl) recvNotification(n *pb.Notification) consensusEvent {
 
 	// new node cannot process notification as new node is not in a consistent
 	// view/N with other nodes.
-	if rbft.in(isNewNode) {
-		rbft.logger.Debugf("New node %d ignore notification", rbft.peerPool.ID)
+	if rbft.in(isNewNode) && n.Epoch == 0 {
+		rbft.logger.Debugf("New node %d ignore notification in epoch 0", rbft.peerPool.ID)
 		return nil
 	}
 
@@ -275,7 +273,7 @@ func (rbft *rbftImpl) recvNotification(n *pb.Notification) consensusEvent {
 	rbft.logger.Debugf("Replica %d now has %d notification in notificationStore for view %d",
 		rbft.peerPool.ID, quorum, n.Basis.View)
 
-	if rbft.atomicIn(InRecovery) && n.Basis.View == rbft.view && quorum >= rbft.allCorrectReplicasQuorum() {
+	if rbft.atomicIn(InRecovery) && n.Basis.View == rbft.view && quorum >= rbft.commonCaseQuorum() {
 		rbft.timerMgr.stopTimer(recoveryRestartTimer)
 		rbft.softStartNewViewTimer(rbft.vcMgr.lastNewViewTimeout, "new Notification", true)
 		rbft.vcMgr.lastNewViewTimeout = 2 * rbft.vcMgr.lastNewViewTimeout

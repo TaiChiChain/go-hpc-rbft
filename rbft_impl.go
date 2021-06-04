@@ -605,9 +605,8 @@ func (rbft *rbftImpl) processEvent(ee consensusEvent) consensusEvent {
 func (rbft *rbftImpl) consensusMessageFilter(msg *pb.ConsensusMessage) consensusEvent {
 
 	// A node in different epoch or in epoch sync will reject normal consensus messages, except:
-	// For epoch check:  {EpochCheck, EpochCheckResponse},
-	// For sync state:   {SyncState, SyncStateResponse},
-	// For checkpoint:   {Checkpoint, FetchCheckpoint},
+	// For sync state: {SyncState, SyncStateResponse},
+	// For checkpoint: {Checkpoint, FetchCheckpoint},
 	if msg.Epoch != rbft.epoch {
 		switch msg.Type {
 		case pb.Type_NOTIFICATION,
@@ -768,7 +767,10 @@ func (rbft *rbftImpl) processReqSetEvent(req *pb.RequestSet) consensusEvent {
 
 	// if current node is in abnormal, add normal txs into txPool without generate batches.
 	if !rbft.isNormal() {
-		rbft.batchMgr.requestPool.AddNewRequests(req.Requests, false, req.Local)
+		_, completionMissingBatchHashes := rbft.batchMgr.requestPool.AddNewRequests(req.Requests, false, req.Local)
+		for _, batchHash := range completionMissingBatchHashes {
+			delete(rbft.storeMgr.missingBatchesInFetching, batchHash)
+		}
 	} else {
 		// primary nodes would check if this transaction triggered generating a batch or not
 		if rbft.isPrimary(rbft.peerPool.ID) {
@@ -776,7 +778,7 @@ func (rbft *rbftImpl) processReqSetEvent(req *pb.RequestSet) consensusEvent {
 			if !rbft.batchMgr.isBatchTimerActive() {
 				rbft.startBatchTimer()
 			}
-			batches := rbft.batchMgr.requestPool.AddNewRequests(req.Requests, true, req.Local)
+			batches, _ := rbft.batchMgr.requestPool.AddNewRequests(req.Requests, true, req.Local)
 			// If these transactions triggers generating a batch, stop batch timer
 			if len(batches) != 0 {
 				rbft.stopBatchTimer()
@@ -789,7 +791,19 @@ func (rbft *rbftImpl) processReqSetEvent(req *pb.RequestSet) consensusEvent {
 				rbft.postBatches(batches)
 			}
 		} else {
-			rbft.batchMgr.requestPool.AddNewRequests(req.Requests, false, req.Local)
+			_, completionMissingBatchHashes := rbft.batchMgr.requestPool.AddNewRequests(req.Requests, false, req.Local)
+			for _, batchHash := range completionMissingBatchHashes {
+				idx, ok := rbft.storeMgr.missingBatchesInFetching[batchHash]
+				if !ok {
+					rbft.logger.Warningf("Replica %d completion batch with hash %s but not found missing record",
+						rbft.peerPool.ID, batchHash)
+				} else {
+					rbft.logger.Infof("Replica %d completion batch with hash %s, try to commit this batch",
+						rbft.peerPool.ID, batchHash)
+					_ = rbft.findNextCommitBatch(idx.d, idx.v, idx.n)
+				}
+				delete(rbft.storeMgr.missingBatchesInFetching, batchHash)
+			}
 		}
 	}
 
@@ -1222,6 +1236,11 @@ func (rbft *rbftImpl) recvCommit(commit *pb.Commit) error {
 
 // fetchMissingTxs fetch missing txs from primary which this node didn't receive but primary received
 func (rbft *rbftImpl) fetchMissingTxs(prePrep *pb.PrePrepare, missingTxHashes map[uint64]string) error {
+	// avoid fetch the same batch again.
+	if _, ok := rbft.storeMgr.missingBatchesInFetching[prePrep.BatchDigest]; ok {
+		return nil
+	}
+
 	rbft.logger.Debugf("Replica %d try to fetch missing txs for view=%d/seqNo=%d/digest=%s from primary %d",
 		rbft.peerPool.ID, prePrep.View, prePrep.SequenceNumber, prePrep.BatchDigest, prePrep.ReplicaId)
 
@@ -1245,6 +1264,11 @@ func (rbft *rbftImpl) fetchMissingTxs(prePrep *pb.PrePrepare, missingTxHashes ma
 		Payload: payload,
 	}
 	rbft.metrics.fetchMissingTxsCounter.Add(float64(1))
+	rbft.storeMgr.missingBatchesInFetching[prePrep.BatchDigest] = msgID{
+		v: prePrep.View,
+		n: prePrep.SequenceNumber,
+		d: prePrep.BatchDigest,
+	}
 	rbft.peerPool.unicast(consensusMsg, prePrep.ReplicaId)
 	return nil
 }
@@ -1325,6 +1349,12 @@ func (rbft *rbftImpl) recvFetchMissingTxs(fetch *pb.FetchMissingRequests) error 
 // recvSendMissingTxs processes SendMissingTxs from primary.
 // Add these transaction txs to requestPool and see if it has correct transaction txs.
 func (rbft *rbftImpl) recvSendMissingTxs(re *pb.SendMissingRequests) consensusEvent {
+	if _, ok := rbft.storeMgr.missingBatchesInFetching[re.BatchDigest]; !ok {
+		rbft.logger.Warningf("Replica %d ignore return missing txs with batch hash %s",
+			rbft.peerPool.ID, re.BatchDigest)
+		return nil
+	}
+
 	rbft.logger.Debugf("Replica %d received sendMissingTxs for view=%d/seqNo=%d/digest=%s from replica %d",
 		rbft.peerPool.ID, re.View, re.SequenceNumber, re.BatchDigest, re.ReplicaId)
 
@@ -1868,6 +1898,12 @@ func (rbft *rbftImpl) moveWatermarks(n uint64) {
 		}
 	}
 
+	for digest, idx := range rbft.storeMgr.missingBatchesInFetching {
+		if idx.n <= h {
+			delete(rbft.storeMgr.missingBatchesInFetching, digest)
+		}
+	}
+
 	rbft.storeMgr.moveWatermarks(rbft, h)
 
 	rbft.hLock.RLock()
@@ -2029,6 +2065,7 @@ func (rbft *rbftImpl) recvStateUpdatedEvent(ss *pb.ServiceState) consensusEvent 
 	rbft.external.SendFilterEvent(pb.InformType_FilterFinishStateUpdate, finishMsg)
 	rbft.exec.setLastExec(seqNo)
 	rbft.batchMgr.setSeqNo(seqNo)
+	rbft.storeMgr.missingBatchesInFetching = make(map[string]msgID)
 	rbft.off(SkipInProgress)
 	rbft.atomicOff(StateTransferring)
 	rbft.metrics.statusGaugeStateTransferring.Set(0)

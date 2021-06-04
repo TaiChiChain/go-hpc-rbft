@@ -220,6 +220,7 @@ func (rbft *rbftImpl) handleRecoveryEvent(e *LocalEvent) consensusEvent {
 		rbft.recoveryMgr.outOfElection = make(map[ntfIdx]*pb.NotificationResponse)
 		rbft.recoveryMgr.differentEpoch = make(map[ntfIde]*pb.NotificationResponse)
 		rbft.vcMgr.viewChangeStore = make(map[vcIdx]*pb.ViewChange)
+		rbft.storeMgr.missingBatchesInFetching = make(map[string]msgID)
 		rbft.maybeSetNormal()
 		rbft.timerMgr.stopTimer(recoveryRestartTimer)
 		rbft.logger.Noticef("======== Replica %d finished recovery, epoch=%d/view=%d/height=%d.", rbft.peerPool.ID, rbft.epoch, rbft.view, rbft.exec.lastExec)
@@ -326,6 +327,7 @@ func (rbft *rbftImpl) handleViewChangeEvent(e *LocalEvent) consensusEvent {
 		// set a viewChangeSeqNo if needed
 		rbft.updateViewChangeSeqNo(rbft.exec.lastExec, rbft.K)
 		delete(rbft.vcMgr.newViewStore, rbft.view)
+		rbft.storeMgr.missingBatchesInFetching = make(map[string]msgID)
 
 		rbft.startTimerIfOutstandingRequests()
 		primaryID := rbft.primaryID(rbft.view)
