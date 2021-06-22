@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.2.33"></a>
+## [0.2.33](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.32...v0.2.33) (2021-06-22)
+
+
+### Features
+
+* **rbft_impl.go:** not stop ns after current node has been deleted ([6358f16](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/6358f16)), closes [#flato-3570](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-3570)
+
+
+
 <a name="0.2.32"></a>
 ## [0.2.32](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.31-3...v0.2.32) (2021-06-04)
 
