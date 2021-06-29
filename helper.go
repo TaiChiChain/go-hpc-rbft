@@ -438,6 +438,7 @@ func (rbft *rbftImpl) compareCheckpointWithWeakSet(chkpt *pb.Checkpoint) (bool, 
 	// existed) must have the same ID with that one.
 	correctID := correctValues[0]
 	selfID, ok := rbft.storeMgr.chkpts[chkpt.SequenceNumber]
+
 	// if self's checkpoint with the same seqNo has a distinguished ID with a weak certs'
 	// checkpoint ID, we should trigger state update right now to recover self block state.
 	if ok && selfID != correctID {
