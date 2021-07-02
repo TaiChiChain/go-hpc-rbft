@@ -856,7 +856,8 @@ func (rbft *rbftImpl) processOutOfDateReqs() {
 	}
 
 	setSize := rbft.config.SetSize
-	rbft.logger.Debugf("Replica %d in normal finds %d remained reqs, broadcast to others split by setSize %d if needed", rbft.peerPool.ID, reqLen, setSize)
+	rbft.logger.Debugf("Replica %d in normal finds %d remained reqs, broadcast to others split by setSize %d "+
+		"if needed", rbft.peerPool.ID, reqLen, setSize)
 
 	// limit TransactionSet Max Mem by flowControlMaxMem before re-broadcast reqs
 	if rbft.flowControl {
@@ -1229,7 +1230,8 @@ func (rbft *rbftImpl) recvCommit(commit *pb.Commit) error {
 				rbft.sendViewChange()
 			}
 		} else {
-			rbft.logger.Debugf("Replica %d committed for seqNo: %d, but sentExecute: %v", rbft.peerPool.ID, commit.SequenceNumber, cert.sentExecute)
+			rbft.logger.Debugf("Replica %d committed for seqNo: %d, but sentExecute: %v",
+				rbft.peerPool.ID, commit.SequenceNumber, cert.sentExecute)
 		}
 	}
 	return nil
@@ -1658,12 +1660,21 @@ func (rbft *rbftImpl) recvCheckpoint(chkpt *pb.Checkpoint) consensusEvent {
 	}
 
 	if rbft.weakCheckpointSetOutOfRange(chkpt) {
-		return rbft.restartRecovery()
+		if rbft.atomicIn(StateTransferring) {
+			rbft.logger.Debugf("Replica %d keep trying state transfer", rbft.peerPool.ID)
+			return nil
+		}
+		rbft.restartRecovery()
+		// try state transfer immediately when found lagging for the first time.
+		rbft.logger.Debugf("Replica %d try state transfer after found high target", rbft.peerPool.ID)
+		rbft.tryStateTransfer()
+		return nil
 	}
 
 	legal, matching := rbft.compareCheckpointWithWeakSet(chkpt)
 	if !legal {
-		rbft.logger.Debugf("Replica %d ignore illegal checkpoint from replica %d, seqNo=%d", rbft.peerPool.ID, chkpt.NodeInfo.ReplicaId, chkpt.SequenceNumber)
+		rbft.logger.Debugf("Replica %d ignore illegal checkpoint from replica %d, seqNo=%d",
+			rbft.peerPool.ID, chkpt.NodeInfo.ReplicaId, chkpt.SequenceNumber)
 		return nil
 	}
 
@@ -1685,8 +1696,8 @@ func (rbft *rbftImpl) recvCheckpoint(chkpt *pb.Checkpoint) consensusEvent {
 	// the quorum certificate must contain 2f+1 messages, including its own
 	_, ok := rbft.storeMgr.chkpts[chkpt.SequenceNumber]
 	if !ok {
-		rbft.logger.Debugf("Replica %d found checkpoint quorum for seqNo %d, digest %s, but it has not reached this checkpoint itself yet",
-			rbft.peerPool.ID, chkpt.SequenceNumber, chkpt.Digest)
+		rbft.logger.Debugf("Replica %d found checkpoint quorum for seqNo %d, digest %s, but it has not "+
+			"reached this checkpoint itself yet", rbft.peerPool.ID, chkpt.SequenceNumber, chkpt.Digest)
 
 		// update transferring target for state update, in order to trigger another state-update instance at the
 		// moment the previous one has finished.
@@ -1753,7 +1764,9 @@ func (rbft *rbftImpl) finishConfigCheckpoint(chkpt *pb.Checkpoint) consensusEven
 	rbft.metrics.statusGaugeInConfChange.Set(0)
 	rbft.maybeSetNormal()
 	rbft.startTimerIfOutstandingRequests()
-	finishMsg := fmt.Sprintf("======== Replica %d finished config change, primary=%d, epoch=%d/n=%d/f=%d/view=%d/h=%d/lastExec=%d", rbft.peerPool.ID, rbft.primaryID(rbft.view), rbft.epoch, rbft.N, rbft.f, rbft.view, rbft.h, rbft.exec.lastExec)
+	finishMsg := fmt.Sprintf("======== Replica %d finished config change, "+
+		"primary=%d, epoch=%d/n=%d/f=%d/view=%d/h=%d/lastExec=%d",
+		rbft.peerPool.ID, rbft.primaryID(rbft.view), rbft.epoch, rbft.N, rbft.f, rbft.view, rbft.h, rbft.exec.lastExec)
 	rbft.external.SendFilterEvent(pb.InformType_FilterFinishConfigChange, finishMsg)
 
 	// set primary sequence log
@@ -1833,17 +1846,22 @@ func (rbft *rbftImpl) weakCheckpointSetOutOfRange(chkpt *pb.Checkpoint) bool {
 			// If there are f+1 nodes have issued checkpoints above our high water mark, then current
 			// node probably cannot record 2f+1 checkpoints for that sequence number, it is perhaps that
 			// current node has been out of date
-			if m := chkptSeqNumArray[len(chkptSeqNumArray)-rbft.oneCorrectQuorum()]; m.Applied > H {
-				rbft.logger.Warningf("Replica %d is out of date, f+1 nodes agree checkpoints out of our high water mark %d", rbft.peerPool.ID, H)
+			lowestCorrectChkpt := chkptSeqNumArray[len(chkptSeqNumArray)-rbft.oneCorrectQuorum()]
+			if lowestCorrectChkpt.Applied > H {
+				rbft.logger.Debugf("Replica %d is out of date, f+1 nodes agree checkpoints "+
+					"out of our high water mark, %d vs %d", rbft.peerPool.ID, lowestCorrectChkpt.Applied, H)
 
-				if rbft.exec.lastExec >= chkpt.SequenceNumber {
-					rbft.logger.Infof("Replica %d has already executed block %d larger than checkpoint's seqNo %d", rbft.peerPool.ID, rbft.exec.lastExec, chkpt.SequenceNumber)
-					rbft.softStartHighWatermarkTimer("replica received f+1 checkpoints out of range but we have already executed")
+				// we have executed to the target height, only need to start a high watermark timer.
+				if rbft.exec.lastExec >= lowestCorrectChkpt.Applied {
+					rbft.logger.Infof("Replica %d has already executed block %d larger than target's "+
+						"seqNo %d", rbft.peerPool.ID, rbft.exec.lastExec, lowestCorrectChkpt.Applied)
+					rbft.softStartHighWatermarkTimer("replica received f+1 checkpoints out of range but " +
+						"we have already executed")
 					return false
 				}
 
 				// update state update target here for an efficient initiation for a new state-update instance.
-				target := m
+				target := lowestCorrectChkpt
 				rbft.updateHighStateTarget(target)
 
 				return true
@@ -1947,10 +1965,13 @@ func (rbft *rbftImpl) updateHighStateTarget(target *pb.MetaState) {
 	}
 
 	if rbft.atomicIn(StateTransferring) {
-		rbft.logger.Infof("Replica %d has found high-target expired which transferring, update target to %d", rbft.peerPool.ID, target.Applied)
+		rbft.logger.Noticef("Replica %d has found high-target expired while transferring, "+
+			"update target to %d", rbft.peerPool.ID, target.Applied)
+	} else {
+		rbft.logger.Noticef("Replica %d updating state target to seqNo %d digest %s", rbft.peerPool.ID,
+			target.Applied, target.Digest)
 	}
 
-	rbft.logger.Debugf("Replica %d updating state target to seqNo %d digest %s", rbft.peerPool.ID, target.Applied, target.Digest)
 	rbft.storeMgr.highStateTarget = target
 }
 
@@ -1964,11 +1985,12 @@ func (rbft *rbftImpl) tryStateTransfer() {
 	rbft.setAbNormal()
 
 	if rbft.atomicIn(StateTransferring) {
-		rbft.logger.Debugf("Replica %d is currently mid tryStateTransfer, it must wait for this tryStateTransfer to complete before initiating a new one", rbft.peerPool.ID)
+		rbft.logger.Debugf("Replica %d is currently mid tryStateTransfer, it must wait for this "+
+			"tryStateTransfer to complete before initiating a new one", rbft.peerPool.ID)
 		return
 	}
 
-	// if high state targe is nil, we could not state update
+	// if high state target is nil, we could not state update
 	if rbft.storeMgr.highStateTarget == nil {
 		rbft.logger.Debugf("Replica %d has no targets to attempt tryStateTransfer to, delaying", rbft.peerPool.ID)
 		return
@@ -2065,20 +2087,14 @@ func (rbft *rbftImpl) recvStateUpdatedEvent(ss *pb.ServiceState) consensusEvent 
 	if rbft.storeMgr.highStateTarget == nil {
 		rbft.logger.Warningf("Replica %d has no state targets, cannot resume tryStateTransfer yet", rbft.peerPool.ID)
 	} else if seqNo < rbft.storeMgr.highStateTarget.Applied {
-		// If state transfer did not complete successfully, or if it did not reach our low watermark, do it again
-		// When this node moves watermark before this node receives StateUpdatedMessage, this would happen.
-		rbft.logger.Warningf("Replica %d recovered to seqNo %d but our high-target has moved to %d, transferring", rbft.peerPool.ID, seqNo, rbft.storeMgr.highStateTarget.Applied)
+		// If state transfer did not complete successfully, or if it did not reach highest target, try again.
+		rbft.logger.Warningf("Replica %d recovered to seqNo %d but our high-target has moved to %d, "+
+			"keep on state transferring", rbft.peerPool.ID, seqNo, rbft.storeMgr.highStateTarget.Applied)
 		rbft.atomicOff(StateTransferring)
 		rbft.metrics.statusGaugeStateTransferring.Set(0)
 		rbft.exec.setLastExec(seqNo)
 		rbft.tryStateTransfer()
-	} else if seqNo == rbft.storeMgr.highStateTarget.Applied {
-		rbft.logger.Debugf("Replica %d recovered to seqNo %d and highest is %d, turn off stateTransferring", rbft.peerPool.ID, seqNo, rbft.storeMgr.highStateTarget.Applied)
-		rbft.exec.setLastExec(seqNo)
-		rbft.atomicOff(StateTransferring)
-		rbft.metrics.statusGaugeStateTransferring.Set(0)
-	} else {
-		rbft.logger.Warningf("Replica %d recovered to seqNo %d but highest is %d, too high for seq", rbft.peerPool.ID, seqNo, rbft.storeMgr.highStateTarget.Applied)
+		return nil
 	}
 
 	// 1. finished state update
