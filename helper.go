@@ -297,7 +297,8 @@ func (rbft *rbftImpl) isPrePrepareLegal(preprep *pb.PrePrepare) bool {
 	}
 
 	if preprep.SequenceNumber <= rbft.exec.lastExec {
-		rbft.logger.Debugf("Replica %d received a prePrepare with seqNo %d lower than lastExec %d, ignore it...", rbft.peerPool.ID, preprep.SequenceNumber, rbft.exec.lastExec)
+		rbft.logger.Debugf("Replica %d received a prePrepare with seqNo %d lower than lastExec %d, "+
+			"ignore it...", rbft.peerPool.ID, preprep.SequenceNumber, rbft.exec.lastExec)
 		return false
 	}
 
@@ -800,7 +801,8 @@ func (rbft *rbftImpl) checkIfNeedStateUpdate(initialCp pb.Vc_C) (bool, error) {
 
 	// If replica's lastExec < initial checkpoint, replica is out of date
 	if lastExec < initialCp.SequenceNumber {
-		rbft.logger.Warningf("Replica %d missing base checkpoint %d (%s), our most recent execution %d", rbft.peerPool.ID, initialCp.SequenceNumber, initialCp.Digest, lastExec)
+		rbft.logger.Warningf("Replica %d missing base checkpoint %d (%s), our most recent execution %d",
+			rbft.peerPool.ID, initialCp.SequenceNumber, initialCp.Digest, lastExec)
 		target := &pb.MetaState{
 			Applied: initialCp.SequenceNumber,
 			Digest:  initialCp.Digest,
