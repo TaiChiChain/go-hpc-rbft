@@ -19,6 +19,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/ultramesh/flato-common/metrics"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
 	txpool "github.com/ultramesh/flato-txpool"
 
@@ -1052,6 +1053,11 @@ func (rbft *rbftImpl) processNewView(msgList xset) {
 		}
 		cert.prePrepare = prePrep
 		rbft.persistQSet(prePrep)
+		if metrics.EnableExpensive() {
+			cert.prePreparedTime = time.Now().UnixNano()
+			duration := time.Duration(cert.prePreparedTime - prePrep.HashBatch.Timestamp).Seconds()
+			rbft.metrics.batchToPrePrepared.Observe(duration)
+		}
 
 		if n > maxN {
 			maxN = n
