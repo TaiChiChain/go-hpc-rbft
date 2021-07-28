@@ -271,13 +271,11 @@ func (rbft *rbftImpl) handleRecoveryEvent(e *LocalEvent) consensusEvent {
 		}
 		rbft.off(InSyncState)
 		rbft.exitSyncState()
-		rbft.initRecovery()
-		return nil
+		return rbft.initRecovery()
 	case RecoverySyncStateRestartTimerEvent:
 		rbft.logger.Debugf("Replica %d sync state restart timer expired", rbft.peerPool.ID)
 		rbft.exitSyncState()
-		rbft.restartSyncState()
-		return nil
+		return rbft.restartSyncState()
 	case NotificationQuorumEvent:
 		rbft.logger.Infof("Replica %d received notification quorum, processing new view", rbft.peerPool.ID)
 		if rbft.isPrimary(rbft.peerPool.ID) {

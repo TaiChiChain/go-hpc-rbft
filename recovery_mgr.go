@@ -844,7 +844,6 @@ func (rbft *rbftImpl) restartSyncState() consensusEvent {
 	}
 
 	rbft.recoveryMgr.syncRspStore = make(map[string]*pb.SyncStateResponse)
-	rbft.initSyncState()
 
 	event := &LocalEvent{
 		Service:   RecoveryService,
@@ -854,7 +853,7 @@ func (rbft *rbftImpl) restartSyncState() consensusEvent {
 	// start sync state restart timer to cycle sync state while there are no new requests.
 	rbft.timerMgr.startTimer(syncStateRestartTimer, event)
 
-	return nil
+	return rbft.initSyncState()
 }
 
 // exitSyncState exit syncState immediately.
