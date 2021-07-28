@@ -303,8 +303,7 @@ func (rbft *rbftImpl) recvNotification(n *pb.Notification) consensusEvent {
 // sendNotificationResponse helps send notification response to the given sender.
 func (rbft *rbftImpl) sendNotificationResponse(destHash string) consensusEvent {
 
-	_, ok := rbft.peerPool.routerMap.HashMap[destHash]
-	if !ok {
+	if !rbft.inRouters(destHash) {
 		rbft.logger.Debugf("sender %s isn't included in routers, ignore it", destHash)
 		return nil
 	}
@@ -726,7 +725,7 @@ func (rbft *rbftImpl) initSyncState() consensusEvent {
 }
 
 func (rbft *rbftImpl) recvSyncState(sync *pb.SyncState) consensusEvent {
-	rbft.logger.Debugf("Replica %d received sync state from %s", rbft.peerPool.ID, sync.NodeInfo.ReplicaHash)
+	rbft.logger.Debugf("Replica %d received sync state from replica %d", rbft.peerPool.ID, sync.NodeInfo.ReplicaId)
 
 	if rbft.in(isNewNode) {
 		rbft.logger.Debugf("Replica %d is in a new node, don't send sync state response", rbft.peerPool.ID)
@@ -791,14 +790,14 @@ func (rbft *rbftImpl) sendSyncStateRsp(to string, needSyncEpoch bool) consensusE
 		Payload: payload,
 	}
 	rbft.peerPool.unicastByHash(consensusMsg, to)
-	rbft.logger.Debugf("Replica %d send sync state response to host %s: epoch=%d, view=%d, meta_state=%+v",
-		rbft.peerPool.ID, to, syncStateRsp.Epoch, syncStateRsp.View, syncStateRsp.InitialState)
+	rbft.logger.Debugf("Replica %d send sync state response to replica %d: epoch=%d, view=%d, meta_state=%+v",
+		rbft.peerPool.ID, rbft.nodeID(to), syncStateRsp.Epoch, syncStateRsp.View, syncStateRsp.InitialState)
 	return nil
 }
 
 func (rbft *rbftImpl) recvSyncStateRsp(rsp *pb.SyncStateResponse) consensusEvent {
-	rbft.logger.Debugf("Replica %d now received sync state response from host %s: epoch=%d, meta_state=%+v",
-		rbft.peerPool.ID, rsp.NodeInfo.ReplicaHash, rsp.Epoch, rsp.InitialState)
+	rbft.logger.Debugf("Replica %d now received sync state response from replica %d: epoch=%d, meta_state=%+v",
+		rbft.peerPool.ID, rsp.NodeInfo.ReplicaId, rsp.Epoch, rsp.InitialState)
 
 	if !rbft.in(InSyncState) {
 		rbft.logger.Debugf("Replica %d is not in sync state, ignore it...", rbft.peerPool.ID)
