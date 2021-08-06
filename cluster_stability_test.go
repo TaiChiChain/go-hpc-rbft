@@ -484,3 +484,101 @@ func TestCluster_ViewChange_StateUpdate_Timeout_StateUpdated_Primary(t *testing.
 	assert.True(t, rbfts[1].isNormal())
 	assert.True(t, rbfts[2].isNormal())
 }
+
+func TestCluster_Checkpoint_in_StateUpdating(t *testing.T) {
+	// flato-3711
+	// test for update high target while transferring for efficient state-update instance initiation.
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	nodes, rbfts := newBasicClusterInstance()
+	unlockCluster(rbfts)
+
+	var retMessageSet []map[pb.Type][]*pb.ConsensusMessage
+	for i := 0; i < 50; i++ {
+		tx := newTx()
+		checkpoint := (i+1)%10 == 0
+		retMessages := executeExceptN(t, rbfts, nodes, tx, checkpoint, 1)
+		retMessageSet = append(retMessageSet, retMessages)
+	}
+
+	for _, retMessages := range retMessageSet {
+		for index, chkpt := range retMessages[pb.Type_CHECKPOINT] {
+			if chkpt == nil {
+				continue
+			}
+			if index == 1 {
+				continue
+			}
+			rbfts[1].processEvent(chkpt)
+		}
+	}
+
+	notificationMsg := nodes[1].broadcastMessageCache
+	assert.Equal(t, pb.Type_NOTIFICATION, notificationMsg.Type)
+
+	for index := range rbfts {
+		if index == 1 {
+			continue
+		}
+		rbfts[index].processEvent(notificationMsg)
+		rsp := nodes[index].unicastMessageCache
+		assert.Equal(t, pb.Type_NOTIFICATION_RESPONSE, rsp.Type)
+		rbfts[1].processEvent(rsp)
+	}
+
+	var retMessageSet2 []map[pb.Type][]*pb.ConsensusMessage
+	for i := 0; i < 10; i++ {
+		tx := newTx()
+		checkpoint := (i+1)%10 == 0
+		retMessages := executeExceptN(t, rbfts, nodes, tx, checkpoint, 1)
+		retMessageSet2 = append(retMessageSet2, retMessages)
+	}
+
+	for _, retMessages := range retMessageSet2 {
+		for index, chkpt := range retMessages[pb.Type_CHECKPOINT] {
+			if chkpt == nil {
+				continue
+			}
+			if index == 1 {
+				continue
+			}
+			rbfts[1].processEvent(chkpt)
+		}
+	}
+
+	updatedEv1 := <-rbfts[1].recvChan
+	assert.Equal(t, CoreStateUpdatedEvent, updatedEv1.(*LocalEvent).EventType)
+
+	rbfts[1].processEvent(updatedEv1)
+
+	var retMessageSet3 []map[pb.Type][]*pb.ConsensusMessage
+	for i := 0; i < 10; i++ {
+		tx := newTx()
+		checkpoint := (i+1)%10 == 0
+		retMessages := executeExceptN(t, rbfts, nodes, tx, checkpoint, 1)
+		retMessageSet3 = append(retMessageSet3, retMessages)
+	}
+
+	for _, retMessages := range retMessageSet3 {
+		for index, chkpt := range retMessages[pb.Type_CHECKPOINT] {
+			if chkpt == nil {
+				continue
+			}
+			if index == 1 {
+				continue
+			}
+			rbfts[1].processEvent(chkpt)
+		}
+	}
+
+	updatedEv2 := <-rbfts[1].recvChan
+	assert.Equal(t, CoreStateUpdatedEvent, updatedEv2.(*LocalEvent).EventType)
+	rbfts[1].processEvent(updatedEv2)
+
+	updatedEv3 := <-rbfts[1].recvChan
+	assert.Equal(t, CoreStateUpdatedEvent, updatedEv3.(*LocalEvent).EventType)
+	rbfts[1].processEvent(updatedEv3)
+	assert.Equal(t, uint64(70), rbfts[1].h)
+}

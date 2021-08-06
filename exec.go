@@ -261,7 +261,7 @@ func (rbft *rbftImpl) handleRecoveryEvent(e *LocalEvent) consensusEvent {
 		return nil
 
 	case RecoveryRestartTimerEvent:
-		rbft.logger.Debugf("Replica %d recovery restart timer expired, restart recovery", rbft.peerPool.ID)
+		rbft.logger.Infof("Replica %d recovery restart timer expired, restart recovery", rbft.peerPool.ID)
 		return rbft.restartRecovery()
 	case RecoverySyncStateRspTimerEvent:
 		rbft.logger.Noticef("Replica %d sync state response timer expired", rbft.peerPool.ID)

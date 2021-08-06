@@ -109,7 +109,11 @@ func TestCluster_SyncSmallEpochWithCheckpoint(t *testing.T) {
 	for _, rsp := range rspList {
 		rbfts[2].processEvent(rsp)
 	}
+	// first state update to 50( which is larger than initial high watermark 40)
 	ev := <-rbfts[2].recvChan
+	rbfts[2].processEvent(ev)
+	// then state update to 60
+	ev = <-rbfts[2].recvChan
 	rbfts[2].processEvent(ev)
 	assert.Equal(t, uint64(1), rbfts[2].epoch)
 	assert.Equal(t, uint64(60), rbfts[2].h)
@@ -167,9 +171,12 @@ func TestCluster_SyncLargeEpochWithCheckpoint(t *testing.T) {
 	for _, rsp := range rspList {
 		rbfts[2].processEvent(rsp)
 	}
+	// first state update to 50( which is larger than initial high watermark 40)
 	ev := <-rbfts[2].recvChan
 	rbfts[2].processEvent(ev)
-
+	// then state update to 51
+	ev = <-rbfts[2].recvChan
+	rbfts[2].processEvent(ev)
 	assert.Equal(t, uint64(51), rbfts[2].epoch)
 	assert.Equal(t, uint64(51), rbfts[2].exec.lastExec)
 }

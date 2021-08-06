@@ -63,7 +63,7 @@ type storeManager struct {
 	// checkpoint numbers received from others which are bigger than our
 	// H(=h+L); map replicaHash to the last checkpoint number received from
 	// that replica bigger than H
-	hChkpts map[string]uint64
+	hChkpts map[string]*pb.MetaState
 
 	// track all non-repeating checkpoints
 	checkpointStore map[chkptID]string
@@ -73,7 +73,7 @@ type storeManager struct {
 func newStoreMgr(c Config) *storeManager {
 	sm := &storeManager{
 		chkpts:                   make(map[uint64]string),
-		hChkpts:                  make(map[string]uint64),
+		hChkpts:                  make(map[string]*pb.MetaState),
 		checkpointStore:          make(map[chkptID]string),
 		certStore:                make(map[msgID]*msgCert),
 		committedCert:            make(map[msgID]string),
