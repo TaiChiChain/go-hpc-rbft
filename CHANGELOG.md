@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.2.34"></a>
+## [0.2.34](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.32-3...v0.2.34) (2021-08-06)
+
+
+### Bug Fixes
+
+* make sure that all the events could be received by event channel ([24b84fb](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/24b84fb))
+* modify the log-printing, hash -> id ([a31cb2e](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/a31cb2e))
+* propose view-change if we have found tx with mis-matched transaction from leader ([103cd6e](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/103cd6e)), closes [#flato-3802](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-3802)
+
+
+
+<a name="0.2.33"></a>
+## [0.2.33](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.32...v0.2.33) (2021-06-22)
+
+
+### Features
+
+* **rbft_impl.go:** not stop ns after current node has been deleted ([6358f16](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/6358f16)), closes [#flato-3570](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-3570)
+
+
+
 <a name="0.2.33"></a>
 ## [0.2.33](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.32...v0.2.33) (2021-06-22)
 
