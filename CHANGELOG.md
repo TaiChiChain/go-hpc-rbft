@@ -12,6 +12,36 @@ All notable changes to this project will be documented in this file. See [standa
 
 
 
+<a name="0.2.32-3"></a>
+## [0.2.32-3](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.32-2...v0.2.32-3) (2021-07-22)
+
+
+### Bug Fixes
+
+* **viewchange:** record prePreparedTime when construct prePrepare in processNewView ([cfdb86a](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/cfdb86a))
+
+
+
+<a name="0.2.32-2"></a>
+## [0.2.32-2](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.32-1...v0.2.32-2) (2021-07-05)
+
+
+### Bug Fixes
+
+* enter stateUpdate immediately when node is out of date ([56eff52](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/56eff52))
+
+
+
+<a name="0.2.32-1"></a>
+## [0.2.32-1](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.32...v0.2.32-1) (2021-06-29)
+
+
+### Bug Fixes
+
+* update high target every time expired ([cc4c0e3](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/cc4c0e3)), closes [#flato-3711](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-3711)
+
+
+
 <a name="0.2.32"></a>
 ## [0.2.32](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.31-3...v0.2.32) (2021-06-04)
 
