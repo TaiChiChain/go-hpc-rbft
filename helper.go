@@ -828,6 +828,14 @@ func (rbft *rbftImpl) getNodeInfo() *pb.NodeInfo {
 	}
 }
 
+func (rbft *rbftImpl) nodeID(hash string) uint64 {
+	id, ok := rbft.peerPool.routerMap.HashMap[hash]
+	if !ok {
+		return 0
+	}
+	return id
+}
+
 func (rbft *rbftImpl) inRouters(hash string) bool {
 	_, ok := rbft.peerPool.routerMap.HashMap[hash]
 	if ok {
