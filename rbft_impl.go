@@ -1374,6 +1374,11 @@ func (rbft *rbftImpl) recvSendMissingTxs(re *pb.SendMissingRequests) consensusEv
 		return nil
 	}
 
+	if !rbft.isPrimary(re.ReplicaId) {
+		rbft.logger.Warningf("Replica %d received send-missing-request from replica %d which is not primary, ignore it", rbft.peerPool.ID, re.ReplicaId)
+		return nil
+	}
+
 	cert := rbft.storeMgr.getCert(re.View, re.SequenceNumber, re.BatchDigest)
 	if cert.sentCommit {
 		rbft.logger.Debugf("Replica %d received return missing transactions which has been committed with "+
@@ -1388,9 +1393,11 @@ func (rbft *rbftImpl) recvSendMissingTxs(re *pb.SendMissingRequests) consensusEv
 
 	err := rbft.batchMgr.requestPool.ReceiveMissingRequests(re.BatchDigest, re.MissingRequests)
 	if err != nil {
+		// there is something wrong with primary for it propose a transaction with mismatched hash,
+		// so that we should send view-change directly to expect a new leader.
 		rbft.logger.Warningf("Replica %d find something wrong with the return of missing txs, error: %v",
 			rbft.peerPool.ID, err)
-		return nil
+		return rbft.sendViewChange()
 	}
 
 	// set pool full status if received txs fill up the txpool.
