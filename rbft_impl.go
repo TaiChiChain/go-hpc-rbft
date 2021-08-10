@@ -1352,7 +1352,7 @@ func (rbft *rbftImpl) recvFetchMissingTxs(fetch *pb.FetchMissingRequests) error 
 // Add these transaction txs to requestPool and see if it has correct transaction txs.
 func (rbft *rbftImpl) recvSendMissingTxs(re *pb.SendMissingRequests) consensusEvent {
 	if _, ok := rbft.storeMgr.missingBatchesInFetching[re.BatchDigest]; !ok {
-		rbft.logger.Warningf("Replica %d ignore return missing txs with batch hash %s",
+		rbft.logger.Debugf("Replica %d ignore return missing txs with batch hash %s",
 			rbft.peerPool.ID, re.BatchDigest)
 		return nil
 	}
