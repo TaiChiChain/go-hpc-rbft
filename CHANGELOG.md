@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.2.34-1"></a>
+## [0.2.34-1](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.34...v0.2.34-1) (2021-08-10)
+
+
+### Bug Fixes
+
+* modify log level ([b4ae21d](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/b4ae21d))
+
+
+
 <a name="0.2.34"></a>
 ## [0.2.34](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.32-3...v0.2.34) (2021-08-06)
 
