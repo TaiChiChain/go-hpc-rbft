@@ -355,6 +355,7 @@ func (rbft *rbftImpl) start() error {
 	initRecoveryEvent := &LocalEvent{
 		Service:   RecoveryService,
 		EventType: RecoveryInitEvent,
+		Event:     rbft.view,
 	}
 	rbft.postMsg(initRecoveryEvent)
 
