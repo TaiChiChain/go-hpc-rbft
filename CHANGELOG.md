@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.2.34-2"></a>
+## [0.2.34-2](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.34-1...v0.2.34-2) (2021-08-17)
+
+
+### Bug Fixes
+
+* check the current view when we process initRecovery event and unit test ([7092c42](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/7092c42)), closes [#flato-3820](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-3820)
+
+
+
 <a name="0.2.34-1"></a>
 ## [0.2.34-1](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.34...v0.2.34-1) (2021-08-10)
 
