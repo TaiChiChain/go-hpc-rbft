@@ -180,6 +180,7 @@ func TestCluster_ReceiveNotificationBeforeStart(t *testing.T) {
 	initRecoveryEvent := &LocalEvent{
 		Service:   RecoveryService,
 		EventType: RecoveryInitEvent,
+		Event:     uint64(0),
 	}
 
 	quorumEvent := &LocalEvent{
@@ -581,4 +582,106 @@ func TestCluster_Checkpoint_in_StateUpdating(t *testing.T) {
 	assert.Equal(t, CoreStateUpdatedEvent, updatedEv3.(*LocalEvent).EventType)
 	rbfts[1].processEvent(updatedEv3)
 	assert.Equal(t, uint64(70), rbfts[1].h)
+}
+
+func TestCluster_InitRecovery(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	nodes, rbfts := newBasicClusterInstance()
+	unlockCluster(rbfts)
+
+	init := &LocalEvent{
+		Service:   RecoveryService,
+		EventType: RecoveryInitEvent,
+		Event:     uint64(0),
+	}
+
+	// replica 2&3 process init recovery directly and broadcast notification in view=1
+	rbfts[1].processEvent(init)
+	rbfts[2].processEvent(init)
+	notifications := make([]*pb.ConsensusMessage, len(nodes))
+	notifications[1] = nodes[1].broadcastMessageCache
+	assert.Equal(t, pb.Type_NOTIFICATION, notifications[1].Type)
+	notifications[2] = nodes[2].broadcastMessageCache
+	assert.Equal(t, pb.Type_NOTIFICATION, notifications[2].Type)
+
+	// replica 1 received notifications from 2&3 and generate a notification in view=1
+	rbfts[0].processEvent(notifications[1])
+	quorum0 := rbfts[0].processEvent(notifications[2])
+	assert.Equal(t, NotificationQuorumEvent, quorum0.(*LocalEvent).EventType)
+	notifications[0] = nodes[0].broadcastMessageCache
+	assert.Equal(t, pb.Type_NOTIFICATION, notifications[0].Type)
+
+	// delayed timeout for init recovery event on replica 1
+	// we should reject it
+	assert.Equal(t, uint64(1), rbfts[0].view)
+	rbfts[0].processEvent(init)
+	assert.Equal(t, uint64(1), rbfts[0].view)
+
+	// replica 4 received notifications from 2&3 and generate a notification in view=1
+	rbfts[3].processEvent(notifications[1])
+	quorum3 := rbfts[3].processEvent(notifications[2])
+	assert.Equal(t, NotificationQuorumEvent, quorum3.(*LocalEvent).EventType)
+	notifications[3] = nodes[3].broadcastMessageCache
+	assert.Equal(t, pb.Type_NOTIFICATION, notifications[3].Type)
+
+	// delayed timeout for init recovery event on replica 4
+	// we should reject it
+	assert.Equal(t, uint64(1), rbfts[3].view)
+	rbfts[0].processEvent(init)
+	assert.Equal(t, uint64(1), rbfts[3].view)
+
+	// replica 1 receives notifications
+	rbfts[0].processEvent(notifications[3])
+
+	// replica 2 receives notifications
+	rbfts[1].processEvent(notifications[0])
+	quorum1 := rbfts[1].processEvent(notifications[2])
+	assert.Equal(t, NotificationQuorumEvent, quorum1.(*LocalEvent).EventType)
+	rbfts[1].processEvent(notifications[3])
+
+	// replica 3 receives notifications
+	rbfts[2].processEvent(notifications[0])
+	quorum2 := rbfts[2].processEvent(notifications[1])
+	assert.Equal(t, NotificationQuorumEvent, quorum2.(*LocalEvent).EventType)
+	rbfts[2].processEvent(notifications[3])
+
+	// replica 4 receives notifications
+	rbfts[3].processEvent(notifications[0])
+
+	// notification quorum event
+	quorumNotification := &LocalEvent{Service: RecoveryService, EventType: NotificationQuorumEvent}
+	for index := range rbfts {
+		finished := rbfts[index].processEvent(quorumNotification)
+
+		if index == 1 {
+			assert.Equal(t, RecoveryDoneEvent, finished.(*LocalEvent).EventType)
+		}
+	}
+
+	// new view message
+	newView := nodes[1].broadcastMessageCache
+	assert.Equal(t, pb.Type_NEW_VIEW, newView.Type)
+
+	for index := range rbfts {
+		if index == 1 {
+			continue
+		}
+
+		finished := rbfts[index].processEvent(newView)
+		assert.Equal(t, RecoveryDoneEvent, finished.(*LocalEvent).EventType)
+	}
+
+	// recovery done event
+	done := &LocalEvent{Service: RecoveryService, EventType: RecoveryDoneEvent}
+	for index := range rbfts {
+		rbfts[index].processEvent(done)
+	}
+
+	// check status
+	for index := range rbfts {
+		assert.Equal(t, uint64(1), rbfts[index].view)
+		assert.True(t, rbfts[index].isNormal())
+	}
 }

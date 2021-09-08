@@ -208,6 +208,18 @@ func (rbft *rbftImpl) handleCoreRbftEvent(e *LocalEvent) consensusEvent {
 func (rbft *rbftImpl) handleRecoveryEvent(e *LocalEvent) consensusEvent {
 	switch e.EventType {
 	case RecoveryInitEvent:
+		preView, ok := e.Event.(uint64)
+		if !ok {
+			rbft.logger.Errorf("Replica %d parsing error, rbft.view", rbft.peerPool.ID)
+			rbft.stopNamespace()
+			return nil
+		}
+
+		if preView < rbft.view {
+			rbft.logger.Debugf("Replica %d has initiated recovery, ignore the event", rbft.peerPool.ID)
+			return nil
+		}
+
 		rbft.logger.Debugf("Replica %d init recovery", rbft.peerPool.ID)
 		return rbft.initRecovery()
 	case RecoveryDoneEvent:
