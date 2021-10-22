@@ -44,7 +44,7 @@ type rbftMetrics struct {
 	// monitor the totally committed tx number by RBFT.
 	committedTxs metrics.Counter
 	// monitor the tx number in each committed block.
-	txsPerBlock metrics.Histogram
+	txsPerBlock metrics.Summary
 
 	// ========================== metrics related to batch duration info ==========================
 	// monitor the batch generation interval for primary.
@@ -278,11 +278,11 @@ func newRBFTMetrics(metricsProv metrics.Provider) (*rbftMetrics, error) {
 		return m, err
 	}
 
-	m.txsPerBlock, err = metricsProv.NewHistogram(
-		metrics.HistogramOpts{
-			Name:    "committed_txs_per_block",
-			Help:    "rbft committed tx number per block",
-			Buckets: []float64{0, 10, 50, 100, 200, 300, 400, 500},
+	m.txsPerBlock, err = metricsProv.NewSummary(
+		metrics.SummaryOpts{
+			Name:       "committed_txs_per_block",
+			Help:       "rbft committed tx number per block",
+			Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
 		},
 	)
 	if err != nil {
