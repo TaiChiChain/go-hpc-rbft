@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.2.36"></a>
+## [0.2.36](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.35...v0.2.36) (2021-10-26)
+
+
+### Bug Fixes
+
+* deadlock of current status mutex ([062018a](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/062018a)), closes [#flato-3973](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-3973)
+* **metrics.go:** replace histogram with summary to record actual txsPerBlock metrics ([03668c0](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/03668c0))
+
+
+
 <a name="0.2.35"></a>
 ## [0.2.35](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.34-2...v0.2.35) (2021-09-08)
 
