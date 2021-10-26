@@ -74,12 +74,12 @@ type node struct {
 	// rbft is the actually RBFT service.
 	rbft *rbftImpl
 
+	// stateLock is used to ensure mutually exclusive access of currentState.
+	stateLock sync.RWMutex
 	// currentState maintains the current application service state.
 	currentState *pb.ServiceState
 	// cpChan is used between node and RBFT service to deliver checkpoint state.
 	cpChan chan *pb.ServiceState
-	// stateLock is used to ensure mutually exclusive access of currentState.
-	stateLock sync.Mutex
 
 	// reloadRouter is used to store the validator set from reload temporarily
 	// for that consensus will use it to update router after the execution of config transaction
@@ -135,9 +135,6 @@ func (n *node) Start() error {
 
 // Start stops a Node instance.
 func (n *node) Stop() {
-	n.stateLock.Lock()
-	defer n.stateLock.Unlock()
-
 	select {
 	case <-n.cpChan:
 	default:
@@ -153,7 +150,10 @@ func (n *node) Stop() {
 	}
 
 	n.rbft.stop()
+
+	n.stateLock.Lock()
 	n.currentState = nil
+	n.stateLock.Unlock()
 }
 
 // Propose proposes requests to RBFT core, requests are ensured to be eventually
@@ -186,19 +186,21 @@ func (n *node) ApplyConfChange(cc *pb.ConfState) {
 // Users can report any necessary extra field optionally.
 func (n *node) ReportExecuted(state *pb.ServiceState) {
 	n.stateLock.Lock()
-	defer n.stateLock.Unlock()
 	if n.currentState == nil {
 		n.logger.Noticef("Init service state with: %+v", state)
 		n.currentState = state
+		n.stateLock.Unlock()
 		return
 	}
 	if state.MetaState.Applied != 0 && state.MetaState.Applied <= n.currentState.MetaState.Applied {
 		n.logger.Warningf("Receive invalid service state %+v, "+
 			"current state %+v", state, n.currentState)
+		n.stateLock.Unlock()
 		return
 	}
 	n.logger.Debugf("Update service state: %+v", state)
 	n.currentState = state
+	n.stateLock.Unlock()
 
 	// a config transaction executed or checkpoint, send state to checkpoint channel
 	if !n.rbft.atomicIn(Pending) && n.rbft.readConfigBatchToExecute() == state.MetaState.Applied || state.MetaState.Applied%n.config.K == 0 && n.cpChan != nil {
@@ -213,12 +215,13 @@ func (n *node) ReportExecuted(state *pb.ServiceState) {
 // finished successfully or not, otherwise, RBFT core will enter abnormal status infinitely.
 func (n *node) ReportStateUpdated(state *pb.ServiceState) {
 	n.stateLock.Lock()
-	defer n.stateLock.Unlock()
 	if state.MetaState.Applied != 0 && state.MetaState.Applied <= n.currentState.MetaState.Applied {
 		n.logger.Infof("Receive a service state with applied ID which is not "+
 			"larger than current state, received: %+v, current state: %+v", state, n.currentState)
 	}
 	n.currentState = state
+	n.stateLock.Unlock()
+
 	n.rbft.reportStateUpdated(state)
 }
 
@@ -247,8 +250,8 @@ func (n *node) Status() NodeStatus {
 
 // getCurrentState retrieves the current application state.
 func (n *node) getCurrentState() *pb.ServiceState {
-	n.stateLock.Lock()
-	defer n.stateLock.Unlock()
+	n.stateLock.RLock()
+	defer n.stateLock.RUnlock()
 	return n.currentState
 }
 
