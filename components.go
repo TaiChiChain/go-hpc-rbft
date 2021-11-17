@@ -153,21 +153,6 @@ type chkptID struct {
 	sequence uint64
 }
 
-// =============================================================================
-// helper functions for sort
-// =============================================================================
-type sortableUint64Slice []*pb.MetaState
-
-func (a sortableUint64Slice) Len() int {
-	return len(a)
-}
-func (a sortableUint64Slice) Swap(i, j int) {
-	a[i], a[j] = a[j], a[i]
-}
-func (a sortableUint64Slice) Less(i, j int) bool {
-	return a[i].Applied < a[j].Applied
-}
-
 // -----------router struct-----------------
 type routerMap struct {
 	HashMap map[string]uint64

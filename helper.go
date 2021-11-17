@@ -442,7 +442,7 @@ func (rbft *rbftImpl) compareCheckpointWithWeakSet(signedCheckpoint *pb.SignedCh
 	// existed) must have the same ID with that one.
 	correctCheckpoints := diffValues[correctHashes[0]]
 	correctID := correctCheckpoints[0].Checkpoint.Digest
-	selfID, ok := rbft.storeMgr.chkpts[checkpointHeight]
+	selfID, ok := rbft.storeMgr.localCheckpoints[checkpointHeight]
 
 	// if self's checkpoint with the same seqNo has a distinguished ID with a weak certs'
 	// checkpoint ID, we should trigger state update right now to recover self block state.
@@ -454,7 +454,7 @@ func (rbft *rbftImpl) compareCheckpointWithWeakSet(signedCheckpoint *pb.SignedCh
 			Applied: checkpointHeight,
 			Digest:  correctID,
 		}
-		rbft.updateHighStateTarget(target)
+		rbft.updateHighStateTarget(target, correctCheckpoints)
 		rbft.tryStateTransfer()
 		return false, nil
 	}
@@ -525,7 +525,7 @@ func (rbft *rbftImpl) compareWholeStates(states wholeStates) consensusEvent {
 					Applied: quorumResp.height,
 					Digest:  quorumResp.digest,
 				}
-				rbft.updateHighStateTarget(target)
+				rbft.updateHighStateTarget(target, sameRespRecord[quorumResp])
 				rbft.tryStateTransfer()
 				return nil
 			}
@@ -559,7 +559,7 @@ func (rbft *rbftImpl) compareWholeStates(states wholeStates) consensusEvent {
 					Applied: quorumResp.height,
 					Digest:  quorumResp.digest,
 				}
-				rbft.updateHighStateTarget(target)
+				rbft.updateHighStateTarget(target, sameRespRecord[quorumResp])
 				rbft.tryStateTransfer()
 				return nil
 			}
@@ -699,7 +699,7 @@ func (rbft *rbftImpl) getVcBasis() *pb.VcBasis {
 func (rbft *rbftImpl) gatherPQC() (cset []*pb.Vc_C, pset []*pb.Vc_PQ, qset []*pb.Vc_PQ) {
 	// Gather all the checkpoints
 	rbft.logger.Debugf("Replica %d gather CSet:", rbft.peerPool.ID)
-	for n, id := range rbft.storeMgr.chkpts {
+	for n, id := range rbft.storeMgr.localCheckpoints {
 		cset = append(cset, &pb.Vc_C{
 			SequenceNumber: n,
 			Digest:         id,
@@ -788,10 +788,10 @@ func (rbft *rbftImpl) checkIfNeedStateUpdate(initialCp pb.Vc_C) (bool, error) {
 
 	if rbft.h < seq {
 		// if we have reached this checkpoint height locally but haven't move h to
-		// this height(may be caused by missing checkpoint msg from other nodes),
+		// this height(maybe caused by missing checkpoint msg from other nodes),
 		// directly move watermarks to this checkpoint height as we have reached
 		// this stable checkpoint normally.
-		if rbft.storeMgr.chkpts[seq] == dig {
+		if rbft.storeMgr.localCheckpoints[seq] == dig {
 			rbft.moveWatermarks(seq)
 			rbft.external.SendFilterEvent(pb.InformType_FilterStableCheckpoint, seq, dig)
 		}
@@ -811,7 +811,8 @@ func (rbft *rbftImpl) checkIfNeedStateUpdate(initialCp pb.Vc_C) (bool, error) {
 			Applied: initialCp.SequenceNumber,
 			Digest:  initialCp.Digest,
 		}
-		rbft.updateHighStateTarget(target)
+		// TODO(DH): use a meaningful checkpointSet.
+		rbft.updateHighStateTarget(target, nil)
 		rbft.tryStateTransfer()
 		return true, nil
 	} else if rbft.atomicIn(InRecovery) && rbft.recoveryMgr.needSyncEpoch {
@@ -820,7 +821,8 @@ func (rbft *rbftImpl) checkIfNeedStateUpdate(initialCp pb.Vc_C) (bool, error) {
 			Applied: initialCp.SequenceNumber,
 			Digest:  initialCp.Digest,
 		}
-		rbft.updateHighStateTarget(target)
+		// TODO(DH): use a meaningful checkpointSet.
+		rbft.updateHighStateTarget(target, nil)
 		rbft.tryStateTransfer()
 		return true, nil
 	} else {

@@ -28,7 +28,7 @@ type Storage interface {
 	DelState(key string) error
 	// ReadState retrieves data with specified key from non-volatile memory.
 	ReadState(key string) ([]byte, error)
-	// ReadState retrieves data with specified key prefix from non-volatile memory.
+	// ReadStateSet retrieves data with specified key prefix from non-volatile memory.
 	ReadStateSet(key string) (map[string][]byte, error)
 	// Destroy clears the non-volatile memory.
 	Destroy(key string) error
@@ -70,7 +70,7 @@ type ServiceOutbound interface {
 	// Users can apply different batches asynchronously but ensure the order by seqNo.
 	Execute(txs []*protos.Transaction, localList []bool, seqNo uint64, timestamp int64)
 	// StateUpdate informs application layer to catch up to given seqNo with specified state digest.
-	StateUpdate(seqNo uint64, digest string, peers []uint64)
+	StateUpdate(seqNo uint64, digest string)
 	// SendFilterEvent posts some impotent events to application layer.
 	// Users can decide to post filer event synchronously or asynchronously.
 	SendFilterEvent(informType pb.InformType, message ...interface{})

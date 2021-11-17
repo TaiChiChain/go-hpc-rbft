@@ -63,7 +63,7 @@ func TestStoreMgr_newStoreMgr(t *testing.T) {
 		assert.Equal(t, "storeManager", structName)
 		assert.Nil(t, nilElems)
 	}
-	assert.Equal(t, "XXX GENESIS", s.chkpts[0])
+	assert.Equal(t, "XXX GENESIS", s.localCheckpoints[0])
 }
 
 func TestStoreMgr_saveCheckpoint(t *testing.T) {
@@ -72,7 +72,7 @@ func TestStoreMgr_saveCheckpoint(t *testing.T) {
 	s, _ := newStorageTestNode(ctrl)
 	s.saveCheckpoint(uint64(10), "base64")
 
-	assert.Equal(t, "base64", s.chkpts[uint64(10)])
+	assert.Equal(t, "base64", s.localCheckpoints[uint64(10)])
 }
 
 func TestStoreMgr_getCert(t *testing.T) {

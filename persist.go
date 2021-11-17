@@ -606,8 +606,8 @@ func (rbft *rbftImpl) restoreState() error {
 		rbft.moveWatermarks(h)
 	}
 
-	rbft.logger.Infof("Replica %d restored state: view: %d, seqNo: %d, reqBatches: %d, chkpts: %d",
-		rbft.peerPool.ID, rbft.view, rbft.exec.lastExec, len(rbft.storeMgr.batchStore), len(rbft.storeMgr.chkpts))
+	rbft.logger.Infof("Replica %d restored state: view: %d, seqNo: %d, reqBatches: %d, localCheckpoints: %d",
+		rbft.peerPool.ID, rbft.view, rbft.exec.lastExec, len(rbft.storeMgr.batchStore), len(rbft.storeMgr.localCheckpoints))
 
 	return nil
 }

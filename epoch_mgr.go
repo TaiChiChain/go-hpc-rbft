@@ -112,7 +112,7 @@ func (rbft *rbftImpl) recvFetchCheckpoint(fetch *pb.FetchCheckpoint) consensusEv
 		return nil
 	}
 
-	digest, ok := rbft.storeMgr.chkpts[fetch.SequenceNumber]
+	digest, ok := rbft.storeMgr.localCheckpoints[fetch.SequenceNumber]
 	var (
 		checkpointHeight uint64
 		checkpointDigest string
@@ -121,7 +121,7 @@ func (rbft *rbftImpl) recvFetchCheckpoint(fetch *pb.FetchCheckpoint) consensusEv
 		// If we cannot find it, the requesting node might fell behind a lot
 		// send back our latest stable-checkpoint-info to help it to recover
 		checkpointHeight = rbft.h
-		checkpointDigest, ok = rbft.storeMgr.chkpts[rbft.h]
+		checkpointDigest, ok = rbft.storeMgr.localCheckpoints[rbft.h]
 		if !ok {
 			rbft.logger.Warningf("Replica %d cannot find digest of its low watermark %d, "+
 				"current node may fall behind", rbft.peerPool.ID, rbft.h)

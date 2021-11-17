@@ -52,28 +52,35 @@ type storeManager struct {
 	seqMap map[uint64]string
 
 	// Set to the highest weak checkpoint cert we have observed
-	highStateTarget *pb.MetaState
+	highStateTarget *stateUpdateTarget
 
 	// ---------------checkpoint related--------------------
 	// checkpoints that we reached by ourselves after commit a block with a
 	// block number == integer multiple of K;
 	// map lastExec to a base64 encoded BlockchainInfo
-	chkpts map[uint64]string
+	localCheckpoints map[uint64]string
 
 	// checkpoint numbers received from others which are bigger than our
 	// H(=h+L); map replicaHash to the last checkpoint number received from
 	// that replica bigger than H
-	hChkpts map[string]*pb.MetaState
+	higherCheckpoints map[string]*pb.SignedCheckpoint
 
-	// track all non-repeating checkpoints
+	// track all non-repeating checkpoints including self and others
 	checkpointStore map[chkptID]*pb.SignedCheckpoint
+}
+
+type stateUpdateTarget struct {
+	// target height and digest
+	metaState *pb.MetaState
+	// signed checkpoints that prove the above target
+	checkpointSet []*pb.SignedCheckpoint
 }
 
 // newStoreMgr news an instance of storeManager
 func newStoreMgr(c Config) *storeManager {
 	sm := &storeManager{
-		chkpts:                   make(map[uint64]string),
-		hChkpts:                  make(map[string]*pb.MetaState),
+		localCheckpoints:         make(map[uint64]string),
+		higherCheckpoints:        make(map[string]*pb.SignedCheckpoint),
 		checkpointStore:          make(map[chkptID]*pb.SignedCheckpoint),
 		certStore:                make(map[msgID]*msgCert),
 		committedCert:            make(map[msgID]string),
@@ -84,15 +91,15 @@ func newStoreMgr(c Config) *storeManager {
 		missingBatchesInFetching: make(map[string]msgID),
 		logger:                   c.Logger,
 	}
-	sm.chkpts[0] = "XXX GENESIS"
+	sm.localCheckpoints[0] = "XXX GENESIS"
 	return sm
 }
 
-// moveWatermarks removes useless set in chkpts, plist, qlist whose index <= h
+// moveWatermarks removes useless set in localCheckpoints, plist, qlist whose index <= h
 func (sm *storeManager) moveWatermarks(rbft *rbftImpl, h uint64) {
-	for n := range sm.chkpts {
+	for n := range sm.localCheckpoints {
 		if n < h {
-			delete(sm.chkpts, n)
+			delete(sm.localCheckpoints, n)
 			rbft.persistDelCheckpoint(n)
 		}
 	}
@@ -110,10 +117,10 @@ func (sm *storeManager) moveWatermarks(rbft *rbftImpl, h uint64) {
 	}
 }
 
-// saveCheckpoint saves checkpoint information to chkpts, whose key is lastExec, value is the global nodeHash of current
+// saveCheckpoint saves checkpoint information to localCheckpoints, whose key is lastExec, value is the global nodeHash of current
 // BlockchainInfo
 func (sm *storeManager) saveCheckpoint(l uint64, gh string) {
-	sm.chkpts[l] = gh
+	sm.localCheckpoints[l] = gh
 }
 
 // Given a digest/view/seq, is there an entry in the certStore?

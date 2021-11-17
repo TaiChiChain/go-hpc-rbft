@@ -869,7 +869,7 @@ func (ext *testExternal) Execute(requests []*protos.Transaction, localList []boo
 		}
 	}
 }
-func (ext *testExternal) StateUpdate(seqNo uint64, digest string, peers []uint64) {
+func (ext *testExternal) StateUpdate(seqNo uint64, digest string) {
 	for key, val := range ext.tf.TestNode[0].blocks {
 		if key <= seqNo {
 			ext.testNode.blocks[key] = val

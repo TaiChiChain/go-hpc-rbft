@@ -773,7 +773,7 @@ func (rbft *rbftImpl) sendSyncStateRsp(to string, needSyncEpoch bool) consensusE
 	if needSyncEpoch {
 		// for requester in lower epoch, send the latest stable checkpoint
 		checkpointHeight = rbft.h
-		checkpointDigest, ok = rbft.storeMgr.chkpts[rbft.h]
+		checkpointDigest, ok = rbft.storeMgr.localCheckpoints[rbft.h]
 		if !ok {
 			rbft.logger.Warningf("Replica %d cannot find digest of its low watermark %d, "+
 				"current node may fall behind", rbft.peerPool.ID, rbft.h)

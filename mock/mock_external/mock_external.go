@@ -271,15 +271,15 @@ func (mr *MockServiceOutboundMockRecorder) Execute(txs, localList, seqNo, timest
 }
 
 // StateUpdate mocks base method
-func (m *MockServiceOutbound) StateUpdate(seqNo uint64, digest string, peers []uint64) {
+func (m *MockServiceOutbound) StateUpdate(seqNo uint64, digest string) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "StateUpdate", seqNo, digest, peers)
+	m.ctrl.Call(m, "StateUpdate", seqNo, digest)
 }
 
 // StateUpdate indicates an expected call of StateUpdate
-func (mr *MockServiceOutboundMockRecorder) StateUpdate(seqNo, digest, peers interface{}) *gomock.Call {
+func (mr *MockServiceOutboundMockRecorder) StateUpdate(seqNo, digest interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StateUpdate", reflect.TypeOf((*MockServiceOutbound)(nil).StateUpdate), seqNo, digest, peers)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StateUpdate", reflect.TypeOf((*MockServiceOutbound)(nil).StateUpdate), seqNo, digest)
 }
 
 // SendFilterEvent mocks base method
@@ -490,15 +490,15 @@ func (mr *MockExternalStackMockRecorder) Execute(txs, localList, seqNo, timestam
 }
 
 // StateUpdate mocks base method
-func (m *MockExternalStack) StateUpdate(seqNo uint64, digest string, peers []uint64) {
+func (m *MockExternalStack) StateUpdate(seqNo uint64, digest string) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "StateUpdate", seqNo, digest, peers)
+	m.ctrl.Call(m, "StateUpdate", seqNo, digest)
 }
 
 // StateUpdate indicates an expected call of StateUpdate
-func (mr *MockExternalStackMockRecorder) StateUpdate(seqNo, digest, peers interface{}) *gomock.Call {
+func (mr *MockExternalStackMockRecorder) StateUpdate(seqNo, digest interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StateUpdate", reflect.TypeOf((*MockExternalStack)(nil).StateUpdate), seqNo, digest, peers)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StateUpdate", reflect.TypeOf((*MockExternalStack)(nil).StateUpdate), seqNo, digest)
 }
 
 // SendFilterEvent mocks base method

@@ -107,11 +107,11 @@ func TestCluster_CheckpointToViewChange(t *testing.T) {
 	}
 
 	missingNodeIndex := 1
-	for key := range rbfts[missingNodeIndex].storeMgr.chkpts {
+	for key := range rbfts[missingNodeIndex].storeMgr.localCheckpoints {
 		if key == 0 {
 			continue
 		}
-		delete(rbfts[missingNodeIndex].storeMgr.chkpts, key)
+		delete(rbfts[missingNodeIndex].storeMgr.localCheckpoints, key)
 	}
 
 	vcEvent := &LocalEvent{

@@ -16,7 +16,6 @@ package rbft
 
 import (
 	"fmt"
-	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -340,7 +339,7 @@ func (rbft *rbftImpl) start() error {
 	// current state has already been checked to be stable, and we need not to check it again
 	metaS := &pb.MetaState{
 		Applied: rbft.h,
-		Digest:  rbft.storeMgr.chkpts[rbft.h],
+		Digest:  rbft.storeMgr.localCheckpoints[rbft.h],
 	}
 	if rbft.equalMetaState(rbft.epochMgr.configBatchToCheck, metaS) {
 		rbft.logger.Info("Config batch to check has already been stable, reset it")
@@ -1719,7 +1718,7 @@ func (rbft *rbftImpl) recvCheckpoint(signedCheckpoint *pb.SignedCheckpoint, loca
 	// we have reached this checkpoint
 	// Note, this is not divergent from the paper, as the paper requires that
 	// the quorum certificate must contain 2f+1 messages, including its own
-	_, ok := rbft.storeMgr.chkpts[checkpointHeight]
+	_, ok := rbft.storeMgr.localCheckpoints[checkpointHeight]
 	if !ok {
 		rbft.logger.Debugf("Replica %d found checkpoint quorum for seqNo %d, digest %s, but it has not "+
 			"reached this checkpoint itself yet", rbft.peerPool.ID, checkpointHeight, checkpointDigest)
@@ -1727,7 +1726,7 @@ func (rbft *rbftImpl) recvCheckpoint(signedCheckpoint *pb.SignedCheckpoint, loca
 		// update transferring target for state update, in order to trigger another state-update instance at the
 		// moment the previous one has finished.
 		target := &pb.MetaState{Applied: checkpointHeight, Digest: checkpointDigest}
-		rbft.updateHighStateTarget(target)
+		rbft.updateHighStateTarget(target, matchingCheckpoints)
 		return nil
 	}
 
@@ -1833,69 +1832,74 @@ func (rbft *rbftImpl) finishNormalCheckpoint(checkpointHeight uint64, checkpoint
 	return nil
 }
 
-// weakCheckpointSetOutOfRange checks if this node is fell behind or not. If we receive f+1 checkpoints whose seqNo > H (for example 150),
-// it is possible that we has fell behind, and will trigger recovery, but if we has already executed blocks larger than these
-// checkpoints, we would like to start high-watermark timer in order to get the latest stable checkpoint.
+// weakCheckpointSetOutOfRange checks if this node is fell behind or not. If we receive f+1
+// checkpoints whose seqNo > H (for example 150), it is possible that we have fell behind, and
+// will trigger recovery, but if we have already executed blocks larger than these checkpoints,
+// we would like to start high-watermark timer in order to get the latest stable checkpoint.
 func (rbft *rbftImpl) weakCheckpointSetOutOfRange(signedCheckpoint *pb.SignedCheckpoint) bool {
 	H := rbft.h + rbft.L
 	checkpointHeight := signedCheckpoint.Checkpoint.Height
-	checkpointDigest := signedCheckpoint.Checkpoint.Digest
 
-	// Track the last observed checkpoint sequence number if it exceeds our high watermark, keyed by replica to prevent unbounded growth
+	// Track the last observed checkpoint sequence number if it exceeds our high watermark,
+	// keyed by replica to prevent unbounded growth
 	if checkpointHeight < H {
 		// For non-byzantine nodes, the checkpoint sequence number increases monotonically
-		delete(rbft.storeMgr.hChkpts, signedCheckpoint.NodeInfo.ReplicaHash)
+		delete(rbft.storeMgr.higherCheckpoints, signedCheckpoint.NodeInfo.ReplicaHash)
 	} else {
 		// We do not track the highest one, as a byzantine node could pick an arbitrarily high sequence number
 		// and even if it recovered to be non-byzantine, we would still believe it to be far ahead
-		rbft.storeMgr.hChkpts[signedCheckpoint.NodeInfo.ReplicaHash] = &pb.MetaState{
-			Applied: checkpointHeight,
-			Digest:  checkpointDigest,
-		}
+		rbft.storeMgr.higherCheckpoints[signedCheckpoint.NodeInfo.ReplicaHash] = signedCheckpoint
 		rbft.logger.Debugf("Replica %d received a checkpoint out of range from replica %d, seq %d",
 			rbft.peerPool.ID, signedCheckpoint.NodeInfo.ReplicaId, checkpointHeight)
 
 		// If f+1 other replicas have reported checkpoints that were (at one time) outside our watermarks
 		// we need to check to see if we have fallen behind.
-		if len(rbft.storeMgr.hChkpts) >= rbft.oneCorrectQuorum() {
-			var chkptSeqNumArray []*pb.MetaState
-			for replicaHash, hChkpt := range rbft.storeMgr.hChkpts {
-				if hChkpt.Applied <= H {
-					delete(rbft.storeMgr.hChkpts, replicaHash)
+		if len(rbft.storeMgr.higherCheckpoints) >= rbft.oneCorrectQuorum() {
+			highestWeakCertMeta := pb.MetaState{}
+			weakCertRecord := make(map[pb.MetaState][]*pb.SignedCheckpoint)
+			for replicaHash, remoteCheckpoint := range rbft.storeMgr.higherCheckpoints {
+				if remoteCheckpoint.Checkpoint.Height <= H {
+					delete(rbft.storeMgr.higherCheckpoints, replicaHash)
 					continue
 				}
-				chkptSeqNumArray = append(chkptSeqNumArray, hChkpt)
-			}
-			sort.Sort(sortableUint64Slice(chkptSeqNumArray))
+				meta := pb.MetaState{
+					Applied: remoteCheckpoint.Checkpoint.Height,
+					Digest:  remoteCheckpoint.Checkpoint.Digest,
+				}
+				if _, exist := weakCertRecord[meta]; !exist {
+					weakCertRecord[meta] = []*pb.SignedCheckpoint{remoteCheckpoint}
+				} else {
+					weakCertRecord[meta] = append(weakCertRecord[meta], remoteCheckpoint)
+				}
 
-			if chkptSeqNumArray == nil {
-				return false
+				// found a weak cert, compare and cache the largest weak cert
+				if len(weakCertRecord[meta]) > rbft.f+1 && meta.Applied > highestWeakCertMeta.Applied {
+					highestWeakCertMeta = meta
+				}
 			}
 
-			if len(chkptSeqNumArray) < rbft.oneCorrectQuorum() {
-				return false
-			}
-
-			// If there are f+1 nodes have issued checkpoints above our high water mark, then current
+			// If there are f+1 nodes have issued checkpoints above our high watermark, then current
 			// node probably cannot record 2f+1 checkpoints for that sequence number, it is perhaps that
 			// current node has been out of date
-			lowestCorrectChkpt := chkptSeqNumArray[len(chkptSeqNumArray)-rbft.oneCorrectQuorum()]
-			if lowestCorrectChkpt.Applied > H {
+			highestWeakCert, ok := weakCertRecord[highestWeakCertMeta]
+			if !ok {
+				return false
+			}
+			if highestWeakCertMeta.Applied > H {
 				rbft.logger.Debugf("Replica %d is out of date, f+1 nodes agree checkpoints "+
-					"out of our high water mark, %d vs %d", rbft.peerPool.ID, lowestCorrectChkpt.Applied, H)
+					"out of our high water mark, %d vs %d", rbft.peerPool.ID, highestWeakCertMeta.Applied, H)
 
 				// we have executed to the target height, only need to start a high watermark timer.
-				if rbft.exec.lastExec >= lowestCorrectChkpt.Applied {
+				if rbft.exec.lastExec >= highestWeakCertMeta.Applied {
 					rbft.logger.Infof("Replica %d has already executed block %d larger than target's "+
-						"seqNo %d", rbft.peerPool.ID, rbft.exec.lastExec, lowestCorrectChkpt.Applied)
+						"seqNo %d", rbft.peerPool.ID, rbft.exec.lastExec, highestWeakCertMeta.Applied)
 					rbft.softStartHighWatermarkTimer("replica received f+1 checkpoints out of range but " +
 						"we have already executed")
 					return false
 				}
 
 				// update state update target here for an efficient initiation for a new state-update instance.
-				target := lowestCorrectChkpt
-				rbft.updateHighStateTarget(target)
+				rbft.updateHighStateTarget(&highestWeakCertMeta, highestWeakCert)
 
 				return true
 			}
@@ -1985,15 +1989,15 @@ func (rbft *rbftImpl) moveWatermarks(n uint64) {
 }
 
 // updateHighStateTarget updates high state target
-func (rbft *rbftImpl) updateHighStateTarget(target *pb.MetaState) {
+func (rbft *rbftImpl) updateHighStateTarget(target *pb.MetaState, checkpointSet []*pb.SignedCheckpoint) {
 	if target == nil {
 		rbft.logger.Warningf("Replica %d received a nil target", rbft.peerPool.ID)
 		return
 	}
 
-	if rbft.storeMgr.highStateTarget != nil && rbft.storeMgr.highStateTarget.Applied >= target.Applied {
+	if rbft.storeMgr.highStateTarget != nil && rbft.storeMgr.highStateTarget.metaState.Applied >= target.Applied {
 		rbft.logger.Infof("Replica %d not updating state target to seqNo %d, has target for seqNo %d",
-			rbft.peerPool.ID, target.Applied, rbft.storeMgr.highStateTarget.Applied)
+			rbft.peerPool.ID, target.Applied, rbft.storeMgr.highStateTarget.metaState.Applied)
 		return
 	}
 
@@ -2005,7 +2009,10 @@ func (rbft *rbftImpl) updateHighStateTarget(target *pb.MetaState) {
 			target.Applied, target.Digest)
 	}
 
-	rbft.storeMgr.highStateTarget = target
+	rbft.storeMgr.highStateTarget = &stateUpdateTarget{
+		metaState:     target,
+		checkpointSet: checkpointSet,
+	}
 }
 
 // tryStateTransfer sets system abnormal and stateTransferring, then skips to target
@@ -2051,9 +2058,9 @@ func (rbft *rbftImpl) tryStateTransfer() {
 	// clean cert with seqNo <= target before stateUpdate to avoid influencing the
 	// following progress
 	for idx := range rbft.storeMgr.certStore {
-		if idx.n <= target.Applied {
+		if idx.n <= target.metaState.Applied {
 			rbft.logger.Debugf("Replica %d clean cert with seqNo %d <= target %d, "+
-				"digest=%s, before state update", rbft.peerPool.ID, idx.n, target.Applied, idx.d)
+				"digest=%s, before state update", rbft.peerPool.ID, idx.n, target.metaState.Applied, idx.d)
 			delete(rbft.storeMgr.certStore, idx)
 			delete(rbft.storeMgr.committedCert, idx)
 			delete(rbft.storeMgr.seqMap, idx.n)
@@ -2061,17 +2068,17 @@ func (rbft *rbftImpl) tryStateTransfer() {
 		}
 	}
 	for d, batch := range rbft.storeMgr.outstandingReqBatches {
-		if batch.SeqNo <= target.Applied {
+		if batch.SeqNo <= target.metaState.Applied {
 			rbft.logger.Debugf("Replica %d clean outstanding batch with seqNo %d <= target %d, "+
-				"digest=%s, before state update", rbft.peerPool.ID, batch.SeqNo, target.Applied, d)
+				"digest=%s, before state update", rbft.peerPool.ID, batch.SeqNo, target.metaState.Applied, d)
 			delete(rbft.storeMgr.outstandingReqBatches, d)
 		}
 	}
 	rbft.metrics.outstandingBatchesGauge.Set(float64(len(rbft.storeMgr.outstandingReqBatches)))
 	for d, batch := range rbft.storeMgr.batchStore {
-		if batch.SeqNo <= target.Applied {
+		if batch.SeqNo <= target.metaState.Applied {
 			rbft.logger.Debugf("Replica %d clean batch with seqNo %d <= target %d, "+
-				"digest=%s, before state update", rbft.peerPool.ID, batch.SeqNo, target.Applied, d)
+				"digest=%s, before state update", rbft.peerPool.ID, batch.SeqNo, target.metaState.Applied, d)
 			delete(rbft.storeMgr.batchStore, d)
 			rbft.persistDelBatch(d)
 		}
@@ -2094,17 +2101,17 @@ func (rbft *rbftImpl) tryStateTransfer() {
 	rbft.batchMgr.cacheBatch = nil
 	rbft.metrics.cacheBatchNumber.Set(float64(0))
 
-	rbft.logger.Noticef("Replica %d try state update to %d", rbft.peerPool.ID, target.Applied)
+	rbft.logger.Noticef("Replica %d try state update to %d", rbft.peerPool.ID, target.metaState.Applied)
 
 	// attempts to synchronize state to a particular target, implicitly calls rollback if needed
 	rbft.metrics.stateUpdateCounter.Add(float64(1))
-	rbft.external.StateUpdate(target.Applied, target.Digest, nil)
+	rbft.external.StateUpdate(target.metaState.Applied, target.metaState.Digest)
 }
 
 // recvStateUpdatedEvent processes StateUpdatedMessage.
 // functions:
 // 1) succeed or not
-// 2) update information about latest stable checkpoint
+// 2) update information about the latest stable checkpoint
 // 3) update epoch info if it has been changed
 //
 // we need to check if the state update process is successful at first
@@ -2119,14 +2126,19 @@ func (rbft *rbftImpl) recvStateUpdatedEvent(ss *pb.ServiceState) consensusEvent 
 	// high state target nil warning
 	if rbft.storeMgr.highStateTarget == nil {
 		rbft.logger.Warningf("Replica %d has no state targets, cannot resume tryStateTransfer yet", rbft.peerPool.ID)
-	} else if seqNo < rbft.storeMgr.highStateTarget.Applied {
-		// If state transfer did not complete successfully, or if it did not reach highest target, try again.
+	} else if seqNo < rbft.storeMgr.highStateTarget.metaState.Applied {
+		// If state transfer did not complete successfully, or if it did not reach the highest target, try again.
 		rbft.logger.Warningf("Replica %d recovered to seqNo %d but our high-target has moved to %d, "+
-			"keep on state transferring", rbft.peerPool.ID, seqNo, rbft.storeMgr.highStateTarget.Applied)
+			"keep on state transferring", rbft.peerPool.ID, seqNo, rbft.storeMgr.highStateTarget.metaState.Applied)
 		rbft.atomicOff(StateTransferring)
 		rbft.metrics.statusGaugeStateTransferring.Set(0)
 		rbft.exec.setLastExec(seqNo)
 		rbft.tryStateTransfer()
+		return nil
+	} else if seqNo > rbft.storeMgr.highStateTarget.metaState.Applied {
+		rbft.logger.Errorf("Replica %d recovered to seqNo %d which is higher than high-target %d",
+			rbft.peerPool.ID, seqNo, rbft.storeMgr.highStateTarget.metaState.Applied)
+		rbft.stopNamespace()
 		return nil
 	}
 
@@ -2145,7 +2157,17 @@ func (rbft *rbftImpl) recvStateUpdatedEvent(ss *pb.ServiceState) consensusEvent 
 	// 2. process information about stable checkpoint
 	rbft.logger.Infof("Replica %d post stable checkpoint event for seqNo %d after state update to the height",
 		rbft.peerPool.ID, seqNo)
-	rbft.external.SendFilterEvent(pb.InformType_FilterStableCheckpoint, seqNo, digest)
+	// we have ensured state updated to current highStateTarget.
+	// TODO(DH): we may have only f+1 checkpoints in checkpointSet, is f+1 weak cert is trustable enough?
+	// if only 2f+1 is strong cert is trustable, we have to fetch checkpoint...
+	checkpointSet := rbft.storeMgr.highStateTarget.checkpointSet
+	if len(checkpointSet) >= rbft.commonCaseQuorum() {
+		rbft.external.SendFilterEvent(pb.InformType_FilterStableCheckpoint, checkpointSet)
+	} else {
+		rbft.logger.Errorf("Replica %d needs to fetch checkpoint as we only have weak cert for height %d",
+			rbft.peerPool.ID, seqNo)
+		rbft.fetchCheckpoint()
+	}
 	rbft.storeMgr.saveCheckpoint(seqNo, digest)
 	rbft.persistCheckpoint(seqNo, []byte(digest))
 	rbft.moveWatermarks(seqNo)
