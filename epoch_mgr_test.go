@@ -3,6 +3,7 @@ package rbft
 import (
 	"testing"
 
+	"github.com/ultramesh/flato-common/types/protos"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
 
 	"github.com/golang/mock/gomock"
@@ -53,10 +54,15 @@ func TestEpoch_recvFetchCheckpoint_SendBackNormal(t *testing.T) {
 		SequenceNumber: uint64(12),
 	}
 	rbfts[0].storeMgr.saveCheckpoint(uint64(12), "block-number-12")
-	chkpt := &pb.Checkpoint{
-		NodeInfo:       rbfts[0].getNodeInfo(),
-		SequenceNumber: uint64(12),
-		Digest:         "block-number-12",
+	chkpt := &pb.SignedCheckpoint{
+		NodeInfo: rbfts[0].getNodeInfo(),
+		Checkpoint: &protos.Checkpoint{
+			Epoch:   rbfts[0].epoch,
+			Height:  uint64(12),
+			Digest:  "block-number-12",
+			NextSet: nil,
+		},
+		Signature: nil,
 	}
 	consensusMsg := rbfts[0].consensusMessagePacker(chkpt)
 	ret := rbfts[0].recvFetchCheckpoint(fetch)
@@ -75,10 +81,15 @@ func TestEpoch_recvFetchCheckpoint_SendBackStableCheckpoint(t *testing.T) {
 	}
 	rbfts[0].h = uint64(50)
 	rbfts[0].storeMgr.saveCheckpoint(uint64(50), "block-number-50")
-	chkpt := &pb.Checkpoint{
-		NodeInfo:       rbfts[0].getNodeInfo(),
-		SequenceNumber: uint64(50),
-		Digest:         "block-number-50",
+	chkpt := &pb.SignedCheckpoint{
+		NodeInfo: rbfts[0].getNodeInfo(),
+		Checkpoint: &protos.Checkpoint{
+			Epoch:   rbfts[0].epoch,
+			Height:  uint64(50),
+			Digest:  "block-number-50",
+			NextSet: nil,
+		},
+		Signature: nil,
 	}
 	consensusMsg := rbfts[0].consensusMessagePacker(chkpt)
 	ret := rbfts[0].recvFetchCheckpoint(fetch)

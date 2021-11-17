@@ -355,90 +355,94 @@ func (rbft *rbftImpl) isCommitLegal(commit *pb.Commit) bool {
 // and ID, if there exists more than one weak sets, we'll never find a stable cert for this
 // seqNo, else checks if self's generated checkpoint has the same ID with the given one,
 // if not, directly start state update to recover to a correct state.
-func (rbft *rbftImpl) compareCheckpointWithWeakSet(chkpt *pb.Checkpoint) (bool, int) {
+func (rbft *rbftImpl) compareCheckpointWithWeakSet(signedCheckpoint *pb.SignedCheckpoint) (bool, []*pb.SignedCheckpoint) {
 	// if checkpoint height is lower than current low watermark, ignore it as we have reached a higher h,
 	// else, continue to find f+1 checkpoint messages with the same seqNo and ID
-	if !rbft.inW(chkpt.SequenceNumber) {
-		if chkpt.SequenceNumber != rbft.h && !rbft.in(SkipInProgress) {
+	checkpointHeight := signedCheckpoint.Checkpoint.Height
+	checkpointHash := hex.EncodeToString(signedCheckpoint.Checkpoint.Hash())
+	if !rbft.inW(checkpointHeight) {
+		if checkpointHeight != rbft.h && !rbft.in(SkipInProgress) {
 			// It is perfectly normal that we receive checkpoints for the watermark we just raised, as we raise it after 2f+1, leaving f replies left
-			rbft.logger.Warningf("Checkpoint sequence number outside watermarks: seqNo %d, low water mark %d", chkpt.SequenceNumber, rbft.h)
+			rbft.logger.Warningf("Checkpoint sequence number outside watermarks: seqNo %d, low water mark %d", checkpointHeight, rbft.h)
 		} else {
-			rbft.logger.Debugf("Checkpoint sequence number outside watermarks: seqNo %d, low water mark %d", chkpt.SequenceNumber, rbft.h)
+			rbft.logger.Debugf("Checkpoint sequence number outside watermarks: seqNo %d, low water mark %d", checkpointHeight, rbft.h)
 		}
-		return false, 0
+		return false, nil
 	}
 
 	cID := chkptID{
-		nodeHash: chkpt.NodeInfo.ReplicaHash,
-		sequence: chkpt.SequenceNumber,
+		nodeHash: signedCheckpoint.NodeInfo.ReplicaHash,
+		sequence: checkpointHeight,
 	}
 
 	_, ok := rbft.storeMgr.checkpointStore[cID]
 	if ok {
 		rbft.logger.Warningf("Replica %d received duplicate checkpoint from replica %s for seqNo %d, update storage", rbft.peerPool.ID, cID.nodeHash, cID.sequence)
 	}
-	rbft.storeMgr.checkpointStore[cID] = chkpt.Digest
+	rbft.storeMgr.checkpointStore[cID] = signedCheckpoint
 
-	// track how many different checkpoint values we have for the seqNo.
-	diffValues := make(map[string][]string)
+	// track how much different checkpoint values we have for the seqNo.
+	diffValues := make(map[string][]*pb.SignedCheckpoint)
 	// track how many "correct"(more than f + 1) checkpoint values we have for the seqNo.
-	var correctValues []string
+	var correctHashes []string
 
 	// track totally matching checkpoints.
 	matching := 0
-	for cp, digest := range rbft.storeMgr.checkpointStore {
-		if cp.sequence != chkpt.SequenceNumber {
+	for cp, signedChkpt := range rbft.storeMgr.checkpointStore {
+		hash := hex.EncodeToString(signedChkpt.Checkpoint.Hash())
+		if cp.sequence != checkpointHeight {
 			continue
 		}
 
-		if digest == chkpt.Digest {
+		if hash == checkpointHash {
 			matching++
 		}
 
-		if _, exist := diffValues[digest]; !exist {
-			diffValues[digest] = []string{cp.nodeHash}
+		if _, exist := diffValues[hash]; !exist {
+			diffValues[hash] = []*pb.SignedCheckpoint{signedChkpt}
 		} else {
-			diffValues[digest] = append(diffValues[digest], cp.nodeHash)
+			diffValues[hash] = append(diffValues[hash], signedChkpt)
 		}
 
 		// if current network contains more than f + 1 checkpoints with the same seqNo
 		// but different ID, we'll never be able to get a stable cert for this seqNo.
 		if len(diffValues) > rbft.f+1 {
 			rbft.logger.Criticalf("Replica %d cannot find stable checkpoint with seqNo %d"+
-				"(%d different values observed already).", rbft.peerPool.ID, chkpt.SequenceNumber, len(diffValues))
+				"(%d different values observed already).", rbft.peerPool.ID, checkpointHeight, len(diffValues))
 			rbft.on(Inconsistent)
 			rbft.metrics.statusGaugeInconsistent.Set(Inconsistent)
 			rbft.setAbNormal()
 			rbft.stopNamespace()
-			return false, 0
+			return false, nil
 		}
 
 		// record all correct checkpoint(weak cert) values.
-		if len(diffValues[digest]) == rbft.f+1 {
-			correctValues = append(correctValues, digest)
+		if len(diffValues[hash]) == rbft.f+1 {
+			correctHashes = append(correctHashes, hash)
 		}
 	}
 
-	if len(correctValues) == 0 {
-		rbft.logger.Debugf("Replica %d hasn't got a weak cert for checkpoint %d", rbft.peerPool.ID, chkpt.SequenceNumber)
-		return true, matching
+	if len(correctHashes) == 0 {
+		rbft.logger.Debugf("Replica %d hasn't got a weak cert for checkpoint %d", rbft.peerPool.ID, checkpointHeight)
+		return true, nil
 	}
 
 	// if we encounter more than one correct weak set, we will never recover to a stable
 	// consensus state.
-	if len(correctValues) > 1 {
-		rbft.logger.Criticalf("Replica %d finds several weak certs for checkpoint %d, values: %v", rbft.peerPool.ID, chkpt.SequenceNumber, correctValues)
+	if len(correctHashes) > 1 {
+		rbft.logger.Criticalf("Replica %d finds several weak certs for checkpoint %d, values: %v", rbft.peerPool.ID, checkpointHeight, correctHashes)
 		rbft.on(Inconsistent)
 		rbft.metrics.statusGaugeInconsistent.Set(Inconsistent)
 		rbft.setAbNormal()
 		rbft.stopNamespace()
-		return false, 0
+		return false, nil
 	}
 
 	// if we can only find one weak cert with the same seqNo and ID, our generated checkpoint(if
 	// existed) must have the same ID with that one.
-	correctID := correctValues[0]
-	selfID, ok := rbft.storeMgr.chkpts[chkpt.SequenceNumber]
+	correctCheckpoints := diffValues[correctHashes[0]]
+	correctID := correctCheckpoints[0].Checkpoint.Digest
+	selfID, ok := rbft.storeMgr.chkpts[checkpointHeight]
 
 	// if self's checkpoint with the same seqNo has a distinguished ID with a weak certs'
 	// checkpoint ID, we should trigger state update right now to recover self block state.
@@ -447,15 +451,15 @@ func (rbft *rbftImpl) compareCheckpointWithWeakSet(chkpt *pb.Checkpoint) (bool, 
 			rbft.peerPool.ID, selfID, correctID)
 
 		target := &pb.MetaState{
-			Applied: chkpt.SequenceNumber,
+			Applied: checkpointHeight,
 			Digest:  correctID,
 		}
 		rbft.updateHighStateTarget(target)
 		rbft.tryStateTransfer()
-		return false, 0
+		return false, nil
 	}
 
-	return true, matching
+	return true, correctCheckpoints
 }
 
 // compareWholeStates compares whole networks' current status during recovery or sync state
@@ -907,4 +911,26 @@ DrainLoop:
 			break DrainLoop
 		}
 	}
+}
+
+// signCheckpoint generates a signature of certain checkpoint message.
+func (rbft *rbftImpl) signCheckpoint(signedCheckpoint *pb.SignedCheckpoint, checkpoint *protos.Checkpoint) error {
+	msg := checkpoint.Hash()
+
+	sig, sErr := rbft.external.Sign(msg)
+	if sErr != nil {
+		return sErr
+	}
+
+	signedCheckpoint.Signature = sig
+	signedCheckpoint.Checkpoint = checkpoint
+
+	return nil
+}
+
+// verifySignedCheckpoint returns whether given signedCheckpoint contains a valid signature.
+func (rbft *rbftImpl) verifySignedCheckpoint(signedCheckpoint *pb.SignedCheckpoint) error {
+	msg := signedCheckpoint.Checkpoint.Hash()
+
+	return rbft.external.Verify(signedCheckpoint.NodeInfo.ReplicaId, signedCheckpoint.Signature, msg)
 }

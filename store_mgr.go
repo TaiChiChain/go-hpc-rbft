@@ -66,7 +66,7 @@ type storeManager struct {
 	hChkpts map[string]*pb.MetaState
 
 	// track all non-repeating checkpoints
-	checkpointStore map[chkptID]string
+	checkpointStore map[chkptID]*pb.SignedCheckpoint
 }
 
 // newStoreMgr news an instance of storeManager
@@ -74,7 +74,7 @@ func newStoreMgr(c Config) *storeManager {
 	sm := &storeManager{
 		chkpts:                   make(map[uint64]string),
 		hChkpts:                  make(map[string]*pb.MetaState),
-		checkpointStore:          make(map[chkptID]string),
+		checkpointStore:          make(map[chkptID]*pb.SignedCheckpoint),
 		certStore:                make(map[msgID]*msgCert),
 		committedCert:            make(map[msgID]string),
 		seqMap:                   make(map[uint64]string),

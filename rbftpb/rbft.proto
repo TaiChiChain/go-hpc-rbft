@@ -15,6 +15,7 @@
 syntax = "proto3";
 
 import "github.com/ultramesh/flato-common/types/protos/transaction.proto";
+import "github.com/ultramesh/flato-common/types/protos/ledger_info.proto";
 
 package rbftpb;
 
@@ -38,6 +39,7 @@ enum Type {
     NOTIFICATION = 16;
     NOTIFICATION_RESPONSE = 17;
     REQUEST_SET = 18;
+    SIGNED_CHECKPOINT = 19;
 }
 
 message consensus_message {
@@ -146,6 +148,7 @@ message vc_basis {
     repeated vc_C cset = 4;
     repeated vc_PQ pset = 5;
     repeated vc_PQ qset = 6;
+    repeated signed_checkpoint signed_checkpoints = 7;
 }
 
 message view_change {
@@ -275,4 +278,10 @@ message reload_message {
 
 message reload_finished {
     uint64 height = 1;
+}
+
+message signed_checkpoint {
+    node_info node_info = 1;
+    protos.Checkpoint checkpoint = 2;
+    bytes signature = 3;
 }

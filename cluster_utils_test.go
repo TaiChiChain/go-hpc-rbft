@@ -319,6 +319,9 @@ func (rbft *rbftImpl) consensusMessagePacker(e consensusEvent) *pb.ConsensusMess
 	case *pb.RequestSet:
 		eventType = pb.Type_REQUEST_SET
 		payload, err = proto.Marshal(et)
+	case *pb.SignedCheckpoint:
+		eventType = pb.Type_SIGNED_CHECKPOINT
+		payload, err = proto.Marshal(et)
 	default:
 		rbft.logger.Errorf("ConsensusMessage Unknown Type: %+v", e)
 		return nil

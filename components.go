@@ -170,7 +170,6 @@ func (a sortableUint64Slice) Less(i, j int) bool {
 
 // -----------router struct-----------------
 type routerMap struct {
-	//IDMap   map[uint64]string
 	HashMap map[string]uint64
 }
 

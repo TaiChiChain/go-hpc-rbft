@@ -97,6 +97,7 @@ func initMsgEventMap() {
 	eventCreators[pb.Type_SYNC_STATE_RESPONSE] = func() interface{} { return &pb.SyncStateResponse{} }
 	eventCreators[pb.Type_NOTIFICATION] = func() interface{} { return &pb.Notification{} }
 	eventCreators[pb.Type_NOTIFICATION_RESPONSE] = func() interface{} { return &pb.NotificationResponse{} }
+	eventCreators[pb.Type_SIGNED_CHECKPOINT] = func() interface{} { return &pb.SignedCheckpoint{} }
 }
 
 // dispatchLocalEvent dispatches local Event to corresponding handles using its service type
@@ -465,6 +466,8 @@ func (rbft *rbftImpl) dispatchMsgToService(e consensusEvent) int {
 	case *pb.FetchMissingRequests:
 		return CoreRbftService
 	case *pb.SendMissingRequests:
+		return CoreRbftService
+	case *pb.SignedCheckpoint:
 		return CoreRbftService
 
 		// view change service

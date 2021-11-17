@@ -50,7 +50,6 @@ type Node interface {
 //    triggered by RBFT core before.
 // ServiceInbound is corresponding to External.ServiceOutbound.
 type ServiceInbound interface {
-	// TODO(DH): set when start node.
 	// ReportExecuted reports to RBFT core that application service has finished applied one batch with
 	// current applied batch seqNo and state digest.
 	// Users can report any necessary extra field optionally.
@@ -63,8 +62,8 @@ type ServiceInbound interface {
 	// finished successfully or not, otherwise, RBFT core will enter abnormal status infinitely.
 	ReportStateUpdated(state *pb.ServiceState)
 
-	// ReportRouterUpdated report router updated:
-	// If validator set was changed after reload, service reports the latest router info to RBFT by ReportRouterUpdated
+	// ReportReloadFinished report router updated:
+	// If validator set was changed after reload, service reports the latest router info to RBFT by ReportReloadFinished
 	ReportReloadFinished(reload *pb.ReloadMessage)
 }
 
@@ -225,7 +224,7 @@ func (n *node) ReportStateUpdated(state *pb.ServiceState) {
 	n.rbft.reportStateUpdated(state)
 }
 
-// ReportRouterUpdated report router updated
+// ReportReloadFinished report router updated
 func (n *node) ReportReloadFinished(reload *pb.ReloadMessage) {
 	switch reload.Type {
 	case pb.ReloadType_FinishReloadRouter:

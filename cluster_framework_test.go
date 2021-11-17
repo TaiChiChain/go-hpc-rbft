@@ -897,10 +897,11 @@ func (ext *testExternal) StateUpdate(seqNo uint64, digest string, peers []uint64
 }
 func (ext *testExternal) SendFilterEvent(informType pb.InformType, message ...interface{}) {
 	if ext.testNode.n.rbft.atomicIn(InConfChange) {
-		height, ok := message[0].(uint64)
+		signedCheckpoints, ok := message[0].([]*pb.SignedCheckpoint)
 		if !ok {
 			return
 		}
+		height := signedCheckpoints[0].Checkpoint.Height
 
 		switch informType {
 		case pb.InformType_FilterStableCheckpoint:
