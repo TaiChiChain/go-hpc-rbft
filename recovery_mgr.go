@@ -421,12 +421,12 @@ func (rbft *rbftImpl) resetStateForRecovery() consensusEvent {
 		basis = rbft.getOutOfElectionBasis()
 	}
 
-	cp, ok := rbft.selectInitialCheckpoint(basis)
+	meta, checkpointSet, ok := rbft.selectInitialCheckpoint(basis)
 	if !ok {
 		rbft.logger.Infof("Replica %d could not find consistent checkpoint.", rbft.peerPool.ID)
 		return nil
 	}
-	rbft.logger.Debugf("initial checkpoint: %+v", cp)
+	rbft.logger.Debugf("initial checkpoint: %+v", meta)
 
 	// after checked initial checkpoint, set recoveryHandled active to avoid resetStateForRecovery again.
 	if rbft.recoveryMgr.recoveryHandled {
@@ -435,14 +435,14 @@ func (rbft *rbftImpl) resetStateForRecovery() consensusEvent {
 	}
 	rbft.recoveryMgr.recoveryHandled = true
 	// check if we need state update
-	need, err := rbft.checkIfNeedStateUpdate(cp)
+	need, err := rbft.checkIfNeedStateUpdate(meta, checkpointSet)
 	if err != nil {
 		return nil
 	}
 	if need {
 		// if we are behind by checkpoint, move watermark and state transfer to the target
 		rbft.logger.Debugf("Replica %d in recovery find itself fall behind, "+
-			"move watermark to %d and state transfer.", rbft.peerPool.ID, cp.SequenceNumber)
+			"move watermark to %d and state transfer.", rbft.peerPool.ID, meta.Applied)
 
 		// clear useless outstanding batch to avoid viewChange caused by outstanding batches after recovery.
 		rbft.cleanOutstandingAndCert()

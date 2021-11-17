@@ -133,12 +133,26 @@ func TestExec_handleCoreRbftEvent_StateUpdatedEvent(t *testing.T) {
 		MetaState: metaS,
 		EpochInfo: epochInfo,
 	}
+	checkpoint := &protos.Checkpoint{
+		Epoch:   uint64(0),
+		Height:  uint64(10),
+		Digest:  "block-number-10",
+		NextSet: nil,
+	}
 	ev := &LocalEvent{
 		Service:   CoreRbftService,
 		EventType: CoreStateUpdatedEvent,
 		Event:     ss,
 	}
 	assert.Equal(t, uint64(0), rbfts[1].exec.lastExec)
+	rbfts[1].storeMgr.highStateTarget = &stateUpdateTarget{
+		metaState: metaS,
+		checkpointSet: []*pb.SignedCheckpoint{
+			{NodeInfo: &pb.NodeInfo{ReplicaId: 1, ReplicaHash: "test-hash-1"}, Checkpoint: checkpoint, Signature: []byte("sig-1")},
+			{NodeInfo: &pb.NodeInfo{ReplicaId: 2, ReplicaHash: "test-hash-2"}, Checkpoint: checkpoint, Signature: []byte("sig-2")},
+			{NodeInfo: &pb.NodeInfo{ReplicaId: 3, ReplicaHash: "test-hash-3"}, Checkpoint: checkpoint, Signature: []byte("sig-3")},
+		},
+	}
 	rbfts[1].handleCoreRbftEvent(ev)
 	assert.Equal(t, uint64(10), rbfts[1].exec.lastExec)
 }

@@ -76,7 +76,7 @@ func TestCluster_SyncSmallEpochWithCheckpoint(t *testing.T) {
 		retMessageSet = append(retMessageSet, retMessages)
 	}
 
-	for index, chkpt := range retMessagesCtx[pb.Type_CHECKPOINT] {
+	for index, chkpt := range retMessagesCtx[pb.Type_SIGNED_CHECKPOINT] {
 		if index == 2 {
 			continue
 		}
@@ -84,7 +84,7 @@ func TestCluster_SyncSmallEpochWithCheckpoint(t *testing.T) {
 	}
 
 	for _, retMessages := range retMessageSet {
-		for index, chkpt := range retMessages[pb.Type_CHECKPOINT] {
+		for index, chkpt := range retMessages[pb.Type_SIGNED_CHECKPOINT] {
 			if index == 2 {
 				continue
 			}
@@ -139,7 +139,7 @@ func TestCluster_SyncLargeEpochWithCheckpoint(t *testing.T) {
 	retMessagesCtx := executeExceptN(t, rbfts, nodes, ctx, true, 2)
 
 	for _, retMessages := range retMessageSet {
-		for index, chkpt := range retMessages[pb.Type_CHECKPOINT] {
+		for index, chkpt := range retMessages[pb.Type_SIGNED_CHECKPOINT] {
 			if index == 2 {
 				continue
 			}
@@ -147,7 +147,7 @@ func TestCluster_SyncLargeEpochWithCheckpoint(t *testing.T) {
 		}
 	}
 
-	for index, chkpt := range retMessagesCtx[pb.Type_CHECKPOINT] {
+	for index, chkpt := range retMessagesCtx[pb.Type_SIGNED_CHECKPOINT] {
 		if index == 2 {
 			continue
 		}

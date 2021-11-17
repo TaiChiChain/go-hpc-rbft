@@ -406,7 +406,7 @@ func (rbft *rbftImpl) compareCheckpointWithWeakSet(signedCheckpoint *pb.SignedCh
 
 		// if current network contains more than f + 1 checkpoints with the same seqNo
 		// but different ID, we'll never be able to get a stable cert for this seqNo.
-		if len(diffValues) > rbft.f+1 {
+		if len(diffValues) > rbft.oneCorrectQuorum() {
 			rbft.logger.Criticalf("Replica %d cannot find stable checkpoint with seqNo %d"+
 				"(%d different values observed already).", rbft.peerPool.ID, checkpointHeight, len(diffValues))
 			rbft.on(Inconsistent)
@@ -417,7 +417,7 @@ func (rbft *rbftImpl) compareCheckpointWithWeakSet(signedCheckpoint *pb.SignedCh
 		}
 
 		// record all correct checkpoint(weak cert) values.
-		if len(diffValues[hash]) == rbft.f+1 {
+		if len(diffValues[hash]) == rbft.oneCorrectQuorum() {
 			correctHashes = append(correctHashes, hash)
 		}
 	}
@@ -690,13 +690,13 @@ func (rbft *rbftImpl) getVcBasis() *pb.VcBasis {
 		}
 	}
 
-	basis.Cset, basis.Pset, basis.Qset = rbft.gatherPQC()
+	basis.Cset, basis.Pset, basis.Qset, basis.SignedCheckpoints = rbft.gatherPQC()
 
 	return basis
 }
 
 // gatherPQC just gather all checkpoints, p entries and q entries.
-func (rbft *rbftImpl) gatherPQC() (cset []*pb.Vc_C, pset []*pb.Vc_PQ, qset []*pb.Vc_PQ) {
+func (rbft *rbftImpl) gatherPQC() (cset []*pb.Vc_C, pset []*pb.Vc_PQ, qset []*pb.Vc_PQ, signedCheckpoints []*pb.SignedCheckpoint) {
 	// Gather all the checkpoints
 	rbft.logger.Debugf("Replica %d gather CSet:", rbft.peerPool.ID)
 	for n, id := range rbft.storeMgr.localCheckpoints {
@@ -704,6 +704,12 @@ func (rbft *rbftImpl) gatherPQC() (cset []*pb.Vc_C, pset []*pb.Vc_PQ, qset []*pb
 			SequenceNumber: n,
 			Digest:         id,
 		})
+		c, err := rbft.generateSignedCheckpoint(n, id)
+		if err != nil {
+			rbft.stopNamespace()
+			return
+		}
+		signedCheckpoints = append(signedCheckpoints, c)
 		rbft.logger.Debugf("seqNo: %d, ID: %s", n, id)
 	}
 	// Gather all the p entries
@@ -776,11 +782,11 @@ func (rbft *rbftImpl) putBackRequestBatches(xset xset) {
 }
 
 // checkIfNeedStateUpdate checks if a replica needs to do state update
-func (rbft *rbftImpl) checkIfNeedStateUpdate(initialCp pb.Vc_C) (bool, error) {
+func (rbft *rbftImpl) checkIfNeedStateUpdate(meta *pb.MetaState, checkpointSet []*pb.SignedCheckpoint) (bool, error) {
 
 	lastExec := rbft.exec.lastExec
-	seq := initialCp.SequenceNumber
-	dig := initialCp.Digest
+	seq := meta.Applied
+	dig := meta.Digest
 
 	if rbft.exec.currentExec != nil {
 		lastExec = *rbft.exec.currentExec
@@ -793,7 +799,7 @@ func (rbft *rbftImpl) checkIfNeedStateUpdate(initialCp pb.Vc_C) (bool, error) {
 		// this stable checkpoint normally.
 		if rbft.storeMgr.localCheckpoints[seq] == dig {
 			rbft.moveWatermarks(seq)
-			rbft.external.SendFilterEvent(pb.InformType_FilterStableCheckpoint, seq, dig)
+			rbft.external.SendFilterEvent(pb.InformType_FilterStableCheckpoint, checkpointSet)
 		}
 
 		if rbft.epochMgr.configBatchToCheck != nil {
@@ -804,25 +810,15 @@ func (rbft *rbftImpl) checkIfNeedStateUpdate(initialCp pb.Vc_C) (bool, error) {
 	}
 
 	// If replica's lastExec < initial checkpoint, replica is out of date
-	if lastExec < initialCp.SequenceNumber {
+	if lastExec < meta.Applied {
 		rbft.logger.Warningf("Replica %d missing base checkpoint %d (%s), our most recent execution %d",
-			rbft.peerPool.ID, initialCp.SequenceNumber, initialCp.Digest, lastExec)
-		target := &pb.MetaState{
-			Applied: initialCp.SequenceNumber,
-			Digest:  initialCp.Digest,
-		}
-		// TODO(DH): use a meaningful checkpointSet.
-		rbft.updateHighStateTarget(target, nil)
+			rbft.peerPool.ID, meta.Applied, meta.Digest, lastExec)
+		rbft.updateHighStateTarget(meta, checkpointSet)
 		rbft.tryStateTransfer()
 		return true, nil
 	} else if rbft.atomicIn(InRecovery) && rbft.recoveryMgr.needSyncEpoch {
 		rbft.logger.Infof("Replica %d in wrong epoch %d needs to state update", rbft.peerPool.ID, rbft.epoch)
-		target := &pb.MetaState{
-			Applied: initialCp.SequenceNumber,
-			Digest:  initialCp.Digest,
-		}
-		// TODO(DH): use a meaningful checkpointSet.
-		rbft.updateHighStateTarget(target, nil)
+		rbft.updateHighStateTarget(meta, checkpointSet)
 		rbft.tryStateTransfer()
 		return true, nil
 	} else {

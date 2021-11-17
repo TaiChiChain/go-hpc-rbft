@@ -154,9 +154,7 @@ func (rbft *rbftImpl) recvViewChange(vc *pb.ViewChange) consensusEvent {
 			rbft.peerPool.ID, vc.Basis.ReplicaId, rbft.view, vc.Basis.View)
 		return nil
 	}
-	//check whether there is pqset which its view is less then vc's view and SequenceNumber more then low watermark
-	//check whether there is cset which its SequenceNumber more then low watermark
-	//if so ,return nil
+	// check view change correctness
 	if !rbft.correctViewChange(vc) {
 		rbft.logger.Warningf("Replica %d found viewChange message incorrect", rbft.peerPool.ID)
 		return nil
@@ -288,15 +286,15 @@ func (rbft *rbftImpl) sendNewView(notification bool) consensusEvent {
 
 	//get suitable checkpoint for later recovery, replicas contains the peer no who has this checkpoint.
 	//if can't find suitable checkpoint, ok return false.
-	cp, ok := rbft.selectInitialCheckpoint(basis)
+	meta, checkpointSet, ok := rbft.selectInitialCheckpoint(basis)
 	if !ok {
 		rbft.logger.Infof("Replica %d could not find consistent checkpoint: %+v", rbft.peerPool.ID, rbft.vcMgr.viewChangeStore)
 		return nil
 	}
-	rbft.logger.Debugf("initial checkpoint: %+v", cp)
+	rbft.logger.Debugf("initial checkpoint: %+v", meta)
 	//select suitable pqcCerts for later recovery.Their sequence is greater then cp
 	//if msgList is nil, must some bug happened
-	msgList := rbft.assignSequenceNumbers(basis, cp.SequenceNumber)
+	msgList := rbft.assignSequenceNumbers(basis, meta.Applied)
 	if msgList == nil {
 		rbft.logger.Infof("Replica %d could not assign sequence numbers for newView", rbft.peerPool.ID)
 		return nil
@@ -311,7 +309,7 @@ func (rbft *rbftImpl) sendNewView(notification bool) consensusEvent {
 	}
 
 	// Check if primary need state update
-	need, err := rbft.checkIfNeedStateUpdate(cp)
+	need, err := rbft.checkIfNeedStateUpdate(meta, checkpointSet)
 	if err != nil {
 		return nil
 	}
@@ -418,16 +416,16 @@ func (rbft *rbftImpl) replicaCheckNewView() consensusEvent {
 		return nil
 	}
 
-	cp, ok := rbft.selectInitialCheckpoint(nv.Bset)
+	meta, checkpointSet, ok := rbft.selectInitialCheckpoint(nv.Bset)
 	// todo wgr we won't step into such branch
 	if !ok {
 		rbft.logger.Infof("Replica %d could not determine initial checkpoint", rbft.peerPool.ID)
 		return rbft.sendViewChange()
 	}
-	rbft.logger.Debugf("initial checkpoint: %+v", cp)
+	rbft.logger.Debugf("initial checkpoint: %+v", meta)
 
 	// Check if the xset sent by new primary is built correctly by the aset
-	msgList := rbft.assignSequenceNumbers(nv.Bset, cp.SequenceNumber)
+	msgList := rbft.assignSequenceNumbers(nv.Bset, meta.Applied)
 	// todo wgr we won't step into such branch
 	if msgList == nil {
 		rbft.logger.Infof("Replica %d could not assign sequence numbers: %+v",
@@ -453,7 +451,7 @@ func (rbft *rbftImpl) replicaCheckNewView() consensusEvent {
 	}
 
 	// Check if replica need state update
-	need, err := rbft.checkIfNeedStateUpdate(cp)
+	need, err := rbft.checkIfNeedStateUpdate(meta, checkpointSet)
 	if err != nil {
 		return nil
 	}
@@ -740,67 +738,109 @@ func (rbft *rbftImpl) getViewChangeBasis() (basis []*pb.VcBasis) {
 	return
 }
 
-// selectInitialCheckpoint selects checkpoint from received ViewChange message
-// If find suitable checkpoint, it return a certain checkpoint and the replicas
-// no list which replicas has this checkpoint.
+// selectInitialCheckpoint selects checkpoint from received ViewChange message.
+// If we find suitable checkpoint, it returns a certain checkpoint meta and the
+// signed checkpoint set.
 // The checkpoint is the max checkpoint which exists in at least oneCorrectQuorum
-// peers and greater then low waterMark in at least commonCaseQuorum.
-func (rbft *rbftImpl) selectInitialCheckpoint(set []*pb.VcBasis) (checkpoint pb.Vc_C, find bool) {
+// peers and greater than low waterMark in at least commonCaseQuorum.
+func (rbft *rbftImpl) selectInitialCheckpoint(set []*pb.VcBasis) (*pb.MetaState, []*pb.SignedCheckpoint, bool) {
+	var (
+		meta          = pb.MetaState{}
+		checkpointSet []*pb.SignedCheckpoint
+		find          bool
+	)
 
 	// For the checkpoint as key, find the corresponding basis messages
-	checkpoints := make(map[pb.Vc_C][]*pb.VcBasis)
+	checkpoints := make(map[pb.MetaState][]*pb.SignedCheckpoint)
 	for _, basis := range set {
+		if len(basis.Cset) != len(basis.SignedCheckpoints) {
+			rbft.logger.Warningf("Replica %d received an invalid vc basis", rbft.peerPool.ID)
+			continue
+		}
 		// Verify that we strip duplicate checkpoints from this Cset
-		set := make(map[pb.Vc_C]bool)
-		for _, c := range basis.Cset {
-			if ok := set[*c]; ok {
+		record := make(map[pb.MetaState]bool)
+		for i, c := range basis.Cset {
+			m := pb.MetaState{Applied: c.SequenceNumber, Digest: c.Digest}
+			if ok := record[m]; ok {
 				continue
 			}
-			checkpoints[*c] = append(checkpoints[*c], basis)
-			set[*c] = true
+			if basis.SignedCheckpoints[i] == nil || basis.SignedCheckpoints[i].Checkpoint == nil ||
+				basis.SignedCheckpoints[i].NodeInfo == nil {
+				rbft.logger.Warningf("Replica %d received an invalid vc basis with nil checkpoint", rbft.peerPool.ID)
+				continue
+			}
+			if basis.SignedCheckpoints[i].Checkpoint.Height != c.SequenceNumber ||
+				basis.SignedCheckpoints[i].Checkpoint.Digest != c.Digest {
+				rbft.logger.Warningf("Replica %d received an invalid vc basis with inconsistent info", rbft.peerPool.ID)
+				continue
+			}
+
+			checkpoints[m] = append(checkpoints[m], basis.SignedCheckpoints[i])
+			record[m] = true
 			rbft.logger.Debugf("Replica %d appending checkpoint from replica %d with seqNo=%d, h=%d, and checkpoint digest %s",
 				rbft.peerPool.ID, basis.ReplicaId, c.SequenceNumber, basis.H, c.Digest)
 		}
 	}
 
-	// Indicate that replica cannot find any checkpoint
+	// Indicate that replica cannot find any weak checkpoint cert
 	if len(checkpoints) == 0 {
 		rbft.logger.Debugf("Replica %d has no checkpoints to select from: %d %s",
 			rbft.peerPool.ID, len(rbft.vcMgr.viewChangeStore), checkpoints)
-		return
+		return nil, nil, false
 	}
 
-	for idx, vcList := range checkpoints {
+	for idx, signedCheckpoints := range checkpoints {
 		// Need weak certificate for the checkpoint
-		if len(vcList) < rbft.oneCorrectQuorum() { // type casting necessary to match types
-			rbft.logger.Debugf("Replica %d has no weak certificate for n:%d, vcList was %d long",
-				rbft.peerPool.ID, idx.SequenceNumber, len(vcList))
+		if len(signedCheckpoints) < rbft.oneCorrectQuorum() {
+			rbft.logger.Debugf("Replica %d has no weak certificate for n:%d, signedCheckpoints was %d long",
+				rbft.peerPool.ID, idx.Applied, len(signedCheckpoints))
 			continue
 		}
 
 		quorum := 0
-		// Note, this is the whole vset (S) in the paper, not just this checkpoint set (S') (vcList)
+		// Note, this is the whole vset (S) in the paper, not just this checkpoint set (S') (signedCheckpoints)
 		// We need 2f+1 low watermarks from S below this seqNo from all replicas
 		// We need f+1 matching checkpoints at this seqNo (S')
-		for _, vc := range set {
-			if vc.H <= idx.SequenceNumber {
+		for _, basis := range set {
+			if basis.H <= idx.Applied {
 				quorum++
 			}
 		}
 
 		if quorum < rbft.commonCaseQuorum() {
-			rbft.logger.Debugf("Replica %d has no quorum for n:%d", rbft.peerPool.ID, idx.SequenceNumber)
+			rbft.logger.Debugf("Replica %d has no quorum for n:%d", rbft.peerPool.ID, idx.Applied)
 			continue
 		}
 
 		// Find the highest checkpoint
-		if checkpoint.SequenceNumber <= idx.SequenceNumber {
-			checkpoint = idx
+		if meta.Applied <= idx.Applied {
+			meta = idx
+			checkpointSet = signedCheckpoints
 			find = true
 		}
 	}
 
-	return
+	if !find {
+		return nil, nil, false
+	}
+
+	validCheckpoints := make([]*pb.SignedCheckpoint, 0, len(checkpointSet))
+	for _, signedCheckpoint := range checkpointSet {
+		err := rbft.verifySignedCheckpoint(signedCheckpoint)
+		if err != nil {
+			rbft.logger.Warningf("Replica %d found an invalid checkpoint from %d", rbft.peerPool.ID,
+				signedCheckpoint.NodeInfo.ReplicaId)
+		} else {
+			validCheckpoints = append(validCheckpoints, signedCheckpoint)
+		}
+	}
+	if len(validCheckpoints) < rbft.oneCorrectQuorum() {
+		rbft.logger.Debugf("Replica %d has no valid weak certificate for n:%d, signedCheckpoints was %d long",
+			rbft.peerPool.ID, meta.Applied, len(validCheckpoints))
+		return nil, nil, false
+	}
+
+	return &meta, checkpointSet, true
 }
 
 // assignSequenceNumbers selects a request to pre-prepare in the new view

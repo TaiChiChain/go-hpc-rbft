@@ -613,7 +613,6 @@ func (rbft *rbftImpl) consensusMessageFilter(msg *pb.ConsensusMessage) consensus
 			pb.Type_NOTIFICATION_RESPONSE,
 			pb.Type_SYNC_STATE,
 			pb.Type_SYNC_STATE_RESPONSE,
-			pb.Type_CHECKPOINT,
 			pb.Type_SIGNED_CHECKPOINT,
 			pb.Type_FETCH_CHECKPOINT:
 		default:
@@ -1873,7 +1872,7 @@ func (rbft *rbftImpl) weakCheckpointSetOutOfRange(signedCheckpoint *pb.SignedChe
 				}
 
 				// found a weak cert, compare and cache the largest weak cert
-				if len(weakCertRecord[meta]) > rbft.f+1 && meta.Applied > highestWeakCertMeta.Applied {
+				if len(weakCertRecord[meta]) > rbft.oneCorrectQuorum() && meta.Applied > highestWeakCertMeta.Applied {
 					highestWeakCertMeta = meta
 				}
 			}

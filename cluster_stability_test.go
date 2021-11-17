@@ -505,7 +505,7 @@ func TestCluster_Checkpoint_in_StateUpdating(t *testing.T) {
 	}
 
 	for _, retMessages := range retMessageSet {
-		for index, chkpt := range retMessages[pb.Type_CHECKPOINT] {
+		for index, chkpt := range retMessages[pb.Type_SIGNED_CHECKPOINT] {
 			if chkpt == nil {
 				continue
 			}
@@ -538,7 +538,7 @@ func TestCluster_Checkpoint_in_StateUpdating(t *testing.T) {
 	}
 
 	for _, retMessages := range retMessageSet2 {
-		for index, chkpt := range retMessages[pb.Type_CHECKPOINT] {
+		for index, chkpt := range retMessages[pb.Type_SIGNED_CHECKPOINT] {
 			if chkpt == nil {
 				continue
 			}
@@ -563,7 +563,7 @@ func TestCluster_Checkpoint_in_StateUpdating(t *testing.T) {
 	}
 
 	for _, retMessages := range retMessageSet3 {
-		for index, chkpt := range retMessages[pb.Type_CHECKPOINT] {
+		for index, chkpt := range retMessages[pb.Type_SIGNED_CHECKPOINT] {
 			if chkpt == nil {
 				continue
 			}

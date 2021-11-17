@@ -27,7 +27,7 @@ func TestEpoch_fetchCheckpoint_and_recv(t *testing.T) {
 
 	rbfts[1].processEvent(msg)
 	msg2 := nodes[1].unicastMessageCache
-	assert.Equal(t, pb.Type_CHECKPOINT, msg2.Type)
+	assert.Equal(t, pb.Type_SIGNED_CHECKPOINT, msg2.Type)
 }
 
 func TestEpoch_recvFetchCheckpoint_RouterNotExist(t *testing.T) {

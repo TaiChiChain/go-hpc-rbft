@@ -83,7 +83,6 @@ func initMsgEventMap() {
 	eventCreators[pb.Type_PRE_PREPARE] = func() interface{} { return &pb.PrePrepare{} }
 	eventCreators[pb.Type_PREPARE] = func() interface{} { return &pb.Prepare{} }
 	eventCreators[pb.Type_COMMIT] = func() interface{} { return &pb.Commit{} }
-	eventCreators[pb.Type_CHECKPOINT] = func() interface{} { return &pb.Checkpoint{} }
 	eventCreators[pb.Type_FETCH_CHECKPOINT] = func() interface{} { return &pb.FetchCheckpoint{} }
 	eventCreators[pb.Type_VIEW_CHANGE] = func() interface{} { return &pb.ViewChange{} }
 	eventCreators[pb.Type_NEW_VIEW] = func() interface{} { return &pb.NewView{} }

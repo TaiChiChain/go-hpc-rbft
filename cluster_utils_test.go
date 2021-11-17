@@ -129,10 +129,10 @@ func executeExceptN(t *testing.T, rbfts []*rbftImpl, nodes []*testNode, tx *prot
 		}
 		if checkpoint {
 			checkpointMsg[index] = nodes[index].broadcastMessageCache
-			assert.Equal(t, pb.Type_CHECKPOINT, checkpointMsg[index].Type)
+			assert.Equal(t, pb.Type_SIGNED_CHECKPOINT, checkpointMsg[index].Type)
 		}
 	}
-	retMessages[pb.Type_CHECKPOINT] = checkpointMsg
+	retMessages[pb.Type_SIGNED_CHECKPOINT] = checkpointMsg
 
 	if checkpoint {
 		if types.IsConfigTx(tx) {
@@ -276,9 +276,6 @@ func (rbft *rbftImpl) consensusMessagePacker(e consensusEvent) *pb.ConsensusMess
 		payload, err = proto.Marshal(et)
 	case *pb.Commit:
 		eventType = pb.Type_COMMIT
-		payload, err = proto.Marshal(et)
-	case *pb.Checkpoint:
-		eventType = pb.Type_CHECKPOINT
 		payload, err = proto.Marshal(et)
 	case *pb.FetchCheckpoint:
 		eventType = pb.Type_FETCH_CHECKPOINT
