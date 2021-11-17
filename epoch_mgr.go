@@ -1,7 +1,6 @@
 package rbft
 
 import (
-	"github.com/ultramesh/flato-common/types/protos"
 	"sync"
 
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
@@ -49,7 +48,7 @@ func newEpochManager(c Config) *epochManager {
 	// we are not sure if such a config batch has been checked for stable yet or not,
 	// so that, update the config-batch-to-check to trigger a stable point check
 	if c.IsNew == false && c.LatestConfig.Applied == c.Applied {
-		em.logger.Noticef("Latest config batch applied %d equal to last exec, which may be non-stable",
+		em.logger.Noticef("Latest config batch height %d equal to last exec, which may be non-stable",
 			c.LatestConfig.Applied)
 		em.configBatchToCheck = c.LatestConfig
 	}
@@ -113,20 +112,16 @@ func (rbft *rbftImpl) recvFetchCheckpoint(fetch *pb.FetchCheckpoint) consensusEv
 		return nil
 	}
 
-	signedCheckpoint := &pb.SignedCheckpoint{
-		NodeInfo: rbft.getNodeInfo(),
-	}
-	checkpoint := &protos.Checkpoint{
-		Epoch:   rbft.epoch,
-		NextSet: nil,
-	}
-
 	digest, ok := rbft.storeMgr.chkpts[fetch.SequenceNumber]
+	var (
+		checkpointHeight uint64
+		checkpointDigest string
+	)
 	if !ok {
 		// If we cannot find it, the requesting node might fell behind a lot
 		// send back our latest stable-checkpoint-info to help it to recover
-		checkpoint.Height = rbft.h
-		checkpoint.Digest, ok = rbft.storeMgr.chkpts[rbft.h]
+		checkpointHeight = rbft.h
+		checkpointDigest, ok = rbft.storeMgr.chkpts[rbft.h]
 		if !ok {
 			rbft.logger.Warningf("Replica %d cannot find digest of its low watermark %d, "+
 				"current node may fall behind", rbft.peerPool.ID, rbft.h)
@@ -134,13 +129,13 @@ func (rbft *rbftImpl) recvFetchCheckpoint(fetch *pb.FetchCheckpoint) consensusEv
 		}
 	} else {
 		// If we can find a checkpoint in corresponding height, just send it back.
-		checkpoint.Height = fetch.SequenceNumber
-		checkpoint.Digest = digest
+		checkpointHeight = fetch.SequenceNumber
+		checkpointDigest = digest
 	}
 
-	sErr := rbft.signCheckpoint(signedCheckpoint, checkpoint)
+	signedCheckpoint, sErr := rbft.generateSignedCheckpoint(checkpointHeight, checkpointDigest)
 	if sErr != nil {
-		rbft.logger.Errorf("Sign checkpoint error: %s", sErr)
+		rbft.logger.Errorf("Replica %d generate checkpoint error: %s", rbft.peerPool.ID, sErr)
 		rbft.stopNamespace()
 		return nil
 	}

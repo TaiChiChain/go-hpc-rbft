@@ -363,9 +363,9 @@ func (rbft *rbftImpl) compareCheckpointWithWeakSet(signedCheckpoint *pb.SignedCh
 	if !rbft.inW(checkpointHeight) {
 		if checkpointHeight != rbft.h && !rbft.in(SkipInProgress) {
 			// It is perfectly normal that we receive checkpoints for the watermark we just raised, as we raise it after 2f+1, leaving f replies left
-			rbft.logger.Warningf("Checkpoint sequence number outside watermarks: seqNo %d, low water mark %d", checkpointHeight, rbft.h)
+			rbft.logger.Warningf("SignedCheckpoint sequence number outside watermarks: seqNo %d, low water mark %d", checkpointHeight, rbft.h)
 		} else {
-			rbft.logger.Debugf("Checkpoint sequence number outside watermarks: seqNo %d, low water mark %d", checkpointHeight, rbft.h)
+			rbft.logger.Debugf("SignedCheckpoint sequence number outside watermarks: seqNo %d, low water mark %d", checkpointHeight, rbft.h)
 		}
 		return false, nil
 	}
@@ -463,28 +463,28 @@ func (rbft *rbftImpl) compareCheckpointWithWeakSet(signedCheckpoint *pb.SignedCh
 }
 
 // compareWholeStates compares whole networks' current status during recovery or sync state
-// Those status including :
-// 1. N: current consensus nodes number
-// 2. epoch: current epoch of bft network
+// including :
+// 1. epoch: current epoch of bft network
 // 3. view: current view of bft network
-// 4. applied(only compared in sync state): current latest blockChain height
-// 5. digest(only compared in sync state): current latest blockChain hash
+// 3. height(only compared in sync state): current latest blockChain height
+// 4. digest(only compared in sync state): current latest blockChain hash
 func (rbft *rbftImpl) compareWholeStates(states wholeStates) consensusEvent {
 	// track all replica hash with same state used to update routing table if needed
-	sameRespCount := make(map[nodeState][]string)
+	sameRespRecord := make(map[nodeState][]*pb.SignedCheckpoint)
 
-	// check if we can find quorum nodeState who have the same n and view, routerMap, if we can find, which means
-	// quorum nodes agree to a N and view, save to quorumRsp, set canFind to true and update N, view if needed
+	// check if we can find quorum nodeState who have the same epoch and view, height and digest, if we can
+	// find, which means quorum nodes agree to same state, save to quorumRsp, set canFind to true and update
+	// epoch, view if needed
 	var quorumResp nodeState
 	canFind := false
 
 	// find the quorum nodeState
 	for key, state := range states {
-		sameRespCount[state] = append(sameRespCount[state], key.ReplicaHash)
+		sameRespRecord[state] = append(sameRespRecord[state], key)
 		// If quorum agree with a same N,view,epoch, check if we need to update routing table first.
 		// As for quorum will be changed according to validator set, and we cannot be sure that router info of
 		// the node is correct, we should calculate the commonCaseQuorum with the N of state.
-		if len(sameRespCount[state]) >= rbft.commonCaseQuorum() {
+		if len(sameRespRecord[state]) >= rbft.commonCaseQuorum() {
 			rbft.logger.Debugf("Replica %d find quorum states, try to process", rbft.peerPool.ID)
 			quorumResp = state
 			canFind = true
@@ -522,7 +522,7 @@ func (rbft *rbftImpl) compareWholeStates(states wholeStates) consensusEvent {
 					"need to state update", rbft.peerPool.ID, quorumResp.epoch, rbft.epoch)
 
 				target := &pb.MetaState{
-					Applied: quorumResp.applied,
+					Applied: quorumResp.height,
 					Digest:  quorumResp.digest,
 				}
 				rbft.updateHighStateTarget(target)
@@ -533,10 +533,10 @@ func (rbft *rbftImpl) compareWholeStates(states wholeStates) consensusEvent {
 			// case 2) wrong height [sync]:
 			// self height of blocks is lower than others
 			// trigger recovery
-			if state.MetaState.Applied != quorumResp.applied {
+			if state.MetaState.Applied != quorumResp.height {
 				rbft.logger.Noticef("Replica %d finds quorum same block state which is different from self,"+
 					"self height: %d, quorum height: %d",
-					rbft.peerPool.ID, state.MetaState.Applied, quorumResp.applied)
+					rbft.peerPool.ID, state.MetaState.Applied, quorumResp.height)
 
 				// node in lower height cannot become a primary node
 				if rbft.isPrimary(rbft.peerPool.ID) {
@@ -550,13 +550,13 @@ func (rbft *rbftImpl) compareWholeStates(states wholeStates) consensusEvent {
 			// case 3) wrong block hash [error]:
 			// we have correct epoch and block-height, but the hash of latest block is wrong
 			// trigger state-update
-			if state.MetaState.Applied == quorumResp.applied && state.MetaState.Digest != quorumResp.digest {
+			if state.MetaState.Applied == quorumResp.height && state.MetaState.Digest != quorumResp.digest {
 				rbft.logger.Errorf("Replica %d finds quorum same block state whose hash is different from self,"+
 					"in height: %d, selfHash: %s, quorumDigest: %s, need to state update",
-					rbft.peerPool.ID, quorumResp.applied, state.MetaState.Digest, quorumResp.digest)
+					rbft.peerPool.ID, quorumResp.height, state.MetaState.Digest, quorumResp.digest)
 
 				target := &pb.MetaState{
-					Applied: quorumResp.applied,
+					Applied: quorumResp.height,
 					Digest:  quorumResp.digest,
 				}
 				rbft.updateHighStateTarget(target)
@@ -566,7 +566,7 @@ func (rbft *rbftImpl) compareWholeStates(states wholeStates) consensusEvent {
 
 			rbft.logger.Infof("======== Replica %d finished sync state for height: %d, current epoch: %d, current view %d",
 				rbft.peerPool.ID, state.MetaState.Applied, rbft.epoch, rbft.view)
-			rbft.external.SendFilterEvent(pb.InformType_FilterStableCheckpoint, quorumResp.applied, quorumResp.digest)
+			rbft.external.SendFilterEvent(pb.InformType_FilterStableCheckpoint, sameRespRecord[quorumResp])
 			return nil
 		}
 
@@ -860,7 +860,7 @@ func (rbft *rbftImpl) equalMetaState(s1 *pb.MetaState, s2 *pb.MetaState) bool {
 		return false
 	}
 
-	// check the applied number
+	// check the height number
 	if s1.Applied != s2.Applied {
 		return false
 	}
@@ -913,24 +913,43 @@ DrainLoop:
 	}
 }
 
-// signCheckpoint generates a signature of certain checkpoint message.
-func (rbft *rbftImpl) signCheckpoint(signedCheckpoint *pb.SignedCheckpoint, checkpoint *protos.Checkpoint) error {
-	msg := checkpoint.Hash()
-
-	sig, sErr := rbft.external.Sign(msg)
-	if sErr != nil {
-		return sErr
+// generateSignedCheckpoint generates a signed checkpoint using given chain height and digest.
+func (rbft *rbftImpl) generateSignedCheckpoint(height uint64, digest string) (*pb.SignedCheckpoint, error) {
+	signedCheckpoint := &pb.SignedCheckpoint{
+		NodeInfo: rbft.getNodeInfo(),
 	}
 
-	signedCheckpoint.Signature = sig
+	checkpoint := &protos.Checkpoint{
+		Epoch:   rbft.epoch,
+		Height:  height,
+		Digest:  digest,
+		NextSet: nil,
+	}
 	signedCheckpoint.Checkpoint = checkpoint
 
-	return nil
+	signature, sErr := rbft.signCheckpoint(checkpoint)
+	if sErr != nil {
+		rbft.logger.Errorf("Replica %d sign checkpoint error: %s", rbft.peerPool.ID, sErr)
+		rbft.stopNamespace()
+		return nil, sErr
+	}
+	signedCheckpoint.Signature = signature
+
+	return signedCheckpoint, nil
+}
+
+// signCheckpoint generates a signature of certain checkpoint message.
+func (rbft *rbftImpl) signCheckpoint(checkpoint *protos.Checkpoint) ([]byte, error) {
+	msg := checkpoint.Hash()
+	sig, sErr := rbft.external.Sign(msg)
+	if sErr != nil {
+		return nil, sErr
+	}
+	return sig, nil
 }
 
 // verifySignedCheckpoint returns whether given signedCheckpoint contains a valid signature.
 func (rbft *rbftImpl) verifySignedCheckpoint(signedCheckpoint *pb.SignedCheckpoint) error {
 	msg := signedCheckpoint.Checkpoint.Hash()
-
 	return rbft.external.Verify(signedCheckpoint.NodeInfo.ReplicaId, signedCheckpoint.Signature, msg)
 }

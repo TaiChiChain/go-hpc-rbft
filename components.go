@@ -173,18 +173,17 @@ type routerMap struct {
 	HashMap map[string]uint64
 }
 
-// nodeState records every node's consensus status(n, view, routerMap) and
-// ledger status(block number, hash and seqNo)
+// nodeState records every node's consensus status(epoch, view) and
+// ledger status(chain height, digest)
 type nodeState struct {
-	n       uint64
-	epoch   uint64
-	view    uint64
-	applied uint64
-	digest  string
+	view   uint64
+	epoch  uint64
+	height uint64
+	digest string
 }
 
 // wholeStates maps node ID to nodeState
-type wholeStates map[*pb.NodeInfo]nodeState
+type wholeStates map[*pb.SignedCheckpoint]nodeState
 
 // -----------viewchange related structs-----------------
 // viewchange index

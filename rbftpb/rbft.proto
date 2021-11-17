@@ -205,10 +205,8 @@ message sync_state {
 }
 
 message sync_state_response {
-    node_info node_info = 1;
-    uint64 epoch = 2;
-    uint64 view = 3;
-    meta_state initial_state = 4;
+    uint64 view = 1;
+    signed_checkpoint signed_checkpoint = 2;
 }
 
 // notification message
@@ -222,9 +220,8 @@ message notification {
 
 message notification_response {
     vc_basis  basis = 1;
-    uint64    n = 2;
-    uint64    epoch = 3;
-    node_info node_info = 4;
+    uint64    epoch = 2;
+    node_info node_info = 3;
 }
 
 message peer {

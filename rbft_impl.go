@@ -58,7 +58,7 @@ type Config struct {
 	// IsNew indicates if current node is a new joint node or not.
 	IsNew bool
 
-	// Applied is latest applied index of application service which should be assigned when node restart.
+	// Applied is the latest height index of application service which should be assigned when node restart.
 	Applied uint64
 
 	// K decides how long this checkpoint period is.
@@ -307,7 +307,7 @@ func newRBFT(cpChan chan *pb.ServiceState, confC chan *pb.ReloadFinished, c Conf
 	rbft.logger.Infof("RBFT Max number of validating peers (N) = %v", rbft.N)
 	rbft.logger.Infof("RBFT Max number of failing peers (f) = %v", rbft.f)
 	rbft.logger.Infof("RBFT byzantine flag = %v", rbft.in(byzantine))
-	rbft.logger.Infof("RBFT Checkpoint period (K) = %v", rbft.K)
+	rbft.logger.Infof("RBFT SignedCheckpoint period (K) = %v", rbft.K)
 	rbft.logger.Infof("RBFT Log multiplier = %v", rbft.logMultiplier)
 	rbft.logger.Infof("RBFT log size (L) = %v", rbft.L)
 	rbft.logger.Infof("RBFT ID: %d", rbft.peerPool.ID)
@@ -607,7 +607,7 @@ func (rbft *rbftImpl) consensusMessageFilter(msg *pb.ConsensusMessage) consensus
 
 	// A node in different epoch or in epoch sync will reject normal consensus messages, except:
 	// For sync state: {SyncState, SyncStateResponse},
-	// For checkpoint: {Checkpoint, FetchCheckpoint},
+	// For checkpoint: {SignedCheckpoint, FetchCheckpoint},
 	if msg.Epoch != rbft.epoch {
 		switch msg.Type {
 		case pb.Type_NOTIFICATION,
@@ -1625,15 +1625,13 @@ func (rbft *rbftImpl) checkpoint(state *pb.MetaState) {
 	rbft.logger.Infof("Replica %d sending checkpoint for view=%d/seqNo=%d and digest=%s",
 		rbft.peerPool.ID, rbft.view, seqNo, digest)
 
-	signedCheckpoint := &pb.SignedCheckpoint{
-		NodeInfo: rbft.getNodeInfo(),
+	signedCheckpoint, err := rbft.generateSignedCheckpoint(seqNo, digest)
+	if err != nil {
+		rbft.logger.Errorf("Replica %d generate signed checkpoint error: %s", rbft.peerPool.ID, err)
+		rbft.stopNamespace()
+		return
 	}
-	checkpoint := &protos.Checkpoint{
-		Epoch:   rbft.epoch,
-		Height:  seqNo,
-		Digest:  digest,
-		NextSet: nil,
-	}
+
 	rbft.storeMgr.saveCheckpoint(seqNo, digest)
 	rbft.persistCheckpoint(seqNo, []byte(digest))
 
@@ -1648,13 +1646,6 @@ func (rbft *rbftImpl) checkpoint(state *pb.MetaState) {
 				"there may be something wrong with checkpoint", rbft.peerPool.ID)
 			rbft.softStartHighWatermarkTimer("replica send checkpoint equal to high-watermark")
 		}
-	}
-
-	sErr := rbft.signCheckpoint(signedCheckpoint, checkpoint)
-	if sErr != nil {
-		rbft.logger.Errorf("Sign checkpoint error: %s", sErr)
-		rbft.stopNamespace()
-		return
 	}
 
 	payload, err := proto.Marshal(signedCheckpoint)

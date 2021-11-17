@@ -45,13 +45,13 @@ type Node interface {
 }
 
 // ServiceInbound receives and records modifications from application service which includes two events:
-// 1. ReportExecuted is invoked after application service has actually applied a batch.
+// 1. ReportExecuted is invoked after application service has actually height a batch.
 // 2. ReportStateUpdated is invoked after application service finished stateUpdate which must be
 //    triggered by RBFT core before.
 // ServiceInbound is corresponding to External.ServiceOutbound.
 type ServiceInbound interface {
-	// ReportExecuted reports to RBFT core that application service has finished applied one batch with
-	// current applied batch seqNo and state digest.
+	// ReportExecuted reports to RBFT core that application service has finished height one batch with
+	// current height batch seqNo and state digest.
 	// Users can report any necessary extra field optionally.
 	// NOTE. Users should ReportExecuted directly after start node to help track the initial state.
 	ReportExecuted(state *pb.ServiceState)
@@ -180,8 +180,8 @@ func (n *node) ApplyConfChange(cc *pb.ConfState) {
 	return
 }
 
-// ReportExecuted reports to RBFT core that application service has finished applied one batch with
-// current applied batch seqNo and state digest.
+// ReportExecuted reports to RBFT core that application service has finished height one batch with
+// current height batch seqNo and state digest.
 // Users can report any necessary extra field optionally.
 func (n *node) ReportExecuted(state *pb.ServiceState) {
 	n.stateLock.Lock()
@@ -215,7 +215,7 @@ func (n *node) ReportExecuted(state *pb.ServiceState) {
 func (n *node) ReportStateUpdated(state *pb.ServiceState) {
 	n.stateLock.Lock()
 	if state.MetaState.Applied != 0 && state.MetaState.Applied <= n.currentState.MetaState.Applied {
-		n.logger.Infof("Receive a service state with applied ID which is not "+
+		n.logger.Infof("Receive a service state with height ID which is not "+
 			"larger than current state, received: %+v, current state: %+v", state, n.currentState)
 	}
 	n.currentState = state
