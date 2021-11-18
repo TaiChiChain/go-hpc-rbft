@@ -21,6 +21,7 @@ import (
 
 	"github.com/ultramesh/flato-common/metrics"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
+	"github.com/ultramesh/flato-rbft/types"
 	txpool "github.com/ultramesh/flato-txpool"
 
 	"github.com/gogo/protobuf/proto"
@@ -294,7 +295,7 @@ func (rbft *rbftImpl) sendNewView(notification bool) consensusEvent {
 	rbft.logger.Debugf("initial checkpoint: %+v", meta)
 	//select suitable pqcCerts for later recovery.Their sequence is greater then cp
 	//if msgList is nil, must some bug happened
-	msgList := rbft.assignSequenceNumbers(basis, meta.Applied)
+	msgList := rbft.assignSequenceNumbers(basis, meta.Height)
 	if msgList == nil {
 		rbft.logger.Infof("Replica %d could not assign sequence numbers for newView", rbft.peerPool.ID)
 		return nil
@@ -425,7 +426,7 @@ func (rbft *rbftImpl) replicaCheckNewView() consensusEvent {
 	rbft.logger.Debugf("initial checkpoint: %+v", meta)
 
 	// Check if the xset sent by new primary is built correctly by the aset
-	msgList := rbft.assignSequenceNumbers(nv.Bset, meta.Applied)
+	msgList := rbft.assignSequenceNumbers(nv.Bset, meta.Height)
 	// todo wgr we won't step into such branch
 	if msgList == nil {
 		rbft.logger.Infof("Replica %d could not assign sequence numbers: %+v",
@@ -743,24 +744,24 @@ func (rbft *rbftImpl) getViewChangeBasis() (basis []*pb.VcBasis) {
 // signed checkpoint set.
 // The checkpoint is the max checkpoint which exists in at least oneCorrectQuorum
 // peers and greater than low waterMark in at least commonCaseQuorum.
-func (rbft *rbftImpl) selectInitialCheckpoint(set []*pb.VcBasis) (*pb.MetaState, []*pb.SignedCheckpoint, bool) {
+func (rbft *rbftImpl) selectInitialCheckpoint(set []*pb.VcBasis) (*types.MetaState, []*pb.SignedCheckpoint, bool) {
 	var (
-		meta          = pb.MetaState{}
+		meta          = types.MetaState{}
 		checkpointSet []*pb.SignedCheckpoint
 		find          bool
 	)
 
 	// For the checkpoint as key, find the corresponding basis messages
-	checkpoints := make(map[pb.MetaState][]*pb.SignedCheckpoint)
+	checkpoints := make(map[types.MetaState][]*pb.SignedCheckpoint)
 	for _, basis := range set {
 		if len(basis.Cset) != len(basis.SignedCheckpoints) {
 			rbft.logger.Warningf("Replica %d received an invalid vc basis", rbft.peerPool.ID)
 			continue
 		}
 		// Verify that we strip duplicate checkpoints from this Cset
-		record := make(map[pb.MetaState]bool)
+		record := make(map[types.MetaState]bool)
 		for i, c := range basis.Cset {
-			m := pb.MetaState{Applied: c.SequenceNumber, Digest: c.Digest}
+			m := types.MetaState{Height: c.SequenceNumber, Digest: c.Digest}
 			if ok := record[m]; ok {
 				continue
 			}
@@ -793,7 +794,7 @@ func (rbft *rbftImpl) selectInitialCheckpoint(set []*pb.VcBasis) (*pb.MetaState,
 		// Need weak certificate for the checkpoint
 		if len(signedCheckpoints) < rbft.oneCorrectQuorum() {
 			rbft.logger.Debugf("Replica %d has no weak certificate for n:%d, signedCheckpoints was %d long",
-				rbft.peerPool.ID, idx.Applied, len(signedCheckpoints))
+				rbft.peerPool.ID, idx.Height, len(signedCheckpoints))
 			continue
 		}
 
@@ -802,18 +803,18 @@ func (rbft *rbftImpl) selectInitialCheckpoint(set []*pb.VcBasis) (*pb.MetaState,
 		// We need 2f+1 low watermarks from S below this seqNo from all replicas
 		// We need f+1 matching checkpoints at this seqNo (S')
 		for _, basis := range set {
-			if basis.H <= idx.Applied {
+			if basis.H <= idx.Height {
 				quorum++
 			}
 		}
 
 		if quorum < rbft.commonCaseQuorum() {
-			rbft.logger.Debugf("Replica %d has no quorum for n:%d", rbft.peerPool.ID, idx.Applied)
+			rbft.logger.Debugf("Replica %d has no quorum for n:%d", rbft.peerPool.ID, idx.Height)
 			continue
 		}
 
 		// Find the highest checkpoint
-		if meta.Applied <= idx.Applied {
+		if meta.Height <= idx.Height {
 			meta = idx
 			checkpointSet = signedCheckpoints
 			find = true
@@ -836,7 +837,7 @@ func (rbft *rbftImpl) selectInitialCheckpoint(set []*pb.VcBasis) (*pb.MetaState,
 	}
 	if len(validCheckpoints) < rbft.oneCorrectQuorum() {
 		rbft.logger.Debugf("Replica %d has no valid weak certificate for n:%d, signedCheckpoints was %d long",
-			rbft.peerPool.ID, meta.Applied, len(validCheckpoints))
+			rbft.peerPool.ID, meta.Height, len(validCheckpoints))
 		return nil, nil, false
 	}
 

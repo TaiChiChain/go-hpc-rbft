@@ -6,6 +6,7 @@ import (
 
 	"github.com/ultramesh/flato-common/types/protos"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
+	"github.com/ultramesh/flato-rbft/types"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/golang/mock/gomock"
@@ -20,10 +21,10 @@ func TestNode_Start(t *testing.T) {
 	n := rbfts[0].node
 	n.rbft.atomicOn(Pending)
 
-	n.currentState = &pb.ServiceState{
-		MetaState: &pb.MetaState{
-			Applied: uint64(0),
-			Digest:  "GENESIS XXX",
+	n.currentState = &types.ServiceState{
+		MetaState: &types.MetaState{
+			Height: uint64(0),
+			Digest: "GENESIS XXX",
 		},
 	}
 	// Test Normal Case
@@ -38,10 +39,10 @@ func TestNode_Stop(t *testing.T) {
 	_, rbfts := newBasicClusterInstance()
 	n := rbfts[0].node
 	r := rbfts[0]
-	n.currentState = &pb.ServiceState{
-		MetaState: &pb.MetaState{
-			Applied: uint64(0),
-			Digest:  "GENESIS XXX",
+	n.currentState = &types.ServiceState{
+		MetaState: &types.MetaState{
+			Height: uint64(0),
+			Digest: "GENESIS XXX",
 		},
 	}
 	_ = n.Start()
@@ -131,8 +132,8 @@ func TestNode_ApplyConfChange(t *testing.T) {
 	_, rbfts := newBasicClusterInstance()
 	n := rbfts[0].node
 
-	r := &pb.Router{Peers: peerSet}
-	cc := &pb.ConfState{QuorumRouter: r}
+	r := &types.Router{Peers: peerSet}
+	cc := &types.ConfState{QuorumRouter: r}
 	n.ApplyConfChange(cc)
 	assert.Equal(t, len(peerSet), len(n.rbft.peerPool.routerMap.HashMap))
 }
@@ -144,10 +145,10 @@ func TestNode_ReportExecuted(t *testing.T) {
 	_, rbfts := newBasicClusterInstance()
 	n := rbfts[0].node
 
-	state1 := &pb.ServiceState{
-		MetaState: &pb.MetaState{
-			Applied: 2,
-			Digest:  "msg",
+	state1 := &types.ServiceState{
+		MetaState: &types.MetaState{
+			Height: 2,
+			Digest: "msg",
 		},
 	}
 
@@ -155,28 +156,28 @@ func TestNode_ReportExecuted(t *testing.T) {
 	n.ReportExecuted(state1)
 	assert.Equal(t, state1, n.currentState)
 
-	state2 := &pb.ServiceState{
-		MetaState: &pb.MetaState{
-			Applied: 2,
-			Digest:  "test",
+	state2 := &types.ServiceState{
+		MetaState: &types.MetaState{
+			Height: 2,
+			Digest: "test",
 		},
 	}
 	n.ReportExecuted(state2)
 	assert.Equal(t, "msg", n.currentState.MetaState.Digest)
 
-	state3 := &pb.ServiceState{
-		MetaState: &pb.MetaState{
-			Applied: 5,
-			Digest:  "test",
+	state3 := &types.ServiceState{
+		MetaState: &types.MetaState{
+			Height: 5,
+			Digest: "test",
 		},
 	}
 	n.ReportExecuted(state3)
 	assert.Equal(t, "test", n.currentState.MetaState.Digest)
 
-	state4 := &pb.ServiceState{
-		MetaState: &pb.MetaState{
-			Applied: 40,
-			Digest:  "test",
+	state4 := &types.ServiceState{
+		MetaState: &types.MetaState{
+			Height: 40,
+			Digest: "test",
 		},
 	}
 	go func() {
@@ -193,17 +194,17 @@ func TestNode_ReportStateUpdated(t *testing.T) {
 	_, rbfts := newBasicClusterInstance()
 	n := rbfts[0].node
 
-	state := &pb.ServiceState{
-		MetaState: &pb.MetaState{
-			Applied: 2,
-			Digest:  "state1",
+	state := &types.ServiceState{
+		MetaState: &types.MetaState{
+			Height: 2,
+			Digest: "state1",
 		},
 	}
 
-	state2 := &pb.ServiceState{
-		MetaState: &pb.MetaState{
-			Applied: 2,
-			Digest:  "state2",
+	state2 := &types.ServiceState{
+		MetaState: &types.MetaState{
+			Height: 2,
+			Digest: "state2",
 		},
 	}
 
@@ -211,10 +212,10 @@ func TestNode_ReportStateUpdated(t *testing.T) {
 	n.ReportStateUpdated(state2)
 	assert.Equal(t, "state2", n.currentState.MetaState.Digest)
 
-	state3 := &pb.ServiceState{
-		MetaState: &pb.MetaState{
-			Applied: 4,
-			Digest:  "state3",
+	state3 := &types.ServiceState{
+		MetaState: &types.MetaState{
+			Height: 4,
+			Digest: "state3",
 		},
 	}
 	n.ReportStateUpdated(state3)
@@ -228,17 +229,17 @@ func TestNode_getCurrentState(t *testing.T) {
 	_, rbfts := newBasicClusterInstance()
 	n := rbfts[0].node
 
-	n.currentState = &pb.ServiceState{
-		MetaState: &pb.MetaState{
-			Applied: 4,
-			Digest:  "test",
+	n.currentState = &types.ServiceState{
+		MetaState: &types.MetaState{
+			Height: 4,
+			Digest: "test",
 		},
 	}
 
-	expState := &pb.ServiceState{
-		MetaState: &pb.MetaState{
-			Applied: 4,
-			Digest:  "test",
+	expState := &types.ServiceState{
+		MetaState: &types.MetaState{
+			Height: 4,
+			Digest: "test",
 		},
 	}
 	assert.Equal(t, expState, n.getCurrentState())

@@ -16,6 +16,7 @@ package rbft
 
 import (
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
+	"github.com/ultramesh/flato-rbft/types"
 )
 
 /**
@@ -71,7 +72,7 @@ type storeManager struct {
 
 type stateUpdateTarget struct {
 	// target height and digest
-	metaState *pb.MetaState
+	metaState *types.MetaState
 	// signed checkpoints that prove the above target
 	checkpointSet []*pb.SignedCheckpoint
 }

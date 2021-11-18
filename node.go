@@ -18,6 +18,7 @@ import (
 	"sync"
 
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
+	"github.com/ultramesh/flato-rbft/types"
 )
 
 // Node represents a node in a RBFT cluster.
@@ -29,11 +30,11 @@ type Node interface {
 	Propose(requests *pb.RequestSet) error
 	// ProposeConfChange proposes config change.
 	// Application needs to call ApplyConfChange when applying EntryConfChange type entry.
-	ProposeConfChange(cc *pb.ConfChange) error
+	ProposeConfChange(cc *types.ConfChange) error
 	// Step advances the state machine using the given message.
 	Step(msg *pb.ConsensusMessage)
 	// ApplyConfChange applies config change to the local node.
-	ApplyConfChange(cc *pb.ConfState)
+	ApplyConfChange(cc *types.ConfState)
 	// Status returns the current node status of the RBFT state machine.
 	Status() NodeStatus
 
@@ -54,17 +55,17 @@ type ServiceInbound interface {
 	// current height batch seqNo and state digest.
 	// Users can report any necessary extra field optionally.
 	// NOTE. Users should ReportExecuted directly after start node to help track the initial state.
-	ReportExecuted(state *pb.ServiceState)
+	ReportExecuted(state *types.ServiceState)
 
 	// ReportStateUpdated reports to RBFT core that application service has finished one desired StateUpdate
 	// request which was triggered by RBFT core before.
 	// Users must ReportStateUpdated after RBFT core invoked StateUpdate request no matter this request was
 	// finished successfully or not, otherwise, RBFT core will enter abnormal status infinitely.
-	ReportStateUpdated(state *pb.ServiceState)
+	ReportStateUpdated(state *types.ServiceState)
 
 	// ReportReloadFinished report router updated:
 	// If validator set was changed after reload, service reports the latest router info to RBFT by ReportReloadFinished
-	ReportReloadFinished(reload *pb.ReloadMessage)
+	ReportReloadFinished(reload *types.ReloadMessage)
 }
 
 // node implements the Node interface and track application service synchronously to help RBFT core
@@ -76,17 +77,17 @@ type node struct {
 	// stateLock is used to ensure mutually exclusive access of currentState.
 	stateLock sync.RWMutex
 	// currentState maintains the current application service state.
-	currentState *pb.ServiceState
+	currentState *types.ServiceState
 	// cpChan is used between node and RBFT service to deliver checkpoint state.
-	cpChan chan *pb.ServiceState
+	cpChan chan *types.ServiceState
 
 	// reloadRouter is used to store the validator set from reload temporarily
 	// for that consensus will use it to update router after the execution of config transaction
-	reloadRouter *pb.Router
+	reloadRouter *types.Router
 	// mutex to set value of reloadRouter
 	reloadRouterLock sync.RWMutex
 	// confChan is used to track if config transaction execution was finished by CommitDB
-	confChan chan *pb.ReloadFinished
+	confChan chan *types.ReloadFinished
 
 	config Config
 	logger Logger
@@ -99,8 +100,8 @@ func NewNode(conf Config) (Node, error) {
 
 // newNode help to initializes a Node service.
 func newNode(conf Config) (*node, error) {
-	cpChan := make(chan *pb.ServiceState)
-	confC := make(chan *pb.ReloadFinished)
+	cpChan := make(chan *types.ServiceState)
+	confC := make(chan *types.ReloadFinished)
 
 	rbft, err := newRBFT(cpChan, confC, conf)
 	if err != nil {
@@ -132,7 +133,7 @@ func (n *node) Start() error {
 	return nil
 }
 
-// Start stops a Node instance.
+// Stop stops a Node instance.
 func (n *node) Stop() {
 	select {
 	case <-n.cpChan:
@@ -165,7 +166,7 @@ func (n *node) Propose(requests *pb.RequestSet) error {
 
 // ProposeConfChange proposes config change.
 // Application needs to call ApplyConfChange when applying EntryConfChange type entry.
-func (n *node) ProposeConfChange(cc *pb.ConfChange) error {
+func (n *node) ProposeConfChange(cc *types.ConfChange) error {
 	return nil
 }
 
@@ -175,7 +176,7 @@ func (n *node) Step(msg *pb.ConsensusMessage) {
 }
 
 // ApplyConfChange applies config change to the local node.
-func (n *node) ApplyConfChange(cc *pb.ConfState) {
+func (n *node) ApplyConfChange(cc *types.ConfState) {
 	n.rbft.postConfState(cc)
 	return
 }
@@ -183,7 +184,7 @@ func (n *node) ApplyConfChange(cc *pb.ConfState) {
 // ReportExecuted reports to RBFT core that application service has finished height one batch with
 // current height batch seqNo and state digest.
 // Users can report any necessary extra field optionally.
-func (n *node) ReportExecuted(state *pb.ServiceState) {
+func (n *node) ReportExecuted(state *types.ServiceState) {
 	n.stateLock.Lock()
 	if n.currentState == nil {
 		n.logger.Noticef("Init service state with: %+v", state)
@@ -191,7 +192,7 @@ func (n *node) ReportExecuted(state *pb.ServiceState) {
 		n.stateLock.Unlock()
 		return
 	}
-	if state.MetaState.Applied != 0 && state.MetaState.Applied <= n.currentState.MetaState.Applied {
+	if state.MetaState.Height != 0 && state.MetaState.Height <= n.currentState.MetaState.Height {
 		n.logger.Warningf("Receive invalid service state %+v, "+
 			"current state %+v", state, n.currentState)
 		n.stateLock.Unlock()
@@ -202,8 +203,9 @@ func (n *node) ReportExecuted(state *pb.ServiceState) {
 	n.stateLock.Unlock()
 
 	// a config transaction executed or checkpoint, send state to checkpoint channel
-	if !n.rbft.atomicIn(Pending) && n.rbft.readConfigBatchToExecute() == state.MetaState.Applied || state.MetaState.Applied%n.config.K == 0 && n.cpChan != nil {
-		n.logger.Debugf("Report checkpoint: {%d, %s} to RBFT core", state.MetaState.Applied, state.MetaState.Digest)
+	if !n.rbft.atomicIn(Pending) && n.rbft.readConfigBatchToExecute() == state.MetaState.Height || state.MetaState.Height%n.config.K == 0 && n.cpChan != nil {
+		n.logger.Debugf("Report checkpoint: {%d, %s} to RBFT core", state.MetaState.Height, state.MetaState.Digest)
+		//protos.NodeInfo{}
 		n.cpChan <- state
 	}
 }
@@ -212,9 +214,9 @@ func (n *node) ReportExecuted(state *pb.ServiceState) {
 // request which was triggered by RBFT core before.
 // Users must ReportStateUpdated after RBFT core invoked StateUpdate request no matter this request was
 // finished successfully or not, otherwise, RBFT core will enter abnormal status infinitely.
-func (n *node) ReportStateUpdated(state *pb.ServiceState) {
+func (n *node) ReportStateUpdated(state *types.ServiceState) {
 	n.stateLock.Lock()
-	if state.MetaState.Applied != 0 && state.MetaState.Applied <= n.currentState.MetaState.Applied {
+	if state.MetaState.Height != 0 && state.MetaState.Height <= n.currentState.MetaState.Height {
 		n.logger.Infof("Receive a service state with height ID which is not "+
 			"larger than current state, received: %+v, current state: %+v", state, n.currentState)
 	}
@@ -225,15 +227,15 @@ func (n *node) ReportStateUpdated(state *pb.ServiceState) {
 }
 
 // ReportReloadFinished report router updated
-func (n *node) ReportReloadFinished(reload *pb.ReloadMessage) {
+func (n *node) ReportReloadFinished(reload *types.ReloadMessage) {
 	switch reload.Type {
-	case pb.ReloadType_FinishReloadRouter:
+	case types.ReloadType_FinishReloadRouter:
 		n.logger.Noticef("Consensus-Reload finished, recv router: %+v", reload.Router)
 		n.setReloadRouter(reload.Router)
-	case pb.ReloadType_FinishReloadCommitDB:
+	case types.ReloadType_FinishReloadCommitDB:
 		n.logger.Noticef("Commit-DB finished, recv height: %d", reload.Height)
 		if n.rbft.atomicIn(InConfChange) && n.confChan != nil {
-			rf := &pb.ReloadFinished{Height: reload.Height}
+			rf := &types.ReloadFinished{Height: reload.Height}
 			n.confChan <- rf
 		} else {
 			n.logger.Info("Current node isn't in config-change")
@@ -248,19 +250,19 @@ func (n *node) Status() NodeStatus {
 }
 
 // getCurrentState retrieves the current application state.
-func (n *node) getCurrentState() *pb.ServiceState {
+func (n *node) getCurrentState() *types.ServiceState {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
 	return n.currentState
 }
 
-func (n *node) setReloadRouter(router *pb.Router) {
+func (n *node) setReloadRouter(router *types.Router) {
 	n.reloadRouterLock.Lock()
 	defer n.reloadRouterLock.Unlock()
 	n.reloadRouter = router
 }
 
-func (n *node) readReloadRouter() *pb.Router {
+func (n *node) readReloadRouter() *types.Router {
 	n.reloadRouterLock.RLock()
 	defer n.reloadRouterLock.RUnlock()
 	return n.reloadRouter

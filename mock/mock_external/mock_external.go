@@ -8,6 +8,7 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	protos "github.com/ultramesh/flato-common/types/protos"
 	rbftpb "github.com/ultramesh/flato-rbft/rbftpb"
+	types "github.com/ultramesh/flato-rbft/types"
 	reflect "reflect"
 )
 
@@ -172,7 +173,7 @@ func (mr *MockNetworkMockRecorder) UnicastByHash(msg, to interface{}) *gomock.Ca
 }
 
 // UpdateTable mocks base method
-func (m *MockNetwork) UpdateTable(change *rbftpb.ConfChange) {
+func (m *MockNetwork) UpdateTable(change *types.ConfChange) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "UpdateTable", change)
 }
@@ -283,7 +284,7 @@ func (mr *MockServiceOutboundMockRecorder) StateUpdate(seqNo, digest interface{}
 }
 
 // SendFilterEvent mocks base method
-func (m *MockServiceOutbound) SendFilterEvent(informType rbftpb.InformType, message ...interface{}) {
+func (m *MockServiceOutbound) SendFilterEvent(informType types.InformType, message ...interface{}) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{informType}
 	for _, a := range message {
@@ -437,7 +438,7 @@ func (mr *MockExternalStackMockRecorder) UnicastByHash(msg, to interface{}) *gom
 }
 
 // UpdateTable mocks base method
-func (m *MockExternalStack) UpdateTable(change *rbftpb.ConfChange) {
+func (m *MockExternalStack) UpdateTable(change *types.ConfChange) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "UpdateTable", change)
 }
@@ -502,7 +503,7 @@ func (mr *MockExternalStackMockRecorder) StateUpdate(seqNo, digest interface{}) 
 }
 
 // SendFilterEvent mocks base method
-func (m *MockExternalStack) SendFilterEvent(informType rbftpb.InformType, message ...interface{}) {
+func (m *MockExternalStack) SendFilterEvent(informType types.InformType, message ...interface{}) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{informType}
 	for _, a := range message {

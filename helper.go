@@ -21,9 +21,10 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/ultramesh/flato-common/types"
+	fCommonTypes "github.com/ultramesh/flato-common/types"
 	"github.com/ultramesh/flato-common/types/protos"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
+	"github.com/ultramesh/flato-rbft/types"
 
 	"github.com/gogo/protobuf/proto"
 )
@@ -450,9 +451,9 @@ func (rbft *rbftImpl) compareCheckpointWithWeakSet(signedCheckpoint *pb.SignedCh
 		rbft.logger.Criticalf("Replica %d generated a checkpoint of %s, but a weak set of the network agrees on %s.",
 			rbft.peerPool.ID, selfID, correctID)
 
-		target := &pb.MetaState{
-			Applied: checkpointHeight,
-			Digest:  correctID,
+		target := &types.MetaState{
+			Height: checkpointHeight,
+			Digest: correctID,
 		}
 		rbft.updateHighStateTarget(target, correctCheckpoints)
 		rbft.tryStateTransfer()
@@ -521,9 +522,9 @@ func (rbft *rbftImpl) compareWholeStates(states wholeStates) consensusEvent {
 				rbft.logger.Warningf("Replica %d finds quorum same epoch %d, which is lager than self epoch %d, "+
 					"need to state update", rbft.peerPool.ID, quorumResp.epoch, rbft.epoch)
 
-				target := &pb.MetaState{
-					Applied: quorumResp.height,
-					Digest:  quorumResp.digest,
+				target := &types.MetaState{
+					Height: quorumResp.height,
+					Digest: quorumResp.digest,
 				}
 				rbft.updateHighStateTarget(target, sameRespRecord[quorumResp])
 				rbft.tryStateTransfer()
@@ -533,10 +534,10 @@ func (rbft *rbftImpl) compareWholeStates(states wholeStates) consensusEvent {
 			// case 2) wrong height [sync]:
 			// self height of blocks is lower than others
 			// trigger recovery
-			if state.MetaState.Applied != quorumResp.height {
+			if state.MetaState.Height != quorumResp.height {
 				rbft.logger.Noticef("Replica %d finds quorum same block state which is different from self,"+
 					"self height: %d, quorum height: %d",
-					rbft.peerPool.ID, state.MetaState.Applied, quorumResp.height)
+					rbft.peerPool.ID, state.MetaState.Height, quorumResp.height)
 
 				// node in lower height cannot become a primary node
 				if rbft.isPrimary(rbft.peerPool.ID) {
@@ -550,14 +551,14 @@ func (rbft *rbftImpl) compareWholeStates(states wholeStates) consensusEvent {
 			// case 3) wrong block hash [error]:
 			// we have correct epoch and block-height, but the hash of latest block is wrong
 			// trigger state-update
-			if state.MetaState.Applied == quorumResp.height && state.MetaState.Digest != quorumResp.digest {
+			if state.MetaState.Height == quorumResp.height && state.MetaState.Digest != quorumResp.digest {
 				rbft.logger.Errorf("Replica %d finds quorum same block state whose hash is different from self,"+
 					"in height: %d, selfHash: %s, quorumDigest: %s, need to state update",
 					rbft.peerPool.ID, quorumResp.height, state.MetaState.Digest, quorumResp.digest)
 
-				target := &pb.MetaState{
-					Applied: quorumResp.height,
-					Digest:  quorumResp.digest,
+				target := &types.MetaState{
+					Height: quorumResp.height,
+					Digest: quorumResp.digest,
 				}
 				rbft.updateHighStateTarget(target, sameRespRecord[quorumResp])
 				rbft.tryStateTransfer()
@@ -565,8 +566,8 @@ func (rbft *rbftImpl) compareWholeStates(states wholeStates) consensusEvent {
 			}
 
 			rbft.logger.Infof("======== Replica %d finished sync state for height: %d, current epoch: %d, current view %d",
-				rbft.peerPool.ID, state.MetaState.Applied, rbft.epoch, rbft.view)
-			rbft.external.SendFilterEvent(pb.InformType_FilterStableCheckpoint, sameRespRecord[quorumResp])
+				rbft.peerPool.ID, state.MetaState.Height, rbft.epoch, rbft.view)
+			rbft.external.SendFilterEvent(types.InformType_FilterStableCheckpoint, sameRespRecord[quorumResp])
 			return nil
 		}
 
@@ -782,10 +783,10 @@ func (rbft *rbftImpl) putBackRequestBatches(xset xset) {
 }
 
 // checkIfNeedStateUpdate checks if a replica needs to do state update
-func (rbft *rbftImpl) checkIfNeedStateUpdate(meta *pb.MetaState, checkpointSet []*pb.SignedCheckpoint) (bool, error) {
+func (rbft *rbftImpl) checkIfNeedStateUpdate(meta *types.MetaState, checkpointSet []*pb.SignedCheckpoint) (bool, error) {
 
 	lastExec := rbft.exec.lastExec
-	seq := meta.Applied
+	seq := meta.Height
 	dig := meta.Digest
 
 	if rbft.exec.currentExec != nil {
@@ -799,20 +800,20 @@ func (rbft *rbftImpl) checkIfNeedStateUpdate(meta *pb.MetaState, checkpointSet [
 		// this stable checkpoint normally.
 		if rbft.storeMgr.localCheckpoints[seq] == dig {
 			rbft.moveWatermarks(seq)
-			rbft.external.SendFilterEvent(pb.InformType_FilterStableCheckpoint, checkpointSet)
+			rbft.external.SendFilterEvent(types.InformType_FilterStableCheckpoint, checkpointSet)
 		}
 
 		if rbft.epochMgr.configBatchToCheck != nil {
-			if seq == rbft.epochMgr.configBatchToCheck.Applied {
+			if seq == rbft.epochMgr.configBatchToCheck.Height {
 				rbft.epochMgr.configBatchToCheck = nil
 			}
 		}
 	}
 
 	// If replica's lastExec < initial checkpoint, replica is out of date
-	if lastExec < meta.Applied {
+	if lastExec < meta.Height {
 		rbft.logger.Warningf("Replica %d missing base checkpoint %d (%s), our most recent execution %d",
-			rbft.peerPool.ID, meta.Applied, meta.Digest, lastExec)
+			rbft.peerPool.ID, meta.Height, meta.Digest, lastExec)
 		rbft.updateHighStateTarget(meta, checkpointSet)
 		rbft.tryStateTransfer()
 		return true, nil
@@ -850,7 +851,7 @@ func (rbft *rbftImpl) inRouters(hash string) bool {
 	return false
 }
 
-func (rbft *rbftImpl) equalMetaState(s1 *pb.MetaState, s2 *pb.MetaState) bool {
+func (rbft *rbftImpl) equalMetaState(s1 *types.MetaState, s2 *types.MetaState) bool {
 	rbft.logger.Debugf("Replica %d check if meta states are equal: 1)%+v, 2)%+v", rbft.peerPool.ID, s1, s2)
 
 	// nil pointer cannot be checked
@@ -859,7 +860,7 @@ func (rbft *rbftImpl) equalMetaState(s1 *pb.MetaState, s2 *pb.MetaState) bool {
 	}
 
 	// check the height number
-	if s1.Applied != s2.Applied {
+	if s1.Height != s2.Height {
 		return false
 	}
 	// check the digest of the state
@@ -883,7 +884,7 @@ func (rbft *rbftImpl) stopNamespace() {
 }
 
 func requestHash(tx *protos.Transaction) string {
-	return types.GetHash(tx).Hex()
+	return fCommonTypes.GetHash(tx).Hex()
 }
 
 // calculateMD5Hash calculate hash by MD5

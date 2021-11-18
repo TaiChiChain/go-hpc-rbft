@@ -442,7 +442,7 @@ func (rbft *rbftImpl) resetStateForRecovery() consensusEvent {
 	if need {
 		// if we are behind by checkpoint, move watermark and state transfer to the target
 		rbft.logger.Debugf("Replica %d in recovery find itself fall behind, "+
-			"move watermark to %d and state transfer.", rbft.peerPool.ID, meta.Applied)
+			"move watermark to %d and state transfer.", rbft.peerPool.ID, meta.Height)
 
 		// clear useless outstanding batch to avoid viewChange caused by outstanding batches after recovery.
 		rbft.cleanOutstandingAndCert()
@@ -719,7 +719,7 @@ func (rbft *rbftImpl) initSyncState() consensusEvent {
 		View: rbft.view,
 	}
 
-	signedCheckpoint, sErr := rbft.generateSignedCheckpoint(state.MetaState.Applied, state.MetaState.Digest)
+	signedCheckpoint, sErr := rbft.generateSignedCheckpoint(state.MetaState.Height, state.MetaState.Digest)
 	if sErr != nil {
 		rbft.logger.Errorf("Replica %d generate checkpoint error: %s", rbft.peerPool.ID, sErr)
 		rbft.stopNamespace()
@@ -786,7 +786,7 @@ func (rbft *rbftImpl) sendSyncStateRsp(to string, needSyncEpoch bool) consensusE
 			rbft.logger.Warningf("Replica %d has a nil state", rbft.peerPool.ID)
 			return nil
 		}
-		checkpointHeight = state.MetaState.Applied
+		checkpointHeight = state.MetaState.Height
 		checkpointDigest = state.MetaState.Digest
 	}
 

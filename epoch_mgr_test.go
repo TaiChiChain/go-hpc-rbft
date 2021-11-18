@@ -5,6 +5,7 @@ import (
 
 	"github.com/ultramesh/flato-common/types/protos"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
+	"github.com/ultramesh/flato-rbft/types"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
@@ -16,9 +17,9 @@ func TestEpoch_fetchCheckpoint_and_recv(t *testing.T) {
 
 	nodes, rbfts := newBasicClusterInstance()
 
-	rbfts[0].epochMgr.configBatchToCheck = &pb.MetaState{
-		Applied: 10,
-		Digest:  "test-block-10",
+	rbfts[0].epochMgr.configBatchToCheck = &types.MetaState{
+		Height: 10,
+		Digest: "test-block-10",
 	}
 
 	rbfts[0].fetchCheckpoint()
@@ -134,7 +135,7 @@ func TestEpoch_turnIntoEpoch(t *testing.T) {
 
 	_, rbfts := newBasicClusterInstance()
 
-	addNode5 := append(defaultValidatorSet, "node5")
+	addNode5 := append(defaultValidatorSet, &protos.NodeInfo{Hostname: "node4", PubKey: "pub-4"})
 	router := vSetToRouters(addNode5)
 
 	rbfts[0].turnIntoEpoch(&router, uint64(8))

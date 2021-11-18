@@ -9,6 +9,7 @@ import (
 	"github.com/ultramesh/flato-common/types/protos"
 	mockexternal "github.com/ultramesh/flato-rbft/mock/mock_external"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
+	"github.com/ultramesh/flato-rbft/types"
 	txpoolmock "github.com/ultramesh/flato-txpool/mock"
 
 	"github.com/golang/mock/gomock"
@@ -57,8 +58,8 @@ func TestRBFT_newRBFT(t *testing.T) {
 		EpochInit:    uint64(0),
 		LatestConfig: nil,
 	}
-	cpChan := make(chan *pb.ServiceState)
-	confC := make(chan *pb.ReloadFinished)
+	cpChan := make(chan *types.ServiceState)
+	confC := make(chan *types.ReloadFinished)
 	rbft, _ := newRBFT(cpChan, confC, conf)
 
 	// Normal case
@@ -176,10 +177,10 @@ func TestRBFT_reportStateUpdated(t *testing.T) {
 
 	unlockCluster(rbfts)
 
-	state2 := &pb.ServiceState{}
-	state2.MetaState = &pb.MetaState{
-		Applied: 20,
-		Digest:  "block-number-20",
+	state2 := &types.ServiceState{}
+	state2.MetaState = &types.MetaState{
+		Height: 20,
+		Digest: "block-number-20",
 	}
 
 	event := &LocalEvent{
@@ -369,9 +370,9 @@ func TestRBFT_postConfState_NormalCase(t *testing.T) {
 	defer ctrl.Finish()
 
 	_, rbfts := newBasicClusterInstance()
-	vSetNode5 := append(defaultValidatorSet, "node5")
+	vSetNode5 := append(defaultValidatorSet, &protos.NodeInfo{Hostname: "node5", PubKey: "pub-5"})
 	r := vSetToRouters(vSetNode5)
-	cc := &pb.ConfState{
+	cc := &types.ConfState{
 		QuorumRouter: &r,
 	}
 	rbfts[0].postConfState(cc)
@@ -383,9 +384,14 @@ func TestRBFT_postConfState_NotExitInRouter(t *testing.T) {
 	defer ctrl.Finish()
 
 	_, rbfts := newBasicClusterInstance()
-	removeNode1 := []string{"node2", "node3", "node4", "node5"}
-	r := vSetToRouters(removeNode1)
-	cc := &pb.ConfState{
+	newVSet := []*protos.NodeInfo{
+		{Hostname: "node2", PubKey: "pub-2"},
+		{Hostname: "node3", PubKey: "pub-3"},
+		{Hostname: "node4", PubKey: "pub-4"},
+		{Hostname: "node5", PubKey: "pub-5"},
+	}
+	r := vSetToRouters(newVSet)
+	cc := &types.ConfState{
 		QuorumRouter: &r,
 	}
 	go rbfts[0].postConfState(cc)
@@ -582,18 +588,18 @@ func TestRBFT_recvStateUpdatedEvent_updateEpoch(t *testing.T) {
 
 	_, rbfts := newBasicClusterInstance()
 
-	metaS := &pb.MetaState{
-		Applied: uint64(10),
-		Digest:  "block-number-10",
+	metaS := &types.MetaState{
+		Height: uint64(10),
+		Digest: "block-number-10",
 	}
 
-	addNode5 := append(defaultValidatorSet, "node5")
-	epochInfo := &pb.EpochInfo{
+	addNode5 := append(defaultValidatorSet, &protos.NodeInfo{Hostname: "node5", PubKey: "pub-5"})
+	epochInfo := &types.EpochInfo{
 		Epoch: uint64(3),
 		VSet:  addNode5,
 	}
 
-	ss := &pb.ServiceState{
+	ss := &types.ServiceState{
 		MetaState: metaS,
 		EpochInfo: epochInfo,
 	}

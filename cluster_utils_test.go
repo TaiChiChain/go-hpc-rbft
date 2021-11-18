@@ -8,9 +8,10 @@ import (
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/ultramesh/fancylogger"
-	"github.com/ultramesh/flato-common/types"
+	fCommonTypes "github.com/ultramesh/flato-common/types"
 	"github.com/ultramesh/flato-common/types/protos"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
+	"github.com/ultramesh/flato-rbft/types"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -135,7 +136,7 @@ func executeExceptN(t *testing.T, rbfts []*rbftImpl, nodes []*testNode, tx *prot
 	retMessages[pb.Type_SIGNED_CHECKPOINT] = checkpointMsg
 
 	if checkpoint {
-		if types.IsConfigTx(tx) {
+		if fCommonTypes.IsConfigTx(tx) {
 			for index := range rbfts {
 				if index == notExec {
 					continue
@@ -209,23 +210,23 @@ func FrameworkNewRawLogger() *fancylogger.Logger {
 	return rawLogger
 }
 
-func vSetToRouters(vSet []string) pb.Router {
-	var routers pb.Router
-	for index, hostname := range vSet {
-		peer := &pb.Peer{
+func vSetToRouters(vSet []*protos.NodeInfo) types.Router {
+	var routers types.Router
+	for index, info := range vSet {
+		peer := &types.Peer{
 			Id:       uint64(index + 1),
-			Hash:     calHash(hostname),
-			Hostname: hostname,
+			Hash:     calHash(info.Hostname),
+			Hostname: info.Hostname,
 		}
 		routers.Peers = append(routers.Peers, peer)
 	}
 	return routers
 }
 
-func getRouter(router *pb.Router) pb.Router {
-	var r pb.Router
+func getRouter(router *types.Router) types.Router {
+	var r types.Router
 	for _, p := range router.Peers {
-		peer := pb.Peer{
+		peer := types.Peer{
 			Id:       p.Id,
 			Hash:     p.Hash,
 			Hostname: p.Hostname,

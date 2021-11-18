@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
+	"github.com/ultramesh/flato-rbft/types"
 
 	"github.com/gogo/protobuf/proto"
 )
@@ -17,7 +18,7 @@ type epochManager struct {
 	// storage for the state of config batch which is waiting for stable-verification
 	// it might be assigned at the initiation of epoch-manager
 	// it will be assigned after config-batch's execution to check a stable-state
-	configBatchToCheck *pb.MetaState
+	configBatchToCheck *types.MetaState
 
 	// track the sequence number of the config transaction to execute
 	// to notice Node transfer state related to config transactions into core
@@ -47,9 +48,9 @@ func newEpochManager(c Config) *epochManager {
 	// if the height of block is equal to the latest config batch,
 	// we are not sure if such a config batch has been checked for stable yet or not,
 	// so that, update the config-batch-to-check to trigger a stable point check
-	if c.IsNew == false && c.LatestConfig.Applied == c.Applied {
+	if c.IsNew == false && c.LatestConfig.Height == c.Applied {
 		em.logger.Noticef("Latest config batch height %d equal to last exec, which may be non-stable",
-			c.LatestConfig.Applied)
+			c.LatestConfig.Height)
 		em.configBatchToCheck = c.LatestConfig
 	}
 
@@ -73,7 +74,7 @@ func (rbft *rbftImpl) fetchCheckpoint() consensusEvent {
 
 	fetch := &pb.FetchCheckpoint{
 		ReplicaHash:    rbft.peerPool.hash,
-		SequenceNumber: rbft.epochMgr.configBatchToCheck.Applied,
+		SequenceNumber: rbft.epochMgr.configBatchToCheck.Height,
 	}
 	rbft.startFetchCheckpointTimer()
 
@@ -180,7 +181,7 @@ func (rbft *rbftImpl) checkIfOutOfEpoch(msg *pb.ConsensusMessage) consensusEvent
 	return nil
 }
 
-func (rbft *rbftImpl) turnIntoEpoch(router *pb.Router, epoch uint64) {
+func (rbft *rbftImpl) turnIntoEpoch(router *types.Router, epoch uint64) {
 	// validator set has been changed, start a new epoch and check new epoch
 	rbft.peerPool.updateRouter(router)
 

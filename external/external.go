@@ -17,6 +17,7 @@ package external
 import (
 	"github.com/ultramesh/flato-common/types/protos"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
+	"github.com/ultramesh/flato-rbft/types"
 )
 
 // Storage is an interface that should be implemented by the application using non-volatile
@@ -43,9 +44,8 @@ type Network interface {
 	// UnicastByHash delivers messages to given node with specified hostname.
 	UnicastByHash(msg *pb.ConsensusMessage, to string) error
 	// UpdateTable updates routing table according to given confChangeType
-	// 3. ConfChangeType_ConfChangeUpdateNode, update routing table with given meta info
 	// It's application's responsibility to ensure update routing table synchronously.
-	UpdateTable(change *pb.ConfChange)
+	UpdateTable(change *types.ConfChange)
 }
 
 // Crypto is used to access the sign/verify methods from the crypto package
@@ -73,7 +73,7 @@ type ServiceOutbound interface {
 	StateUpdate(seqNo uint64, digest string)
 	// SendFilterEvent posts some impotent events to application layer.
 	// Users can decide to post filer event synchronously or asynchronously.
-	SendFilterEvent(informType pb.InformType, message ...interface{})
+	SendFilterEvent(informType types.InformType, message ...interface{})
 }
 
 // ExternalStack integrates all external interfaces which must be implemented by application users.

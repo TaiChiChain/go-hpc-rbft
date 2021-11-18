@@ -5,6 +5,7 @@ import (
 
 	"github.com/ultramesh/flato-common/types/protos"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
+	"github.com/ultramesh/flato-rbft/types"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
@@ -121,15 +122,15 @@ func TestExec_handleCoreRbftEvent_StateUpdatedEvent(t *testing.T) {
 
 	_, rbfts := newBasicClusterInstance()
 
-	metaS := &pb.MetaState{
-		Applied: uint64(10),
-		Digest:  "block-number-10",
+	metaS := &types.MetaState{
+		Height: uint64(10),
+		Digest: "block-number-10",
 	}
-	epochInfo := &pb.EpochInfo{
+	epochInfo := &types.EpochInfo{
 		Epoch: uint64(0),
 		VSet:  defaultValidatorSet,
 	}
-	ss := &pb.ServiceState{
+	ss := &types.ServiceState{
 		MetaState: metaS,
 		EpochInfo: epochInfo,
 	}

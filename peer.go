@@ -17,6 +17,7 @@ package rbft
 import (
 	"github.com/ultramesh/flato-rbft/external"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
+	"github.com/ultramesh/flato-rbft/types"
 )
 
 // peerPool maintains local peer ID which is the unique peer through the consensus network.
@@ -52,7 +53,7 @@ func newPeerPool(c Config) *peerPool {
 	return pool
 }
 
-func (pool *peerPool) initPeers(peers []*pb.Peer) {
+func (pool *peerPool) initPeers(peers []*types.Peer) {
 	pool.logger.Infof("Local ID: %d, update routerMap:", pool.ID)
 	length := len(peers)
 	preID := pool.ID
@@ -73,8 +74,8 @@ func (pool *peerPool) initPeers(peers []*pb.Peer) {
 	}
 }
 
-func (pool *peerPool) updateRouter(router *pb.Router) {
-	cc := &pb.ConfChange{
+func (pool *peerPool) updateRouter(router *types.Router) {
+	cc := &types.ConfChange{
 		Router: router,
 	}
 	pool.network.UpdateTable(cc)
