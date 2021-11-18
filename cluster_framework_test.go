@@ -193,7 +193,10 @@ func newTestFramework(account int, loggerFile bool) *testFramework {
 		log: FrameworkNewRawLogger(),
 	}
 
-	tf.log.Debugf("%s", tf.Router)
+	tf.log.Debugf("routers:")
+	for _, peer := range tf.Router.Peers {
+		tf.log.Debugf("ID: %d, hostname: %s, hash: %s", peer.Id, peer.Hostname, peer.Hash)
+	}
 
 	// set node number
 	tf.setN(len(tf.Router.Peers))
@@ -330,7 +333,7 @@ func (tf *testFramework) newTestNode(id uint64, hostname string, cc chan *channe
 	stateInit := &types.ServiceState{}
 	stateInit.MetaState = &types.MetaState{
 		Height: 0,
-		Digest: "",
+		Digest: "XXX GENESIS",
 	}
 	tn.N.ReportExecuted(stateInit)
 
@@ -594,7 +597,7 @@ func (tf *testFramework) frameworkAddNode(hostname string, loggerFile bool, vSet
 	stateInit := &types.ServiceState{}
 	stateInit.MetaState = &types.MetaState{
 		Height: 0,
-		Digest: "",
+		Digest: "XXX GENESIS",
 	}
 	tn.N.ReportExecuted(stateInit)
 

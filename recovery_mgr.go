@@ -719,7 +719,7 @@ func (rbft *rbftImpl) initSyncState() consensusEvent {
 		View: rbft.view,
 	}
 
-	signedCheckpoint, sErr := rbft.generateSignedCheckpoint(state.MetaState.Height, state.MetaState.Digest)
+	signedCheckpoint, sErr := rbft.generateSignedCheckpoint(state)
 	if sErr != nil {
 		rbft.logger.Errorf("Replica %d generate checkpoint error: %s", rbft.peerPool.ID, sErr)
 		rbft.stopNamespace()
@@ -766,14 +766,13 @@ func (rbft *rbftImpl) sendSyncStateRsp(to string, needSyncEpoch bool) consensusE
 	}
 
 	var (
-		checkpointHeight uint64
-		checkpointDigest string
 		ok               bool
+		signedCheckpoint *pb.SignedCheckpoint
+		sErr             error
 	)
 	if needSyncEpoch {
 		// for requester in lower epoch, send the latest stable checkpoint
-		checkpointHeight = rbft.h
-		checkpointDigest, ok = rbft.storeMgr.localCheckpoints[rbft.h]
+		signedCheckpoint, ok = rbft.storeMgr.localCheckpoints[rbft.h]
 		if !ok {
 			rbft.logger.Warningf("Replica %d cannot find digest of its low watermark %d, "+
 				"current node may fall behind", rbft.peerPool.ID, rbft.h)
@@ -786,15 +785,12 @@ func (rbft *rbftImpl) sendSyncStateRsp(to string, needSyncEpoch bool) consensusE
 			rbft.logger.Warningf("Replica %d has a nil state", rbft.peerPool.ID)
 			return nil
 		}
-		checkpointHeight = state.MetaState.Height
-		checkpointDigest = state.MetaState.Digest
-	}
-
-	signedCheckpoint, sErr := rbft.generateSignedCheckpoint(checkpointHeight, checkpointDigest)
-	if sErr != nil {
-		rbft.logger.Errorf("Replica %d generate checkpoint error: %s", rbft.peerPool.ID, sErr)
-		rbft.stopNamespace()
-		return nil
+		signedCheckpoint, sErr = rbft.generateSignedCheckpoint(state)
+		if sErr != nil {
+			rbft.logger.Errorf("Replica %d generate checkpoint error: %s", rbft.peerPool.ID, sErr)
+			rbft.stopNamespace()
+			return nil
+		}
 	}
 	syncStateRsp.SignedCheckpoint = signedCheckpoint
 

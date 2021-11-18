@@ -15,7 +15,11 @@
 // Package types defines all structs used by external modules.
 package types
 
-import "github.com/ultramesh/flato-common/types/protos"
+import (
+	"fmt"
+
+	"github.com/ultramesh/flato-common/types/protos"
+)
 
 // ----------- ServiceState related structs-----------------
 
@@ -33,6 +37,22 @@ type EpochInfo struct {
 	Epoch      uint64
 	VSet       []*protos.NodeInfo
 	LastConfig uint64
+}
+
+func (state *ServiceState) String() string {
+	var s string
+	if state.MetaState != nil {
+		s += fmt.Sprintf("height: %d, digest: %s\n", state.MetaState.Height,
+			state.MetaState.Digest)
+	}
+	if state.EpochInfo != nil {
+		s += fmt.Sprintf("epoch: %d, last config: %d", state.EpochInfo.Epoch,
+			state.EpochInfo.LastConfig)
+	}
+	if s == "" {
+		return "NIL ServiceState"
+	}
+	return s
 }
 
 // ----------- Reload related structs-----------------

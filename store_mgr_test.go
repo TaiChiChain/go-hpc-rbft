@@ -53,28 +53,6 @@ func newStorageTestNode(ctrl *gomock.Controller) (*storeManager, Config) {
 	return newStoreMgr(conf), conf
 }
 
-func TestStoreMgr_newStoreMgr(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	s, _ := newStorageTestNode(ctrl)
-
-	structName, nilElems, err := checkNilElems(s)
-	if err == nil {
-		assert.Equal(t, "storeManager", structName)
-		assert.Nil(t, nilElems)
-	}
-	assert.Equal(t, "XXX GENESIS", s.localCheckpoints[0])
-}
-
-func TestStoreMgr_saveCheckpoint(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	s, _ := newStorageTestNode(ctrl)
-	s.saveCheckpoint(uint64(10), "base64")
-
-	assert.Equal(t, "base64", s.localCheckpoints[uint64(10)])
-}
-
 func TestStoreMgr_getCert(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()

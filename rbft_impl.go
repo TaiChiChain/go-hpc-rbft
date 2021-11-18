@@ -271,11 +271,34 @@ func newRBFT(cpChan chan *types.ServiceState, confC chan *types.ReloadFinished, 
 		rbft.on(isNewNode)
 	}
 
+	// new peer pool
+	rbft.peerPool = newPeerPool(c)
+
 	// new executor
 	rbft.exec = newExecutor()
 
 	// new store manager
 	rbft.storeMgr = newStoreMgr(c)
+
+	// mock an initial checkpoint.
+	state := &types.ServiceState{
+		MetaState: &types.MetaState{
+			Height: 0,
+			Digest: "XXX GENESIS",
+		},
+		EpochInfo: &types.EpochInfo{
+			Epoch:      0,
+			VSet:       []*protos.NodeInfo{},
+			LastConfig: 0,
+		},
+	}
+	mockCheckpoint, gErr := rbft.generateSignedCheckpoint(state)
+	if gErr != nil {
+		rbft.metrics.unregisterMetrics()
+		rbft.metrics = nil
+		return nil, gErr
+	}
+	rbft.storeMgr.localCheckpoints[0] = mockCheckpoint
 
 	// new batch manager
 	rbft.batchMgr = newBatchManager(c)
@@ -286,11 +309,7 @@ func newRBFT(cpChan chan *types.ServiceState, confC chan *types.ReloadFinished, 
 	// new viewChange manager
 	rbft.vcMgr = newVcManager(c)
 
-	// new peer pool
-	rbft.peerPool = newPeerPool(c)
-
 	// restore state from consensus database
-	// TODO(move to node interface?)
 	rbft.exec.setLastExec(c.Applied)
 
 	// new epoch manager
@@ -340,7 +359,7 @@ func (rbft *rbftImpl) start() error {
 	// current state has already been checked to be stable, and we need not to check it again
 	metaS := &types.MetaState{
 		Height: rbft.h,
-		Digest: rbft.storeMgr.localCheckpoints[rbft.h],
+		Digest: rbft.storeMgr.localCheckpoints[rbft.h].Checkpoint.Digest,
 	}
 	if rbft.equalMetaState(rbft.epochMgr.configBatchToCheck, metaS) {
 		rbft.logger.Info("Config batch to check has already been stable, reset it")
@@ -1579,7 +1598,7 @@ func (rbft *rbftImpl) afterCommitBlock(idx msgID, isConfig bool) {
 			if state.MetaState.Height == rbft.exec.lastExec {
 				rbft.logger.Debugf("Call the checkpoint for config batch, seqNo=%d", rbft.exec.lastExec)
 				rbft.epochMgr.configBatchToCheck = state.MetaState
-				rbft.checkpoint(state.MetaState)
+				rbft.checkpoint(state)
 			} else {
 				// reqBatch call execute but have not done with execute
 				rbft.logger.Errorf("Fail to call the checkpoint, seqNo=%d", rbft.exec.lastExec)
@@ -1594,7 +1613,7 @@ func (rbft *rbftImpl) afterCommitBlock(idx msgID, isConfig bool) {
 
 			if state.MetaState.Height == rbft.exec.lastExec {
 				rbft.logger.Debugf("Call the checkpoint for normal, seqNo=%d", rbft.exec.lastExec)
-				rbft.checkpoint(state.MetaState)
+				rbft.checkpoint(state)
 			} else {
 				// reqBatch call execute but have not done with execute
 				rbft.logger.Errorf("Fail to call the checkpoint, seqNo=%d", rbft.exec.lastExec)
@@ -1613,23 +1632,23 @@ func (rbft *rbftImpl) afterCommitBlock(idx msgID, isConfig bool) {
 //=============================================================================
 
 // checkpoint generate a checkpoint and broadcast it to outer.
-func (rbft *rbftImpl) checkpoint(state *types.MetaState) {
+func (rbft *rbftImpl) checkpoint(state *types.ServiceState) {
 
-	digest := state.Digest
-	seqNo := state.Height
+	digest := state.MetaState.Digest
+	seqNo := state.MetaState.Height
 
 	rbft.logger.Infof("Replica %d sending checkpoint for view=%d/seqNo=%d and digest=%s",
 		rbft.peerPool.ID, rbft.view, seqNo, digest)
 
-	signedCheckpoint, err := rbft.generateSignedCheckpoint(seqNo, digest)
+	signedCheckpoint, err := rbft.generateSignedCheckpoint(state)
 	if err != nil {
 		rbft.logger.Errorf("Replica %d generate signed checkpoint error: %s", rbft.peerPool.ID, err)
 		rbft.stopNamespace()
 		return
 	}
 
-	rbft.storeMgr.saveCheckpoint(seqNo, digest)
-	rbft.persistCheckpoint(seqNo, []byte(digest))
+	rbft.storeMgr.saveCheckpoint(seqNo, signedCheckpoint)
+	rbft.persistCheckpoint(signedCheckpoint)
 
 	if rbft.epochMgr.configBatchToCheck != nil {
 		// use fetchCheckpointTimer to fetch the missing checkpoint
@@ -1729,15 +1748,14 @@ func (rbft *rbftImpl) recvCheckpoint(signedCheckpoint *pb.SignedCheckpoint, loca
 
 	// the checkpoint is trigger by config batch
 	if rbft.epochMgr.configBatchToCheck != nil {
-		return rbft.finishConfigCheckpoint(signedCheckpoint)
+		return rbft.finishConfigCheckpoint(checkpointHeight, checkpointDigest, matchingCheckpoints)
 	}
 
 	return rbft.finishNormalCheckpoint(checkpointHeight, checkpointDigest, matchingCheckpoints)
 }
 
-func (rbft *rbftImpl) finishConfigCheckpoint(signedCheckpoint *pb.SignedCheckpoint) consensusEvent {
-	checkpointHeight := signedCheckpoint.Checkpoint.Height
-	checkpointDigest := signedCheckpoint.Checkpoint.Digest
+func (rbft *rbftImpl) finishConfigCheckpoint(checkpointHeight uint64, checkpointDigest string,
+	matchingCheckpoints []*pb.SignedCheckpoint) consensusEvent {
 	if checkpointHeight != rbft.epochMgr.configBatchToCheck.Height {
 		rbft.logger.Warningf("Replica %d received a non-expected checkpoint for config batch, "+
 			"received %d, expected %d", checkpointHeight, rbft.epochMgr.configBatchToCheck.Height)
@@ -1750,7 +1768,7 @@ func (rbft *rbftImpl) finishConfigCheckpoint(signedCheckpoint *pb.SignedCheckpoi
 
 	rbft.logger.Infof("Replica %d post stable checkpoint event for seqNo %d after "+
 		"executed to the height with the same digest", rbft.peerPool.ID, checkpointHeight)
-	rbft.external.SendFilterEvent(types.InformType_FilterStableCheckpoint, checkpointHeight, checkpointDigest)
+	rbft.external.SendFilterEvent(types.InformType_FilterStableCheckpoint, matchingCheckpoints)
 	rbft.epochMgr.configBatchToCheck = nil
 
 	// waiting for commit db finish the reload
@@ -2118,7 +2136,6 @@ func (rbft *rbftImpl) tryStateTransfer() {
 // self epoch-info and trigger another recovery process
 func (rbft *rbftImpl) recvStateUpdatedEvent(ss *types.ServiceState) consensusEvent {
 	seqNo := ss.MetaState.Height
-	digest := ss.MetaState.Digest
 
 	// high state target nil warning
 	if rbft.storeMgr.highStateTarget == nil {
@@ -2165,8 +2182,14 @@ func (rbft *rbftImpl) recvStateUpdatedEvent(ss *types.ServiceState) consensusEve
 			rbft.peerPool.ID, seqNo)
 		rbft.fetchCheckpoint()
 	}
-	rbft.storeMgr.saveCheckpoint(seqNo, digest)
-	rbft.persistCheckpoint(seqNo, []byte(digest))
+	signedCheckpoint, gErr := rbft.generateSignedCheckpoint(ss)
+	if gErr != nil {
+		rbft.logger.Errorf("Replica %d generate signed checkpoint error: %s", rbft.peerPool.ID, gErr)
+		rbft.stopNamespace()
+		return nil
+	}
+	rbft.storeMgr.saveCheckpoint(seqNo, signedCheckpoint)
+	rbft.persistCheckpoint(signedCheckpoint)
 	rbft.moveWatermarks(seqNo)
 
 	// 3. process epoch-info

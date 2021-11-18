@@ -604,6 +604,20 @@ func TestRBFT_recvStateUpdatedEvent_updateEpoch(t *testing.T) {
 		EpochInfo: epochInfo,
 	}
 
+	rbfts[0].storeMgr.highStateTarget = &stateUpdateTarget{
+		metaState: metaS,
+		checkpointSet: []*pb.SignedCheckpoint{
+			{NodeInfo: &pb.NodeInfo{ReplicaId: 1, ReplicaHash: "hash-1"},
+				Checkpoint: &protos.Checkpoint{Height: uint64(10), Digest: "block-number-10"},
+				Signature:  []byte("sig-1")},
+			{NodeInfo: &pb.NodeInfo{ReplicaId: 2, ReplicaHash: "hash-2"},
+				Checkpoint: &protos.Checkpoint{Height: uint64(10), Digest: "block-number-10"},
+				Signature:  []byte("sig-2")},
+			{NodeInfo: &pb.NodeInfo{ReplicaId: 3, ReplicaHash: "hash-3"},
+				Checkpoint: &protos.Checkpoint{Height: uint64(10), Digest: "block-number-10"},
+				Signature:  []byte("sig-3")},
+		},
+	}
 	rbfts[0].recvStateUpdatedEvent(ss)
 	assert.Equal(t, 5, len(rbfts[0].peerPool.routerMap.HashMap))
 }

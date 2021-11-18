@@ -61,6 +61,7 @@ func TestPersist_restoreView(t *testing.T) {
 	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
 	log := FrameworkNewRawLogger()
 	ext := mockexternal.NewMockExternalStack(ctrl)
+	ext.EXPECT().Sign(gomock.Any()).Return([]byte("sig"), nil).AnyTimes()
 	node := newPersistTestReplica(ctrl, pool, log, ext)
 
 	node.rbft.setView(2)
@@ -101,6 +102,7 @@ func TestPersist_restoreQList(t *testing.T) {
 	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
 	log := FrameworkNewRawLogger()
 	ext := mockexternal.NewMockExternalStack(ctrl)
+	ext.EXPECT().Sign(gomock.Any()).Return([]byte("sig"), nil).AnyTimes()
 	node := newPersistTestReplica(ctrl, pool, log, ext)
 
 	var ret map[string][]byte
@@ -138,6 +140,7 @@ func TestPersist_restorePList(t *testing.T) {
 	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
 	log := FrameworkNewRawLogger()
 	ext := mockexternal.NewMockExternalStack(ctrl)
+	ext.EXPECT().Sign(gomock.Any()).Return([]byte("sig"), nil).AnyTimes()
 	node := newPersistTestReplica(ctrl, pool, log, ext)
 
 	var ret map[string][]byte
@@ -170,6 +173,7 @@ func TestPersist_restoreBatchStore(t *testing.T) {
 	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
 	log := FrameworkNewRawLogger()
 	ext := mockexternal.NewMockExternalStack(ctrl)
+	ext.EXPECT().Sign(gomock.Any()).Return([]byte("sig"), nil).AnyTimes()
 	node := newPersistTestReplica(ctrl, pool, log, ext)
 
 	var ret map[string][]byte
@@ -186,6 +190,7 @@ func TestPersist_restoreQSet(t *testing.T) {
 	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
 	log := FrameworkNewRawLogger()
 	ext := mockexternal.NewMockExternalStack(ctrl)
+	ext.EXPECT().Sign(gomock.Any()).Return([]byte("sig"), nil).AnyTimes()
 	node := newPersistTestReplica(ctrl, pool, log, ext)
 
 	q := &pb.PrePrepare{
@@ -213,6 +218,7 @@ func TestPersist_restorePSet(t *testing.T) {
 	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
 	log := FrameworkNewRawLogger()
 	ext := mockexternal.NewMockExternalStack(ctrl)
+	ext.EXPECT().Sign(gomock.Any()).Return([]byte("sig"), nil).AnyTimes()
 	node := newPersistTestReplica(ctrl, pool, log, ext)
 
 	p := &pb.Prepare{
@@ -240,6 +246,7 @@ func TestPersist_restoreCSet(t *testing.T) {
 	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
 	log := FrameworkNewRawLogger()
 	ext := mockexternal.NewMockExternalStack(ctrl)
+	ext.EXPECT().Sign(gomock.Any()).Return([]byte("sig"), nil).AnyTimes()
 	node := newPersistTestReplica(ctrl, pool, log, ext)
 
 	c := &pb.Commit{
@@ -267,6 +274,7 @@ func TestPersist_restoreCert(t *testing.T) {
 	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
 	log := FrameworkNewRawLogger()
 	ext := mockexternal.NewMockExternalStack(ctrl)
+	ext.EXPECT().Sign(gomock.Any()).Return([]byte("sig"), nil).AnyTimes()
 	node := newPersistTestReplica(ctrl, pool, log, ext)
 
 	q := &pb.PrePrepare{
@@ -332,6 +340,7 @@ func TestPersist_restoreState(t *testing.T) {
 	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
 	log := FrameworkNewRawLogger()
 	ext := mockexternal.NewMockExternalStack(ctrl)
+	ext.EXPECT().Sign(gomock.Any()).Return([]byte("sig"), nil).AnyTimes()
 	node := newPersistTestReplica(ctrl, pool, log, ext)
 
 	var ret map[string][]byte

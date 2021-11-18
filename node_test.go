@@ -24,7 +24,7 @@ func TestNode_Start(t *testing.T) {
 	n.currentState = &types.ServiceState{
 		MetaState: &types.MetaState{
 			Height: uint64(0),
-			Digest: "GENESIS XXX",
+			Digest: "XXX GENESIS",
 		},
 	}
 	// Test Normal Case
@@ -42,7 +42,7 @@ func TestNode_Stop(t *testing.T) {
 	n.currentState = &types.ServiceState{
 		MetaState: &types.MetaState{
 			Height: uint64(0),
-			Digest: "GENESIS XXX",
+			Digest: "XXX GENESIS",
 		},
 	}
 	_ = n.Start()
@@ -148,7 +148,7 @@ func TestNode_ReportExecuted(t *testing.T) {
 	state1 := &types.ServiceState{
 		MetaState: &types.MetaState{
 			Height: 2,
-			Digest: "msg",
+			Digest: "block-hash-2",
 		},
 	}
 
@@ -159,25 +159,25 @@ func TestNode_ReportExecuted(t *testing.T) {
 	state2 := &types.ServiceState{
 		MetaState: &types.MetaState{
 			Height: 2,
-			Digest: "test",
+			Digest: "block-hash-2",
 		},
 	}
 	n.ReportExecuted(state2)
-	assert.Equal(t, "msg", n.currentState.MetaState.Digest)
+	assert.Equal(t, "block-hash-2", n.currentState.MetaState.Digest)
 
 	state3 := &types.ServiceState{
 		MetaState: &types.MetaState{
 			Height: 5,
-			Digest: "test",
+			Digest: "block-hash-5",
 		},
 	}
 	n.ReportExecuted(state3)
-	assert.Equal(t, "test", n.currentState.MetaState.Digest)
+	assert.Equal(t, "block-hash-5", n.currentState.MetaState.Digest)
 
 	state4 := &types.ServiceState{
 		MetaState: &types.MetaState{
 			Height: 40,
-			Digest: "test",
+			Digest: "block-hash-40",
 		},
 	}
 	go func() {

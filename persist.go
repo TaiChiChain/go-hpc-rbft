@@ -447,13 +447,19 @@ func (rbft *rbftImpl) persistDelAllBatches() {
 	_ = rbft.storage.Destroy("batch")
 }
 
-// persistCheckpoint persists checkpoint to database, which, key contains the seqNo of checkpoint, value is the
-// checkpoint ID
-func (rbft *rbftImpl) persistCheckpoint(seqNo uint64, id []byte) {
-	key := fmt.Sprintf("chkpt.%d", seqNo)
-	err := rbft.storage.StoreState(key, id)
+// persistCheckpoint persists checkpoint to database, which, key contains the seqNo of checkpoint,
+// value is the signed checkpoint
+func (rbft *rbftImpl) persistCheckpoint(signedC *pb.SignedCheckpoint) {
+	key := fmt.Sprintf("chkpt.%d", signedC.Checkpoint.Height)
+	checkpointBytes, mErr := proto.Marshal(signedC)
+	if mErr != nil {
+		rbft.logger.Warningf("Replica %d marshal checkpoint %d error: %s", rbft.peerPool.ID,
+			signedC.Checkpoint.Height, mErr)
+		return
+	}
+	err := rbft.storage.StoreState(key, checkpointBytes)
 	if err != nil {
-		rbft.logger.Errorf("Persist chkpt failed with err: %s ", err)
+		rbft.logger.Errorf("Persist checkpoint failed with err: %s ", err)
 	}
 }
 
@@ -580,14 +586,21 @@ func (rbft *rbftImpl) restoreState() error {
 
 	chkpts, err := rbft.storage.ReadStateSet("chkpt.")
 	if err == nil {
-		for key, id := range chkpts {
+		for key, bytes := range chkpts {
 			var seqNo uint64
 			if _, err = fmt.Sscanf(key, "chkpt.%d", &seqNo); err != nil {
 				rbft.logger.Warningf("Replica %d could not restore checkpoint key %s", rbft.peerPool.ID, key)
 			} else {
-				digest := string(id)
-				rbft.logger.Debugf("Replica %d found checkpoint %s for seqNo %d", rbft.peerPool.ID, digest, seqNo)
-				rbft.storeMgr.saveCheckpoint(seqNo, digest)
+				signedC := &pb.SignedCheckpoint{}
+				err = proto.Unmarshal(bytes, signedC)
+				if err == nil {
+					rbft.logger.Debugf("Replica %d found checkpoint %s for seqNo %d", rbft.peerPool.ID,
+						signedC.Checkpoint.Digest, seqNo)
+					rbft.storeMgr.saveCheckpoint(seqNo, signedC)
+				} else {
+					rbft.logger.Warningf("Replica %d could not unmarshal checkpoint key %s for error: %v",
+						rbft.peerPool.ID, key, err)
+				}
 			}
 		}
 	} else {

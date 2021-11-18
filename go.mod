@@ -13,7 +13,7 @@ require (
 
 replace github.com/ultramesh/crypto-standard => git.hyperchain.cn/ultramesh/crypto-standard.git v0.2.3
 
-replace github.com/ultramesh/flato-common => ../flato-common
+replace github.com/ultramesh/flato-common => git.hyperchain.cn/ultramesh/flato-common.git v0.2.28-0.20211120015754-1d8986fae40c
 
 replace github.com/ultramesh/flato-txpool => git.hyperchain.cn/ultramesh/flato-txpool.git v0.2.13
 

@@ -54,8 +54,7 @@ func TestEpoch_recvFetchCheckpoint_SendBackNormal(t *testing.T) {
 		ReplicaHash:    calHash("node2"),
 		SequenceNumber: uint64(12),
 	}
-	rbfts[0].storeMgr.saveCheckpoint(uint64(12), "block-number-12")
-	chkpt := &pb.SignedCheckpoint{
+	signedC := &pb.SignedCheckpoint{
 		NodeInfo: rbfts[0].getNodeInfo(),
 		Checkpoint: &protos.Checkpoint{
 			Epoch:   rbfts[0].epoch,
@@ -65,7 +64,8 @@ func TestEpoch_recvFetchCheckpoint_SendBackNormal(t *testing.T) {
 		},
 		Signature: nil,
 	}
-	consensusMsg := rbfts[0].consensusMessagePacker(chkpt)
+	rbfts[0].storeMgr.saveCheckpoint(uint64(12), signedC)
+	consensusMsg := rbfts[0].consensusMessagePacker(signedC)
 	ret := rbfts[0].recvFetchCheckpoint(fetch)
 	assert.Nil(t, ret)
 	assert.Equal(t, consensusMsg, nodes[0].unicastMessageCache)
@@ -81,8 +81,7 @@ func TestEpoch_recvFetchCheckpoint_SendBackStableCheckpoint(t *testing.T) {
 		SequenceNumber: uint64(12),
 	}
 	rbfts[0].h = uint64(50)
-	rbfts[0].storeMgr.saveCheckpoint(uint64(50), "block-number-50")
-	chkpt := &pb.SignedCheckpoint{
+	signedC := &pb.SignedCheckpoint{
 		NodeInfo: rbfts[0].getNodeInfo(),
 		Checkpoint: &protos.Checkpoint{
 			Epoch:   rbfts[0].epoch,
@@ -92,7 +91,8 @@ func TestEpoch_recvFetchCheckpoint_SendBackStableCheckpoint(t *testing.T) {
 		},
 		Signature: nil,
 	}
-	consensusMsg := rbfts[0].consensusMessagePacker(chkpt)
+	rbfts[0].storeMgr.saveCheckpoint(uint64(50), signedC)
+	consensusMsg := rbfts[0].consensusMessagePacker(signedC)
 	ret := rbfts[0].recvFetchCheckpoint(fetch)
 	assert.Nil(t, ret)
 	assert.Equal(t, consensusMsg, nodes[0].unicastMessageCache)
@@ -135,7 +135,7 @@ func TestEpoch_turnIntoEpoch(t *testing.T) {
 
 	_, rbfts := newBasicClusterInstance()
 
-	addNode5 := append(defaultValidatorSet, &protos.NodeInfo{Hostname: "node4", PubKey: "pub-4"})
+	addNode5 := append(defaultValidatorSet, &protos.NodeInfo{Hostname: "node5", PubKey: "pub-5"})
 	router := vSetToRouters(addNode5)
 
 	rbfts[0].turnIntoEpoch(&router, uint64(8))

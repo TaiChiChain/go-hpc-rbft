@@ -58,8 +58,8 @@ type storeManager struct {
 	// ---------------checkpoint related--------------------
 	// checkpoints that we reached by ourselves after commit a block with a
 	// block number == integer multiple of K;
-	// map lastExec to a base64 encoded BlockchainInfo
-	localCheckpoints map[uint64]string
+	// map lastExec to signed checkpoint after executed certain block
+	localCheckpoints map[uint64]*pb.SignedCheckpoint
 
 	// checkpoint numbers received from others which are bigger than our
 	// H(=h+L); map replicaHash to the last checkpoint number received from
@@ -80,7 +80,7 @@ type stateUpdateTarget struct {
 // newStoreMgr news an instance of storeManager
 func newStoreMgr(c Config) *storeManager {
 	sm := &storeManager{
-		localCheckpoints:         make(map[uint64]string),
+		localCheckpoints:         make(map[uint64]*pb.SignedCheckpoint),
 		higherCheckpoints:        make(map[string]*pb.SignedCheckpoint),
 		checkpointStore:          make(map[chkptID]*pb.SignedCheckpoint),
 		certStore:                make(map[msgID]*msgCert),
@@ -92,7 +92,6 @@ func newStoreMgr(c Config) *storeManager {
 		missingBatchesInFetching: make(map[string]msgID),
 		logger:                   c.Logger,
 	}
-	sm.localCheckpoints[0] = "XXX GENESIS"
 	return sm
 }
 
@@ -120,8 +119,8 @@ func (sm *storeManager) moveWatermarks(rbft *rbftImpl, h uint64) {
 
 // saveCheckpoint saves checkpoint information to localCheckpoints, whose key is lastExec, value is the global nodeHash of current
 // BlockchainInfo
-func (sm *storeManager) saveCheckpoint(l uint64, gh string) {
-	sm.localCheckpoints[l] = gh
+func (sm *storeManager) saveCheckpoint(height uint64, signedCheckpoint *pb.SignedCheckpoint) {
+	sm.localCheckpoints[height] = signedCheckpoint
 }
 
 // Given a digest/view/seq, is there an entry in the certStore?

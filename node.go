@@ -187,7 +187,7 @@ func (n *node) ApplyConfChange(cc *types.ConfState) {
 func (n *node) ReportExecuted(state *types.ServiceState) {
 	n.stateLock.Lock()
 	if n.currentState == nil {
-		n.logger.Noticef("Init service state with: %+v", state)
+		n.logger.Noticef("Init service state with: %s", state)
 		n.currentState = state
 		n.stateLock.Unlock()
 		return
@@ -198,14 +198,13 @@ func (n *node) ReportExecuted(state *types.ServiceState) {
 		n.stateLock.Unlock()
 		return
 	}
-	n.logger.Debugf("Update service state: %+v", state)
+	n.logger.Debugf("Update service state: %s", state)
 	n.currentState = state
 	n.stateLock.Unlock()
 
 	// a config transaction executed or checkpoint, send state to checkpoint channel
 	if !n.rbft.atomicIn(Pending) && n.rbft.readConfigBatchToExecute() == state.MetaState.Height || state.MetaState.Height%n.config.K == 0 && n.cpChan != nil {
 		n.logger.Debugf("Report checkpoint: {%d, %s} to RBFT core", state.MetaState.Height, state.MetaState.Digest)
-		//protos.NodeInfo{}
 		n.cpChan <- state
 	}
 }
