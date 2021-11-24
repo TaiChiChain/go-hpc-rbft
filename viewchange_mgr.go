@@ -829,8 +829,8 @@ func (rbft *rbftImpl) selectInitialCheckpoint(set []*pb.VcBasis) (*types.MetaSta
 	for _, signedCheckpoint := range checkpointSet {
 		err := rbft.verifySignedCheckpoint(signedCheckpoint)
 		if err != nil {
-			rbft.logger.Warningf("Replica %d found an invalid checkpoint from %d", rbft.peerPool.ID,
-				signedCheckpoint.NodeInfo.ReplicaId)
+			rbft.logger.Errorf("Replica %d verify signature of checkpoint from %d error: %s",
+				rbft.peerPool.ID, signedCheckpoint.NodeInfo.ReplicaId, err)
 		} else {
 			validCheckpoints = append(validCheckpoints, signedCheckpoint)
 		}

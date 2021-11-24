@@ -126,13 +126,10 @@ func TestExec_handleCoreRbftEvent_StateUpdatedEvent(t *testing.T) {
 		Height: uint64(10),
 		Digest: "block-number-10",
 	}
-	epochInfo := &types.EpochInfo{
-		Epoch: uint64(0),
-		VSet:  defaultValidatorSet,
-	}
+
 	ss := &types.ServiceState{
 		MetaState: metaS,
-		EpochInfo: epochInfo,
+		Epoch:     uint64(0),
 	}
 	checkpoint := &protos.Checkpoint{
 		Epoch:   uint64(0),

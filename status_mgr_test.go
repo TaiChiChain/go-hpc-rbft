@@ -20,7 +20,6 @@ func newTestStatusNode(ctrl *gomock.Controller) *rbftImpl {
 	conf := Config{
 		ID:          1,
 		Hash:        calHash("node1"),
-		IsNew:       false,
 		Peers:       peerSet,
 		Logger:      log,
 		External:    external,

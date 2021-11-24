@@ -224,9 +224,6 @@ func (rbft *rbftImpl) handleRecoveryEvent(e *LocalEvent) consensusEvent {
 		rbft.logger.Debugf("Replica %d init recovery", rbft.peerPool.ID)
 		return rbft.initRecovery()
 	case RecoveryDoneEvent:
-		if rbft.in(isNewNode) {
-			rbft.off(isNewNode)
-		}
 		rbft.atomicOff(InRecovery)
 		rbft.metrics.statusGaugeInRecovery.Set(0)
 		rbft.recoveryMgr.notificationStore = make(map[ntfIdx]*pb.Notification)
@@ -247,7 +244,7 @@ func (rbft *rbftImpl) handleRecoveryEvent(e *LocalEvent) consensusEvent {
 
 `)
 		finishMsg := fmt.Sprintf("======== Replica %d finished recovery, primary=%d, epoch=%d/n=%d/f=%d/view=%d/h=%d/lastExec=%d", rbft.peerPool.ID, rbft.primaryID(rbft.view), rbft.epoch, rbft.N, rbft.f, rbft.view, rbft.h, rbft.exec.lastExec)
-		rbft.external.SendFilterEvent(types.InformType_FilterFinishRecovery, finishMsg)
+		rbft.external.SendFilterEvent(types.InformTypeFilterFinishRecovery, finishMsg)
 		// after recovery, new primary need to send null request as a heartbeat, and non-primary will start a
 		// first request timer which must be longer than null request timer in which non-primary must receive a
 		// request from primary(null request or pre-prepare...), or this node will send viewChange.
@@ -363,7 +360,7 @@ func (rbft *rbftImpl) handleViewChangeEvent(e *LocalEvent) consensusEvent {
 		}
 
 		// send viewchange result to web socket API
-		rbft.external.SendFilterEvent(types.InformType_FilterFinishViewChange, finishMsg)
+		rbft.external.SendFilterEvent(types.InformTypeFilterFinishViewChange, finishMsg)
 
 		rbft.primaryResubmitTransactions()
 

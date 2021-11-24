@@ -95,28 +95,6 @@ func newStoreMgr(c Config) *storeManager {
 	return sm
 }
 
-// moveWatermarks removes useless set in localCheckpoints, plist, qlist whose index <= h
-func (sm *storeManager) moveWatermarks(rbft *rbftImpl, h uint64) {
-	for n := range sm.localCheckpoints {
-		if n < h {
-			delete(sm.localCheckpoints, n)
-			rbft.persistDelCheckpoint(n)
-		}
-	}
-
-	for idx := range rbft.vcMgr.qlist {
-		if idx.n <= h {
-			delete(rbft.vcMgr.qlist, idx)
-		}
-	}
-
-	for n := range rbft.vcMgr.plist {
-		if n <= h {
-			delete(rbft.vcMgr.plist, n)
-		}
-	}
-}
-
 // saveCheckpoint saves checkpoint information to localCheckpoints, whose key is lastExec, value is the global nodeHash of current
 // BlockchainInfo
 func (sm *storeManager) saveCheckpoint(height uint64, signedCheckpoint *pb.SignedCheckpoint) {

@@ -40,7 +40,6 @@ const (
 	InSyncState    // node is syncing state
 	NeedSyncState  // node need to sync state
 	SkipInProgress // node try to state update
-	isNewNode      // node is a new node
 	byzantine      // byzantine
 )
 

@@ -23,16 +23,19 @@ import (
 
 // ----------- ServiceState related structs-----------------
 
+// ServiceState indicates the returned info from chain db.
 type ServiceState struct {
 	MetaState *MetaState
-	EpochInfo *EpochInfo
+	Epoch     uint64
 }
 
+// MetaState is the basic info for block.
 type MetaState struct {
 	Height uint64
 	Digest string
 }
 
+// EpochInfo is the information for epoch, including the epoch number, last configuration block height, and validator set.
 type EpochInfo struct {
 	Epoch      uint64
 	VSet       []*protos.NodeInfo
@@ -45,10 +48,7 @@ func (state *ServiceState) String() string {
 		s += fmt.Sprintf("height: %d, digest: %s\n", state.MetaState.Height,
 			state.MetaState.Digest)
 	}
-	if state.EpochInfo != nil {
-		s += fmt.Sprintf("epoch: %d, last config: %d", state.EpochInfo.Epoch,
-			state.EpochInfo.LastConfig)
-	}
+	s += fmt.Sprintf("epoch: %d", state.Epoch)
 	if s == "" {
 		return "NIL ServiceState"
 	}
@@ -57,52 +57,74 @@ func (state *ServiceState) String() string {
 
 // ----------- Reload related structs-----------------
 
+// ReloadType indicates different reload event types.
 type ReloadType int32
 
 const (
-	ReloadType_FinishReloadRouter   ReloadType = 0
-	ReloadType_FinishReloadCommitDB ReloadType = 1
+	// ReloadTypeFinishReloadRouter indicates the reload event of execution finished.
+	ReloadTypeFinishReloadRouter ReloadType = 0
+
+	// ReloadTypeFinishReloadCommitDB indicates the reload event of commit-db finished.
+	ReloadTypeFinishReloadCommitDB ReloadType = 1
 )
 
+// ReloadMessage is the event message after reload process finished.
 type ReloadMessage struct {
 	Type   ReloadType
 	Height uint64
 	Router *Router
 }
 
+// ReloadFinished is the reload finished event.
 type ReloadFinished struct {
 	Height uint64
 }
 
 // ----------- Router related structs-----------------
 
+// Router is the router info.
 type Router struct {
 	Peers []*Peer
 }
 
+// Peer is the peer info.
 type Peer struct {
-	Id       uint64
+	ID       uint64
 	Hostname string
 	Hash     string
 }
 
+// ConfChange is the config change event.
 type ConfChange struct {
 	Router *Router
 }
 
+// ConfState is the config state structure.
 type ConfState struct {
 	QuorumRouter *Router
 }
 
 // ----------- Filter system related structs-----------------
 
+// InformType indicates different event types.
 type InformType int32
 
 const (
-	InformType_FilterFinishRecovery     InformType = 0
-	InformType_FilterFinishViewChange   InformType = 1
-	InformType_FilterFinishConfigChange InformType = 2
-	InformType_FilterFinishStateUpdate  InformType = 3
-	InformType_FilterPoolFull           InformType = 4
-	InformType_FilterStableCheckpoint   InformType = 5
+	// InformTypeFilterFinishRecovery indicates recovery finished event.
+	InformTypeFilterFinishRecovery InformType = 0
+
+	// InformTypeFilterFinishViewChange indicates vc finished event.
+	InformTypeFilterFinishViewChange InformType = 1
+
+	// InformTypeFilterFinishConfigChange indicates config change finished event.
+	InformTypeFilterFinishConfigChange InformType = 2
+
+	// InformTypeFilterFinishStateUpdate indicates state update finished event.
+	InformTypeFilterFinishStateUpdate InformType = 3
+
+	// InformTypeFilterPoolFull indicates pool full event.
+	InformTypeFilterPoolFull InformType = 4
+
+	// InformTypeFilterStableCheckpoint indicates stable checkpoint event.
+	InformTypeFilterStableCheckpoint InformType = 5
 )

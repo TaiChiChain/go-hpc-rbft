@@ -44,11 +44,10 @@ func newEpochManager(c Config) *epochManager {
 		return em
 	}
 
-	// for nodes already in cluster:
 	// if the height of block is equal to the latest config batch,
 	// we are not sure if such a config batch has been checked for stable yet or not,
 	// so that, update the config-batch-to-check to trigger a stable point check
-	if c.IsNew == false && c.LatestConfig.Height == c.Applied {
+	if c.LatestConfig.Height == c.Applied {
 		em.logger.Noticef("Latest config batch height %d equal to last exec, which may be non-stable",
 			c.LatestConfig.Height)
 		em.configBatchToCheck = c.LatestConfig
@@ -144,11 +143,6 @@ func (rbft *rbftImpl) recvFetchCheckpoint(fetch *pb.FetchCheckpoint) consensusEv
 
 // checkIfOutOfEpoch track all the messages from nodes in lager epoch than self
 func (rbft *rbftImpl) checkIfOutOfEpoch(msg *pb.ConsensusMessage) consensusEvent {
-	// new node needn't check if it is out of epoch, for that it jumped into sync at the moment started
-	if rbft.in(isNewNode) {
-		return nil
-	}
-
 	// as current node has already executed the block no less than epoch number and it is possible that
 	// current node will finish the epoch change later, so that we needn't to check epoch here
 	if rbft.exec.lastExec >= msg.Epoch {
@@ -166,9 +160,9 @@ func (rbft *rbftImpl) checkIfOutOfEpoch(msg *pb.ConsensusMessage) consensusEvent
 	return nil
 }
 
-func (rbft *rbftImpl) turnIntoEpoch(router *types.Router, epoch uint64) {
+func (rbft *rbftImpl) turnIntoEpoch() {
 	// validator set has been changed, start a new epoch and check new epoch
-	rbft.peerPool.updateRouter(router)
+	epoch := rbft.external.Reconfiguration()
 
 	// set the latest epoch
 	rbft.setEpoch(epoch)
@@ -195,8 +189,8 @@ func (rbft *rbftImpl) turnIntoEpoch(router *types.Router, epoch uint64) {
 	rbft.metrics.clusterSizeGauge.Set(float64(rbft.N))
 	rbft.metrics.quorumSizeGauge.Set(float64(rbft.commonCaseQuorum()))
 
-	rbft.logger.Debugf("======== Replica %d turn into a new epoch, epoch=%d/view=%d/height=%d.",
-		rbft.peerPool.ID, rbft.epoch, rbft.view, rbft.exec.lastExec)
+	rbft.logger.Debugf("======== Replica %d turn into a new epoch, epoch=%d/N=%d/view=%d/height=%d.",
+		rbft.peerPool.ID, rbft.epoch, rbft.N, rbft.view, rbft.exec.lastExec)
 	rbft.logger.Notice(`
 
   +==============================================+
@@ -206,12 +200,6 @@ func (rbft *rbftImpl) turnIntoEpoch(router *types.Router, epoch uint64) {
   +==============================================+
 
 `)
-
-	// close the new node target
-	if rbft.in(isNewNode) {
-		rbft.logger.Infof("Replica %d has found a stable epoch info, close the new-node target", rbft.peerPool.ID)
-		rbft.off(isNewNode)
-	}
 
 	// reset reload router cache
 	rbft.node.setReloadRouter(nil)

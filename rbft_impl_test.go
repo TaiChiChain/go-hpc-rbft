@@ -31,7 +31,6 @@ func TestRBFT_newRBFT(t *testing.T) {
 	conf := Config{
 		ID:                      1,
 		Hash:                    calHash("node1"),
-		IsNew:                   false,
 		Peers:                   peerSet,
 		K:                       10,
 		LogMultiplier:           4,
@@ -77,10 +76,8 @@ func TestRBFT_newRBFT(t *testing.T) {
 	// Is a New Node
 	conf.Peers = peerSet
 	conf.ID = 4
-	conf.IsNew = true
 	rbft, _ = newRBFT(cpChan, confC, conf)
-	assert.Equal(t, 3, rbft.N)
-	assert.Equal(t, true, rbft.in(isNewNode))
+	assert.Equal(t, 4, rbft.N)
 }
 
 //============================================
@@ -370,7 +367,7 @@ func TestRBFT_postConfState_NormalCase(t *testing.T) {
 	defer ctrl.Finish()
 
 	_, rbfts := newBasicClusterInstance()
-	vSetNode5 := append(defaultValidatorSet, &protos.NodeInfo{Hostname: "node5", PubKey: "pub-5"})
+	vSetNode5 := append(defaultValidatorSet, &protos.NodeInfo{Hostname: "node5", PubKey: []byte("pub-5")})
 	r := vSetToRouters(vSetNode5)
 	cc := &types.ConfState{
 		QuorumRouter: &r,
@@ -385,10 +382,10 @@ func TestRBFT_postConfState_NotExitInRouter(t *testing.T) {
 
 	_, rbfts := newBasicClusterInstance()
 	newVSet := []*protos.NodeInfo{
-		{Hostname: "node2", PubKey: "pub-2"},
-		{Hostname: "node3", PubKey: "pub-3"},
-		{Hostname: "node4", PubKey: "pub-4"},
-		{Hostname: "node5", PubKey: "pub-5"},
+		{Hostname: "node2", PubKey: []byte("pub-2")},
+		{Hostname: "node3", PubKey: []byte("pub-3")},
+		{Hostname: "node4", PubKey: []byte("pub-4")},
+		{Hostname: "node5", PubKey: []byte("pub-5")},
 	}
 	r := vSetToRouters(newVSet)
 	cc := &types.ConfState{
@@ -580,44 +577,4 @@ func TestRBFT_recvFetchMissingTxs(t *testing.T) {
 	rbfts[1].setView(uint64(2))
 	ret = rbfts[1].recvSendMissingTxs(re)
 	assert.Nil(t, ret)
-}
-
-func TestRBFT_recvStateUpdatedEvent_updateEpoch(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	_, rbfts := newBasicClusterInstance()
-
-	metaS := &types.MetaState{
-		Height: uint64(10),
-		Digest: "block-number-10",
-	}
-
-	addNode5 := append(defaultValidatorSet, &protos.NodeInfo{Hostname: "node5", PubKey: "pub-5"})
-	epochInfo := &types.EpochInfo{
-		Epoch: uint64(3),
-		VSet:  addNode5,
-	}
-
-	ss := &types.ServiceState{
-		MetaState: metaS,
-		EpochInfo: epochInfo,
-	}
-
-	rbfts[0].storeMgr.highStateTarget = &stateUpdateTarget{
-		metaState: metaS,
-		checkpointSet: []*pb.SignedCheckpoint{
-			{NodeInfo: &pb.NodeInfo{ReplicaId: 1, ReplicaHash: "hash-1"},
-				Checkpoint: &protos.Checkpoint{Height: uint64(10), Digest: "block-number-10"},
-				Signature:  []byte("sig-1")},
-			{NodeInfo: &pb.NodeInfo{ReplicaId: 2, ReplicaHash: "hash-2"},
-				Checkpoint: &protos.Checkpoint{Height: uint64(10), Digest: "block-number-10"},
-				Signature:  []byte("sig-2")},
-			{NodeInfo: &pb.NodeInfo{ReplicaId: 3, ReplicaHash: "hash-3"},
-				Checkpoint: &protos.Checkpoint{Height: uint64(10), Digest: "block-number-10"},
-				Signature:  []byte("sig-3")},
-		},
-	}
-	rbfts[0].recvStateUpdatedEvent(ss)
-	assert.Equal(t, 5, len(rbfts[0].peerPool.routerMap.HashMap))
 }

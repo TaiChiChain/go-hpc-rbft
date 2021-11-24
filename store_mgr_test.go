@@ -21,7 +21,6 @@ func newStorageTestNode(ctrl *gomock.Controller) (*storeManager, Config) {
 	conf := Config{
 		ID:                      2,
 		Hash:                    "hash-node2",
-		IsNew:                   false,
 		Peers:                   peerSet,
 		K:                       10,
 		LogMultiplier:           4,

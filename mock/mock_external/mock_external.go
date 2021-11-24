@@ -223,17 +223,17 @@ func (mr *MockCryptoMockRecorder) Sign(msg interface{}) *gomock.Call {
 }
 
 // Verify mocks base method
-func (m *MockCrypto) Verify(peerID uint64, signature, msg []byte) error {
+func (m *MockCrypto) Verify(peerHash string, signature, msg []byte) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Verify", peerID, signature, msg)
+	ret := m.ctrl.Call(m, "Verify", peerHash, signature, msg)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Verify indicates an expected call of Verify
-func (mr *MockCryptoMockRecorder) Verify(peerID, signature, msg interface{}) *gomock.Call {
+func (mr *MockCryptoMockRecorder) Verify(peerHash, signature, msg interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Verify", reflect.TypeOf((*MockCrypto)(nil).Verify), peerID, signature, msg)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Verify", reflect.TypeOf((*MockCrypto)(nil).Verify), peerHash, signature, msg)
 }
 
 // MockServiceOutbound is a mock of ServiceOutbound interface
@@ -298,6 +298,57 @@ func (mr *MockServiceOutboundMockRecorder) SendFilterEvent(informType interface{
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{informType}, message...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendFilterEvent", reflect.TypeOf((*MockServiceOutbound)(nil).SendFilterEvent), varargs...)
+}
+
+// MockEpochService is a mock of EpochService interface
+type MockEpochService struct {
+	ctrl     *gomock.Controller
+	recorder *MockEpochServiceMockRecorder
+}
+
+// MockEpochServiceMockRecorder is the mock recorder for MockEpochService
+type MockEpochServiceMockRecorder struct {
+	mock *MockEpochService
+}
+
+// NewMockEpochService creates a new mock instance
+func NewMockEpochService(ctrl *gomock.Controller) *MockEpochService {
+	mock := &MockEpochService{ctrl: ctrl}
+	mock.recorder = &MockEpochServiceMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use
+func (m *MockEpochService) EXPECT() *MockEpochServiceMockRecorder {
+	return m.recorder
+}
+
+// Reconfiguration mocks base method
+func (m *MockEpochService) Reconfiguration() uint64 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Reconfiguration")
+	ret0, _ := ret[0].(uint64)
+	return ret0
+}
+
+// Reconfiguration indicates an expected call of Reconfiguration
+func (mr *MockEpochServiceMockRecorder) Reconfiguration() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Reconfiguration", reflect.TypeOf((*MockEpochService)(nil).Reconfiguration))
+}
+
+// GetNodeInfos mocks base method
+func (m *MockEpochService) GetNodeInfos() []*protos.NodeInfo {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNodeInfos")
+	ret0, _ := ret[0].([]*protos.NodeInfo)
+	return ret0
+}
+
+// GetNodeInfos indicates an expected call of GetNodeInfos
+func (mr *MockEpochServiceMockRecorder) GetNodeInfos() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNodeInfos", reflect.TypeOf((*MockEpochService)(nil).GetNodeInfos))
 }
 
 // MockExternalStack is a mock of ExternalStack interface
@@ -465,17 +516,17 @@ func (mr *MockExternalStackMockRecorder) Sign(msg interface{}) *gomock.Call {
 }
 
 // Verify mocks base method
-func (m *MockExternalStack) Verify(peerID uint64, signature, msg []byte) error {
+func (m *MockExternalStack) Verify(peerHash string, signature, msg []byte) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Verify", peerID, signature, msg)
+	ret := m.ctrl.Call(m, "Verify", peerHash, signature, msg)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Verify indicates an expected call of Verify
-func (mr *MockExternalStackMockRecorder) Verify(peerID, signature, msg interface{}) *gomock.Call {
+func (mr *MockExternalStackMockRecorder) Verify(peerHash, signature, msg interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Verify", reflect.TypeOf((*MockExternalStack)(nil).Verify), peerID, signature, msg)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Verify", reflect.TypeOf((*MockExternalStack)(nil).Verify), peerHash, signature, msg)
 }
 
 // Execute mocks base method
@@ -517,4 +568,32 @@ func (mr *MockExternalStackMockRecorder) SendFilterEvent(informType interface{},
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{informType}, message...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendFilterEvent", reflect.TypeOf((*MockExternalStack)(nil).SendFilterEvent), varargs...)
+}
+
+// Reconfiguration mocks base method
+func (m *MockExternalStack) Reconfiguration() uint64 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Reconfiguration")
+	ret0, _ := ret[0].(uint64)
+	return ret0
+}
+
+// Reconfiguration indicates an expected call of Reconfiguration
+func (mr *MockExternalStackMockRecorder) Reconfiguration() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Reconfiguration", reflect.TypeOf((*MockExternalStack)(nil).Reconfiguration))
+}
+
+// GetNodeInfos mocks base method
+func (m *MockExternalStack) GetNodeInfos() []*protos.NodeInfo {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNodeInfos")
+	ret0, _ := ret[0].([]*protos.NodeInfo)
+	return ret0
+}
+
+// GetNodeInfos indicates an expected call of GetNodeInfos
+func (mr *MockExternalStackMockRecorder) GetNodeInfos() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNodeInfos", reflect.TypeOf((*MockExternalStack)(nil).GetNodeInfos))
 }

@@ -19,28 +19,28 @@ import (
 
 var (
 	defaultValidatorSet = []*protos.NodeInfo{
-		{Hostname: "node1", PubKey: "pub-1"},
-		{Hostname: "node2", PubKey: "pub-2"},
-		{Hostname: "node3", PubKey: "pub-3"},
-		{Hostname: "node4", PubKey: "pub-4"},
+		{Hostname: "node1", PubKey: []byte("pub-1")},
+		{Hostname: "node2", PubKey: []byte("pub-2")},
+		{Hostname: "node3", PubKey: []byte("pub-3")},
+		{Hostname: "node4", PubKey: []byte("pub-4")},
 	}
 )
 
 var peerSet = []*types.Peer{
 	{
-		Id:   uint64(1),
+		ID:   uint64(1),
 		Hash: calHash("node1"),
 	},
 	{
-		Id:   uint64(2),
+		ID:   uint64(2),
 		Hash: calHash("node2"),
 	},
 	{
-		Id:   uint64(3),
+		ID:   uint64(3),
 		Hash: calHash("node3"),
 	},
 	{
-		Id:   uint64(4),
+		ID:   uint64(4),
 		Hash: calHash("node4"),
 	},
 }
@@ -171,7 +171,7 @@ func newTestFramework(account int, loggerFile bool) *testFramework {
 		id := uint64(i + 1)
 		hostname := "node" + strconv.Itoa(i+1)
 		peer := &types.Peer{
-			Id:       id,
+			ID:       id,
 			Hash:     calHash(hostname),
 			Hostname: hostname,
 		}
@@ -195,7 +195,7 @@ func newTestFramework(account int, loggerFile bool) *testFramework {
 
 	tf.log.Debugf("routers:")
 	for _, peer := range tf.Router.Peers {
-		tf.log.Debugf("ID: %d, hostname: %s, hash: %s", peer.Id, peer.Hostname, peer.Hash)
+		tf.log.Debugf("ID: %d, hostname: %s, hash: %s", peer.ID, peer.Hostname, peer.Hash)
 	}
 
 	// set node number
@@ -203,7 +203,7 @@ func newTestFramework(account int, loggerFile bool) *testFramework {
 
 	// Init testNode in TestFramework
 	for i := range tf.Router.Peers {
-		tn := tf.newTestNode(tf.Router.Peers[i].Id, tf.Router.Peers[i].Hostname, cc, loggerFile)
+		tn := tf.newTestNode(tf.Router.Peers[i].ID, tf.Router.Peers[i].Hostname, cc, loggerFile)
 		tf.TestNode = append(tf.TestNode, tn)
 	}
 
@@ -228,7 +228,7 @@ func (tf *testFramework) newNodeConfig(
 	var peers []*types.Peer
 	for index, info := range epochInfo.VSet {
 		peer := &types.Peer{
-			Id:       uint64(index + 1),
+			ID:       uint64(index + 1),
 			Hostname: info.Hostname,
 			Hash:     calHash(info.Hostname),
 		}
@@ -239,7 +239,6 @@ func (tf *testFramework) newNodeConfig(
 		ID:       id,
 		Hash:     calHash(hostname),
 		Hostname: hostname,
-		IsNew:    isNew,
 
 		EpochInit:    epochInfo.Epoch,
 		Peers:        peers,
@@ -482,10 +481,10 @@ func (tf *testFramework) frameworkDelNode(hostname string) {
 		for _, node := range senderRouter.Peers {
 			if node.Hostname != hostname {
 				index++
-				node.Id = index
+				node.ID = index
 				delRouter.Peers = append(delRouter.Peers, node)
 			} else {
-				delPeer.Id = node.Id
+				delPeer.ID = node.ID
 			}
 		}
 
@@ -556,7 +555,7 @@ func (tf *testFramework) frameworkAddNode(hostname string, loggerFile bool, vSet
 	// new peer
 	hash := calHash(hostname)
 	newPeer := &types.Peer{
-		Id:       id,
+		ID:       id,
 		Hash:     hash,
 		Hostname: hostname,
 	}
@@ -759,7 +758,7 @@ func (ext *testExternal) Unicast(msg *pb.ConsensusMessage, to uint64) error {
 	}
 
 	for _, peer := range ext.testNode.Router.Peers {
-		if peer.Id == to {
+		if peer.ID == to {
 			cm.to = peer.Hash
 			break
 		}
@@ -788,7 +787,7 @@ func (ext *testExternal) UpdateTable(update *types.ConfChange) {
 	var newPeers []*types.Peer
 	for _, peer := range router.Peers {
 		newPeer := &types.Peer{
-			Id:       peer.Id,
+			ID:       peer.ID,
 			Hostname: peer.Hostname,
 			Hash:     calHash(peer.Hostname),
 		}
@@ -805,7 +804,7 @@ func (ext *testExternal) UpdateTable(update *types.ConfChange) {
 func (ext *testExternal) Sign(msg []byte) ([]byte, error) {
 	return nil, nil
 }
-func (ext *testExternal) Verify(peerID uint64, signature []byte, msg []byte) error {
+func (ext *testExternal) Verify(peerHash string, signature []byte, msg []byte) error {
 	return nil
 }
 
@@ -838,7 +837,7 @@ func (ext *testExternal) Execute(requests []*protos.Transaction, localList []boo
 				var peers []*types.Peer
 				for index, nodeInfo := range info.VSet {
 					peer := &types.Peer{
-						Id:       uint64(index + 1),
+						ID:       uint64(index + 1),
 						Hostname: nodeInfo.Hostname,
 					}
 					peers = append(peers, peer)
@@ -854,7 +853,7 @@ func (ext *testExternal) Execute(requests []*protos.Transaction, localList []boo
 				ext.testNode.n.logger.Debugf("Validator Set %+v", router)
 				ext.tf.log.Infof("router: %+v", router)
 				re := &types.ReloadMessage{
-					Type:   types.ReloadType_FinishReloadRouter,
+					Type:   types.ReloadTypeFinishReloadRouter,
 					Router: router,
 				}
 				ext.testNode.N.ReportReloadFinished(re)
@@ -890,12 +889,11 @@ func (ext *testExternal) StateUpdate(seqNo uint64, digest string) {
 			}
 		}
 	}
+	ext.testNode.VSet = ext.tf.TestNode[0].VSet
+	ext.testNode.Epoch = ext.tf.TestNode[0].Epoch
 
 	state := &types.ServiceState{}
-	state.EpochInfo = &types.EpochInfo{
-		Epoch: ext.tf.TestNode[0].Epoch,
-		VSet:  ext.tf.TestNode[0].VSet,
-	}
+	state.Epoch = ext.tf.TestNode[0].Epoch
 	state.MetaState = &types.MetaState{
 		Height: ext.testNode.Applied,
 		Digest: ext.testNode.Digest,
@@ -912,12 +910,34 @@ func (ext *testExternal) SendFilterEvent(informType types.InformType, message ..
 		height := signedCheckpoints[0].Checkpoint.Height
 
 		switch informType {
-		case types.InformType_FilterStableCheckpoint:
+		case types.InformTypeFilterStableCheckpoint:
 			re := &types.ReloadMessage{
-				Type:   types.ReloadType_FinishReloadCommitDB,
+				Type:   types.ReloadTypeFinishReloadCommitDB,
 				Height: height,
 			}
 			go ext.testNode.N.ReportReloadFinished(re)
 		}
 	}
+}
+
+func (ext *testExternal) Reconfiguration() uint64 {
+	var newPeers []*types.Peer
+	for index, peer := range ext.testNode.VSet {
+		newPeer := &types.Peer{
+			ID:       uint64(index + 1),
+			Hostname: peer.Hostname,
+			Hash:     calHash(peer.Hostname),
+		}
+		newPeers = append(newPeers, newPeer)
+	}
+	newRouter := &types.Router{Peers: newPeers}
+	ext.testNode.Router = getRouter(newRouter)
+	ext.tf.log.Noticef("[Cluster_Service %s update] router: %+v", ext.testNode.Hostname, newRouter)
+	cc := &types.ConfState{QuorumRouter: newRouter}
+	ext.testNode.N.ApplyConfChange(cc)
+	return ext.testNode.Epoch
+}
+
+func (ext *testExternal) GetNodeInfos() []*protos.NodeInfo {
+	return ext.testNode.VSet
 }

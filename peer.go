@@ -59,15 +59,15 @@ func (pool *peerPool) initPeers(peers []*types.Peer) {
 	preID := pool.ID
 	pool.routerMap.HashMap = make(map[string]uint64)
 	for _, p := range peers {
-		if p.Id > uint64(length) {
-			pool.logger.Errorf("Something wrong with peer[id=%d], peer id cannot be larger than peers' amount %d", p.Id, length)
+		if p.ID > uint64(length) {
+			pool.logger.Errorf("Something wrong with peer[id=%d], peer id cannot be larger than peers' amount %d", p.ID, length)
 			return
 		}
 		if p.Hash == pool.hash {
-			pool.ID = p.Id
+			pool.ID = p.ID
 		}
-		pool.logger.Infof("ID: %d, Hash: %s", p.Id, p.Hash)
-		pool.routerMap.HashMap[p.Hash] = p.Id
+		pool.logger.Infof("ID: %d, Hash: %s", p.ID, p.Hash)
+		pool.routerMap.HashMap[p.Hash] = p.ID
 	}
 	if preID != pool.ID {
 		pool.logger.Infof("Update Local ID: %d ===> %d", preID, pool.ID)

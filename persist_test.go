@@ -22,7 +22,6 @@ func newPersistTestReplica(ctrl *gomock.Controller, pool txpool.TxPool, log Logg
 	conf := Config{
 		ID:                      2,
 		Hash:                    calHash("node2"),
-		IsNew:                   false,
 		Peers:                   peerSet,
 		K:                       10,
 		LogMultiplier:           4,

@@ -31,5 +31,8 @@ func NewMockMinimalExternal(ctrl *gomock.Controller) *MockExternalStack {
 	mock.EXPECT().StateUpdate(gomock.Any(), gomock.Any()).Return().AnyTimes()
 	mock.EXPECT().SendFilterEvent(gomock.Any(), gomock.Any()).Return().AnyTimes()
 
+	mock.EXPECT().Reconfiguration().Return(uint64(0)).AnyTimes()
+	mock.EXPECT().GetNodeInfos().Return(nil).AnyTimes()
+
 	return mock
 }

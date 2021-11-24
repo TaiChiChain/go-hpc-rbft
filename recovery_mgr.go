@@ -195,11 +195,6 @@ func (rbft *rbftImpl) sendNotification(keepCurrentVote bool) consensusEvent {
 	// use recoveryRestartTimer to track resend of notification.
 	rbft.timerMgr.startTimer(recoveryRestartTimer, event)
 
-	if rbft.in(isNewNode) {
-		rbft.logger.Debugf("New node %d doesn't send notification to itself", rbft.peerPool.ID)
-		return nil
-	}
-
 	return rbft.recvNotification(n)
 }
 
@@ -212,13 +207,6 @@ func (rbft *rbftImpl) recvNotification(n *pb.Notification) consensusEvent {
 
 	rbft.logger.Debugf("Replica %d received notification from replica %d, e:%d, v:%d, h:%d, |C|:%d, |P|:%d, |Q|:%d",
 		rbft.peerPool.ID, n.NodeInfo.ReplicaId, n.Epoch, n.Basis.View, n.Basis.H, len(n.Basis.Cset), len(n.Basis.Pset), len(n.Basis.Qset))
-
-	// new node cannot process notification as new node is not in a consistent
-	// view/N with other nodes.
-	if rbft.in(isNewNode) && n.Epoch == 0 {
-		rbft.logger.Debugf("New node %d ignore notification in epoch 0", rbft.peerPool.ID)
-		return nil
-	}
 
 	if !rbft.inRouters(n.NodeInfo.ReplicaHash) {
 		return nil
@@ -733,11 +721,6 @@ func (rbft *rbftImpl) initSyncState() consensusEvent {
 func (rbft *rbftImpl) recvSyncState(sync *pb.SyncState) consensusEvent {
 	rbft.logger.Debugf("Replica %d received sync state from replica %d", rbft.peerPool.ID, sync.NodeInfo.ReplicaId)
 
-	if rbft.in(isNewNode) {
-		rbft.logger.Debugf("Replica %d is in a new node, don't send sync state response", rbft.peerPool.ID)
-		return nil
-	}
-
 	if !rbft.inRouters(sync.NodeInfo.ReplicaHash) {
 		return nil
 	}
@@ -821,7 +804,8 @@ func (rbft *rbftImpl) recvSyncStateRsp(rsp *pb.SyncStateResponse, local bool) co
 	if !local {
 		vErr := rbft.verifySignedCheckpoint(rsp.SignedCheckpoint)
 		if vErr != nil {
-			rbft.logger.Errorf("Replica %d verify signature of checkpoint error: %s", rbft.peerPool.ID, vErr)
+			rbft.logger.Errorf("Replica %d verify signature of checkpoint from %d error: %s",
+				rbft.peerPool.ID, rsp.SignedCheckpoint.NodeInfo.ReplicaId, vErr)
 			return nil
 		}
 	}

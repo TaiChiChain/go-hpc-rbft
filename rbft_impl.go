@@ -55,7 +55,6 @@ type Config struct {
 	// It's application's responsibility to ensure a consistent peer list among cluster.
 	Peers []*types.Peer
 
-	// IsNew indicates if current node is a new joint node or not.
 	IsNew bool
 
 	// Applied is the latest height index of application service which should be assigned when node restart.
@@ -221,12 +220,6 @@ func newRBFT(cpChan chan *types.ServiceState, confC chan *types.ReloadFinished, 
 	}
 
 	N := len(c.Peers)
-	// new node turn on isNewNode flag to start add node process after recovery.
-	if c.IsNew {
-		// new node excludes itself when start node until finish entering the cluster.
-		N--
-	}
-
 	rbft.N = N
 	rbft.f = (rbft.N - 1) / 3
 	rbft.K = c.K
@@ -235,19 +228,6 @@ func newRBFT(cpChan chan *types.ServiceState, confC chan *types.ReloadFinished, 
 
 	if c.Peers == nil {
 		return nil, fmt.Errorf("nil peers")
-	}
-
-	// genesis node must have itself included in router.
-	if !c.IsNew {
-		found := false
-		for _, p := range c.Peers {
-			if p.Hash == c.Hash {
-				found = true
-			}
-		}
-		if !found {
-			return nil, fmt.Errorf("peers: %+v doesn't contain self Hash: %s", c.Peers, c.Hash)
-		}
 	}
 
 	// new metrics instance
@@ -265,11 +245,6 @@ func newRBFT(cpChan chan *types.ServiceState, confC chan *types.ReloadFinished, 
 	// new status manager
 	rbft.status = newStatusMgr()
 	rbft.initStatus()
-	// new node turn on isNewNode flag to start add node process after recovery.
-	if c.IsNew {
-		rbft.logger.Notice("Replica starts as a new node")
-		rbft.on(isNewNode)
-	}
 
 	// new peer pool
 	rbft.peerPool = newPeerPool(c)
@@ -286,11 +261,7 @@ func newRBFT(cpChan chan *types.ServiceState, confC chan *types.ReloadFinished, 
 			Height: 0,
 			Digest: "XXX GENESIS",
 		},
-		EpochInfo: &types.EpochInfo{
-			Epoch:      0,
-			VSet:       []*protos.NodeInfo{},
-			LastConfig: 0,
-		},
+		Epoch: 0,
 	}
 	mockCheckpoint, gErr := rbft.generateSignedCheckpoint(state)
 	if gErr != nil {
@@ -1648,7 +1619,7 @@ func (rbft *rbftImpl) checkpoint(state *types.ServiceState) {
 	}
 
 	rbft.storeMgr.saveCheckpoint(seqNo, signedCheckpoint)
-	rbft.persistCheckpoint(signedCheckpoint)
+	rbft.persistCheckpoint(seqNo, []byte(digest))
 
 	if rbft.epochMgr.configBatchToCheck != nil {
 		// use fetchCheckpointTimer to fetch the missing checkpoint
@@ -1680,21 +1651,23 @@ func (rbft *rbftImpl) checkpoint(state *types.ServiceState) {
 
 // recvCheckpoint processes logic after receive checkpoint.
 func (rbft *rbftImpl) recvCheckpoint(signedCheckpoint *pb.SignedCheckpoint, local bool) consensusEvent {
+	if signedCheckpoint.Checkpoint.Epoch < rbft.epoch {
+		rbft.logger.Debugf("Replica %d received checkpoint from expired epoch %d, current epoch %d, ignore it.",
+			rbft.peerPool.ID, signedCheckpoint.Checkpoint.Epoch, rbft.epoch)
+		return nil
+	}
+
 	checkpointHeight := signedCheckpoint.Checkpoint.Height
 	checkpointDigest := signedCheckpoint.Checkpoint.Digest
 	rbft.logger.Debugf("Replica %d received checkpoint from replica %d, seqNo %d, digest %s",
 		rbft.peerPool.ID, signedCheckpoint.NodeInfo.ReplicaId, checkpointHeight, checkpointDigest)
 
-	if rbft.in(isNewNode) {
-		rbft.logger.Debug("A new node reject checkpoint messages")
-		return nil
-	}
-
 	// verify signature of remote checkpoint.
 	if !local {
 		vErr := rbft.verifySignedCheckpoint(signedCheckpoint)
 		if vErr != nil {
-			rbft.logger.Errorf("Replica %d verify signature of checkpoint error: %s", rbft.peerPool.ID, vErr)
+			rbft.logger.Errorf("Replica %d verify signature of checkpoint from %d error: %s",
+				rbft.peerPool.ID, signedCheckpoint.NodeInfo.ReplicaId, vErr)
 			return nil
 		}
 	}
@@ -1768,7 +1741,7 @@ func (rbft *rbftImpl) finishConfigCheckpoint(checkpointHeight uint64, checkpoint
 
 	rbft.logger.Infof("Replica %d post stable checkpoint event for seqNo %d after "+
 		"executed to the height with the same digest", rbft.peerPool.ID, checkpointHeight)
-	rbft.external.SendFilterEvent(types.InformType_FilterStableCheckpoint, matchingCheckpoints)
+	rbft.external.SendFilterEvent(types.InformTypeFilterStableCheckpoint, matchingCheckpoints)
 	rbft.epochMgr.configBatchToCheck = nil
 
 	// waiting for commit db finish the reload
@@ -1792,12 +1765,11 @@ func (rbft *rbftImpl) finishConfigCheckpoint(checkpointHeight uint64, checkpoint
 	// two types of config transaction:
 	// 1. validator set changed: try to start a new epoch
 	// 2. validator set not changed: do not start a new epoch
-	routerInfo := rbft.node.readReloadRouter()
-	if routerInfo != nil {
-		rbft.turnIntoEpoch(routerInfo, checkpointHeight)
+	if rbft.atomicIn(InConfChange) {
+		rbft.turnIntoEpoch()
 	}
 
-	// move watermark for config batch
+	// NOTE! move watermark after turnIntoEpoch.
 	rbft.moveWatermarks(checkpointHeight)
 
 	// finish config change and restart consensus
@@ -1808,7 +1780,7 @@ func (rbft *rbftImpl) finishConfigCheckpoint(checkpointHeight uint64, checkpoint
 	finishMsg := fmt.Sprintf("======== Replica %d finished config change, "+
 		"primary=%d, epoch=%d/n=%d/f=%d/view=%d/h=%d/lastExec=%d",
 		rbft.peerPool.ID, rbft.primaryID(rbft.view), rbft.epoch, rbft.N, rbft.f, rbft.view, rbft.h, rbft.exec.lastExec)
-	rbft.external.SendFilterEvent(types.InformType_FilterFinishConfigChange, finishMsg)
+	rbft.external.SendFilterEvent(types.InformTypeFilterFinishConfigChange, finishMsg)
 
 	// set primary sequence log
 	if rbft.isPrimary(rbft.peerPool.ID) {
@@ -1835,7 +1807,7 @@ func (rbft *rbftImpl) finishNormalCheckpoint(checkpointHeight uint64, checkpoint
 	rbft.moveWatermarks(checkpointHeight)
 	rbft.logger.Infof("Replica %d post stable checkpoint event for seqNo %d after "+
 		"executed to the height with the same digest", rbft.peerPool.ID, rbft.h)
-	rbft.external.SendFilterEvent(types.InformType_FilterStableCheckpoint, matchingCheckpoints)
+	rbft.external.SendFilterEvent(types.InformTypeFilterStableCheckpoint, matchingCheckpoints)
 
 	// make sure node is in normal status before try to batch, as we may reach stable
 	// checkpoint in vc/recovery.
@@ -1987,13 +1959,34 @@ func (rbft *rbftImpl) moveWatermarks(n uint64) {
 		}
 	}
 
+	// save local checkpoint to help remote lagging nodes recover.
+	for seqNo, signedCheckpoint := range rbft.storeMgr.localCheckpoints {
+		if seqNo < h {
+			delete(rbft.storeMgr.localCheckpoints, seqNo)
+			rbft.persistDelCheckpoint(seqNo)
+		} else {
+			// NOTE! reset replicaId in case ID has been changed after turn into a higher epoch.
+			signedCheckpoint.NodeInfo.ReplicaId = rbft.peerPool.ID
+		}
+	}
+
+	for idx := range rbft.vcMgr.qlist {
+		if idx.n <= h {
+			delete(rbft.vcMgr.qlist, idx)
+		}
+	}
+
+	for seqNo := range rbft.vcMgr.plist {
+		if seqNo <= h {
+			delete(rbft.vcMgr.plist, seqNo)
+		}
+	}
+
 	for digest, idx := range rbft.storeMgr.missingBatchesInFetching {
 		if idx.n <= h {
 			delete(rbft.storeMgr.missingBatchesInFetching, digest)
 		}
 	}
-
-	rbft.storeMgr.moveWatermarks(rbft, h)
 
 	rbft.hLock.RLock()
 	rbft.h = h
@@ -2136,6 +2129,7 @@ func (rbft *rbftImpl) tryStateTransfer() {
 // self epoch-info and trigger another recovery process
 func (rbft *rbftImpl) recvStateUpdatedEvent(ss *types.ServiceState) consensusEvent {
 	seqNo := ss.MetaState.Height
+	digest := ss.MetaState.Digest
 
 	// high state target nil warning
 	if rbft.storeMgr.highStateTarget == nil {
@@ -2159,7 +2153,7 @@ func (rbft *rbftImpl) recvStateUpdatedEvent(ss *types.ServiceState) consensusEve
 	// 1. finished state update
 	rbft.logger.Noticef("======== Replica %d finished stateUpdate, height: %d", rbft.peerPool.ID, seqNo)
 	finishMsg := fmt.Sprintf("======== Replica %d finished stateUpdate, height: %d", rbft.peerPool.ID, seqNo)
-	rbft.external.SendFilterEvent(types.InformType_FilterFinishStateUpdate, finishMsg)
+	rbft.external.SendFilterEvent(types.InformTypeFilterFinishStateUpdate, finishMsg)
 	rbft.exec.setLastExec(seqNo)
 	rbft.batchMgr.setSeqNo(seqNo)
 	rbft.storeMgr.missingBatchesInFetching = make(map[string]msgID)
@@ -2168,20 +2162,21 @@ func (rbft *rbftImpl) recvStateUpdatedEvent(ss *types.ServiceState) consensusEve
 	rbft.metrics.statusGaugeStateTransferring.Set(0)
 	rbft.maybeSetNormal()
 
-	// 2. process information about stable checkpoint
+	// 2. process epoch-info
+	epochChanged := ss.Epoch != rbft.epoch
+	if epochChanged {
+		rbft.turnIntoEpoch()
+		rbft.logger.Noticef("======== Replica %d updated epoch, epoch=%d.", rbft.peerPool.ID, rbft.epoch)
+	}
+
+	// 3. process information about stable checkpoint
 	rbft.logger.Infof("Replica %d post stable checkpoint event for seqNo %d after state update to the height",
 		rbft.peerPool.ID, seqNo)
 	// we have ensured state updated to current highStateTarget.
 	// TODO(DH): we may have only f+1 checkpoints in checkpointSet, is f+1 weak cert is trustable enough?
 	// if only 2f+1 is strong cert is trustable, we have to fetch checkpoint...
 	checkpointSet := rbft.storeMgr.highStateTarget.checkpointSet
-	if len(checkpointSet) >= rbft.commonCaseQuorum() {
-		rbft.external.SendFilterEvent(types.InformType_FilterStableCheckpoint, checkpointSet)
-	} else {
-		rbft.logger.Errorf("Replica %d needs to fetch checkpoint as we only have weak cert for height %d",
-			rbft.peerPool.ID, seqNo)
-		rbft.fetchCheckpoint()
-	}
+	rbft.external.SendFilterEvent(types.InformTypeFilterStableCheckpoint, checkpointSet)
 	signedCheckpoint, gErr := rbft.generateSignedCheckpoint(ss)
 	if gErr != nil {
 		rbft.logger.Errorf("Replica %d generate signed checkpoint error: %s", rbft.peerPool.ID, gErr)
@@ -2189,30 +2184,13 @@ func (rbft *rbftImpl) recvStateUpdatedEvent(ss *types.ServiceState) consensusEve
 		return nil
 	}
 	rbft.storeMgr.saveCheckpoint(seqNo, signedCheckpoint)
-	rbft.persistCheckpoint(signedCheckpoint)
+	rbft.persistCheckpoint(seqNo, []byte(digest))
+	// NOTE! move watermark after turnIntoEpoch if epochChanged.
 	rbft.moveWatermarks(seqNo)
 
-	// 3. process epoch-info
-	changed := false
-	if ss.EpochInfo != nil {
-		changed = ss.EpochInfo.Epoch != rbft.epoch
-	}
-	if changed {
-		var peers []*types.Peer
-		for index, info := range ss.EpochInfo.VSet {
-			peer := &types.Peer{
-				Id:       uint64(index + 1),
-				Hostname: info.Hostname,
-			}
-			peers = append(peers, peer)
-		}
-		router := &types.Router{
-			Peers: peers,
-		}
-		rbft.turnIntoEpoch(router, ss.EpochInfo.Epoch)
-
-		// trigger another round of recovery to find correct view-number
-		rbft.logger.Noticef("======== Replica %d updated epoch, epoch=%d.", rbft.peerPool.ID, rbft.epoch)
+	// 4. process recovery/vc.
+	if epochChanged {
+		// trigger another round of recovery after epoch change to find correct view-number
 		rbft.timerMgr.stopTimer(recoveryRestartTimer)
 		return rbft.initRecovery()
 	}

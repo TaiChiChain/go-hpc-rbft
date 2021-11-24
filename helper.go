@@ -57,12 +57,6 @@ func (rbft *rbftImpl) primaryID(v uint64) uint64 {
 
 // isPrimary returns if current node is primary or not
 func (rbft *rbftImpl) isPrimary(id uint64) bool {
-	// new node cannot become a primary node, directly return false.
-	if rbft.in(isNewNode) && id == rbft.peerPool.ID {
-		rbft.logger.Debugf("New node cannot become a primary node, no=%d/view=%d/ID=%d",
-			rbft.peerPool.ID, rbft.view, rbft.peerPool.ID)
-		return false
-	}
 	return rbft.primaryID(rbft.view) == id
 }
 
@@ -567,7 +561,7 @@ func (rbft *rbftImpl) compareWholeStates(states wholeStates) consensusEvent {
 
 			rbft.logger.Infof("======== Replica %d finished sync state for height: %d, current epoch: %d, current view %d",
 				rbft.peerPool.ID, state.MetaState.Height, rbft.epoch, rbft.view)
-			rbft.external.SendFilterEvent(types.InformType_FilterStableCheckpoint, sameRespRecord[quorumResp])
+			rbft.external.SendFilterEvent(types.InformTypeFilterStableCheckpoint, sameRespRecord[quorumResp])
 			return nil
 		}
 
@@ -795,7 +789,7 @@ func (rbft *rbftImpl) checkIfNeedStateUpdate(meta *types.MetaState, checkpointSe
 		// this stable checkpoint normally.
 		if rbft.storeMgr.localCheckpoints[seq].Checkpoint.Digest == dig {
 			rbft.moveWatermarks(seq)
-			rbft.external.SendFilterEvent(types.InformType_FilterStableCheckpoint, checkpointSet)
+			rbft.external.SendFilterEvent(types.InformTypeFilterStableCheckpoint, checkpointSet)
 		}
 
 		if rbft.epochMgr.configBatchToCheck != nil {
@@ -914,16 +908,14 @@ func (rbft *rbftImpl) generateSignedCheckpoint(state *types.ServiceState) (*pb.S
 	}
 
 	checkpoint := &protos.Checkpoint{
-		// TODO(DH): use current epoch or next epoch?
 		Epoch:   rbft.epoch,
 		Height:  state.MetaState.Height,
 		Digest:  state.MetaState.Digest,
 		NextSet: nil,
 	}
-	if state.EpochInfo != nil && state.EpochInfo.Epoch > rbft.epoch {
-		rbft.logger.Noticef("Replica %d generate a checkpoint with new validator set: %+v",
-			rbft.peerPool.ID, state.EpochInfo.VSet)
-		checkpoint.NextSet = state.EpochInfo.VSet
+	if state.Epoch > rbft.epoch {
+		checkpoint.NextSet = rbft.external.GetNodeInfos()
+		rbft.logger.Noticef("Replica %d generate a checkpoint with new validator set: %+v", rbft.peerPool.ID, checkpoint.NextSet)
 	}
 	signedCheckpoint.Checkpoint = checkpoint
 
@@ -951,5 +943,5 @@ func (rbft *rbftImpl) signCheckpoint(checkpoint *protos.Checkpoint) ([]byte, err
 // verifySignedCheckpoint returns whether given signedCheckpoint contains a valid signature.
 func (rbft *rbftImpl) verifySignedCheckpoint(signedCheckpoint *pb.SignedCheckpoint) error {
 	msg := signedCheckpoint.Checkpoint.Hash()
-	return rbft.external.Verify(signedCheckpoint.NodeInfo.ReplicaId, signedCheckpoint.Signature, msg)
+	return rbft.external.Verify(signedCheckpoint.NodeInfo.ReplicaHash, signedCheckpoint.Signature, msg)
 }

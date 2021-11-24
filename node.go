@@ -228,10 +228,10 @@ func (n *node) ReportStateUpdated(state *types.ServiceState) {
 // ReportReloadFinished report router updated
 func (n *node) ReportReloadFinished(reload *types.ReloadMessage) {
 	switch reload.Type {
-	case types.ReloadType_FinishReloadRouter:
+	case types.ReloadTypeFinishReloadRouter:
 		n.logger.Noticef("Consensus-Reload finished, recv router: %+v", reload.Router)
 		n.setReloadRouter(reload.Router)
-	case types.ReloadType_FinishReloadCommitDB:
+	case types.ReloadTypeFinishReloadCommitDB:
 		n.logger.Noticef("Commit-DB finished, recv height: %d", reload.Height)
 		if n.rbft.atomicIn(InConfChange) && n.confChan != nil {
 			rf := &types.ReloadFinished{Height: reload.Height}

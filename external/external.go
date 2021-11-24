@@ -52,8 +52,8 @@ type Network interface {
 type Crypto interface {
 	// Sign signs messages, returns error if any.
 	Sign(msg []byte) ([]byte, error)
-	// Verify verifies signature signed with msg from given peerID, return nil if verify successfully
-	Verify(peerID uint64, signature []byte, msg []byte) error
+	// Verify verifies signature signed with msg from given peerHash, return nil if verify successfully
+	Verify(peerHash string, signature []byte, msg []byte) error
 }
 
 // ServiceOutbound is the application service invoked by RBFT library which includes two core events:
@@ -76,10 +76,20 @@ type ServiceOutbound interface {
 	SendFilterEvent(informType types.InformType, message ...interface{})
 }
 
+// EpochService provides service for epoch management.
+type EpochService interface {
+	// Reconfiguration is used to update router info of consensus, return updated epoch number.
+	Reconfiguration() uint64
+
+	// GetNodeInfos returns the full node info with public key.
+	GetNodeInfos() []*protos.NodeInfo
+}
+
 // ExternalStack integrates all external interfaces which must be implemented by application users.
 type ExternalStack interface {
 	Storage
 	Network
 	Crypto
 	ServiceOutbound
+	EpochService
 }
