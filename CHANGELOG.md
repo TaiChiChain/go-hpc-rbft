@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.2.36-1"></a>
+## [0.2.36-1](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.36...v0.2.36-1) (2021-12-02)
+
+
+### Bug Fixes
+
+* stop namespace when find self not in router ([07f9014](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/07f9014))
+
+
+
 <a name="0.2.36"></a>
 ## [0.2.36](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.35...v0.2.36) (2021-10-26)
 
