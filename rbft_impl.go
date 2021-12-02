@@ -483,6 +483,7 @@ func (rbft *rbftImpl) postConfState(cc *pb.ConfState) {
 		rbft.logger.Criticalf("%s cannot find self id in quorum routers: %+v", rbft.peerPool.hash, cc.QuorumRouter.Peers)
 		rbft.atomicOn(Pending)
 		rbft.metrics.statusGaugePending.Set(Pending)
+		rbft.stopNamespace()
 		return
 	}
 	rbft.peerPool.initPeers(cc.QuorumRouter.Peers)
