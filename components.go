@@ -153,39 +153,22 @@ type chkptID struct {
 	sequence uint64
 }
 
-// =============================================================================
-// helper functions for sort
-// =============================================================================
-type sortableUint64Slice []*pb.MetaState
-
-func (a sortableUint64Slice) Len() int {
-	return len(a)
-}
-func (a sortableUint64Slice) Swap(i, j int) {
-	a[i], a[j] = a[j], a[i]
-}
-func (a sortableUint64Slice) Less(i, j int) bool {
-	return a[i].Applied < a[j].Applied
-}
-
 // -----------router struct-----------------
 type routerMap struct {
-	//IDMap   map[uint64]string
 	HashMap map[string]uint64
 }
 
-// nodeState records every node's consensus status(n, view, routerMap) and
-// ledger status(block number, hash and seqNo)
+// nodeState records every node's consensus status(epoch, view) and
+// ledger status(chain height, digest)
 type nodeState struct {
-	n       uint64
-	epoch   uint64
-	view    uint64
-	applied uint64
-	digest  string
+	view   uint64
+	epoch  uint64
+	height uint64
+	digest string
 }
 
 // wholeStates maps node ID to nodeState
-type wholeStates map[*pb.NodeInfo]nodeState
+type wholeStates map[*pb.SignedCheckpoint]nodeState
 
 // -----------viewchange related structs-----------------
 // viewchange index

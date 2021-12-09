@@ -5,7 +5,7 @@ import (
 
 	"github.com/ultramesh/flato-common/metrics/disabled"
 	mockexternal "github.com/ultramesh/flato-rbft/mock/mock_external"
-	pb "github.com/ultramesh/flato-rbft/rbftpb"
+	"github.com/ultramesh/flato-rbft/types"
 	txpoolmock "github.com/ultramesh/flato-txpool/mock"
 
 	"github.com/golang/mock/gomock"
@@ -20,7 +20,6 @@ func newTestStatusNode(ctrl *gomock.Controller) *rbftImpl {
 	conf := Config{
 		ID:          1,
 		Hash:        calHash("node1"),
-		IsNew:       false,
 		Peers:       peerSet,
 		Logger:      log,
 		External:    external,
@@ -32,8 +31,8 @@ func newTestStatusNode(ctrl *gomock.Controller) *rbftImpl {
 		LatestConfig: nil,
 	}
 
-	cpChan := make(chan *pb.ServiceState)
-	confC := make(chan *pb.ReloadFinished)
+	cpChan := make(chan *types.ServiceState)
+	confC := make(chan *types.ReloadFinished)
 	rbft, _ := newRBFT(cpChan, confC, conf)
 
 	return rbft

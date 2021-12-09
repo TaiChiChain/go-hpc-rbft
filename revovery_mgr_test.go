@@ -5,6 +5,7 @@ import (
 
 	"github.com/ultramesh/flato-common/types/protos"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
+	"github.com/ultramesh/flato-rbft/types"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
@@ -222,8 +223,8 @@ func TestRecovery_NormalCheckpointFailing_Recovery(t *testing.T) {
 
 	msg := <-rbfts[3].recvChan
 	event := msg.(*LocalEvent)
-	ss := event.Event.(*pb.ServiceState)
-	assert.Equal(t, uint64(10), ss.MetaState.Applied)
+	ss := event.Event.(*types.ServiceState)
+	assert.Equal(t, uint64(10), ss.MetaState.Height)
 
 	recoveryDone := rbfts[3].processEvent(event)
 	assert.Equal(t, uint64(10), rbfts[3].h)
@@ -341,11 +342,11 @@ func TestRecovery_SyncStateToStateUpdate(t *testing.T) {
 
 	tx := newTx()
 	executeExceptN(t, rbfts, nodes, tx, false, 3)
-	metaS := &pb.MetaState{
-		Applied: uint64(1),
-		Digest:  "wrong-digest",
+	metaS := &types.MetaState{
+		Height: uint64(1),
+		Digest: "wrong-digest",
 	}
-	rbfts[3].node.currentState = &pb.ServiceState{
+	rbfts[3].node.currentState = &types.ServiceState{
 		MetaState: metaS,
 	}
 
@@ -370,8 +371,8 @@ func TestRecovery_SyncStateToStateUpdate(t *testing.T) {
 
 	msg := <-rbfts[3].recvChan
 	event := msg.(*LocalEvent)
-	ss := event.Event.(*pb.ServiceState)
-	assert.Equal(t, uint64(1), ss.MetaState.Applied)
+	ss := event.Event.(*types.ServiceState)
+	assert.Equal(t, uint64(1), ss.MetaState.Height)
 
 	assert.Equal(t, uint64(0), rbfts[3].exec.lastExec)
 	rbfts[3].processEvent(msg)
@@ -387,11 +388,11 @@ func TestRecovery_SyncStateToSyncEpoch(t *testing.T) {
 
 	ctx := newCTX(defaultValidatorSet)
 	executeExceptN(t, rbfts, nodes, ctx, true, 3)
-	metaS := &pb.MetaState{
-		Applied: uint64(1),
-		Digest:  "wrong-digest",
+	metaS := &types.MetaState{
+		Height: uint64(1),
+		Digest: "wrong-digest",
 	}
-	rbfts[3].node.currentState = &pb.ServiceState{
+	rbfts[3].node.currentState = &types.ServiceState{
 		MetaState: metaS,
 	}
 
@@ -417,8 +418,8 @@ func TestRecovery_SyncStateToSyncEpoch(t *testing.T) {
 
 	msg := <-rbfts[3].recvChan
 	event := msg.(*LocalEvent)
-	ss := event.Event.(*pb.ServiceState)
-	assert.Equal(t, uint64(1), ss.MetaState.Applied)
+	ss := event.Event.(*types.ServiceState)
+	assert.Equal(t, uint64(1), ss.MetaState.Height)
 
 	assert.Equal(t, uint64(0), rbfts[3].exec.lastExec)
 	rbfts[3].processEvent(msg)

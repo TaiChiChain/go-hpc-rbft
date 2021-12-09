@@ -18,6 +18,7 @@ import (
 	"fmt"
 
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
+	"github.com/ultramesh/flato-rbft/types"
 
 	"github.com/gogo/protobuf/proto"
 )
@@ -83,7 +84,6 @@ func initMsgEventMap() {
 	eventCreators[pb.Type_PRE_PREPARE] = func() interface{} { return &pb.PrePrepare{} }
 	eventCreators[pb.Type_PREPARE] = func() interface{} { return &pb.Prepare{} }
 	eventCreators[pb.Type_COMMIT] = func() interface{} { return &pb.Commit{} }
-	eventCreators[pb.Type_CHECKPOINT] = func() interface{} { return &pb.Checkpoint{} }
 	eventCreators[pb.Type_FETCH_CHECKPOINT] = func() interface{} { return &pb.FetchCheckpoint{} }
 	eventCreators[pb.Type_VIEW_CHANGE] = func() interface{} { return &pb.ViewChange{} }
 	eventCreators[pb.Type_NEW_VIEW] = func() interface{} { return &pb.NewView{} }
@@ -97,6 +97,7 @@ func initMsgEventMap() {
 	eventCreators[pb.Type_SYNC_STATE_RESPONSE] = func() interface{} { return &pb.SyncStateResponse{} }
 	eventCreators[pb.Type_NOTIFICATION] = func() interface{} { return &pb.Notification{} }
 	eventCreators[pb.Type_NOTIFICATION_RESPONSE] = func() interface{} { return &pb.NotificationResponse{} }
+	eventCreators[pb.Type_SIGNED_CHECKPOINT] = func() interface{} { return &pb.SignedCheckpoint{} }
 }
 
 // dispatchLocalEvent dispatches local Event to corresponding handles using its service type
@@ -165,7 +166,7 @@ func (rbft *rbftImpl) handleCoreRbftEvent(e *LocalEvent) consensusEvent {
 		return nil
 
 	case CoreStateUpdatedEvent:
-		return rbft.recvStateUpdatedEvent(e.Event.(*pb.ServiceState))
+		return rbft.recvStateUpdatedEvent(e.Event.(*types.ServiceState))
 
 	case CoreResendMissingTxsEvent:
 		ev, ok := e.Event.(*pb.FetchMissingRequests)
@@ -223,9 +224,6 @@ func (rbft *rbftImpl) handleRecoveryEvent(e *LocalEvent) consensusEvent {
 		rbft.logger.Debugf("Replica %d init recovery", rbft.peerPool.ID)
 		return rbft.initRecovery()
 	case RecoveryDoneEvent:
-		if rbft.in(isNewNode) {
-			rbft.off(isNewNode)
-		}
 		rbft.atomicOff(InRecovery)
 		rbft.metrics.statusGaugeInRecovery.Set(0)
 		rbft.recoveryMgr.notificationStore = make(map[ntfIdx]*pb.Notification)
@@ -246,7 +244,7 @@ func (rbft *rbftImpl) handleRecoveryEvent(e *LocalEvent) consensusEvent {
 
 `)
 		finishMsg := fmt.Sprintf("======== Replica %d finished recovery, primary=%d, epoch=%d/n=%d/f=%d/view=%d/h=%d/lastExec=%d", rbft.peerPool.ID, rbft.primaryID(rbft.view), rbft.epoch, rbft.N, rbft.f, rbft.view, rbft.h, rbft.exec.lastExec)
-		rbft.external.SendFilterEvent(pb.InformType_FilterFinishRecovery, finishMsg)
+		rbft.external.SendFilterEvent(types.InformTypeFilterFinishRecovery, finishMsg)
 		// after recovery, new primary need to send null request as a heartbeat, and non-primary will start a
 		// first request timer which must be longer than null request timer in which non-primary must receive a
 		// request from primary(null request or pre-prepare...), or this node will send viewChange.
@@ -362,7 +360,7 @@ func (rbft *rbftImpl) handleViewChangeEvent(e *LocalEvent) consensusEvent {
 		}
 
 		// send viewchange result to web socket API
-		rbft.external.SendFilterEvent(pb.InformType_FilterFinishViewChange, finishMsg)
+		rbft.external.SendFilterEvent(types.InformTypeFilterFinishViewChange, finishMsg)
 
 		rbft.primaryResubmitTransactions()
 
@@ -460,11 +458,11 @@ func (rbft *rbftImpl) dispatchMsgToService(e consensusEvent) int {
 		return CoreRbftService
 	case *pb.Commit:
 		return CoreRbftService
-	case *pb.Checkpoint:
-		return CoreRbftService
 	case *pb.FetchMissingRequests:
 		return CoreRbftService
 	case *pb.SendMissingRequests:
+		return CoreRbftService
+	case *pb.SignedCheckpoint:
 		return CoreRbftService
 
 		// view change service

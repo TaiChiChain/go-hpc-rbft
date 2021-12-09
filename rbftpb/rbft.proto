@@ -15,6 +15,7 @@
 syntax = "proto3";
 
 import "github.com/ultramesh/flato-common/types/protos/transaction.proto";
+import "github.com/ultramesh/flato-common/types/protos/ledger_info.proto";
 
 package rbftpb;
 
@@ -23,7 +24,7 @@ enum Type {
     PRE_PREPARE = 1;
     PREPARE = 2;
     COMMIT = 3;
-    CHECKPOINT = 4;
+    SIGNED_CHECKPOINT = 4;
     FETCH_CHECKPOINT = 5;
     VIEW_CHANGE = 6;
     NEW_VIEW = 7;
@@ -117,10 +118,10 @@ message commit {
     string batch_digest = 4;
 }
 
-message checkpoint {
-     node_info node_info = 1;
-     uint64 sequence_number = 2;
-     string digest = 3;
+message signed_checkpoint {
+    node_info node_info = 1;
+    protos.Checkpoint checkpoint = 2;
+    bytes signature = 3;
 }
 
 message fetch_checkpoint {
@@ -146,6 +147,7 @@ message vc_basis {
     repeated vc_C cset = 4;
     repeated vc_PQ pset = 5;
     repeated vc_PQ qset = 6;
+    repeated signed_checkpoint signed_checkpoints = 7;
 }
 
 message view_change {
@@ -186,11 +188,6 @@ message Cset {
     repeated commit set = 1;
 }
 
-message meta_state {
-    uint64 applied = 1;
-    string digest = 2;
-}
-
 message node_info {
     uint64 replica_id = 1;
     string replica_hash = 2;
@@ -202,13 +199,10 @@ message sync_state {
 }
 
 message sync_state_response {
-    node_info node_info = 1;
-    uint64 epoch = 2;
-    uint64 view = 3;
-    meta_state initial_state = 4;
+    uint64 view = 1;
+    signed_checkpoint signed_checkpoint = 2;
 }
 
-// notification message
 message notification {
     vc_basis  basis = 1;
     uint64    epoch = 2;
@@ -219,60 +213,6 @@ message notification {
 
 message notification_response {
     vc_basis  basis = 1;
-    uint64    n = 2;
-    uint64    epoch = 3;
-    node_info node_info = 4;
-}
-
-message peer {
-    uint64 id = 1;
-    string hostname = 2;
-    string hash = 3;
-}
-
-message router {
-    repeated peer peers = 1;
-}
-
-message conf_change {
-    router router = 1;
-}
-
-message conf_state {
-    router quorum_router = 1;
-}
-
-message service_state {
-    meta_state meta_state = 1;
-    epoch_info epoch_info = 2;
-}
-
-message epoch_info {
-    uint64 epoch = 1;
-    repeated string v_set = 2;
-    uint64 lastConfig = 3;
-}
-
-enum inform_type {
-    FilterFinishRecovery = 0;
-    FilterFinishViewChange = 1;
-    FilterFinishConfigChange = 2;
-    FilterFinishStateUpdate = 3;
-    FilterPoolFull = 4;
-    FilterStableCheckpoint = 5;
-}
-
-enum reload_type {
-    FinishReloadRouter = 0;
-    FinishReloadCommitDB = 1;
-}
-
-message reload_message {
-    reload_type type = 1;
-    uint64 height = 2;
-    router router = 3;
-}
-
-message reload_finished {
-    uint64 height = 1;
+    uint64    epoch = 2;
+    node_info node_info = 3;
 }

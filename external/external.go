@@ -17,6 +17,7 @@ package external
 import (
 	"github.com/ultramesh/flato-common/types/protos"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
+	"github.com/ultramesh/flato-rbft/types"
 )
 
 // Storage is an interface that should be implemented by the application using non-volatile
@@ -28,7 +29,7 @@ type Storage interface {
 	DelState(key string) error
 	// ReadState retrieves data with specified key from non-volatile memory.
 	ReadState(key string) ([]byte, error)
-	// ReadState retrieves data with specified key prefix from non-volatile memory.
+	// ReadStateSet retrieves data with specified key prefix from non-volatile memory.
 	ReadStateSet(key string) (map[string][]byte, error)
 	// Destroy clears the non-volatile memory.
 	Destroy(key string) error
@@ -43,17 +44,16 @@ type Network interface {
 	// UnicastByHash delivers messages to given node with specified hostname.
 	UnicastByHash(msg *pb.ConsensusMessage, to string) error
 	// UpdateTable updates routing table according to given confChangeType
-	// 3. ConfChangeType_ConfChangeUpdateNode, update routing table with given meta info
 	// It's application's responsibility to ensure update routing table synchronously.
-	UpdateTable(change *pb.ConfChange)
+	UpdateTable(change *types.ConfChange)
 }
 
 // Crypto is used to access the sign/verify methods from the crypto package
 type Crypto interface {
 	// Sign signs messages, returns error if any.
 	Sign(msg []byte) ([]byte, error)
-	// Verify verifies signature signed with msg from given peerID, return nil if verify successfully
-	Verify(peerID uint64, signature []byte, msg []byte) error
+	// Verify verifies signature signed with msg from given peerHash, return nil if verify successfully
+	Verify(peerHash string, signature []byte, msg []byte) error
 }
 
 // ServiceOutbound is the application service invoked by RBFT library which includes two core events:
@@ -70,10 +70,19 @@ type ServiceOutbound interface {
 	// Users can apply different batches asynchronously but ensure the order by seqNo.
 	Execute(txs []*protos.Transaction, localList []bool, seqNo uint64, timestamp int64)
 	// StateUpdate informs application layer to catch up to given seqNo with specified state digest.
-	StateUpdate(seqNo uint64, digest string, peers []uint64)
+	StateUpdate(seqNo uint64, digest string)
 	// SendFilterEvent posts some impotent events to application layer.
 	// Users can decide to post filer event synchronously or asynchronously.
-	SendFilterEvent(informType pb.InformType, message ...interface{})
+	SendFilterEvent(informType types.InformType, message ...interface{})
+}
+
+// EpochService provides service for epoch management.
+type EpochService interface {
+	// Reconfiguration is used to update router info of consensus, return updated epoch number.
+	Reconfiguration() uint64
+
+	// GetNodeInfos returns the full node info with public key.
+	GetNodeInfos() []*protos.NodeInfo
 }
 
 // ExternalStack integrates all external interfaces which must be implemented by application users.
@@ -82,4 +91,5 @@ type ExternalStack interface {
 	Network
 	Crypto
 	ServiceOutbound
+	EpochService
 }
