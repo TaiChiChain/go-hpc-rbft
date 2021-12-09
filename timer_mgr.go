@@ -291,7 +291,7 @@ func (tm *timerManager) makeRequestTimeoutLegal() {
 }
 
 // makeCleanVcTimeoutLegal checks if clean vc timeout is legal or not, if not, make it
-// legal, which, cleanVcTimeout should more then 6* viewChange time
+// legal, which, cleanVcTimeout should more than 6* viewChange time
 func (tm *timerManager) makeCleanVcTimeoutLegal() {
 	cleanVcTimeout := tm.getTimeoutValue(cleanViewChangeTimer)
 	nvTimeout := tm.getTimeoutValue(newViewTimer)

@@ -5,6 +5,7 @@ import (
 
 	"github.com/ultramesh/flato-common/types/protos"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
+	"github.com/ultramesh/flato-rbft/types"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
@@ -121,17 +122,20 @@ func TestExec_handleCoreRbftEvent_StateUpdatedEvent(t *testing.T) {
 
 	_, rbfts := newBasicClusterInstance()
 
-	metaS := &pb.MetaState{
-		Applied: uint64(10),
-		Digest:  "block-number-10",
+	metaS := &types.MetaState{
+		Height: uint64(10),
+		Digest: "block-number-10",
 	}
-	epochInfo := &pb.EpochInfo{
-		Epoch: uint64(0),
-		VSet:  defaultValidatorSet,
-	}
-	ss := &pb.ServiceState{
+
+	ss := &types.ServiceState{
 		MetaState: metaS,
-		EpochInfo: epochInfo,
+		Epoch:     uint64(0),
+	}
+	checkpoint := &protos.Checkpoint{
+		Epoch:   uint64(0),
+		Height:  uint64(10),
+		Digest:  "block-number-10",
+		NextSet: nil,
 	}
 	ev := &LocalEvent{
 		Service:   CoreRbftService,
@@ -139,6 +143,14 @@ func TestExec_handleCoreRbftEvent_StateUpdatedEvent(t *testing.T) {
 		Event:     ss,
 	}
 	assert.Equal(t, uint64(0), rbfts[1].exec.lastExec)
+	rbfts[1].storeMgr.highStateTarget = &stateUpdateTarget{
+		metaState: metaS,
+		checkpointSet: []*pb.SignedCheckpoint{
+			{NodeInfo: &pb.NodeInfo{ReplicaId: 1, ReplicaHash: "test-hash-1"}, Checkpoint: checkpoint, Signature: []byte("sig-1")},
+			{NodeInfo: &pb.NodeInfo{ReplicaId: 2, ReplicaHash: "test-hash-2"}, Checkpoint: checkpoint, Signature: []byte("sig-2")},
+			{NodeInfo: &pb.NodeInfo{ReplicaId: 3, ReplicaHash: "test-hash-3"}, Checkpoint: checkpoint, Signature: []byte("sig-3")},
+		},
+	}
 	rbfts[1].handleCoreRbftEvent(ev)
 	assert.Equal(t, uint64(10), rbfts[1].exec.lastExec)
 }

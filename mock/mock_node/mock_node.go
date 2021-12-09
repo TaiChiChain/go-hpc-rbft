@@ -8,6 +8,7 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	rbft "github.com/ultramesh/flato-rbft"
 	rbftpb "github.com/ultramesh/flato-rbft/rbftpb"
+	types "github.com/ultramesh/flato-rbft/types"
 	reflect "reflect"
 )
 
@@ -63,7 +64,7 @@ func (mr *MockNodeMockRecorder) Propose(requests interface{}) *gomock.Call {
 }
 
 // ProposeConfChange mocks base method
-func (m *MockNode) ProposeConfChange(cc *rbftpb.ConfChange) error {
+func (m *MockNode) ProposeConfChange(cc *types.ConfChange) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ProposeConfChange", cc)
 	ret0, _ := ret[0].(error)
@@ -89,7 +90,7 @@ func (mr *MockNodeMockRecorder) Step(msg interface{}) *gomock.Call {
 }
 
 // ApplyConfChange mocks base method
-func (m *MockNode) ApplyConfChange(cc *rbftpb.ConfState) {
+func (m *MockNode) ApplyConfChange(cc *types.ConfState) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "ApplyConfChange", cc)
 }
@@ -115,7 +116,7 @@ func (mr *MockNodeMockRecorder) Status() *gomock.Call {
 }
 
 // ReportExecuted mocks base method
-func (m *MockNode) ReportExecuted(state *rbftpb.ServiceState) {
+func (m *MockNode) ReportExecuted(state *types.ServiceState) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "ReportExecuted", state)
 }
@@ -127,7 +128,7 @@ func (mr *MockNodeMockRecorder) ReportExecuted(state interface{}) *gomock.Call {
 }
 
 // ReportStateUpdated mocks base method
-func (m *MockNode) ReportStateUpdated(state *rbftpb.ServiceState) {
+func (m *MockNode) ReportStateUpdated(state *types.ServiceState) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "ReportStateUpdated", state)
 }
@@ -139,7 +140,7 @@ func (mr *MockNodeMockRecorder) ReportStateUpdated(state interface{}) *gomock.Ca
 }
 
 // ReportReloadFinished mocks base method
-func (m *MockNode) ReportReloadFinished(reload *rbftpb.ReloadMessage) {
+func (m *MockNode) ReportReloadFinished(reload *types.ReloadMessage) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "ReportReloadFinished", reload)
 }
@@ -186,7 +187,7 @@ func (m *MockServiceInbound) EXPECT() *MockServiceInboundMockRecorder {
 }
 
 // ReportExecuted mocks base method
-func (m *MockServiceInbound) ReportExecuted(state *rbftpb.ServiceState) {
+func (m *MockServiceInbound) ReportExecuted(state *types.ServiceState) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "ReportExecuted", state)
 }
@@ -198,7 +199,7 @@ func (mr *MockServiceInboundMockRecorder) ReportExecuted(state interface{}) *gom
 }
 
 // ReportStateUpdated mocks base method
-func (m *MockServiceInbound) ReportStateUpdated(state *rbftpb.ServiceState) {
+func (m *MockServiceInbound) ReportStateUpdated(state *types.ServiceState) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "ReportStateUpdated", state)
 }
@@ -210,7 +211,7 @@ func (mr *MockServiceInboundMockRecorder) ReportStateUpdated(state interface{}) 
 }
 
 // ReportReloadFinished mocks base method
-func (m *MockServiceInbound) ReportReloadFinished(reload *rbftpb.ReloadMessage) {
+func (m *MockServiceInbound) ReportReloadFinished(reload *types.ReloadMessage) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "ReportReloadFinished", reload)
 }

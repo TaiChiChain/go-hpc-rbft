@@ -60,7 +60,7 @@ func (rbft *rbftImpl) dispatchRecoveryMsg(e consensusEvent) consensusEvent {
 	case *pb.SyncState:
 		return rbft.recvSyncState(et)
 	case *pb.SyncStateResponse:
-		return rbft.recvSyncStateRsp(et)
+		return rbft.recvSyncStateRsp(et, false)
 	case *pb.RecoveryFetchPQC:
 		return rbft.returnRecoveryPQC(et)
 	case *pb.RecoveryReturnPQC:
@@ -195,11 +195,6 @@ func (rbft *rbftImpl) sendNotification(keepCurrentVote bool) consensusEvent {
 	// use recoveryRestartTimer to track resend of notification.
 	rbft.timerMgr.startTimer(recoveryRestartTimer, event)
 
-	if rbft.in(isNewNode) {
-		rbft.logger.Debugf("New node %d doesn't send notification to itself", rbft.peerPool.ID)
-		return nil
-	}
-
 	return rbft.recvNotification(n)
 }
 
@@ -212,13 +207,6 @@ func (rbft *rbftImpl) recvNotification(n *pb.Notification) consensusEvent {
 
 	rbft.logger.Debugf("Replica %d received notification from replica %d, e:%d, v:%d, h:%d, |C|:%d, |P|:%d, |Q|:%d",
 		rbft.peerPool.ID, n.NodeInfo.ReplicaId, n.Epoch, n.Basis.View, n.Basis.H, len(n.Basis.Cset), len(n.Basis.Pset), len(n.Basis.Qset))
-
-	// new node cannot process notification as new node is not in a consistent
-	// view/N with other nodes.
-	if rbft.in(isNewNode) && n.Epoch == 0 {
-		rbft.logger.Debugf("New node %d ignore notification in epoch 0", rbft.peerPool.ID)
-		return nil
-	}
 
 	if !rbft.inRouters(n.NodeInfo.ReplicaHash) {
 		return nil
@@ -310,7 +298,6 @@ func (rbft *rbftImpl) sendNotificationResponse(destHash string) consensusEvent {
 
 	nr := &pb.NotificationResponse{
 		Basis:    rbft.getVcBasis(),
-		N:        uint64(rbft.N),
 		Epoch:    rbft.epoch,
 		NodeInfo: rbft.getNodeInfo(),
 	}
@@ -382,8 +369,9 @@ func (rbft *rbftImpl) recvNotificationResponse(nr *pb.NotificationResponse) cons
 	if eQuorum >= rbft.commonCaseQuorum() {
 		states := make(wholeStates)
 		for _, nrs := range rbft.recoveryMgr.differentEpoch {
-			states[nrs.NodeInfo] = nodeState{
-				n:     nrs.N,
+			// assign an empty key, because this key is only used in sync state
+			// to generate a quorum checkpoint.
+			states[&pb.SignedCheckpoint{}] = nodeState{
 				epoch: nrs.Epoch,
 			}
 		}
@@ -395,8 +383,9 @@ func (rbft *rbftImpl) recvNotificationResponse(nr *pb.NotificationResponse) cons
 	if vQuorum >= rbft.commonCaseQuorum() {
 		states := make(wholeStates)
 		for _, nrs := range rbft.recoveryMgr.outOfElection {
-			states[nrs.NodeInfo] = nodeState{
-				n:     nrs.N,
+			// assign an empty key, because this key is only used in sync state
+			// to generate a quorum checkpoint.
+			states[&pb.SignedCheckpoint{}] = nodeState{
 				view:  nrs.Basis.View,
 				epoch: nrs.Epoch,
 			}
@@ -420,12 +409,12 @@ func (rbft *rbftImpl) resetStateForRecovery() consensusEvent {
 		basis = rbft.getOutOfElectionBasis()
 	}
 
-	cp, ok := rbft.selectInitialCheckpoint(basis)
+	meta, checkpointSet, ok := rbft.selectInitialCheckpoint(basis)
 	if !ok {
 		rbft.logger.Infof("Replica %d could not find consistent checkpoint.", rbft.peerPool.ID)
 		return nil
 	}
-	rbft.logger.Debugf("initial checkpoint: %+v", cp)
+	rbft.logger.Debugf("initial checkpoint: %+v", meta)
 
 	// after checked initial checkpoint, set recoveryHandled active to avoid resetStateForRecovery again.
 	if rbft.recoveryMgr.recoveryHandled {
@@ -433,15 +422,15 @@ func (rbft *rbftImpl) resetStateForRecovery() consensusEvent {
 		return nil
 	}
 	rbft.recoveryMgr.recoveryHandled = true
-	// check if need state update
-	need, err := rbft.checkIfNeedStateUpdate(cp)
+	// check if we need state update
+	need, err := rbft.checkIfNeedStateUpdate(meta, checkpointSet)
 	if err != nil {
 		return nil
 	}
 	if need {
 		// if we are behind by checkpoint, move watermark and state transfer to the target
 		rbft.logger.Debugf("Replica %d in recovery find itself fall behind, "+
-			"move watermark to %d and state transfer.", rbft.peerPool.ID, cp.SequenceNumber)
+			"move watermark to %d and state transfer.", rbft.peerPool.ID, meta.Height)
 
 		// clear useless outstanding batch to avoid viewChange caused by outstanding batches after recovery.
 		rbft.cleanOutstandingAndCert()
@@ -715,22 +704,22 @@ func (rbft *rbftImpl) initSyncState() consensusEvent {
 		return nil
 	}
 	syncStateRsp := &pb.SyncStateResponse{
-		NodeInfo:     rbft.getNodeInfo(),
-		Epoch:        rbft.epoch,
-		View:         rbft.view,
-		InitialState: state.MetaState,
+		View: rbft.view,
 	}
-	rbft.recvSyncStateRsp(syncStateRsp)
+
+	signedCheckpoint, sErr := rbft.generateSignedCheckpoint(state)
+	if sErr != nil {
+		rbft.logger.Errorf("Replica %d generate checkpoint error: %s", rbft.peerPool.ID, sErr)
+		rbft.stopNamespace()
+		return nil
+	}
+	syncStateRsp.SignedCheckpoint = signedCheckpoint
+	rbft.recvSyncStateRsp(syncStateRsp, true)
 	return nil
 }
 
 func (rbft *rbftImpl) recvSyncState(sync *pb.SyncState) consensusEvent {
 	rbft.logger.Debugf("Replica %d received sync state from replica %d", rbft.peerPool.ID, sync.NodeInfo.ReplicaId)
-
-	if rbft.in(isNewNode) {
-		rbft.logger.Debugf("Replica %d is in a new node, don't send sync state response", rbft.peerPool.ID)
-		return nil
-	}
 
 	if !rbft.inRouters(sync.NodeInfo.ReplicaHash) {
 		return nil
@@ -756,18 +745,22 @@ func (rbft *rbftImpl) recvSyncState(sync *pb.SyncState) consensusEvent {
 
 func (rbft *rbftImpl) sendSyncStateRsp(to string, needSyncEpoch bool) consensusEvent {
 	syncStateRsp := &pb.SyncStateResponse{
-		NodeInfo: rbft.getNodeInfo(),
-		Epoch:    rbft.epoch,
-		View:     rbft.view,
+		View: rbft.view,
 	}
 
+	var (
+		ok               bool
+		signedCheckpoint *pb.SignedCheckpoint
+		sErr             error
+	)
 	if needSyncEpoch {
 		// for requester in lower epoch, send the latest stable checkpoint
-		metaS := &pb.MetaState{
-			Applied: rbft.h,
-			Digest:  rbft.storeMgr.chkpts[rbft.h],
+		signedCheckpoint, ok = rbft.storeMgr.localCheckpoints[rbft.h]
+		if !ok {
+			rbft.logger.Warningf("Replica %d cannot find digest of its low watermark %d, "+
+				"current node may fall behind", rbft.peerPool.ID, rbft.h)
+			return nil
 		}
-		syncStateRsp.InitialState = metaS
 	} else {
 		// for normal case, send current state
 		state := rbft.node.getCurrentState()
@@ -775,8 +768,14 @@ func (rbft *rbftImpl) sendSyncStateRsp(to string, needSyncEpoch bool) consensusE
 			rbft.logger.Warningf("Replica %d has a nil state", rbft.peerPool.ID)
 			return nil
 		}
-		syncStateRsp.InitialState = state.MetaState
+		signedCheckpoint, sErr = rbft.generateSignedCheckpoint(state)
+		if sErr != nil {
+			rbft.logger.Errorf("Replica %d generate checkpoint error: %s", rbft.peerPool.ID, sErr)
+			rbft.stopNamespace()
+			return nil
+		}
 	}
+	syncStateRsp.SignedCheckpoint = signedCheckpoint
 
 	payload, err := proto.Marshal(syncStateRsp)
 	if err != nil {
@@ -790,40 +789,53 @@ func (rbft *rbftImpl) sendSyncStateRsp(to string, needSyncEpoch bool) consensusE
 		Payload: payload,
 	}
 	rbft.peerPool.unicastByHash(consensusMsg, to)
-	rbft.logger.Debugf("Replica %d send sync state response to replica %d: epoch=%d, view=%d, meta_state=%+v",
-		rbft.peerPool.ID, rbft.nodeID(to), syncStateRsp.Epoch, syncStateRsp.View, syncStateRsp.InitialState)
+	rbft.logger.Debugf("Replica %d send sync state response to replica %d: epoch=%d, view=%d, checkpoint=%+v",
+		rbft.peerPool.ID, rbft.nodeID(to), syncStateRsp.SignedCheckpoint.Checkpoint.Epoch, syncStateRsp.View,
+		syncStateRsp.SignedCheckpoint.Checkpoint)
 	return nil
 }
 
-func (rbft *rbftImpl) recvSyncStateRsp(rsp *pb.SyncStateResponse) consensusEvent {
-	rbft.logger.Debugf("Replica %d now received sync state response from replica %d: epoch=%d, meta_state=%+v",
-		rbft.peerPool.ID, rsp.NodeInfo.ReplicaId, rsp.Epoch, rsp.InitialState)
+func (rbft *rbftImpl) recvSyncStateRsp(rsp *pb.SyncStateResponse, local bool) consensusEvent {
+	if rsp.SignedCheckpoint == nil || rsp.SignedCheckpoint.Checkpoint == nil {
+		rbft.logger.Errorf("Replica %d reject sync state response with nil checkpoint info", rbft.peerPool.ID)
+		return nil
+	}
+	// verify signature of remote checkpoint.
+	if !local {
+		vErr := rbft.verifySignedCheckpoint(rsp.SignedCheckpoint)
+		if vErr != nil {
+			rbft.logger.Errorf("Replica %d verify signature of checkpoint from %d error: %s",
+				rbft.peerPool.ID, rsp.SignedCheckpoint.NodeInfo.ReplicaId, vErr)
+			return nil
+		}
+	}
+
+	checkpoint := rsp.SignedCheckpoint.Checkpoint
+	rbft.logger.Debugf("Replica %d now received sync state response from replica %d: epoch=%d, checkpoint=%+v",
+		rbft.peerPool.ID, rsp.SignedCheckpoint.NodeInfo.ReplicaId, checkpoint.Epoch, checkpoint)
 
 	if !rbft.in(InSyncState) {
 		rbft.logger.Debugf("Replica %d is not in sync state, ignore it...", rbft.peerPool.ID)
 		return nil
 	}
 
-	if rsp.Epoch > rsp.InitialState.Applied {
-		rbft.logger.Warningf("Replica %d in epoch %d reject a illegal response", rbft.peerPool.ID, rbft.epoch)
-		return nil
-	}
-	if oldRsp, ok := rbft.recoveryMgr.syncRspStore[rsp.NodeInfo.ReplicaHash]; ok {
-		if oldRsp.InitialState.Applied > rsp.InitialState.Applied {
-			rbft.logger.Debugf("Duplicate sync state response, new applied=%d is lower than old applied=%d, reject it",
-				rsp.InitialState.Applied, oldRsp.InitialState.Applied)
+	if oldRsp, ok := rbft.recoveryMgr.syncRspStore[rsp.SignedCheckpoint.NodeInfo.ReplicaHash]; ok {
+		if oldRsp.SignedCheckpoint.Checkpoint.Height > checkpoint.Height {
+			rbft.logger.Debugf("Duplicate sync state response, new height=%d is lower than old height=%d, reject it",
+				checkpoint.Height, oldRsp.SignedCheckpoint.Checkpoint.Height)
 			return nil
 		}
 	}
-	rbft.recoveryMgr.syncRspStore[rsp.NodeInfo.ReplicaHash] = rsp
+	rbft.recoveryMgr.syncRspStore[rsp.SignedCheckpoint.NodeInfo.ReplicaHash] = rsp
 	if len(rbft.recoveryMgr.syncRspStore) >= rbft.commonCaseQuorum() {
 		states := make(wholeStates)
-		for _, rsp := range rbft.recoveryMgr.syncRspStore {
-			states[rsp.NodeInfo] = nodeState{
-				epoch:   rsp.Epoch,
-				view:    rsp.View,
-				applied: rsp.InitialState.Applied,
-				digest:  rsp.InitialState.Digest,
+		for _, response := range rbft.recoveryMgr.syncRspStore {
+			states[response.SignedCheckpoint] = nodeState{
+				view: response.View,
+
+				epoch:  response.SignedCheckpoint.Checkpoint.Epoch,
+				height: response.SignedCheckpoint.Checkpoint.Height,
+				digest: response.SignedCheckpoint.Checkpoint.Digest,
 			}
 		}
 		return rbft.compareWholeStates(states)

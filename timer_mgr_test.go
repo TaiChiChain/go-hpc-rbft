@@ -19,7 +19,6 @@ func newTestTimerMgr(ctrl *gomock.Controller) *timerManager {
 	tx := txpoolmock.NewMockMinimalTxPool(ctrl)
 	conf := Config{
 		ID:            1,
-		IsNew:         false,
 		Peers:         peerSet,
 		Logger:        log,
 		External:      external,

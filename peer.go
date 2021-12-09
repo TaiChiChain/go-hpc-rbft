@@ -17,6 +17,7 @@ package rbft
 import (
 	"github.com/ultramesh/flato-rbft/external"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
+	"github.com/ultramesh/flato-rbft/types"
 )
 
 // peerPool maintains local peer ID which is the unique peer through the consensus network.
@@ -52,29 +53,29 @@ func newPeerPool(c Config) *peerPool {
 	return pool
 }
 
-func (pool *peerPool) initPeers(peers []*pb.Peer) {
+func (pool *peerPool) initPeers(peers []*types.Peer) {
 	pool.logger.Infof("Local ID: %d, update routerMap:", pool.ID)
 	length := len(peers)
 	preID := pool.ID
 	pool.routerMap.HashMap = make(map[string]uint64)
 	for _, p := range peers {
-		if p.Id > uint64(length) {
-			pool.logger.Errorf("Something wrong with peer[id=%d], peer id cannot be larger than peers' amount %d", p.Id, length)
+		if p.ID > uint64(length) {
+			pool.logger.Errorf("Something wrong with peer[id=%d], peer id cannot be larger than peers' amount %d", p.ID, length)
 			return
 		}
 		if p.Hash == pool.hash {
-			pool.ID = p.Id
+			pool.ID = p.ID
 		}
-		pool.logger.Infof("ID: %d, Hash: %s", p.Id, p.Hash)
-		pool.routerMap.HashMap[p.Hash] = p.Id
+		pool.logger.Infof("ID: %d, Hash: %s", p.ID, p.Hash)
+		pool.routerMap.HashMap[p.Hash] = p.ID
 	}
 	if preID != pool.ID {
 		pool.logger.Infof("Update Local ID: %d ===> %d", preID, pool.ID)
 	}
 }
 
-func (pool *peerPool) updateRouter(router *pb.Router) {
-	cc := &pb.ConfChange{
+func (pool *peerPool) updateRouter(router *types.Router) {
+	cc := &types.ConfChange{
 		Router: router,
 	}
 	pool.network.UpdateTable(cc)

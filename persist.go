@@ -23,6 +23,7 @@ import (
 	"time"
 
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
+	"github.com/ultramesh/flato-rbft/types"
 
 	"github.com/gogo/protobuf/proto"
 )
@@ -587,16 +588,24 @@ func (rbft *rbftImpl) restoreState() error {
 			} else {
 				digest := string(id)
 				rbft.logger.Debugf("Replica %d found checkpoint %s for seqNo %d", rbft.peerPool.ID, digest, seqNo)
-				rbft.storeMgr.saveCheckpoint(seqNo, digest)
+				state := &types.ServiceState{
+					MetaState: &types.MetaState{Height: seqNo, Digest: digest},
+					Epoch:     rbft.epoch,
+				}
+				signedC, gErr := rbft.generateSignedCheckpoint(state)
+				if gErr != nil {
+					return gErr
+				}
+				rbft.storeMgr.saveCheckpoint(seqNo, signedC)
 			}
 		}
 	} else {
 		rbft.logger.Warningf("Replica %d could not restore checkpoints: %s", rbft.peerPool.ID, err)
 	}
 
-	hstr, err := rbft.storage.ReadState("rbft.h")
-	if err != nil {
-		rbft.logger.Warningf("Replica %d could not restore h: %s", rbft.peerPool.ID, err)
+	hstr, rErr := rbft.storage.ReadState("rbft.h")
+	if rErr != nil {
+		rbft.logger.Warningf("Replica %d could not restore h: %s", rbft.peerPool.ID, rErr)
 	} else {
 		h, err := strconv.ParseUint(string(hstr), 10, 64)
 		if err != nil {
@@ -606,8 +615,8 @@ func (rbft *rbftImpl) restoreState() error {
 		rbft.moveWatermarks(h)
 	}
 
-	rbft.logger.Infof("Replica %d restored state: view: %d, seqNo: %d, reqBatches: %d, chkpts: %d",
-		rbft.peerPool.ID, rbft.view, rbft.exec.lastExec, len(rbft.storeMgr.batchStore), len(rbft.storeMgr.chkpts))
+	rbft.logger.Infof("Replica %d restored state: view: %d, seqNo: %d, reqBatches: %d, localCheckpoints: %d",
+		rbft.peerPool.ID, rbft.view, rbft.exec.lastExec, len(rbft.storeMgr.batchStore), len(rbft.storeMgr.localCheckpoints))
 
 	return nil
 }

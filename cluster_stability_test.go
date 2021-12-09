@@ -107,11 +107,11 @@ func TestCluster_CheckpointToViewChange(t *testing.T) {
 	}
 
 	missingNodeIndex := 1
-	for key := range rbfts[missingNodeIndex].storeMgr.chkpts {
+	for key := range rbfts[missingNodeIndex].storeMgr.localCheckpoints {
 		if key == 0 {
 			continue
 		}
-		delete(rbfts[missingNodeIndex].storeMgr.chkpts, key)
+		delete(rbfts[missingNodeIndex].storeMgr.localCheckpoints, key)
 	}
 
 	vcEvent := &LocalEvent{
@@ -505,7 +505,7 @@ func TestCluster_Checkpoint_in_StateUpdating(t *testing.T) {
 	}
 
 	for _, retMessages := range retMessageSet {
-		for index, chkpt := range retMessages[pb.Type_CHECKPOINT] {
+		for index, chkpt := range retMessages[pb.Type_SIGNED_CHECKPOINT] {
 			if chkpt == nil {
 				continue
 			}
@@ -538,7 +538,7 @@ func TestCluster_Checkpoint_in_StateUpdating(t *testing.T) {
 	}
 
 	for _, retMessages := range retMessageSet2 {
-		for index, chkpt := range retMessages[pb.Type_CHECKPOINT] {
+		for index, chkpt := range retMessages[pb.Type_SIGNED_CHECKPOINT] {
 			if chkpt == nil {
 				continue
 			}
@@ -563,7 +563,7 @@ func TestCluster_Checkpoint_in_StateUpdating(t *testing.T) {
 	}
 
 	for _, retMessages := range retMessageSet3 {
-		for index, chkpt := range retMessages[pb.Type_CHECKPOINT] {
+		for index, chkpt := range retMessages[pb.Type_SIGNED_CHECKPOINT] {
 			if chkpt == nil {
 				continue
 			}
