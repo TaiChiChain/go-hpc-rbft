@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.2.37"></a>
+## [0.2.37](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.36-2...v0.2.37) (2021-12-09)
+
+
+### Features
+
+* signed checkpoint: adapt config checkpoint ([80e7637](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/80e7637))
+* signed checkpoint: adapt normal case ([873e3db](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/873e3db))
+* signed checkpoint: adapt state update ([4dda07d](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/4dda07d))
+* signed checkpoint: adapt sync state ([df39212](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/df39212))
+* signed checkpoint: adapt vc/recovery ([b05d815](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/b05d815))
+* signed checkpoint: remove IsNew flag totally ([556c65d](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/556c65d))
+* signed checkpoint: tidy protobuf ([3aadd9a](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/3aadd9a))
+
+
+
 <a name="0.2.36-2"></a>
 ## [0.2.36-2](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.36-1...v0.2.36-2) (2021-12-07)
 
