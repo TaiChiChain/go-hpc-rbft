@@ -2176,12 +2176,25 @@ func (rbft *rbftImpl) recvStateUpdatedEvent(ss *types.ServiceState) consensusEve
 	// TODO(DH): we may have only f+1 checkpoints in checkpointSet, is f+1 weak cert is trustable enough?
 	// if only 2f+1 is strong cert is trustable, we have to fetch checkpoint...
 	checkpointSet := rbft.storeMgr.highStateTarget.checkpointSet
-	rbft.external.SendFilterEvent(types.InformTypeFilterStableCheckpoint, checkpointSet)
-	signedCheckpoint, gErr := rbft.generateSignedCheckpoint(ss)
-	if gErr != nil {
-		rbft.logger.Errorf("Replica %d generate signed checkpoint error: %s", rbft.peerPool.ID, gErr)
+	if len(checkpointSet) == 0 {
+		rbft.logger.Warningf("Replica %d found an empty checkpoint set", rbft.peerPool.ID)
 		rbft.stopNamespace()
 		return nil
+	}
+	rbft.external.SendFilterEvent(types.InformTypeFilterStableCheckpoint, checkpointSet)
+	// NOTE! don't generate local checkpoint using current epoch, use remote consistent checkpoint
+	// to generate a signed checkpoint as this consistent checkpoint may be generated in an old epoch.
+	checkpoint := checkpointSet[0].Checkpoint
+	signature, sErr := rbft.signCheckpoint(checkpoint)
+	if sErr != nil {
+		rbft.logger.Errorf("Replica %d generate signed checkpoint error: %s", rbft.peerPool.ID, sErr)
+		rbft.stopNamespace()
+		return nil
+	}
+	signedCheckpoint := &pb.SignedCheckpoint{
+		NodeInfo:   rbft.getNodeInfo(),
+		Checkpoint: checkpoint,
+		Signature:  signature,
 	}
 	rbft.storeMgr.saveCheckpoint(seqNo, signedCheckpoint)
 	rbft.persistCheckpoint(seqNo, []byte(digest))
