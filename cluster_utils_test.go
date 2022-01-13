@@ -47,7 +47,7 @@ func setClusterExecExcept(rbfts []*rbftImpl, nodes []*testNode, seq uint64, noEx
 		rbfts[index].exec.setLastExec(seq)
 		rbfts[index].batchMgr.setSeqNo(seq)
 		pos := seq / 10 * 10
-		rbfts[index].moveWatermarks(pos)
+		rbfts[index].moveWatermarks(pos, false)
 		nodes[index].Applied = seq
 	}
 }
