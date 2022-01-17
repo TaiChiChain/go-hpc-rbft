@@ -612,7 +612,7 @@ func (rbft *rbftImpl) restoreState() error {
 			rbft.logger.Warningf("transfer rbft.h from string to uint64 failed with err: %s", err)
 			return err
 		}
-		rbft.moveWatermarks(h)
+		rbft.moveWatermarks(h, false)
 	}
 
 	rbft.logger.Infof("Replica %d restored state: view: %d, seqNo: %d, reqBatches: %d, localCheckpoints: %d",

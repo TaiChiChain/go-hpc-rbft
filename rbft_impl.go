@@ -1770,7 +1770,7 @@ func (rbft *rbftImpl) finishConfigCheckpoint(checkpointHeight uint64, checkpoint
 	}
 
 	// NOTE! move watermark after turnIntoEpoch.
-	rbft.moveWatermarks(checkpointHeight)
+	rbft.moveWatermarks(checkpointHeight, true)
 
 	// finish config change and restart consensus
 	rbft.atomicOff(InConfChange)
@@ -1804,7 +1804,7 @@ func (rbft *rbftImpl) finishNormalCheckpoint(checkpointHeight uint64, checkpoint
 	rbft.logger.Infof("Replica %d found normal checkpoint quorum for seqNo %d, digest %s",
 		rbft.peerPool.ID, checkpointHeight, checkpointDigest)
 
-	rbft.moveWatermarks(checkpointHeight)
+	rbft.moveWatermarks(checkpointHeight, false)
 	rbft.logger.Infof("Replica %d post stable checkpoint event for seqNo %d after "+
 		"executed to the height with the same digest", rbft.peerPool.ID, rbft.h)
 	rbft.external.SendFilterEvent(types.InformTypeFilterStableCheckpoint, matchingCheckpoints)
@@ -1897,7 +1897,7 @@ func (rbft *rbftImpl) weakCheckpointSetOutOfRange(signedCheckpoint *pb.SignedChe
 }
 
 // moveWatermarks move low watermark h to n, and clear all message whose seqNo is smaller than h.
-func (rbft *rbftImpl) moveWatermarks(n uint64) {
+func (rbft *rbftImpl) moveWatermarks(n uint64, newEpoch bool) {
 
 	h := n
 
@@ -1965,8 +1965,18 @@ func (rbft *rbftImpl) moveWatermarks(n uint64) {
 			delete(rbft.storeMgr.localCheckpoints, seqNo)
 			rbft.persistDelCheckpoint(seqNo)
 		} else {
-			// NOTE! reset replicaId in case ID has been changed after turn into a higher epoch.
-			signedCheckpoint.NodeInfo.ReplicaId = rbft.peerPool.ID
+			if newEpoch {
+				// NOTE! reset replicaId in case ID has been changed after turn into a higher epoch.
+				signedCheckpoint.NodeInfo.ReplicaId = rbft.peerPool.ID
+				newSig, sErr := rbft.signCheckpoint(signedCheckpoint.Checkpoint)
+				if sErr != nil {
+					rbft.logger.Errorf("Replica %d sign checkpoint error: %s", rbft.peerPool.ID, sErr)
+					rbft.stopNamespace()
+					return
+				}
+				// NOTE! reset replicaId in case node cert has been replaced.
+				signedCheckpoint.Signature = newSig
+			}
 		}
 	}
 
@@ -2186,7 +2196,7 @@ func (rbft *rbftImpl) recvStateUpdatedEvent(ss *types.ServiceState) consensusEve
 	rbft.storeMgr.saveCheckpoint(seqNo, signedCheckpoint)
 	rbft.persistCheckpoint(seqNo, []byte(digest))
 	// NOTE! move watermark after turnIntoEpoch if epochChanged.
-	rbft.moveWatermarks(seqNo)
+	rbft.moveWatermarks(seqNo, epochChanged)
 
 	// 4. process recovery/vc.
 	if epochChanged {
