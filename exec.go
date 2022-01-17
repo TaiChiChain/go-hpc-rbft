@@ -233,6 +233,7 @@ func (rbft *rbftImpl) handleRecoveryEvent(e *LocalEvent) consensusEvent {
 		rbft.storeMgr.missingBatchesInFetching = make(map[string]msgID)
 		rbft.maybeSetNormal()
 		rbft.timerMgr.stopTimer(recoveryRestartTimer)
+		rbft.stopNewViewTimer()
 		rbft.logger.Noticef("======== Replica %d finished recovery, epoch=%d/view=%d/height=%d.", rbft.peerPool.ID, rbft.epoch, rbft.view, rbft.exec.lastExec)
 		rbft.logger.Notice(`
 
@@ -337,6 +338,7 @@ func (rbft *rbftImpl) handleViewChangeEvent(e *LocalEvent) consensusEvent {
 		delete(rbft.vcMgr.newViewStore, rbft.view)
 		rbft.storeMgr.missingBatchesInFetching = make(map[string]msgID)
 
+		rbft.stopNewViewTimer()
 		rbft.startTimerIfOutstandingRequests()
 		primaryID := rbft.primaryID(rbft.view)
 

@@ -439,8 +439,6 @@ func (rbft *rbftImpl) resetStateForRecovery() consensusEvent {
 
 	rbft.cleanOutstandingAndCert()
 
-	rbft.stopNewViewTimer()
-
 	// clear all cert with different view.
 	for idx := range rbft.storeMgr.certStore {
 		if idx.v != rbft.view {
