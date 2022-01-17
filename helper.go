@@ -788,7 +788,7 @@ func (rbft *rbftImpl) checkIfNeedStateUpdate(meta *types.MetaState, checkpointSe
 		// directly move watermarks to this checkpoint height as we have reached
 		// this stable checkpoint normally.
 		if rbft.storeMgr.localCheckpoints[seq].Checkpoint.Digest == dig {
-			rbft.moveWatermarks(seq)
+			rbft.moveWatermarks(seq, false)
 			rbft.external.SendFilterEvent(types.InformTypeFilterStableCheckpoint, checkpointSet)
 		}
 

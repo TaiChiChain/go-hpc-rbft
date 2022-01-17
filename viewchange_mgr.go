@@ -492,7 +492,6 @@ func (rbft *rbftImpl) resetStateForNewView() consensusEvent {
 
 	// empty the outstandingReqBatch, it is useless since new primary will resend pre-prepare
 	rbft.cleanOutstandingAndCert()
-	rbft.stopNewViewTimer()
 
 	// set seqNo to lastExec for new primary to sort following batches from correct seqNo.
 	rbft.batchMgr.setSeqNo(rbft.exec.lastExec)

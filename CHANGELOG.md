@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.2.37-2"></a>
+## [0.2.37-2](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.37-1...v0.2.37-2) (2022-01-07)
+
+
+### Bug Fixes
+
+* stop new view timer after finish vc/recovery ([2a4064a](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/2a4064a))
+
+
+
+<a name="0.2.37-1"></a>
+## [0.2.37-1](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.37...v0.2.37-1) (2021-12-14)
+
+
+### Bug Fixes
+
+* use remote consistent checkpoint to generate signed checkpoint after state update ([1b69be6](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/1b69be6)), closes [#flato-4175](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-4175)
+
+
+
 <a name="0.2.37"></a>
 ## [0.2.37](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.36-2...v0.2.37) (2021-12-09)
 
