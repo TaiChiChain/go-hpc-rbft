@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.2.38"></a>
+## [0.2.38](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.37-2...v0.2.38) (2022-01-17)
+
+
+### Bug Fixes
+
+* reset local checkpoint signature after epoch change in case of cert replace ([85a00a3](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/85a00a3))
+
+
+
 <a name="0.2.37-2"></a>
 ## [0.2.37-2](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.37-1...v0.2.37-2) (2022-01-07)
 
