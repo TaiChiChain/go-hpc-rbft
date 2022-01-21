@@ -80,12 +80,6 @@ type node struct {
 	currentState *types.ServiceState
 	// cpChan is used between node and RBFT service to deliver checkpoint state.
 	cpChan chan *types.ServiceState
-
-	// reloadRouter is used to store the validator set from reload temporarily
-	// for that consensus will use it to update router after the execution of config transaction
-	reloadRouter *types.Router
-	// mutex to set value of reloadRouter
-	reloadRouterLock sync.RWMutex
 	// confChan is used to track if config transaction execution was finished by CommitDB
 	confChan chan *types.ReloadFinished
 
@@ -114,8 +108,6 @@ func newNode(conf Config) (*node, error) {
 		confChan: confC,
 		config:   conf,
 		logger:   conf.Logger,
-
-		reloadRouter: nil,
 	}
 
 	rbft.node = n
@@ -228,9 +220,6 @@ func (n *node) ReportStateUpdated(state *types.ServiceState) {
 // ReportReloadFinished report router updated
 func (n *node) ReportReloadFinished(reload *types.ReloadMessage) {
 	switch reload.Type {
-	case types.ReloadTypeFinishReloadRouter:
-		n.logger.Noticef("Consensus-Reload finished, recv router: %+v", reload.Router)
-		n.setReloadRouter(reload.Router)
 	case types.ReloadTypeFinishReloadCommitDB:
 		n.logger.Noticef("Commit-DB finished, recv height: %d", reload.Height)
 		if n.rbft.atomicIn(InConfChange) && n.confChan != nil {
@@ -253,16 +242,4 @@ func (n *node) getCurrentState() *types.ServiceState {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
 	return n.currentState
-}
-
-func (n *node) setReloadRouter(router *types.Router) {
-	n.reloadRouterLock.Lock()
-	defer n.reloadRouterLock.Unlock()
-	n.reloadRouter = router
-}
-
-func (n *node) readReloadRouter() *types.Router {
-	n.reloadRouterLock.RLock()
-	defer n.reloadRouterLock.RUnlock()
-	return n.reloadRouter
 }

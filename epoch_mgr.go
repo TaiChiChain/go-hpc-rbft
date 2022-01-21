@@ -200,9 +200,6 @@ func (rbft *rbftImpl) turnIntoEpoch() {
   +==============================================+
 
 `)
-
-	// reset reload router cache
-	rbft.node.setReloadRouter(nil)
 }
 
 // setEpoch sets the epoch with the epochLock.

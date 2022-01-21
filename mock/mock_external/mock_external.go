@@ -351,6 +351,20 @@ func (mr *MockEpochServiceMockRecorder) GetNodeInfos() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNodeInfos", reflect.TypeOf((*MockEpochService)(nil).GetNodeInfos))
 }
 
+// GetEpoch mocks base method
+func (m *MockEpochService) GetEpoch() uint64 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetEpoch")
+	ret0, _ := ret[0].(uint64)
+	return ret0
+}
+
+// GetEpoch indicates an expected call of GetEpoch
+func (mr *MockEpochServiceMockRecorder) GetEpoch() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEpoch", reflect.TypeOf((*MockEpochService)(nil).GetEpoch))
+}
+
 // MockExternalStack is a mock of ExternalStack interface
 type MockExternalStack struct {
 	ctrl     *gomock.Controller
@@ -596,4 +610,18 @@ func (m *MockExternalStack) GetNodeInfos() []*protos.NodeInfo {
 func (mr *MockExternalStackMockRecorder) GetNodeInfos() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNodeInfos", reflect.TypeOf((*MockExternalStack)(nil).GetNodeInfos))
+}
+
+// GetEpoch mocks base method
+func (m *MockExternalStack) GetEpoch() uint64 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetEpoch")
+	ret0, _ := ret[0].(uint64)
+	return ret0
+}
+
+// GetEpoch indicates an expected call of GetEpoch
+func (mr *MockExternalStackMockRecorder) GetEpoch() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEpoch", reflect.TypeOf((*MockExternalStack)(nil).GetEpoch))
 }

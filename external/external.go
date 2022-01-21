@@ -83,6 +83,9 @@ type EpochService interface {
 
 	// GetNodeInfos returns the full node info with public key.
 	GetNodeInfos() []*protos.NodeInfo
+
+	// GetEpoch returns the current epoch.
+	GetEpoch() uint64
 }
 
 // ExternalStack integrates all external interfaces which must be implemented by application users.
