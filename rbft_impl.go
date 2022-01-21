@@ -1763,10 +1763,15 @@ func (rbft *rbftImpl) finishConfigCheckpoint(checkpointHeight uint64, checkpoint
 	}
 
 	// two types of config transaction:
-	// 1. validator set changed: try to start a new epoch
-	// 2. validator set not changed: do not start a new epoch
-	if rbft.atomicIn(InConfChange) {
+	// 1. epoch changed: try to start a new epoch
+	// 2. epoch not changed: do not start a new epoch
+	chainEpoch := rbft.external.GetEpoch()
+	epochChanged := chainEpoch != rbft.epoch
+	if epochChanged {
 		rbft.turnIntoEpoch()
+	} else {
+		rbft.logger.Noticef("Replica %d don't change epoch as epoch %d has not been changed",
+			rbft.peerPool.ID, rbft.epoch)
 	}
 
 	// NOTE! move watermark after turnIntoEpoch.

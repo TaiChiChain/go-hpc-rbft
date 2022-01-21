@@ -852,11 +852,6 @@ func (ext *testExternal) Execute(requests []*protos.Transaction, localList []boo
 				ext.testNode.n.logger.Debugf("Epoch Number %d", state.MetaState.Height)
 				ext.testNode.n.logger.Debugf("Validator Set %+v", router)
 				ext.tf.log.Infof("router: %+v", router)
-				re := &types.ReloadMessage{
-					Type:   types.ReloadTypeFinishReloadRouter,
-					Router: router,
-				}
-				ext.testNode.N.ReportReloadFinished(re)
 			}
 		}
 		go ext.testNode.N.ReportExecuted(state)
@@ -940,4 +935,8 @@ func (ext *testExternal) Reconfiguration() uint64 {
 
 func (ext *testExternal) GetNodeInfos() []*protos.NodeInfo {
 	return ext.testNode.VSet
+}
+
+func (ext *testExternal) GetEpoch() uint64 {
+	return ext.testNode.Epoch
 }

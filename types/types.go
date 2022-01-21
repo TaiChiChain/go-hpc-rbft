@@ -61,9 +61,6 @@ func (state *ServiceState) String() string {
 type ReloadType int32
 
 const (
-	// ReloadTypeFinishReloadRouter indicates the reload event of execution finished.
-	ReloadTypeFinishReloadRouter ReloadType = 0
-
 	// ReloadTypeFinishReloadCommitDB indicates the reload event of commit-db finished.
 	ReloadTypeFinishReloadCommitDB ReloadType = 1
 )
@@ -72,7 +69,6 @@ const (
 type ReloadMessage struct {
 	Type   ReloadType
 	Height uint64
-	Router *Router
 }
 
 // ReloadFinished is the reload finished event.
