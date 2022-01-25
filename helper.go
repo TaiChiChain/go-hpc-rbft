@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"math"
 
+	mockEngine "github.com/ultramesh/flato-common/mock"
 	fCommonTypes "github.com/ultramesh/flato-common/types"
 	"github.com/ultramesh/flato-common/types/protos"
 	pb "github.com/ultramesh/flato-rbft/rbftpb"
@@ -873,7 +874,7 @@ func (rbft *rbftImpl) stopNamespace() {
 }
 
 func requestHash(tx *protos.Transaction) string {
-	return fCommonTypes.GetHash(tx).Hex()
+	return fCommonTypes.GetHash(tx, &mockEngine.MockEngineImpl{}, fCommonTypes.KECCAK_256).String()
 }
 
 // calculateMD5Hash calculate hash by MD5
