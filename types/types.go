@@ -43,14 +43,16 @@ type EpochInfo struct {
 }
 
 func (state *ServiceState) String() string {
-	var s string
-	if state.MetaState != nil {
-		s += fmt.Sprintf("height: %d, digest: %s\n", state.MetaState.Height,
+	var ms string
+	if state.MetaState == nil {
+		ms = "NIL"
+	} else {
+		ms = fmt.Sprintf("height: %d, digest: %s", state.MetaState.Height,
 			state.MetaState.Digest)
 	}
-	s += fmt.Sprintf("epoch: %d", state.Epoch)
-	if s == "" {
-		return "NIL ServiceState"
+	s := fmt.Sprintf("epoch: %d, MetaState: %s", state.Epoch, ms)
+	if state.MetaState == nil {
+		return s
 	}
 	return s
 }
