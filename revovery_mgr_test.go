@@ -139,6 +139,18 @@ func TestRecovery_ReplicaRecovery(t *testing.T) {
 		}
 		rbfts[3].processEvent(returnRecoveryPQC[index])
 	}
+
+	// replica 3 fetch missing txs of batch 1
+	fetchMissingReq := nodes[3].unicastMessageCache
+	assert.Equal(t, pb.Type_FETCH_MISSING_REQUESTS, fetchMissingReq.Type)
+	rbfts[0].processEvent(fetchMissingReq)
+
+	// primary 1 return fetch missing txs of batch 1
+	sendMissingTxs := nodes[0].unicastMessageCache
+	assert.Equal(t, pb.Type_SEND_MISSING_REQUESTS, sendMissingTxs.Type)
+	// replica 3 execute batch 1 and 2.
+	rbfts[3].processEvent(sendMissingTxs)
+
 	assert.Equal(t, uint64(2), rbfts[3].exec.lastExec)
 }
 
