@@ -353,7 +353,7 @@ func (rbft *rbftImpl) isCommitLegal(commit *pb.Commit) bool {
 func (rbft *rbftImpl) compareCheckpointWithWeakSet(signedCheckpoint *pb.SignedCheckpoint) (bool, []*pb.SignedCheckpoint) {
 	// if checkpoint height is lower than current low watermark, ignore it as we have reached a higher h,
 	// else, continue to find f+1 checkpoint messages with the same seqNo and ID
-	checkpointHeight := signedCheckpoint.Checkpoint.Height
+	checkpointHeight := signedCheckpoint.Checkpoint.Height()
 	checkpointHash := hex.EncodeToString(signedCheckpoint.Checkpoint.Hash())
 	if !rbft.inW(checkpointHeight) {
 		if checkpointHeight != rbft.h && !rbft.in(SkipInProgress) {
@@ -436,12 +436,12 @@ func (rbft *rbftImpl) compareCheckpointWithWeakSet(signedCheckpoint *pb.SignedCh
 	// if we can only find one weak cert with the same seqNo and ID, our generated checkpoint(if
 	// existed) must have the same ID with that one.
 	correctCheckpoints := diffValues[correctHashes[0]]
-	correctID := correctCheckpoints[0].Checkpoint.Digest
+	correctID := correctCheckpoints[0].Checkpoint.Digest()
 	localCheckpoint, exist := rbft.storeMgr.localCheckpoints[checkpointHeight]
 
 	// if self's checkpoint with the same seqNo has a distinguished ID with a weak certs'
 	// checkpoint ID, we should trigger state update right now to recover self block state.
-	if exist && localCheckpoint.Checkpoint.Digest != correctID {
+	if exist && localCheckpoint.Checkpoint.Digest() != correctID {
 		rbft.logger.Criticalf("Replica %d generated a checkpoint of %s, but a weak set of the network agrees on %s.",
 			rbft.peerPool.ID, localCheckpoint, correctID)
 
@@ -697,7 +697,7 @@ func (rbft *rbftImpl) gatherPQC() (cset []*pb.Vc_C, pset []*pb.Vc_PQ, qset []*pb
 	for n, signedCheckpoint := range rbft.storeMgr.localCheckpoints {
 		cset = append(cset, &pb.Vc_C{
 			SequenceNumber: n,
-			Digest:         signedCheckpoint.Checkpoint.Digest,
+			Digest:         signedCheckpoint.Checkpoint.Digest(),
 		})
 		signedCheckpoints = append(signedCheckpoints, signedCheckpoint)
 		rbft.logger.Debugf("seqNo: %d, ID: %s", n, signedCheckpoint.Checkpoint.Digest)
@@ -787,7 +787,7 @@ func (rbft *rbftImpl) checkIfNeedStateUpdate(meta *types.MetaState, checkpointSe
 		// this height(maybe caused by missing checkpoint msg from other nodes),
 		// directly move watermarks to this checkpoint height as we have reached
 		// this stable checkpoint normally.
-		if rbft.storeMgr.localCheckpoints[seq].Checkpoint.Digest == dig {
+		if rbft.storeMgr.localCheckpoints[seq].Checkpoint.Digest() == dig {
 			rbft.moveWatermarks(seq, false)
 			rbft.external.SendFilterEvent(types.InformTypeFilterStableCheckpoint, checkpointSet)
 		}
@@ -908,14 +908,17 @@ func (rbft *rbftImpl) generateSignedCheckpoint(state *types.ServiceState) (*pb.S
 	}
 
 	checkpoint := &protos.Checkpoint{
-		Epoch:   rbft.epoch,
-		Height:  state.MetaState.Height,
-		Digest:  state.MetaState.Digest,
-		NextSet: nil,
+		Epoch:         rbft.epoch,
+		ConsensusInfo: nil,
+		StateInfo: &protos.Checkpoint_StateInfo{
+			Height: state.MetaState.Height,
+			Digest: state.MetaState.Digest,
+		},
+		ConfigInfo: nil,
 	}
 	if state.Epoch > rbft.epoch {
-		checkpoint.NextSet = rbft.external.GetNodeInfos()
-		rbft.logger.Noticef("Replica %d generate a checkpoint with new validator set: %+v", rbft.peerPool.ID, checkpoint.NextSet)
+		checkpoint.SetValidatorSet(rbft.external.GetNodeInfos())
+		rbft.logger.Noticef("Replica %d generate a checkpoint with new validator set: %+v", rbft.peerPool.ID, checkpoint.ValidatorSet())
 	}
 	signedCheckpoint.Checkpoint = checkpoint
 

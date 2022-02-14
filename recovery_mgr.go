@@ -818,9 +818,9 @@ func (rbft *rbftImpl) recvSyncStateRsp(rsp *pb.SyncStateResponse, local bool) co
 	}
 
 	if oldRsp, ok := rbft.recoveryMgr.syncRspStore[rsp.SignedCheckpoint.NodeInfo.ReplicaHash]; ok {
-		if oldRsp.SignedCheckpoint.Checkpoint.Height > checkpoint.Height {
+		if oldRsp.SignedCheckpoint.Checkpoint.Height() > checkpoint.Height() {
 			rbft.logger.Debugf("Duplicate sync state response, new height=%d is lower than old height=%d, reject it",
-				checkpoint.Height, oldRsp.SignedCheckpoint.Checkpoint.Height)
+				checkpoint.Height(), oldRsp.SignedCheckpoint.Checkpoint.Height())
 			return nil
 		}
 	}
@@ -832,8 +832,8 @@ func (rbft *rbftImpl) recvSyncStateRsp(rsp *pb.SyncStateResponse, local bool) co
 				view: response.View,
 
 				epoch:  response.SignedCheckpoint.Checkpoint.Epoch,
-				height: response.SignedCheckpoint.Checkpoint.Height,
-				digest: response.SignedCheckpoint.Checkpoint.Digest,
+				height: response.SignedCheckpoint.Checkpoint.Height(),
+				digest: response.SignedCheckpoint.Checkpoint.Digest(),
 			}
 		}
 		return rbft.compareWholeStates(states)
