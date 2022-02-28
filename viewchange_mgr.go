@@ -599,7 +599,7 @@ func (rbft *rbftImpl) recvSendRequestBatch(batch *pb.SendRequestBatch) consensus
 		rbft.logger.Debugf("Replica %d received missing request: %s, but we don't miss this request, ignore it", rbft.peerPool.ID, digest)
 		return nil // either the wrong digest, or we got it already from someone else
 	}
-	// store into batchStore only，and store into requestPool by order when processNewView.
+	// store into batchStore only, and store into requestPool by order when processNewView.
 	rbft.storeMgr.batchStore[digest] = batch.Batch
 	rbft.persistBatch(digest)
 	rbft.metrics.batchesGauge.Add(float64(1))
