@@ -1305,23 +1305,6 @@ func (rbft *rbftImpl) recvFetchMissingTxs(fetch *pb.FetchMissingRequests) error 
 		ReplicaId:            rbft.peerPool.ID,
 	}
 
-	defer func() {
-		if r := recover(); r != nil {
-			rbft.logger.Warningf("Primary %d finds marshal error: %v in marshaling SendMissingTxs, retry.", rbft.peerPool.ID, r)
-			localEvent := &LocalEvent{
-				Service:   CoreRbftService,
-				EventType: CoreResendMissingTxsEvent,
-				Event:     fetch,
-			}
-			if rbft.atomicIn(Pending) {
-				rbft.logger.Debugf("Replica %d is in pending status, reject consensus messages", rbft.peerPool.ID)
-				return
-			}
-
-			go rbft.postMsg(localEvent)
-		}
-	}()
-
 	payload, err := proto.Marshal(re)
 	if err != nil {
 		rbft.logger.Errorf("ConsensusMessage_SEND_MISSING_TXS Marshal Error: %s", err)

@@ -300,3 +300,24 @@ func TestExec_handleViewChangeEvent_ViewChangeResendTimerEvent(t *testing.T) {
 	rbfts[1].handleViewChangeEvent(ev)
 	assert.Equal(t, pb.Type_NOTIFICATION, nodes[1].broadcastMessageCache.Type)
 }
+
+func TestExec_handleEpochMgrEvent_FetchCheckpointEvent(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	nodes, rbfts := newBasicClusterInstance()
+
+	ev := &LocalEvent{
+		Service:   EpochMgrService,
+		EventType: FetchCheckpointEvent,
+	}
+
+	rbfts[1].handleEpochMgrEvent(ev)
+
+	rbfts[1].epochMgr.configBatchToCheck = &types.MetaState{
+		Height: 10,
+		Digest: "block-hash-10",
+	}
+	rbfts[1].handleEpochMgrEvent(ev)
+	assert.Equal(t, pb.Type_FETCH_CHECKPOINT, nodes[1].broadcastMessageCache.Type)
+}

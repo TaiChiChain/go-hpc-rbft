@@ -410,6 +410,26 @@ func TestRBFT_processOutOfDateReqs(t *testing.T) {
 	rbfts[1].setNormal()
 	rbfts[1].processOutOfDateReqs()
 	assert.Equal(t, false, rbfts[1].isPoolFull())
+
+	// split according to set size when broadcast.
+	batch := make([]*protos.Transaction, 100)
+	for i := 0; i < 100; i++ {
+		batch[i] = newTx()
+	}
+	rbfts[1].batchMgr.requestPool.AddNewRequests(batch, false, true)
+	// sleep to trigger txpool tolerance time.
+	time.Sleep(1 * time.Second)
+	rbfts[1].processOutOfDateReqs()
+	assert.Equal(t, false, rbfts[1].isPoolFull())
+
+	// split according to set mem size when broadcast.
+	rbfts[1].flowControl = true
+	rbfts[1].flowControlMaxMem = 3 * batch[0].Size()
+	rbfts[1].batchMgr.requestPool.AddNewRequests(batch, false, true)
+	// sleep to trigger txpool tolerance time.
+	time.Sleep(1 * time.Second)
+	rbfts[1].processOutOfDateReqs()
+	assert.Equal(t, false, rbfts[1].isPoolFull())
 }
 
 func TestRBFT_sendNullRequest(t *testing.T) {
@@ -551,6 +571,15 @@ func TestRBFT_recvFetchMissingTxs(t *testing.T) {
 	}
 
 	var ret consensusEvent
+	rbfts[1].exec.lastExec = uint64(10)
+	ret = rbfts[1].recvSendMissingTxs(re)
+	assert.Nil(t, ret)
+
+	rbfts[1].storeMgr.missingBatchesInFetching[preprep.BatchDigest] = msgID{
+		v: preprep.View,
+		n: preprep.SequenceNumber,
+		d: preprep.BatchDigest,
+	}
 	rbfts[1].exec.lastExec = uint64(10)
 	ret = rbfts[1].recvSendMissingTxs(re)
 	assert.Nil(t, ret)
