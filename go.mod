@@ -6,15 +6,15 @@ require (
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/mock v1.4.4
 	github.com/stretchr/testify v1.6.1
-	github.com/ultramesh/fancylogger v0.1.2
-	github.com/ultramesh/flato-common v0.2.30
-	github.com/ultramesh/flato-txpool v0.2.13
+	github.com/ultramesh/fancylogger v0.1.3
+	github.com/ultramesh/flato-common v0.2.39
+	github.com/ultramesh/flato-txpool v0.2.16
 )
 
-replace github.com/ultramesh/crypto-standard => git.hyperchain.cn/ultramesh/crypto-standard.git v0.2.3
+replace github.com/ultramesh/crypto-standard => git.hyperchain.cn/ultramesh/crypto-standard.git v0.2.5
 
-replace github.com/ultramesh/flato-common => git.hyperchain.cn/ultramesh/flato-common.git v0.2.30
+replace github.com/ultramesh/flato-common => git.hyperchain.cn/ultramesh/flato-common.git v0.2.39
 
-replace github.com/ultramesh/flato-txpool => git.hyperchain.cn/ultramesh/flato-txpool.git v0.2.13
+replace github.com/ultramesh/flato-txpool => git.hyperchain.cn/ultramesh/flato-txpool.git v0.2.16
 
-replace github.com/ultramesh/fancylogger => git.hyperchain.cn/ultramesh/fancylogger.git v0.1.2
+replace github.com/ultramesh/fancylogger => git.hyperchain.cn/ultramesh/fancylogger.git v0.1.3
