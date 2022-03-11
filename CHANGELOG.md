@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.2.43"></a>
+## [0.2.43](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.42...v0.2.43) (2022-03-11)
+
+
+### Bug Fixes
+
+* stop batch timer when node cannot create batch after batch timeout ([1893ca4](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/1893ca4))
+
+
+
 <a name="0.2.42"></a>
 ## [0.2.42](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.41...v0.2.42) (2022-03-11)
 
