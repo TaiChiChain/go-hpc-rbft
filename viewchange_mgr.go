@@ -188,10 +188,10 @@ func (rbft *rbftImpl) recvViewChange(vc *pb.ViewChange) consensusEvent {
 	// has not expired"
 	replicas := make(map[uint64]bool)
 	minView := uint64(0)
-	for idx := range rbft.vcMgr.viewChangeStore {
-		if vc.Timestamp+int64(rbft.timerMgr.getTimeoutValue(cleanViewChangeTimer)) < time.Now().UnixNano() {
+	for idx, remoteVC := range rbft.vcMgr.viewChangeStore {
+		if remoteVC.Timestamp+int64(rbft.timerMgr.getTimeoutValue(cleanViewChangeTimer)) < time.Now().UnixNano() {
 			rbft.logger.Debugf("Replica %d drop an out-of-time viewChange message from replica %d",
-				rbft.peerPool.ID, vc.Basis.ReplicaId)
+				rbft.peerPool.ID, remoteVC.Basis.ReplicaId)
 			delete(rbft.vcMgr.viewChangeStore, idx)
 			continue
 		}
