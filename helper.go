@@ -700,7 +700,7 @@ func (rbft *rbftImpl) gatherPQC() (cset []*pb.Vc_C, pset []*pb.Vc_PQ, qset []*pb
 			Digest:         signedCheckpoint.Checkpoint.Digest(),
 		})
 		signedCheckpoints = append(signedCheckpoints, signedCheckpoint)
-		rbft.logger.Debugf("seqNo: %d, ID: %s", n, signedCheckpoint.Checkpoint.Digest)
+		rbft.logger.Debugf("seqNo: %d, ID: %s", n, signedCheckpoint.Checkpoint.Digest())
 	}
 	// Gather all the p entries
 	rbft.logger.Debugf("Replica %d gather PSet:", rbft.peerPool.ID)

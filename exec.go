@@ -122,6 +122,11 @@ func (rbft *rbftImpl) handleCoreRbftEvent(e *LocalEvent) consensusEvent {
 	switch e.EventType {
 	case CoreBatchTimerEvent:
 		if !rbft.isNormal() {
+			rbft.logger.Debugf("Replica %d is in abnormal, not try to create a batch", rbft.peerPool.ID)
+			return nil
+		}
+		if !rbft.isPrimary(rbft.peerPool.ID) {
+			rbft.logger.Debugf("Replica %d is not primary, not try to create a batch", rbft.peerPool.ID)
 			return nil
 		}
 		rbft.logger.Debugf("Primary %d batch timer expired, try to create a batch", rbft.peerPool.ID)
