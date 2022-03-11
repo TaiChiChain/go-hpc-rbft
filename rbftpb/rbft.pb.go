@@ -2229,7 +2229,7 @@ func (m *FetchMissingRequests) MarshalTo(dAtA []byte) (int, error) {
 		i += copy(dAtA[i:], m.BatchDigest)
 	}
 	if len(m.MissingRequestHashes) > 0 {
-		for k, _ := range m.MissingRequestHashes {
+		for k := range m.MissingRequestHashes {
 			dAtA[i] = 0x2a
 			i++
 			v := m.MissingRequestHashes[k]
@@ -2284,7 +2284,7 @@ func (m *SendMissingRequests) MarshalTo(dAtA []byte) (int, error) {
 		i += copy(dAtA[i:], m.BatchDigest)
 	}
 	if len(m.MissingRequestHashes) > 0 {
-		for k, _ := range m.MissingRequestHashes {
+		for k := range m.MissingRequestHashes {
 			dAtA[i] = 0x2a
 			i++
 			v := m.MissingRequestHashes[k]
@@ -2300,7 +2300,7 @@ func (m *SendMissingRequests) MarshalTo(dAtA []byte) (int, error) {
 		}
 	}
 	if len(m.MissingRequests) > 0 {
-		for k, _ := range m.MissingRequests {
+		for k := range m.MissingRequests {
 			dAtA[i] = 0x32
 			i++
 			v := m.MissingRequests[k]
@@ -2801,7 +2801,7 @@ func (m *NewView) MarshalTo(dAtA []byte) (int, error) {
 		i = encodeVarintRbft(dAtA, i, uint64(m.View))
 	}
 	if len(m.Xset) > 0 {
-		for k, _ := range m.Xset {
+		for k := range m.Xset {
 			dAtA[i] = 0x1a
 			i++
 			v := m.Xset[k]

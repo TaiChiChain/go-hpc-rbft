@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.2.41"></a>
+## [0.2.41](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.40...v0.2.41) (2022-03-11)
+
+
+### Features
+
+* **checkpoint:** #flato-4275,adapt new checkpoint protocol ([08cbb04](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/08cbb04)), closes [#flato-4275](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-4275)
+
+
+
 <a name="0.2.40"></a>
 ## [0.2.40](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.39...v0.2.40) (2022-03-01)
 
