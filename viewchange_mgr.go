@@ -769,8 +769,8 @@ func (rbft *rbftImpl) selectInitialCheckpoint(set []*pb.VcBasis) (*types.MetaSta
 				rbft.logger.Warningf("Replica %d received an invalid vc basis with nil checkpoint", rbft.peerPool.ID)
 				continue
 			}
-			if basis.SignedCheckpoints[i].Checkpoint.Height != c.SequenceNumber ||
-				basis.SignedCheckpoints[i].Checkpoint.Digest != c.Digest {
+			if basis.SignedCheckpoints[i].Checkpoint.Height() != c.SequenceNumber ||
+				basis.SignedCheckpoints[i].Checkpoint.Digest() != c.Digest {
 				rbft.logger.Warningf("Replica %d received an invalid vc basis with inconsistent info", rbft.peerPool.ID)
 				continue
 			}

@@ -314,19 +314,19 @@ func TestHelper_compareCheckpointWithWeakSet(t *testing.T) {
 
 	mockCheckpoint2 := &pb.SignedCheckpoint{
 		NodeInfo:   &pb.NodeInfo{ReplicaId: 2, ReplicaHash: calHash("node2")},
-		Checkpoint: &protos.Checkpoint{Epoch: 0, Height: 10, Digest: "block-hash-10"},
+		Checkpoint: &protos.Checkpoint{Epoch: 0, StateInfo: &protos.Checkpoint_StateInfo{Height: 10, Digest: "block-hash-10"}},
 		Signature:  nil,
 	}
 	mockCheckpoint3 := &pb.SignedCheckpoint{
 		NodeInfo:   &pb.NodeInfo{ReplicaId: 3, ReplicaHash: calHash("node3")},
-		Checkpoint: &protos.Checkpoint{Epoch: 0, Height: 10, Digest: "block-hash-10"},
+		Checkpoint: &protos.Checkpoint{Epoch: 0, StateInfo: &protos.Checkpoint_StateInfo{Height: 10, Digest: "block-hash-10"}},
 		Signature:  nil,
 	}
 
 	// out of watermark
 	mockCheckpoint4 := &pb.SignedCheckpoint{
 		NodeInfo:   &pb.NodeInfo{ReplicaId: 4, ReplicaHash: calHash("node4")},
-		Checkpoint: &protos.Checkpoint{Epoch: 0, Height: 0, Digest: "block-hash-0"},
+		Checkpoint: &protos.Checkpoint{Epoch: 0, StateInfo: &protos.Checkpoint_StateInfo{Height: 0, Digest: "block-hash-0"}},
 		Signature:  nil,
 	}
 
@@ -337,7 +337,7 @@ func TestHelper_compareCheckpointWithWeakSet(t *testing.T) {
 	// in watermark, but don't have enough checkpoint
 	mockCheckpoint4 = &pb.SignedCheckpoint{
 		NodeInfo:   &pb.NodeInfo{ReplicaId: 4, ReplicaHash: calHash("node4")},
-		Checkpoint: &protos.Checkpoint{Epoch: 0, Height: 10, Digest: "block-hash-10"},
+		Checkpoint: &protos.Checkpoint{Epoch: 0, StateInfo: &protos.Checkpoint_StateInfo{Height: 10, Digest: "block-hash-10"}},
 		Signature:  nil,
 	}
 
@@ -350,7 +350,7 @@ func TestHelper_compareCheckpointWithWeakSet(t *testing.T) {
 	rbfts[0].storeMgr.checkpointStore[chkptID{nodeHash: calHash("node3"), sequence: 10}] = mockCheckpoint3
 	mockCheckpoint4 = &pb.SignedCheckpoint{
 		NodeInfo:   &pb.NodeInfo{ReplicaId: 4, ReplicaHash: calHash("node4")},
-		Checkpoint: &protos.Checkpoint{Epoch: 0, Height: 10, Digest: "block-hash-10"},
+		Checkpoint: &protos.Checkpoint{Epoch: 0, StateInfo: &protos.Checkpoint_StateInfo{Height: 10, Digest: "block-hash-10"}},
 		Signature:  nil,
 	}
 
@@ -361,7 +361,7 @@ func TestHelper_compareCheckpointWithWeakSet(t *testing.T) {
 	// in watermark, have self valid checkpoint
 	selfCheckpoint := &pb.SignedCheckpoint{
 		NodeInfo:   &pb.NodeInfo{ReplicaId: 1, ReplicaHash: calHash("node1")},
-		Checkpoint: &protos.Checkpoint{Epoch: 0, Height: 10, Digest: "block-hash-10"},
+		Checkpoint: &protos.Checkpoint{Epoch: 0, StateInfo: &protos.Checkpoint_StateInfo{Height: 10, Digest: "block-hash-10"}},
 		Signature:  nil,
 	}
 	rbfts[0].storeMgr.localCheckpoints = map[uint64]*pb.SignedCheckpoint{10: selfCheckpoint}
@@ -373,7 +373,7 @@ func TestHelper_compareCheckpointWithWeakSet(t *testing.T) {
 	// in watermark, have self invalid checkpoint(incorrect block hash)
 	selfCheckpoint = &pb.SignedCheckpoint{
 		NodeInfo:   &pb.NodeInfo{ReplicaId: 1, ReplicaHash: calHash("node1")},
-		Checkpoint: &protos.Checkpoint{Epoch: 0, Height: 10, Digest: "block-hash-20"},
+		Checkpoint: &protos.Checkpoint{Epoch: 0, StateInfo: &protos.Checkpoint_StateInfo{Height: 10, Digest: "block-hash-20"}},
 		Signature:  nil,
 	}
 	rbfts[0].storeMgr.localCheckpoints = map[uint64]*pb.SignedCheckpoint{10: selfCheckpoint}
@@ -386,10 +386,10 @@ func TestHelper_compareCheckpointWithWeakSet(t *testing.T) {
 	rbfts[0].off(SkipInProgress)
 	rbfts[0].off(StateTransferring)
 	rbfts[0].setNormal()
-	mockCheckpoint2.Checkpoint = &protos.Checkpoint{Epoch: 0, Height: 10, Digest: "block-hash-0"}
+	mockCheckpoint2.Checkpoint = &protos.Checkpoint{Epoch: 0, StateInfo: &protos.Checkpoint_StateInfo{Height: 10, Digest: "block-hash-0"}}
 	mockCheckpoint4 = &pb.SignedCheckpoint{
 		NodeInfo:   &pb.NodeInfo{ReplicaId: 4, ReplicaHash: calHash("node4")},
-		Checkpoint: &protos.Checkpoint{Epoch: 0, Height: 10, Digest: "block-hash-20"},
+		Checkpoint: &protos.Checkpoint{Epoch: 0, StateInfo: &protos.Checkpoint_StateInfo{Height: 10, Digest: "block-hash-20"}},
 		Signature:  nil,
 	}
 	rbfts[0].storeMgr.localCheckpoints = map[uint64]*pb.SignedCheckpoint{10: selfCheckpoint}
@@ -404,10 +404,10 @@ func TestHelper_compareCheckpointWithWeakSet(t *testing.T) {
 	// in watermark, but fork has happened(2 vs 2)
 	rbfts[0].off(Inconsistent)
 	rbfts[0].setNormal()
-	mockCheckpoint2.Checkpoint = &protos.Checkpoint{Epoch: 0, Height: 10, Digest: "block-hash-10"}
+	mockCheckpoint2.Checkpoint = &protos.Checkpoint{Epoch: 0, StateInfo: &protos.Checkpoint_StateInfo{Height: 10, Digest: "block-hash-10"}}
 	mockCheckpoint4 = &pb.SignedCheckpoint{
 		NodeInfo:   &pb.NodeInfo{ReplicaId: 4, ReplicaHash: calHash("node4")},
-		Checkpoint: &protos.Checkpoint{Epoch: 0, Height: 10, Digest: "block-hash-20"},
+		Checkpoint: &protos.Checkpoint{Epoch: 0, StateInfo: &protos.Checkpoint_StateInfo{Height: 10, Digest: "block-hash-20"}},
 		Signature:  nil,
 	}
 	rbfts[0].storeMgr.checkpointStore[chkptID{nodeHash: calHash("node1"), sequence: 10}] = selfCheckpoint

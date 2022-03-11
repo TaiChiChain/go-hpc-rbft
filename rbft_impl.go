@@ -330,7 +330,7 @@ func (rbft *rbftImpl) start() error {
 	// current state has already been checked to be stable, and we need not to check it again
 	metaS := &types.MetaState{
 		Height: rbft.h,
-		Digest: rbft.storeMgr.localCheckpoints[rbft.h].Checkpoint.Digest,
+		Digest: rbft.storeMgr.localCheckpoints[rbft.h].Checkpoint.Digest(),
 	}
 	if rbft.equalMetaState(rbft.epochMgr.configBatchToCheck, metaS) {
 		rbft.logger.Info("Config batch to check has already been stable, reset it")
@@ -1640,8 +1640,8 @@ func (rbft *rbftImpl) recvCheckpoint(signedCheckpoint *pb.SignedCheckpoint, loca
 		return nil
 	}
 
-	checkpointHeight := signedCheckpoint.Checkpoint.Height
-	checkpointDigest := signedCheckpoint.Checkpoint.Digest
+	checkpointHeight := signedCheckpoint.Checkpoint.Height()
+	checkpointDigest := signedCheckpoint.Checkpoint.Digest()
 	rbft.logger.Debugf("Replica %d received checkpoint from replica %d, seqNo %d, digest %s",
 		rbft.peerPool.ID, signedCheckpoint.NodeInfo.ReplicaId, checkpointHeight, checkpointDigest)
 
@@ -1813,7 +1813,7 @@ func (rbft *rbftImpl) finishNormalCheckpoint(checkpointHeight uint64, checkpoint
 // we would like to start high-watermark timer in order to get the latest stable checkpoint.
 func (rbft *rbftImpl) weakCheckpointSetOutOfRange(signedCheckpoint *pb.SignedCheckpoint) bool {
 	H := rbft.h + rbft.L
-	checkpointHeight := signedCheckpoint.Checkpoint.Height
+	checkpointHeight := signedCheckpoint.Checkpoint.Height()
 
 	// Track the last observed checkpoint sequence number if it exceeds our high watermark,
 	// keyed by replica to prevent unbounded growth
@@ -1833,13 +1833,13 @@ func (rbft *rbftImpl) weakCheckpointSetOutOfRange(signedCheckpoint *pb.SignedChe
 			highestWeakCertMeta := types.MetaState{}
 			weakCertRecord := make(map[types.MetaState][]*pb.SignedCheckpoint)
 			for replicaHash, remoteCheckpoint := range rbft.storeMgr.higherCheckpoints {
-				if remoteCheckpoint.Checkpoint.Height <= H {
+				if remoteCheckpoint.Checkpoint.Height() <= H {
 					delete(rbft.storeMgr.higherCheckpoints, replicaHash)
 					continue
 				}
 				meta := types.MetaState{
-					Height: remoteCheckpoint.Checkpoint.Height,
-					Digest: remoteCheckpoint.Checkpoint.Digest,
+					Height: remoteCheckpoint.Checkpoint.Height(),
+					Digest: remoteCheckpoint.Checkpoint.Digest(),
 				}
 				if _, exist := weakCertRecord[meta]; !exist {
 					weakCertRecord[meta] = []*pb.SignedCheckpoint{remoteCheckpoint}

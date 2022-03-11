@@ -15,7 +15,7 @@
 syntax = "proto3";
 
 import "github.com/ultramesh/flato-common/types/protos/transaction.proto";
-import "github.com/ultramesh/flato-common/types/protos/ledger_info.proto";
+import "github.com/ultramesh/flato-common/types/protos/checkpoint.proto";
 
 package rbftpb;
 

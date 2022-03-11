@@ -132,10 +132,13 @@ func TestExec_handleCoreRbftEvent_StateUpdatedEvent(t *testing.T) {
 		Epoch:     uint64(0),
 	}
 	checkpoint := &protos.Checkpoint{
-		Epoch:   uint64(0),
-		Height:  uint64(10),
-		Digest:  "block-number-10",
-		NextSet: nil,
+		Epoch:         uint64(0),
+		ConsensusInfo: nil,
+		StateInfo: &protos.Checkpoint_StateInfo{
+			Height: uint64(10),
+			Digest: "block-number-10",
+		},
+		ConfigInfo: nil,
 	}
 	ev := &LocalEvent{
 		Service:   CoreRbftService,

@@ -57,10 +57,13 @@ func TestEpoch_recvFetchCheckpoint_SendBackNormal(t *testing.T) {
 	signedC := &pb.SignedCheckpoint{
 		NodeInfo: rbfts[0].getNodeInfo(),
 		Checkpoint: &protos.Checkpoint{
-			Epoch:   rbfts[0].epoch,
-			Height:  uint64(12),
-			Digest:  "block-number-12",
-			NextSet: nil,
+			Epoch:         rbfts[0].epoch,
+			ConsensusInfo: nil,
+			StateInfo: &protos.Checkpoint_StateInfo{
+				Height: uint64(12),
+				Digest: "block-number-12",
+			},
+			ConfigInfo: nil,
 		},
 		Signature: nil,
 	}
@@ -84,10 +87,13 @@ func TestEpoch_recvFetchCheckpoint_SendBackStableCheckpoint(t *testing.T) {
 	signedC := &pb.SignedCheckpoint{
 		NodeInfo: rbfts[0].getNodeInfo(),
 		Checkpoint: &protos.Checkpoint{
-			Epoch:   rbfts[0].epoch,
-			Height:  uint64(50),
-			Digest:  "block-number-50",
-			NextSet: nil,
+			Epoch:         rbfts[0].epoch,
+			ConsensusInfo: nil,
+			StateInfo: &protos.Checkpoint_StateInfo{
+				Height: uint64(50),
+				Digest: "block-number-50",
+			},
+			ConfigInfo: nil,
 		},
 		Signature: nil,
 	}
