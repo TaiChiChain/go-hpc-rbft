@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.2.42"></a>
+## [0.2.42](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.41...v0.2.42) (2022-03-11)
+
+
+### Bug Fixes
+
+* reject create batch when node is not primary ([6c30ebd](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/6c30ebd))
+
+
+
 <a name="0.2.41"></a>
 ## [0.2.41](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.40...v0.2.41) (2022-03-11)
 
