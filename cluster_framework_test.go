@@ -902,7 +902,7 @@ func (ext *testExternal) SendFilterEvent(informType types.InformType, message ..
 		if !ok {
 			return
 		}
-		height := signedCheckpoints[0].Checkpoint.Height
+		height := signedCheckpoints[0].Checkpoint.Height()
 
 		switch informType {
 		case types.InformTypeFilterStableCheckpoint:
