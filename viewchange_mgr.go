@@ -1072,7 +1072,7 @@ func (rbft *rbftImpl) processNewView(msgList xset) {
 			}
 
 			// re-construct batches by order in xSet to de-duplicate txs during different batches in msgList which
-			// may be cause by different primary puts the same txs into different batches with different seqNo'
+			// may be caused by different primary puts the same txs into different batches with different seqNo'
 			oldBatch := &txpool.RequestHashBatch{
 				BatchHash:  batch.BatchHash,
 				TxHashList: batch.RequestHashList,
