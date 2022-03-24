@@ -450,14 +450,22 @@ func (rbft *rbftImpl) resetStateForRecovery() consensusEvent {
 		}
 	}
 
-	// remove all the batches that smaller than initial checkpoint.
-	var deleteList []string
+	var (
+		// remove all the batches that smaller than initial checkpoint.
+		deleteList []string
+		// NOTE!!! save batches with seqNo larger than initial checkpoint because those
+		// batches may be useful in PQList.
+		saveBatches []string
+	)
 	for digest, batch := range rbft.storeMgr.batchStore {
 		if batch.SeqNo <= rbft.h {
 			rbft.logger.Debugf("Replica %d clear batch %s with seqNo %d <= initial checkpoint %d", rbft.peerPool.ID, digest, batch.SeqNo, rbft.h)
 			delete(rbft.storeMgr.batchStore, digest)
 			rbft.persistDelBatch(digest)
 			deleteList = append(deleteList, digest)
+		} else {
+			rbft.logger.Debugf("Replica %d save batch %s with seqNo %d > initial checkpoint %d", rbft.peerPool.ID, digest, batch.SeqNo, rbft.h)
+			saveBatches = append(saveBatches, digest)
 		}
 	}
 	rbft.metrics.batchesGauge.Set(float64(len(rbft.storeMgr.batchStore)))
@@ -467,10 +475,9 @@ func (rbft *rbftImpl) resetStateForRecovery() consensusEvent {
 		rbft.setNotFull()
 	}
 
-	// directly restore all batchedTxs back into non-batched txs and reset to batched status
-	// after fetchPQC if needed.
-	rbft.logger.Noticef("Replica %d restore txpool when reset state in recovery", rbft.peerPool.ID)
-	rbft.batchMgr.requestPool.RestorePool()
+	// directly restore all batchedTxs back into non-batched txs except those in batchStore.
+	rbft.logger.Noticef("Replica %d reset txpool when reset state in recovery", rbft.peerPool.ID)
+	rbft.batchMgr.requestPool.Reset(saveBatches)
 
 	// clear cacheBatch as they are useless and all related batches have been restored in requestPool.
 	rbft.batchMgr.cacheBatch = nil
