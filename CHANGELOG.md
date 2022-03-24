@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.2.44"></a>
+## [0.2.44](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.43...v0.2.44) (2022-03-24)
+
+
+### Features
+
+* **crypto:** Hash solution ([d63d287](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/d63d287))
+
+
+
 <a name="0.2.43"></a>
 ## [0.2.43](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.42...v0.2.43) (2022-03-11)
 
