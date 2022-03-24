@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.2.45"></a>
+## [0.2.45](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.44...v0.2.45) (2022-03-24)
+
+
+
+<a name="0.2.39-1"></a>
+## [0.2.39-1](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.39...v0.2.39-1) (2022-01-29)
+
+
+### Bug Fixes
+
+* Reset txpool with some saving batches rather than restore pool after single recovery ([c81fedb](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/c81fedb))
+
+
+
 <a name="0.2.44"></a>
 ## [0.2.44](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.43...v0.2.44) (2022-03-24)
 
