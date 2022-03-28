@@ -11,7 +11,7 @@ require (
 	github.com/ultramesh/flato-txpool v0.2.17
 )
 
-replace github.com/ultramesh/flato-common => git.hyperchain.cn/ultramesh/flato-common.git v0.2.44
+replace github.com/ultramesh/flato-common => git.hyperchain.cn/ultramesh/flato-common.git v0.2.46-0.20220401114206-84b9126baec8
 
 replace github.com/ultramesh/flato-txpool => git.hyperchain.cn/ultramesh/flato-txpool.git v0.2.17
 

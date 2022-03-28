@@ -909,13 +909,11 @@ func (rbft *rbftImpl) generateSignedCheckpoint(state *types.ServiceState) (*pb.S
 	}
 
 	checkpoint := &protos.Checkpoint{
-		Epoch:         rbft.epoch,
-		ConsensusInfo: nil,
-		StateInfo: &protos.Checkpoint_StateInfo{
+		Epoch: rbft.epoch,
+		ExecuteState: &protos.Checkpoint_ExecuteState{
 			Height: state.MetaState.Height,
 			Digest: state.MetaState.Digest,
 		},
-		ConfigInfo: nil,
 	}
 	if state.Epoch > rbft.epoch {
 		checkpoint.SetValidatorSet(rbft.external.GetNodeInfos())

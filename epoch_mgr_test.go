@@ -57,15 +57,12 @@ func TestEpoch_recvFetchCheckpoint_SendBackNormal(t *testing.T) {
 	signedC := &pb.SignedCheckpoint{
 		NodeInfo: rbfts[0].getNodeInfo(),
 		Checkpoint: &protos.Checkpoint{
-			Epoch:         rbfts[0].epoch,
-			ConsensusInfo: nil,
-			StateInfo: &protos.Checkpoint_StateInfo{
+			Epoch: rbfts[0].epoch,
+			ExecuteState: &protos.Checkpoint_ExecuteState{
 				Height: uint64(12),
 				Digest: "block-number-12",
 			},
-			ConfigInfo: nil,
 		},
-		Signature: nil,
 	}
 	rbfts[0].storeMgr.saveCheckpoint(uint64(12), signedC)
 	consensusMsg := rbfts[0].consensusMessagePacker(signedC)
@@ -87,15 +84,12 @@ func TestEpoch_recvFetchCheckpoint_SendBackStableCheckpoint(t *testing.T) {
 	signedC := &pb.SignedCheckpoint{
 		NodeInfo: rbfts[0].getNodeInfo(),
 		Checkpoint: &protos.Checkpoint{
-			Epoch:         rbfts[0].epoch,
-			ConsensusInfo: nil,
-			StateInfo: &protos.Checkpoint_StateInfo{
+			Epoch: rbfts[0].epoch,
+			ExecuteState: &protos.Checkpoint_ExecuteState{
 				Height: uint64(50),
 				Digest: "block-number-50",
 			},
-			ConfigInfo: nil,
 		},
-		Signature: nil,
 	}
 	rbfts[0].storeMgr.saveCheckpoint(uint64(50), signedC)
 	consensusMsg := rbfts[0].consensusMessagePacker(signedC)
