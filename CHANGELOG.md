@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.2.46"></a>
+## [0.2.46](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.45...v0.2.46) (2022-04-21)
+
+
+### Bug Fixes
+
+* fix some logger and print ([1d2ae60](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/1d2ae60))
+
+
+### Features
+
+* **go.mod:** update go version to 1.17 & add go.sum ([afed51a](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/afed51a))
+* **noxbft:** #flato-4331, adapt hotstuff ([577f2de](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/577f2de)), closes [#flato-4331](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-4331)
+
+
+
 <a name="0.2.45"></a>
 ## [0.2.45](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.44...v0.2.45) (2022-03-24)
 
