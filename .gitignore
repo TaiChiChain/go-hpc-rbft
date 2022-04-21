@@ -165,8 +165,6 @@ core/vm/jcee/java/hyperjvm
 # ignore java target directory
 target
 
-go.sum
-
 testLogger
 
 cluster_init_test.go
