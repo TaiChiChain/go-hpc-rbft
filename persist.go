@@ -616,8 +616,8 @@ func (rbft *rbftImpl) restoreState() error {
 	}
 
 	rbft.logger.Infof("Replica %d restored state: epoch: %d, view: %d, seqNo: %d, "+
-		"reqBatches: %d, localCheckpoints: %d", rbft.epoch, rbft.peerPool.ID,
-		rbft.view, rbft.exec.lastExec, len(rbft.storeMgr.batchStore), len(rbft.storeMgr.localCheckpoints))
+		"reqBatches: %d, localCheckpoints: %d", rbft.peerPool.ID, rbft.epoch, rbft.view, rbft.exec.lastExec,
+		len(rbft.storeMgr.batchStore), len(rbft.storeMgr.localCheckpoints))
 
 	return nil
 }

@@ -42,6 +42,7 @@ type EpochInfo struct {
 	LastConfig uint64
 }
 
+// String implement the Stringer interface.
 func (state *ServiceState) String() string {
 	var ms string
 	if state.MetaState == nil {
@@ -85,11 +86,31 @@ type Router struct {
 	Peers []*Peer
 }
 
+// String implement the Stringer interface.
+func (r *Router) String() string {
+	if r == nil {
+		return "NIL ROUTER"
+	}
+	s := "Router:"
+	for _, p := range r.Peers {
+		s += fmt.Sprintf("\n%s", p)
+	}
+	return s
+}
+
 // Peer is the peer info.
 type Peer struct {
 	ID       uint64
 	Hostname string
 	Hash     string
+}
+
+// String implement the Stringer interface.
+func (p *Peer) String() string {
+	if p == nil {
+		return "NIL PEER"
+	}
+	return fmt.Sprintf("ID: %d, Hostname: %s, Hash: %s", p.ID, p.Hostname, p.Hash)
 }
 
 // ConfChange is the config change event.
