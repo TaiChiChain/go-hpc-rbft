@@ -41,8 +41,8 @@ type Network interface {
 	Broadcast(msg *pb.ConsensusMessage) error
 	// Unicast delivers messages to given node with specified id.
 	Unicast(msg *pb.ConsensusMessage, to uint64) error
-	// UnicastByHash delivers messages to given node with specified hostname.
-	UnicastByHash(msg *pb.ConsensusMessage, to string) error
+	// UnicastByHostname delivers messages to given node with specified hostname.
+	UnicastByHostname(msg *pb.ConsensusMessage, to string) error
 	// UpdateTable updates routing table according to given confChangeType
 	// It's application's responsibility to ensure update routing table synchronously.
 	UpdateTable(change *types.ConfChange)
@@ -70,7 +70,7 @@ type ServiceOutbound interface {
 	// Users can apply different batches asynchronously but ensure the order by seqNo.
 	Execute(txs []*protos.Transaction, localList []bool, seqNo uint64, timestamp int64)
 	// StateUpdate informs application layer to catch up to given seqNo with specified state digest.
-	StateUpdate(seqNo uint64, digest string)
+	StateUpdate(seqNo uint64, digest string, checkpoints []*pb.SignedCheckpoint)
 	// SendFilterEvent posts some impotent events to application layer.
 	// Users can decide to post filer event synchronously or asynchronously.
 	SendFilterEvent(informType types.InformType, message ...interface{})
@@ -86,6 +86,9 @@ type EpochService interface {
 
 	// GetEpoch returns the current epoch.
 	GetEpoch() uint64
+
+	// IsConfigBlock returns if the block at height is config block .
+	IsConfigBlock(height uint64) bool
 }
 
 // ExternalStack integrates all external interfaces which must be implemented by application users.

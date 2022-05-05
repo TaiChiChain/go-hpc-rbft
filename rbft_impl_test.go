@@ -373,7 +373,7 @@ func TestRBFT_postConfState_NormalCase(t *testing.T) {
 		QuorumRouter: &r,
 	}
 	rbfts[0].postConfState(cc)
-	assert.Equal(t, 5, len(rbfts[0].peerPool.routerMap.HashMap))
+	assert.Equal(t, 5, len(rbfts[0].peerPool.routerMap.HostMap))
 }
 
 func TestRBFT_postConfState_NotExitInRouter(t *testing.T) {

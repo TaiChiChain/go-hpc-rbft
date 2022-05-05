@@ -372,6 +372,8 @@ func TestPersist_restoreState(t *testing.T) {
 	ext.EXPECT().ReadStateSet("batch.").Return(map[string][]byte{"cset.": []byte("CSet")}, nil).AnyTimes()
 	ext.EXPECT().ReadStateSet("chkpt.").Return(ret, nil)
 
+	ext.EXPECT().IsConfigBlock(gomock.Any()).Return(false).AnyTimes()
+
 	// move h from 0 to 10
 	assert.Nil(t, node.rbft.restoreState())
 	assert.Equal(t, uint64(10), node.rbft.h)

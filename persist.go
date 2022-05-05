@@ -592,7 +592,7 @@ func (rbft *rbftImpl) restoreState() error {
 					MetaState: &types.MetaState{Height: seqNo, Digest: digest},
 					Epoch:     rbft.epoch,
 				}
-				signedC, gErr := rbft.generateSignedCheckpoint(state)
+				signedC, gErr := rbft.generateSignedCheckpoint(state, rbft.external.IsConfigBlock(seqNo))
 				if gErr != nil {
 					return gErr
 				}

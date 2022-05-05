@@ -147,9 +147,9 @@ func TestExec_handleCoreRbftEvent_StateUpdatedEvent(t *testing.T) {
 	rbfts[1].storeMgr.highStateTarget = &stateUpdateTarget{
 		metaState: metaS,
 		checkpointSet: []*pb.SignedCheckpoint{
-			{NodeInfo: &pb.NodeInfo{ReplicaId: 1, ReplicaHash: "test-hash-1"}, Checkpoint: checkpoint, Signature: []byte("sig-1")},
-			{NodeInfo: &pb.NodeInfo{ReplicaId: 2, ReplicaHash: "test-hash-2"}, Checkpoint: checkpoint, Signature: []byte("sig-2")},
-			{NodeInfo: &pb.NodeInfo{ReplicaId: 3, ReplicaHash: "test-hash-3"}, Checkpoint: checkpoint, Signature: []byte("sig-3")},
+			{NodeInfo: &pb.NodeInfo{ReplicaId: 1, ReplicaHost: "test-hash-1"}, Checkpoint: checkpoint, Signature: []byte("sig-1")},
+			{NodeInfo: &pb.NodeInfo{ReplicaId: 2, ReplicaHost: "test-hash-2"}, Checkpoint: checkpoint, Signature: []byte("sig-2")},
+			{NodeInfo: &pb.NodeInfo{ReplicaId: 3, ReplicaHost: "test-hash-3"}, Checkpoint: checkpoint, Signature: []byte("sig-3")},
 		},
 	}
 	rbfts[1].handleCoreRbftEvent(ev)
