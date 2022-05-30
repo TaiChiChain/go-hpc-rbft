@@ -72,7 +72,7 @@ func (rbft *rbftImpl) fetchCheckpoint() consensusEvent {
 	}
 
 	fetch := &pb.FetchCheckpoint{
-		ReplicaHash:    rbft.peerPool.hash,
+		ReplicaHost:    rbft.peerPool.hostname,
 		SequenceNumber: rbft.epochMgr.configBatchToCheck.Height,
 	}
 	rbft.startFetchCheckpointTimer()
@@ -108,7 +108,7 @@ func (rbft *rbftImpl) stopFetchCheckpointTimer() {
 }
 
 func (rbft *rbftImpl) recvFetchCheckpoint(fetch *pb.FetchCheckpoint) consensusEvent {
-	if !rbft.inRouters(fetch.ReplicaHash) {
+	if !rbft.inRouters(fetch.GetReplicaHost()) {
 		return nil
 	}
 
@@ -136,7 +136,7 @@ func (rbft *rbftImpl) recvFetchCheckpoint(fetch *pb.FetchCheckpoint) consensusEv
 		Epoch:   rbft.epoch,
 		Payload: payload,
 	}
-	rbft.peerPool.unicastByHash(consensusMsg, fetch.ReplicaHash)
+	rbft.peerPool.unicastByHostname(consensusMsg, fetch.GetReplicaHost())
 
 	return nil
 }
@@ -145,7 +145,7 @@ func (rbft *rbftImpl) recvFetchCheckpoint(fetch *pb.FetchCheckpoint) consensusEv
 func (rbft *rbftImpl) checkIfOutOfEpoch(msg *pb.ConsensusMessage) consensusEvent {
 	// as current node has already executed the block no less than epoch number and it is possible that
 	// current node will finish the epoch change later, so that we needn't to check epoch here
-	if rbft.exec.lastExec >= msg.Epoch {
+	if rbft.epoch >= msg.Epoch {
 		return nil
 	}
 
@@ -182,7 +182,7 @@ func (rbft *rbftImpl) turnIntoEpoch() {
 	rbft.vcMgr.viewChangeStore = make(map[vcIdx]*pb.ViewChange)
 
 	// update N/f
-	rbft.N = len(rbft.peerPool.routerMap.HashMap)
+	rbft.N = len(rbft.peerPool.routerMap.HostMap)
 	rbft.f = (rbft.N - 1) / 3
 	rbft.persistN(rbft.N)
 

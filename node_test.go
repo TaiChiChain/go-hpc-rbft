@@ -135,7 +135,7 @@ func TestNode_ApplyConfChange(t *testing.T) {
 	r := &types.Router{Peers: peerSet}
 	cc := &types.ConfState{QuorumRouter: r}
 	n.ApplyConfChange(cc)
-	assert.Equal(t, len(peerSet), len(n.rbft.peerPool.routerMap.HashMap))
+	assert.Equal(t, len(peerSet), len(n.rbft.peerPool.routerMap.HostMap))
 }
 
 func TestNode_ReportExecuted(t *testing.T) {

@@ -125,7 +125,7 @@ message signed_checkpoint {
 }
 
 message fetch_checkpoint {
-    string replica_hash = 1;
+    string replica_host = 1;
     uint64 sequence_number = 2;
 }
 
@@ -190,7 +190,7 @@ message Cset {
 
 message node_info {
     uint64 replica_id = 1;
-    string replica_hash = 2;
+    string replica_host = 2;
 }
 
 message sync_state {

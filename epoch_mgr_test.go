@@ -37,7 +37,7 @@ func TestEpoch_recvFetchCheckpoint_RouterNotExist(t *testing.T) {
 
 	nodes, rbfts := newBasicClusterInstance()
 	fetch := &pb.FetchCheckpoint{
-		ReplicaHash:    calHash("node5"),
+		ReplicaHost:    "node5",
 		SequenceNumber: uint64(12),
 	}
 	ret := rbfts[0].recvFetchCheckpoint(fetch)
@@ -51,7 +51,7 @@ func TestEpoch_recvFetchCheckpoint_SendBackNormal(t *testing.T) {
 
 	nodes, rbfts := newBasicClusterInstance()
 	fetch := &pb.FetchCheckpoint{
-		ReplicaHash:    calHash("node2"),
+		ReplicaHost:    "node2",
 		SequenceNumber: uint64(12),
 	}
 	signedC := &pb.SignedCheckpoint{
@@ -77,7 +77,7 @@ func TestEpoch_recvFetchCheckpoint_SendBackStableCheckpoint(t *testing.T) {
 
 	nodes, rbfts := newBasicClusterInstance()
 	fetch := &pb.FetchCheckpoint{
-		ReplicaHash:    calHash("node2"),
+		ReplicaHost:    "node2",
 		SequenceNumber: uint64(12),
 	}
 	rbfts[0].h = uint64(50)
