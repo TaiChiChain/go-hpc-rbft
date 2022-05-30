@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.3.0"></a>
+# [0.3.0](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.47...v0.3.0) (2022-05-30)
+
+
+### Features
+
+* **epoch:** #flato-4506, adapt verifiable epoch change and state update ([78ccfeb](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/78ccfeb)), closes [#flato-4506](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-4506)
+
+
+
 <a name="0.2.47"></a>
 ## [0.2.47](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.46...v0.2.47) (2022-05-25)
 
