@@ -95,7 +95,7 @@ func newStoreMgr(c Config) *storeManager {
 	return sm
 }
 
-// saveCheckpoint saves checkpoint information to localCheckpoints, whose key is lastExec, value is the global nodeHash of current
+// saveCheckpoint saves checkpoint information to localCheckpoints, whose key is lastExec, value is the global nodeHost of current
 // BlockchainInfo
 func (sm *storeManager) saveCheckpoint(height uint64, signedCheckpoint *pb.SignedCheckpoint) {
 	sm.localCheckpoints[height] = signedCheckpoint

@@ -149,13 +149,13 @@ type ntfIde struct {
 
 // ----------checkpoint related structs------------------
 type chkptID struct {
-	nodeHash string
+	nodeHost string
 	sequence uint64
 }
 
 // -----------router struct-----------------
 type routerMap struct {
-	HashMap map[string]uint64
+	HostMap map[string]uint64
 }
 
 // nodeState records every node's consensus status(epoch, view) and

@@ -28,20 +28,24 @@ var (
 
 var peerSet = []*types.Peer{
 	{
-		ID:   uint64(1),
-		Hash: calHash("node1"),
+		ID:       uint64(1),
+		Hostname: "node1",
+		Hash:     calHash("node1"),
 	},
 	{
-		ID:   uint64(2),
-		Hash: calHash("node2"),
+		ID:       uint64(2),
+		Hostname: "node2",
+		Hash:     calHash("node2"),
 	},
 	{
-		ID:   uint64(3),
-		Hash: calHash("node3"),
+		ID:       uint64(3),
+		Hostname: "node3",
+		Hash:     calHash("node3"),
 	},
 	{
-		ID:   uint64(4),
-		Hash: calHash("node4"),
+		ID:       uint64(4),
+		Hostname: "node4",
+		Hash:     calHash("node4"),
 	},
 }
 
@@ -768,7 +772,7 @@ func (ext *testExternal) Unicast(msg *pb.ConsensusMessage, to uint64) error {
 	go ext.postMsg(cm)
 	return nil
 }
-func (ext *testExternal) UnicastByHash(msg *pb.ConsensusMessage, to string) error {
+func (ext *testExternal) UnicastByHostname(msg *pb.ConsensusMessage, to string) error {
 	if !ext.testNode.online {
 		return errors.New("node offline")
 	}
@@ -782,6 +786,7 @@ func (ext *testExternal) UnicastByHash(msg *pb.ConsensusMessage, to string) erro
 	go ext.postMsg(cm)
 	return nil
 }
+
 func (ext *testExternal) UpdateTable(update *types.ConfChange) {
 	router := update.Router
 	var newPeers []*types.Peer
@@ -871,7 +876,7 @@ func (ext *testExternal) Execute(requests []*protos.Transaction, localList []boo
 		}
 	}
 }
-func (ext *testExternal) StateUpdate(seqNo uint64, digest string) {
+func (ext *testExternal) StateUpdate(seqNo uint64, digest string, ckpts []*pb.SignedCheckpoint) {
 	for key, val := range ext.tf.TestNode[0].blocks {
 		if key <= seqNo {
 			ext.testNode.blocks[key] = val
@@ -939,4 +944,8 @@ func (ext *testExternal) GetNodeInfos() []*protos.NodeInfo {
 
 func (ext *testExternal) GetEpoch() uint64 {
 	return ext.testNode.Epoch
+}
+
+func (ext *testExternal) IsConfigBlock(height uint64) bool {
+	return false
 }

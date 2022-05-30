@@ -27,8 +27,8 @@ type peerPool struct {
 	// track local node's ID
 	ID uint64
 
-	// track local node's Hash
-	hash string
+	// track local node's Host
+	hostname string
 
 	// track the vp router
 	routerMap routerMap
@@ -43,10 +43,10 @@ type peerPool struct {
 // init peer pool in rbft core
 func newPeerPool(c Config) *peerPool {
 	pool := &peerPool{
-		ID:      c.ID,
-		hash:    c.Hash,
-		network: c.External,
-		logger:  c.Logger,
+		ID:       c.ID,
+		hostname: c.Hostname,
+		network:  c.External,
+		logger:   c.Logger,
 	}
 	pool.initPeers(c.Peers)
 
@@ -57,17 +57,20 @@ func (pool *peerPool) initPeers(peers []*types.Peer) {
 	pool.logger.Infof("Local ID: %d, update routerMap:", pool.ID)
 	length := len(peers)
 	preID := pool.ID
-	pool.routerMap.HashMap = make(map[string]uint64)
+	pool.routerMap.HostMap = make(map[string]uint64)
 	for _, p := range peers {
 		if p.ID > uint64(length) {
 			pool.logger.Errorf("Something wrong with peer[id=%d], peer id cannot be larger than peers' amount %d", p.ID, length)
 			return
 		}
-		if p.Hash == pool.hash {
+		//if p.Hash == pool.hash {
+		if p.Hostname == pool.hostname {
 			pool.ID = p.ID
 		}
-		pool.logger.Infof("ID: %d, Hash: %s", p.ID, p.Hash)
-		pool.routerMap.HashMap[p.Hash] = p.ID
+		//pool.logger.Infof("ID: %d, Hash: %s", p.ID, p.Hash)
+		pool.logger.Infof("ID: %d, Hostname: %s", p.ID, p.Hostname)
+		//pool.routerMap.HostMap[p.Hash] = p.ID
+		pool.routerMap.HostMap[p.Hostname] = p.ID
 	}
 	if preID != pool.ID {
 		pool.logger.Infof("Update Local ID: %d ===> %d", preID, pool.ID)
@@ -97,8 +100,8 @@ func (pool *peerPool) unicast(msg *pb.ConsensusMessage, to uint64) {
 	}
 }
 
-func (pool *peerPool) unicastByHash(msg *pb.ConsensusMessage, to string) {
-	err := pool.network.UnicastByHash(msg, to)
+func (pool *peerPool) unicastByHostname(msg *pb.ConsensusMessage, to string) {
+	err := pool.network.UnicastByHostname(msg, to)
 	if err != nil {
 		pool.logger.Errorf("Unicast to %d failed: %v", to, err)
 		return

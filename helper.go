@@ -366,13 +366,13 @@ func (rbft *rbftImpl) compareCheckpointWithWeakSet(signedCheckpoint *pb.SignedCh
 	}
 
 	cID := chkptID{
-		nodeHash: signedCheckpoint.NodeInfo.ReplicaHash,
+		nodeHost: signedCheckpoint.NodeInfo.ReplicaHost,
 		sequence: checkpointHeight,
 	}
 
 	_, ok := rbft.storeMgr.checkpointStore[cID]
 	if ok {
-		rbft.logger.Warningf("Replica %d received duplicate checkpoint from replica %s for seqNo %d, update storage", rbft.peerPool.ID, cID.nodeHash, cID.sequence)
+		rbft.logger.Warningf("Replica %d received duplicate checkpoint from replica %s for seqNo %d, update storage", rbft.peerPool.ID, cID.nodeHost, cID.sequence)
 	}
 	rbft.storeMgr.checkpointStore[cID] = signedCheckpoint
 
@@ -819,24 +819,24 @@ func (rbft *rbftImpl) checkIfNeedStateUpdate(meta *types.MetaState, checkpointSe
 func (rbft *rbftImpl) getNodeInfo() *pb.NodeInfo {
 	return &pb.NodeInfo{
 		ReplicaId:   rbft.peerPool.ID,
-		ReplicaHash: rbft.peerPool.hash,
+		ReplicaHost: rbft.peerPool.hostname,
 	}
 }
 
-func (rbft *rbftImpl) nodeID(hash string) uint64 {
-	id, ok := rbft.peerPool.routerMap.HashMap[hash]
+func (rbft *rbftImpl) nodeID(hostname string) uint64 {
+	id, ok := rbft.peerPool.routerMap.HostMap[hostname]
 	if !ok {
 		return 0
 	}
 	return id
 }
 
-func (rbft *rbftImpl) inRouters(hash string) bool {
-	_, ok := rbft.peerPool.routerMap.HashMap[hash]
+func (rbft *rbftImpl) inRouters(hostname string) bool {
+	_, ok := rbft.peerPool.routerMap.HostMap[hostname]
 	if ok {
 		return true
 	}
-	rbft.logger.Warningf("Replica %d cannot find %s in routers,", rbft.peerPool.ID, hash)
+	rbft.logger.Warningf("Replica %d cannot find %s in routers,", rbft.peerPool.ID, hostname)
 	return false
 }
 
@@ -902,7 +902,7 @@ DrainLoop:
 }
 
 // generateSignedCheckpoint generates a signed checkpoint using given service state.
-func (rbft *rbftImpl) generateSignedCheckpoint(state *types.ServiceState) (*pb.SignedCheckpoint, error) {
+func (rbft *rbftImpl) generateSignedCheckpoint(state *types.ServiceState, isConfig bool) (*pb.SignedCheckpoint, error) {
 	signedCheckpoint := &pb.SignedCheckpoint{
 		NodeInfo: rbft.getNodeInfo(),
 	}
@@ -914,7 +914,8 @@ func (rbft *rbftImpl) generateSignedCheckpoint(state *types.ServiceState) (*pb.S
 			Digest: state.MetaState.Digest,
 		},
 	}
-	if state.Epoch > rbft.epoch {
+
+	if isConfig {
 		checkpoint.SetValidatorSet(rbft.external.GetNodeInfos())
 		rbft.logger.Noticef("Replica %d generate a checkpoint with new validator set: %+v", rbft.peerPool.ID, checkpoint.ValidatorSet())
 	}
@@ -944,5 +945,5 @@ func (rbft *rbftImpl) signCheckpoint(checkpoint *protos.Checkpoint) ([]byte, err
 // verifySignedCheckpoint returns whether given signedCheckpoint contains a valid signature.
 func (rbft *rbftImpl) verifySignedCheckpoint(signedCheckpoint *pb.SignedCheckpoint) error {
 	msg := signedCheckpoint.Checkpoint.Hash()
-	return rbft.external.Verify(signedCheckpoint.NodeInfo.ReplicaHash, signedCheckpoint.Signature, msg)
+	return rbft.external.Verify(signedCheckpoint.NodeInfo.ReplicaHost, signedCheckpoint.Signature, msg)
 }

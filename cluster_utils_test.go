@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/gogo/protobuf/proto"
+
 	"github.com/ultramesh/fancylogger"
 	fCommonTypes "github.com/ultramesh/flato-common/types"
 	"github.com/ultramesh/flato-common/types/protos"
@@ -242,7 +243,7 @@ func (tf *testFramework) setN(num int) {
 }
 
 func calHash(hostname string) string {
-	return "hash-" + hostname
+	return hostname
 }
 
 func newBasicClusterInstance() ([]*testNode, []*rbftImpl) {

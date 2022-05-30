@@ -208,7 +208,7 @@ func (rbft *rbftImpl) recvNotification(n *pb.Notification) consensusEvent {
 	rbft.logger.Debugf("Replica %d received notification from replica %d, e:%d, v:%d, h:%d, |C|:%d, |P|:%d, |Q|:%d",
 		rbft.peerPool.ID, n.NodeInfo.ReplicaId, n.Epoch, n.Basis.View, n.Basis.H, len(n.Basis.Cset), len(n.Basis.Pset), len(n.Basis.Qset))
 
-	if !rbft.inRouters(n.NodeInfo.ReplicaHash) {
+	if !rbft.inRouters(n.NodeInfo.ReplicaHost) {
 		return nil
 	}
 
@@ -218,13 +218,13 @@ func (rbft *rbftImpl) recvNotification(n *pb.Notification) consensusEvent {
 
 	if n.Epoch < rbft.epoch {
 		// directly return notification response when our epoch is larger than the requester.
-		return rbft.sendNotificationResponse(n.NodeInfo.ReplicaHash)
+		return rbft.sendNotificationResponse(n.NodeInfo.ReplicaHost)
 	}
 
 	if n.Basis.View < rbft.view {
 		if rbft.isNormal() {
 			// directly return notification response as we are in normal.
-			return rbft.sendNotificationResponse(n.NodeInfo.ReplicaHash)
+			return rbft.sendNotificationResponse(n.NodeInfo.ReplicaHost)
 		}
 		// ignore notification with lower view as we are in abnormal.
 		rbft.logger.Debugf("Replica %d ignore notification with a lower view %d than self "+
@@ -282,7 +282,7 @@ func (rbft *rbftImpl) recvNotification(n *pb.Notification) consensusEvent {
 			return rbft.initRecovery()
 		}
 
-		return rbft.sendNotificationResponse(n.NodeInfo.ReplicaHash)
+		return rbft.sendNotificationResponse(n.NodeInfo.ReplicaHost)
 	}
 
 	return nil
@@ -317,7 +317,7 @@ func (rbft *rbftImpl) sendNotificationResponse(destHash string) consensusEvent {
 		Epoch:   rbft.epoch,
 		Payload: rspMsg,
 	}
-	rbft.peerPool.unicastByHash(consensusMsg, destHash)
+	rbft.peerPool.unicastByHostname(consensusMsg, destHash)
 	return nil
 }
 
@@ -712,7 +712,7 @@ func (rbft *rbftImpl) initSyncState() consensusEvent {
 		View: rbft.view,
 	}
 
-	signedCheckpoint, sErr := rbft.generateSignedCheckpoint(state)
+	signedCheckpoint, sErr := rbft.generateSignedCheckpoint(state, rbft.external.IsConfigBlock(state.MetaState.Height))
 	if sErr != nil {
 		rbft.logger.Errorf("Replica %d generate checkpoint error: %s", rbft.peerPool.ID, sErr)
 		rbft.stopNamespace()
@@ -726,7 +726,7 @@ func (rbft *rbftImpl) initSyncState() consensusEvent {
 func (rbft *rbftImpl) recvSyncState(sync *pb.SyncState) consensusEvent {
 	rbft.logger.Debugf("Replica %d received sync state from replica %d", rbft.peerPool.ID, sync.NodeInfo.ReplicaId)
 
-	if !rbft.inRouters(sync.NodeInfo.ReplicaHash) {
+	if !rbft.inRouters(sync.NodeInfo.ReplicaHost) {
 		return nil
 	}
 
@@ -737,10 +737,10 @@ func (rbft *rbftImpl) recvSyncState(sync *pb.SyncState) consensusEvent {
 
 	if sync.Epoch < rbft.epoch {
 		// if requester is in a lower epoch, we need to help the requester to sync epoch
-		return rbft.sendSyncStateRsp(sync.NodeInfo.ReplicaHash, true)
+		return rbft.sendSyncStateRsp(sync.NodeInfo.ReplicaHost, true)
 	} else if sync.Epoch == rbft.epoch {
 		// we are in the same epoch, so trigger a normal sync state
-		return rbft.sendSyncStateRsp(sync.NodeInfo.ReplicaHash, false)
+		return rbft.sendSyncStateRsp(sync.NodeInfo.ReplicaHost, false)
 	} else {
 		// received a message from larger epoch, current node might be out of epoch
 		rbft.logger.Debugf("Replica %d might be out of epoch for requester's epoch is %d", rbft.peerPool.ID, sync.Epoch)
@@ -773,7 +773,7 @@ func (rbft *rbftImpl) sendSyncStateRsp(to string, needSyncEpoch bool) consensusE
 			rbft.logger.Warningf("Replica %d has a nil state", rbft.peerPool.ID)
 			return nil
 		}
-		signedCheckpoint, sErr = rbft.generateSignedCheckpoint(state)
+		signedCheckpoint, sErr = rbft.generateSignedCheckpoint(state, rbft.external.IsConfigBlock(state.MetaState.Height))
 		if sErr != nil {
 			rbft.logger.Errorf("Replica %d generate checkpoint error: %s", rbft.peerPool.ID, sErr)
 			rbft.stopNamespace()
@@ -793,7 +793,7 @@ func (rbft *rbftImpl) sendSyncStateRsp(to string, needSyncEpoch bool) consensusE
 		Epoch:   rbft.epoch,
 		Payload: payload,
 	}
-	rbft.peerPool.unicastByHash(consensusMsg, to)
+	rbft.peerPool.unicastByHostname(consensusMsg, to)
 	rbft.logger.Debugf("Replica %d send sync state response to replica %d: epoch=%d, view=%d, checkpoint=%+v",
 		rbft.peerPool.ID, rbft.nodeID(to), syncStateRsp.SignedCheckpoint.Checkpoint.Epoch, syncStateRsp.View,
 		syncStateRsp.SignedCheckpoint.Checkpoint)
@@ -824,14 +824,14 @@ func (rbft *rbftImpl) recvSyncStateRsp(rsp *pb.SyncStateResponse, local bool) co
 		return nil
 	}
 
-	if oldRsp, ok := rbft.recoveryMgr.syncRspStore[rsp.SignedCheckpoint.NodeInfo.ReplicaHash]; ok {
+	if oldRsp, ok := rbft.recoveryMgr.syncRspStore[rsp.SignedCheckpoint.NodeInfo.ReplicaHost]; ok {
 		if oldRsp.SignedCheckpoint.Checkpoint.Height() > checkpoint.Height() {
 			rbft.logger.Debugf("Duplicate sync state response, new height=%d is lower than old height=%d, reject it",
 				checkpoint.Height(), oldRsp.SignedCheckpoint.Checkpoint.Height())
 			return nil
 		}
 	}
-	rbft.recoveryMgr.syncRspStore[rsp.SignedCheckpoint.NodeInfo.ReplicaHash] = rsp
+	rbft.recoveryMgr.syncRspStore[rsp.SignedCheckpoint.NodeInfo.ReplicaHost] = rsp
 	if len(rbft.recoveryMgr.syncRspStore) >= rbft.commonCaseQuorum() {
 		states := make(wholeStates)
 		for _, response := range rbft.recoveryMgr.syncRspStore {
