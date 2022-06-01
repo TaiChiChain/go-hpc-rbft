@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+<a name="0.3.0-1"></a>
+# [0.3.0-1](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.3.0...v0.3.0-1) (2022-06-01)
+
+
+### Bug Fixes
+
+* decrease epoch when generate checkpoint with a low chain height ([7577e85](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/7577e85)), closes [#flato-4741](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-4741)
+
+
+
 <a name="0.3.0"></a>
 # [0.3.0](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.47...v0.3.0) (2022-05-30)
 
