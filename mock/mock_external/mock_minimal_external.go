@@ -22,7 +22,6 @@ func NewMockMinimalExternal(ctrl *gomock.Controller) *MockExternalStack {
 
 	mock.EXPECT().Broadcast(gomock.Any()).Return(nil).AnyTimes()
 	mock.EXPECT().Unicast(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
-	//mock.EXPECT().UnicastByHash(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	mock.EXPECT().UnicastByHostname(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	mock.EXPECT().UpdateTable(gomock.Any()).Return().AnyTimes()
 
@@ -37,6 +36,7 @@ func NewMockMinimalExternal(ctrl *gomock.Controller) *MockExternalStack {
 	mock.EXPECT().GetNodeInfos().Return(nil).AnyTimes()
 
 	mock.EXPECT().IsConfigBlock(gomock.Any()).Return(false).AnyTimes()
+	mock.EXPECT().GetLastCheckpoint().Return(nil).AnyTimes()
 
 	return mock
 }

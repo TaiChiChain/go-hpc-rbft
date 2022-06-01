@@ -89,6 +89,9 @@ type EpochService interface {
 
 	// IsConfigBlock returns if the block at height is config block .
 	IsConfigBlock(height uint64) bool
+
+	// GetLastCheckpoint return the last QuorumCheckpoint in ledger
+	GetLastCheckpoint() *protos.QuorumCheckpoint
 }
 
 // ExternalStack integrates all external interfaces which must be implemented by application users.

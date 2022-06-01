@@ -949,3 +949,19 @@ func (ext *testExternal) GetEpoch() uint64 {
 func (ext *testExternal) IsConfigBlock(height uint64) bool {
 	return false
 }
+
+// GetLastCheckpoint return the last QuorumCheckpoint in ledger
+func (ext *testExternal) GetLastCheckpoint() *protos.QuorumCheckpoint {
+	return &protos.QuorumCheckpoint{
+		Checkpoint: &protos.Checkpoint{
+			Epoch:          ext.testNode.Epoch,
+			ConsensusState: &protos.Checkpoint_ConsensusState{},
+			ExecuteState: &protos.Checkpoint_ExecuteState{
+				Height: ext.testNode.Applied,
+				Digest: ext.testNode.Digest,
+			},
+			NextEpochState: &protos.Checkpoint_NextEpochState{},
+		},
+		Signatures: nil,
+	}
+}

@@ -379,6 +379,20 @@ func (mr *MockEpochServiceMockRecorder) IsConfigBlock(height interface{}) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsConfigBlock", reflect.TypeOf((*MockEpochService)(nil).IsConfigBlock), height)
 }
 
+// GetLastCheckpoint mocks base method
+func (m *MockEpochService) GetLastCheckpoint() *protos.QuorumCheckpoint {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetLastCheckpoint")
+	ret0, _ := ret[0].(*protos.QuorumCheckpoint)
+	return ret0
+}
+
+// GetLastCheckpoint indicates an expected call of GetLastCheckpoint
+func (mr *MockEpochServiceMockRecorder) GetLastCheckpoint() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLastCheckpoint", reflect.TypeOf((*MockEpochService)(nil).GetLastCheckpoint))
+}
+
 // MockExternalStack is a mock of ExternalStack interface
 type MockExternalStack struct {
 	ctrl     *gomock.Controller
@@ -652,4 +666,18 @@ func (m *MockExternalStack) IsConfigBlock(height uint64) bool {
 func (mr *MockExternalStackMockRecorder) IsConfigBlock(height interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsConfigBlock", reflect.TypeOf((*MockExternalStack)(nil).IsConfigBlock), height)
+}
+
+// GetLastCheckpoint mocks base method
+func (m *MockExternalStack) GetLastCheckpoint() *protos.QuorumCheckpoint {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetLastCheckpoint")
+	ret0, _ := ret[0].(*protos.QuorumCheckpoint)
+	return ret0
+}
+
+// GetLastCheckpoint indicates an expected call of GetLastCheckpoint
+func (mr *MockExternalStackMockRecorder) GetLastCheckpoint() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLastCheckpoint", reflect.TypeOf((*MockExternalStack)(nil).GetLastCheckpoint))
 }
