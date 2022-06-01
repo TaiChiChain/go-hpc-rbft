@@ -117,7 +117,6 @@ func (rbft *rbftImpl) oneCorrectQuorum() int {
 
 // prePrepared returns if there existed a pre-prepare message in certStore with the given digest,view,seqNo
 func (rbft *rbftImpl) prePrepared(digest string, v uint64, n uint64) bool {
-	// TODO(DH): we need to ensure that we actually have the request batch.
 	cert := rbft.storeMgr.certStore[msgID{v, n, digest}]
 
 	if cert != nil {
@@ -916,8 +915,23 @@ func (rbft *rbftImpl) generateSignedCheckpoint(state *types.ServiceState, isConf
 	}
 
 	if isConfig {
+		ledgerStableCheckpoint := rbft.external.GetLastCheckpoint()
+		// NOTE! compare current height with ledger stable checkpoint height.
+		// if currentHeight is lower than ledger stable checkpoint height, which means
+		// current checkpoint is generated in previous epoch, we need to decrease the
+		// epoch value.
+		if ledgerStableCheckpoint != nil {
+			ledgerStableCheckpointHeight := ledgerStableCheckpoint.Height()
+			currentHeight := state.MetaState.Height
+			if currentHeight <= ledgerStableCheckpointHeight {
+				rbft.logger.Noticef("Replica %d decrease epoch as current height %d is lower "+
+					"than the last stable checkpoint height %d", rbft.peerPool.ID, currentHeight, ledgerStableCheckpointHeight)
+				checkpoint.Epoch--
+			}
+		}
 		checkpoint.SetValidatorSet(rbft.external.GetNodeInfos())
-		rbft.logger.Noticef("Replica %d generate a checkpoint with new validator set: %+v", rbft.peerPool.ID, checkpoint.ValidatorSet())
+		rbft.logger.Noticef("Replica %d generate a checkpoint with new validator set: %+v",
+			rbft.peerPool.ID, checkpoint.ValidatorSet())
 	}
 	signedCheckpoint.Checkpoint = checkpoint
 
@@ -928,6 +942,9 @@ func (rbft *rbftImpl) generateSignedCheckpoint(state *types.ServiceState, isConf
 		return nil, sErr
 	}
 	signedCheckpoint.Signature = signature
+
+	rbft.logger.Infof("Replica %d generated signed checkpoint with epoch %d, height: %d, "+
+		"digest: %s", rbft.peerPool.ID, checkpoint.Epoch, checkpoint.Height(), checkpoint.Digest())
 
 	return signedCheckpoint, nil
 }
