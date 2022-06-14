@@ -3,8 +3,8 @@ package rbft
 import (
 	"sync"
 
-	pb "github.com/ultramesh/flato-rbft/rbftpb"
-	"github.com/ultramesh/flato-rbft/types"
+	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
+	"github.com/hyperchain/go-hpc-rbft/types"
 
 	"github.com/gogo/protobuf/proto"
 )

@@ -17,14 +17,16 @@ package rbft
 import (
 	"sync"
 
-	pb "github.com/ultramesh/flato-rbft/rbftpb"
-	"github.com/ultramesh/flato-rbft/types"
+	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
+	"github.com/hyperchain/go-hpc-rbft/types"
 )
 
 // Node represents a node in a RBFT cluster.
 type Node interface {
 	// Start starts a RBFT node instance.
 	Start() error
+	// Stop performs any necessary termination of the Node.
+	Stop()
 	// Propose proposes requests to RBFT core, requests are ensured to be eventually
 	// submitted to all non-fault nodes unless current node crash down.
 	Propose(requests *pb.RequestSet) error
@@ -37,12 +39,8 @@ type Node interface {
 	ApplyConfChange(cc *types.ConfState)
 	// Status returns the current node status of the RBFT state machine.
 	Status() NodeStatus
-
 	// ServiceInbound receives and records modifications from application service.
 	ServiceInbound
-
-	// Stop performs any necessary termination of the Node.
-	Stop()
 }
 
 // ServiceInbound receives and records modifications from application service which includes two events:

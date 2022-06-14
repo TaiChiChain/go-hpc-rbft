@@ -21,10 +21,10 @@ import (
 	"fmt"
 	"math"
 
-	fCommonTypes "github.com/ultramesh/flato-common/types"
-	"github.com/ultramesh/flato-common/types/protos"
-	pb "github.com/ultramesh/flato-rbft/rbftpb"
-	"github.com/ultramesh/flato-rbft/types"
+	hpcCommonTypes "github.com/hyperchain/go-hpc-common/types"
+	"github.com/hyperchain/go-hpc-common/types/protos"
+	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
+	"github.com/hyperchain/go-hpc-rbft/types"
 
 	"github.com/gogo/protobuf/proto"
 )
@@ -873,7 +873,7 @@ func (rbft *rbftImpl) stopNamespace() {
 }
 
 func requestHash(tx *protos.Transaction) string {
-	return fCommonTypes.GetHash(tx).String()
+	return hpcCommonTypes.GetHash(tx).String()
 }
 
 // calculateMD5Hash calculate hash by MD5

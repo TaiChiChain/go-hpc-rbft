@@ -20,13 +20,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ultramesh/flato-common/metrics"
-	fCommonTypes "github.com/ultramesh/flato-common/types"
-	"github.com/ultramesh/flato-common/types/protos"
-	"github.com/ultramesh/flato-rbft/external"
-	pb "github.com/ultramesh/flato-rbft/rbftpb"
-	"github.com/ultramesh/flato-rbft/types"
-	txpool "github.com/ultramesh/flato-txpool"
+	"github.com/hyperchain/go-hpc-common/metrics"
+	hpcCommonTypes "github.com/hyperchain/go-hpc-common/types"
+	"github.com/hyperchain/go-hpc-common/types/protos"
+	"github.com/hyperchain/go-hpc-rbft/external"
+	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
+	"github.com/hyperchain/go-hpc-rbft/types"
+	txpool "github.com/hyperchain/go-hpc-txpool"
 
 	"github.com/gogo/protobuf/proto"
 )
@@ -742,7 +742,7 @@ func (rbft *rbftImpl) processReqSetEvent(req *pb.RequestSet) consensusEvent {
 	// if current node is in config change, reject another config tx
 	if rbft.atomicIn(InConfChange) {
 		for _, tx := range req.Requests {
-			if fCommonTypes.IsConfigTx(tx) {
+			if hpcCommonTypes.IsConfigTx(tx) {
 				rbft.logger.Debugf("Replica %d is processing a ctx, reject another one", rbft.peerPool.ID)
 				rbft.rejectRequestSet(req)
 				return nil

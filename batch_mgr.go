@@ -17,8 +17,8 @@ package rbft
 import (
 	"fmt"
 
-	pb "github.com/ultramesh/flato-rbft/rbftpb"
-	txpool "github.com/ultramesh/flato-txpool"
+	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
+	txpool "github.com/hyperchain/go-hpc-txpool"
 )
 
 // batchManager manages basic batch issues, including:

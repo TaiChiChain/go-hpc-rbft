@@ -18,7 +18,7 @@ package types
 import (
 	"fmt"
 
-	"github.com/ultramesh/flato-common/types/protos"
+	"github.com/hyperchain/go-hpc-common/types/protos"
 )
 
 // ----------- ServiceState related structs-----------------

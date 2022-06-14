@@ -3,10 +3,10 @@ package rbft
 import (
 	"testing"
 
-	"github.com/ultramesh/flato-common/metrics/disabled"
-	mockexternal "github.com/ultramesh/flato-rbft/mock/mock_external"
-	"github.com/ultramesh/flato-rbft/types"
-	txpoolmock "github.com/ultramesh/flato-txpool/mock"
+	"github.com/hyperchain/go-hpc-common/metrics/disabled"
+	mockexternal "github.com/hyperchain/go-hpc-rbft/mock/mock_external"
+	"github.com/hyperchain/go-hpc-rbft/types"
+	txpoolmock "github.com/hyperchain/go-hpc-txpool/mock"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"

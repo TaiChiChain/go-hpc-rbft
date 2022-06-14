@@ -4,10 +4,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ultramesh/flato-common/metrics/disabled"
-	mockexternal "github.com/ultramesh/flato-rbft/mock/mock_external"
-	pb "github.com/ultramesh/flato-rbft/rbftpb"
-	txpoolmock "github.com/ultramesh/flato-txpool/mock"
+	"github.com/hyperchain/go-hpc-common/metrics/disabled"
+	mockexternal "github.com/hyperchain/go-hpc-rbft/mock/mock_external"
+	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
+	txpoolmock "github.com/hyperchain/go-hpc-txpool/mock"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"

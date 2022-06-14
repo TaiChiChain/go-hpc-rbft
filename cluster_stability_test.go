@@ -3,7 +3,7 @@ package rbft
 import (
 	"testing"
 
-	pb "github.com/ultramesh/flato-rbft/rbftpb"
+	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
@@ -278,7 +278,6 @@ func TestCluster_ReceiveNotificationBeforeStart(t *testing.T) {
 }
 
 func TestCluster_ViewChange_StateUpdate_Timeout_StateUpdated_Replica(t *testing.T) {
-	// test sample 1 for flato-3235
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -361,7 +360,6 @@ func TestCluster_ViewChange_StateUpdate_Timeout_StateUpdated_Replica(t *testing.
 }
 
 func TestCluster_ViewChange_StateUpdate_Timeout_StateUpdated_Primary(t *testing.T) {
-	// test sample 2 for flato-3235
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -487,7 +485,6 @@ func TestCluster_ViewChange_StateUpdate_Timeout_StateUpdated_Primary(t *testing.
 }
 
 func TestCluster_Checkpoint_in_StateUpdating(t *testing.T) {
-	// flato-3711
 	// test for update high target while transferring for efficient state-update instance initiation.
 
 	ctrl := gomock.NewController(t)

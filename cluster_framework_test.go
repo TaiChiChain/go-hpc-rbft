@@ -7,14 +7,14 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/ultramesh/fancylogger"
-	"github.com/ultramesh/flato-common/metrics/disabled"
-	fCommonTypes "github.com/ultramesh/flato-common/types"
-	"github.com/ultramesh/flato-common/types/protos"
-	"github.com/ultramesh/flato-rbft/external"
-	pb "github.com/ultramesh/flato-rbft/rbftpb"
-	"github.com/ultramesh/flato-rbft/types"
-	"github.com/ultramesh/flato-txpool"
+	"github.com/hyperchain/go-hpc-common/fancylogger"
+	"github.com/hyperchain/go-hpc-common/metrics/disabled"
+	hpcCommonTypes "github.com/hyperchain/go-hpc-common/types"
+	"github.com/hyperchain/go-hpc-common/types/protos"
+	"github.com/hyperchain/go-hpc-rbft/external"
+	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
+	"github.com/hyperchain/go-hpc-rbft/types"
+	txpool "github.com/hyperchain/go-hpc-txpool"
 )
 
 var (
@@ -836,7 +836,7 @@ func (ext *testExternal) Execute(requests []*protos.Transaction, localList []boo
 		ext.testNode.n.logger.Debugf("Block Hash %s", state.MetaState.Digest)
 		//report latest validator set
 		if len(requests) != 0 {
-			if fCommonTypes.IsConfigTx(requests[0]) {
+			if hpcCommonTypes.IsConfigTx(requests[0]) {
 				info := &types.EpochInfo{}
 				_ = json.Unmarshal(requests[0].Value, info)
 				var peers []*types.Peer
@@ -861,7 +861,7 @@ func (ext *testExternal) Execute(requests []*protos.Transaction, localList []boo
 		}
 		go ext.testNode.N.ReportExecuted(state)
 
-		if !fCommonTypes.IsConfigTx(requests[0]) && state.MetaState.Height%10 != 0 {
+		if !hpcCommonTypes.IsConfigTx(requests[0]) && state.MetaState.Height%10 != 0 {
 			success := make(chan bool)
 			go func() {
 				for {

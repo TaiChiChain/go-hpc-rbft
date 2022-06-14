@@ -1,7 +1,7 @@
 {
-  "name": "flato-rbft",
+  "name": "go-hpc-rbft",
   "version": "0.3.0",
-  "description": "Flato-RBFT is a high performance blockchain platform",
+  "description": "go-hpc-rbft is a high performance pbft implement",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -9,7 +9,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git.hyperchain.cn/ultramesh/flato-rbft"
+    "url": "git.hyperchain.cn/hyperchain/go-hpc-rbft"
   },
   "keywords": [
     "blockchain",

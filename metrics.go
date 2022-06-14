@@ -1,6 +1,6 @@
 package rbft
 
-import "github.com/ultramesh/flato-common/metrics"
+import "github.com/hyperchain/go-hpc-common/metrics"
 
 // rbftMetrics helps collect all metrics in rbft
 type rbftMetrics struct {

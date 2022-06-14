@@ -6,9 +6,9 @@ package mockexternal
 
 import (
 	gomock "github.com/golang/mock/gomock"
-	protos "github.com/ultramesh/flato-common/types/protos"
-	rbftpb "github.com/ultramesh/flato-rbft/rbftpb"
-	types "github.com/ultramesh/flato-rbft/types"
+	protos "github.com/hyperchain/go-hpc-common/types/protos"
+	rbftpb "github.com/hyperchain/go-hpc-rbft/rbftpb"
+	types "github.com/hyperchain/go-hpc-rbft/types"
 	reflect "reflect"
 )
 
