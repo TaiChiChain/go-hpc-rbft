@@ -14,8 +14,8 @@
 
 syntax = "proto3";
 
-import "github.com/ultramesh/flato-common/types/protos/transaction.proto";
-import "github.com/ultramesh/flato-common/types/protos/checkpoint.proto";
+import "github.com/hyperchain/go-hpc-common/types/protos/transaction.proto";
+import "github.com/hyperchain/go-hpc-common/types/protos/checkpoint.proto";
 
 package rbftpb;
 

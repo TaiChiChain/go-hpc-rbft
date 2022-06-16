@@ -3,9 +3,9 @@ package rbft
 import (
 	"testing"
 
-	"github.com/ultramesh/flato-common/types/protos"
-	pb "github.com/ultramesh/flato-rbft/rbftpb"
-	"github.com/ultramesh/flato-rbft/types"
+	"github.com/hyperchain/go-hpc-common/types/protos"
+	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
+	"github.com/hyperchain/go-hpc-rbft/types"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"

@@ -1,7 +1,7 @@
-Flato-RBFT
+Go-HPC-RBFT
 ======
 
-> RBFT service for flato in go.
+> RBFT service in go.
 
 ## Table of Contents
 
@@ -13,7 +13,7 @@ Flato-RBFT
 - [License](#license)
 
 ## Usage
-flato-rbft provides RBFT service for flato.
+go-hpc-rbft provides RBFT service.
 
 You can initialize a RBFT service by: 
 ```
@@ -49,7 +49,10 @@ For more information about the service above, you can catch them from file `exte
 
 ## API
 ### Node
-import pb "github.com/ultramesh/rbft/rbftpb"
+import (
+    pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
+    "github.com/hyperchain/go-hpc-rbft/types"
+)
 
 Instantiate Node
 ```func NewNode(conf Config) (Node, error)```
@@ -61,25 +64,28 @@ Stop Node Instance
 ```func (n *node) Stop()```
 
 Propose Requests
-```func (n *node) Propose(requests []*protos.Transaction) error```
+```Propose(requests *pb.RequestSet) error```
 
 Propose Config Change
-```func (n *node) ProposeConfChange(cc *pb.ConfChange) error```
+```ProposeConfChange(cc *types.ConfChange) error```
 
 Receive and Process Consensus Messages
-```func (n *node) Step(msg *pb.ConsensusMessage)```
+```Step(msg *pb.ConsensusMessage)```
 
 RBFT Core Apply Config Change
-```func (n *node) ApplyConfChange(cc *pb.ConfState)```
-
-Report Batch Executed to RBFT Core
-```func (n *node) ReportExecuted(state *pb.ServiceState)```
-
-Report State Updated to RBFT Core
-```func (n *node) ReportStateUpdated(state *pb.ServiceState)```
+```ApplyConfChange(cc *types.ConfState)```
 
 Get Current RBFT Core State
-```func (n *node) Status() NodeStatus```
+```Status() NodeStatus```
+
+Report Block Executed State to RBFT Core
+```ReportExecuted(state *types.ServiceState)```
+
+Report State Updated to RBFT Core
+```ReportStateUpdated(state *types.ServiceState)```
+
+Report Config Checkpoint Reload Finished to RBFT Core
+```ReportReloadFinished(reload *types.ReloadMessage)```
 
 ## Mockgen
 

@@ -21,7 +21,7 @@ This file defines the structs used in RBFT
 import (
 	"time"
 
-	pb "github.com/ultramesh/flato-rbft/rbftpb"
+	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
 )
 
 // constant timer names

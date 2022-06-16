@@ -17,7 +17,7 @@ package rbft
 import (
 	"sync"
 
-	pb "github.com/ultramesh/flato-rbft/rbftpb"
+	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
 
 	"github.com/gogo/protobuf/proto"
 )

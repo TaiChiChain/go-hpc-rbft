@@ -8,11 +8,11 @@ import (
 
 	"github.com/gogo/protobuf/proto"
 
-	"github.com/ultramesh/fancylogger"
-	fCommonTypes "github.com/ultramesh/flato-common/types"
-	"github.com/ultramesh/flato-common/types/protos"
-	pb "github.com/ultramesh/flato-rbft/rbftpb"
-	"github.com/ultramesh/flato-rbft/types"
+	"github.com/hyperchain/go-hpc-common/fancylogger"
+	hpcCommonTypes "github.com/hyperchain/go-hpc-common/types"
+	"github.com/hyperchain/go-hpc-common/types/protos"
+	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
+	"github.com/hyperchain/go-hpc-rbft/types"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -137,7 +137,7 @@ func executeExceptN(t *testing.T, rbfts []*rbftImpl, nodes []*testNode, tx *prot
 	retMessages[pb.Type_SIGNED_CHECKPOINT] = checkpointMsg
 
 	if checkpoint {
-		if fCommonTypes.IsConfigTx(tx) {
+		if hpcCommonTypes.IsConfigTx(tx) {
 			for index := range rbfts {
 				if index == notExec {
 					continue

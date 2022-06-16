@@ -3,7 +3,7 @@ package rbft
 import (
 	"testing"
 
-	pb "github.com/ultramesh/flato-rbft/rbftpb"
+	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"

@@ -15,9 +15,9 @@
 package external
 
 import (
-	"github.com/ultramesh/flato-common/types/protos"
-	pb "github.com/ultramesh/flato-rbft/rbftpb"
-	"github.com/ultramesh/flato-rbft/types"
+	"github.com/hyperchain/go-hpc-common/types/protos"
+	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
+	"github.com/hyperchain/go-hpc-rbft/types"
 )
 
 // Storage is an interface that should be implemented by the application using non-volatile

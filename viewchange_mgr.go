@@ -19,10 +19,10 @@ import (
 	"sort"
 	"time"
 
-	"github.com/ultramesh/flato-common/metrics"
-	pb "github.com/ultramesh/flato-rbft/rbftpb"
-	"github.com/ultramesh/flato-rbft/types"
-	txpool "github.com/ultramesh/flato-txpool"
+	"github.com/hyperchain/go-hpc-common/metrics"
+	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
+	"github.com/hyperchain/go-hpc-rbft/types"
+	txpool "github.com/hyperchain/go-hpc-txpool"
 
 	"github.com/gogo/protobuf/proto"
 )

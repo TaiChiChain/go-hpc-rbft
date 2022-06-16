@@ -6,9 +6,9 @@ package mocknode
 
 import (
 	gomock "github.com/golang/mock/gomock"
-	rbft "github.com/ultramesh/flato-rbft"
-	rbftpb "github.com/ultramesh/flato-rbft/rbftpb"
-	types "github.com/ultramesh/flato-rbft/types"
+	rbft "github.com/hyperchain/go-hpc-rbft"
+	rbftpb "github.com/hyperchain/go-hpc-rbft/rbftpb"
+	types "github.com/hyperchain/go-hpc-rbft/types"
 	reflect "reflect"
 )
 

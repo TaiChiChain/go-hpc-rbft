@@ -15,9 +15,9 @@
 package rbft
 
 import (
-	"github.com/ultramesh/flato-rbft/external"
-	pb "github.com/ultramesh/flato-rbft/rbftpb"
-	"github.com/ultramesh/flato-rbft/types"
+	"github.com/hyperchain/go-hpc-rbft/external"
+	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
+	"github.com/hyperchain/go-hpc-rbft/types"
 )
 
 // peerPool maintains local peer ID which is the unique peer through the consensus network.
