@@ -418,7 +418,6 @@ func (rbft *rbftImpl) replicaCheckNewView() consensusEvent {
 	}
 
 	meta, checkpointSet, ok := rbft.selectInitialCheckpoint(nv.Bset)
-	// todo wgr we won't step into such branch
 	if !ok {
 		rbft.logger.Infof("Replica %d could not determine initial checkpoint", rbft.peerPool.ID)
 		return rbft.sendViewChange()
@@ -427,14 +426,12 @@ func (rbft *rbftImpl) replicaCheckNewView() consensusEvent {
 
 	// Check if the xset sent by new primary is built correctly by the aset
 	msgList := rbft.assignSequenceNumbers(nv.Bset, meta.Height)
-	// todo wgr we won't step into such branch
 	if msgList == nil {
 		rbft.logger.Infof("Replica %d could not assign sequence numbers: %+v",
 			rbft.peerPool.ID, rbft.vcMgr.viewChangeStore)
 		return rbft.sendViewChange()
 	}
 	rbft.logger.Debugf("x-set: %+v", msgList)
-	// todo wgr we won't step into such branch
 	if !(len(msgList) == 0 && len(nv.Xset) == 0) && !reflect.DeepEqual(msgList, nv.Xset) {
 		rbft.logger.Warningf("Replica %d failed to verify newView xset: computed %+v, received %+v",
 			rbft.peerPool.ID, msgList, nv.Xset)

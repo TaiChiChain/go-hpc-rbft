@@ -1,8 +1,8 @@
 cloud.google.com/go v0.26.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMTw=
-git.hyperchain.cn/hyperchain/go-hpc-common.git v0.2.55 h1:ktdVC2miNVw5cpnonHkN1Cn9OY+HuZ5ff344uQU/5dg=
-git.hyperchain.cn/hyperchain/go-hpc-common.git v0.2.55/go.mod h1:wPrDPdi7dtTOnJn/rsNVUEkdv+iqCQKIa2emd42d+J4=
-git.hyperchain.cn/hyperchain/go-hpc-txpool.git v0.2.19 h1:iAtEcv4EKTLgSkeAgSpDfrdMGeBKCalIP2/Mo/yf+sg=
-git.hyperchain.cn/hyperchain/go-hpc-txpool.git v0.2.19/go.mod h1:wC0b/w6by+LufLHe4bcwPFGZu4DAUUZVKFgB+j4i+BE=
+git.hyperchain.cn/hyperchain/go-hpc-common.git v0.3.0 h1:cRIxneTgS/gqheLdp7y2pNUROc2m2a5jI7rR5dgKRY8=
+git.hyperchain.cn/hyperchain/go-hpc-common.git v0.3.0/go.mod h1:wPrDPdi7dtTOnJn/rsNVUEkdv+iqCQKIa2emd42d+J4=
+git.hyperchain.cn/hyperchain/go-hpc-txpool.git v0.3.0 h1:PAnjx2VIS1GrZOmUeOV9pWxz7Cn7cXBq4kbOOkK9h7o=
+git.hyperchain.cn/hyperchain/go-hpc-txpool.git v0.3.0/go.mod h1:SoVFSYg4hFEVNTOWZLXnIuhUtnXSI5epKmmKTc649R8=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/alecthomas/template v0.0.0-20160405071501-a0175ee3bccc/go.mod h1:LOuyumcjzFXgccqObfd/Ljyb9UuFJ6TxHnclSeseNhc=
 github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751/go.mod h1:LOuyumcjzFXgccqObfd/Ljyb9UuFJ6TxHnclSeseNhc=
