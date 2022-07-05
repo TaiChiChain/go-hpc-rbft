@@ -566,7 +566,6 @@ func (rbft *rbftImpl) restoreBatchStore() {
 // params from database
 func (rbft *rbftImpl) restoreState() error {
 
-	// TODO(DH): move router restore to external.
 	rbft.batchMgr.setSeqNo(rbft.exec.lastExec)
 	setView := rbft.restoreView()
 	rbft.restoreN()

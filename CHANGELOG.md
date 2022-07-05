@@ -137,6 +137,16 @@ All notable changes to this project will be documented in this file. See [standa
 * we need to persist checkpoint in state-updated ([b685ce4](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/b685ce43b0ea80fbfa04680598bc5b31f8b71282)), closes [#flato-2843](/git.hyperchain.cn/hyperchain/go-hpc-rbft/issues/flato-2843)
 * we need to start high watermark for abnormal pre-prepare ([c67af06](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/c67af06c928fe62dfbacc06adc35c11b759451bf)), closes [#flato-3119](/git.hyperchain.cn/hyperchain/go-hpc-rbft/issues/flato-3119)
 
+<a name="0.3.0-1"></a>
+# [0.3.0-1](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.3.0...v0.3.0-1) (2022-06-01)
+
+
+### Bug Fixes
+
+* decrease epoch when generate checkpoint with a low chain height ([7577e85](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/7577e85)), closes [#flato-4741](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-4741)
+
+
+
 <a name="0.3.0"></a>
 # [0.3.0](http://git.hyperchain.cn/ultramesh/flato-rbft/compare/v0.2.47...v0.3.0) (2022-05-30)
 

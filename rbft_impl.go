@@ -2168,20 +2168,13 @@ func (rbft *rbftImpl) recvStateUpdatedEvent(ss *types.ServiceState) consensusEve
 		// TODO(YC): send InformTypeFilterFinishConfigChange event
 	}
 
-	// 3. process information about stable checkpoint
-	rbft.logger.Infof("Replica %d post stable checkpoint event for seqNo %d after state update to the height",
-		rbft.peerPool.ID, seqNo)
-	// we have ensured state updated to current highStateTarget.
-	// TODO(DH): we may have only f+1 checkpoints in checkpointSet, is f+1 weak cert is trustable enough?
-	// if only 2f+1 is strong cert is trustable, we have to fetch checkpoint...
+	// 3. sign and cache local checkpoint.
 	checkpointSet := rbft.storeMgr.highStateTarget.checkpointSet
 	if len(checkpointSet) == 0 {
 		rbft.logger.Warningf("Replica %d found an empty checkpoint set", rbft.peerPool.ID)
 		rbft.stopNamespace()
 		return nil
 	}
-	// TODO(YC): delete, don't submit checkpoint after stateUpdate
-	//rbft.external.SendFilterEvent(types.InformTypeFilterStableCheckpoint, checkpointSet)
 
 	// NOTE! don't generate local checkpoint using current epoch, use remote consistent checkpoint
 	// to generate a signed checkpoint as this consistent checkpoint may be generated in an old epoch.
