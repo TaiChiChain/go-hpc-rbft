@@ -1,6 +1,6 @@
 {
   "name": "go-hpc-rbft",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "go-hpc-rbft is a high performance pbft implement",
   "main": "index.js",
   "scripts": {

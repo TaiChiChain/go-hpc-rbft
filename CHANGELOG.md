@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.4.0](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v0.3.1...v0.4.0) (2022-07-05)
+
+
+### Bug Fixes
+
+* decrease epoch when generate checkpoint with a low chain height ([7577e85](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/7577e857c25022bd05299e14f9aa9c90b3e61883)), closes [#flato-4741](/git.hyperchain.cn/hyperchain/go-hpc-rbft/issues/flato-4741)
+
 ### 0.3.1 (2022-06-16)
 
 
