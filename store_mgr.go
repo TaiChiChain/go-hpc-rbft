@@ -123,10 +123,10 @@ func (sm *storeManager) getCert(v uint64, n uint64, d string) (cert *msgCert) {
 
 // existedDigest checks if there exists another PRE-PREPARE message in certStore which has the same digest, same view,
 // but different seqNo with the given one
-func (sm *storeManager) existedDigest(n uint64, view uint64, digest string) bool {
+func (sm *storeManager) existedDigest(v uint64, n uint64, d string) bool {
 	for _, cert := range sm.certStore {
 		if p := cert.prePrepare; p != nil {
-			if p.View == view && p.SequenceNumber != n && p.BatchDigest == digest && digest != "" {
+			if p.View == v && p.SequenceNumber != n && p.BatchDigest == d && d != "" {
 				// This will happen if primary receive same digest result of txs
 				// It may result in DDos attack
 				sm.logger.Warningf("Other prePrepare found with same digest but different seqNo: %d "+

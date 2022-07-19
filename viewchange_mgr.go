@@ -519,7 +519,6 @@ func (rbft *rbftImpl) resetStateForNewView() consensusEvent {
 
 // used in view-change to fetch missing assigned, non-checkpointed requests
 func (rbft *rbftImpl) fetchRequestBatches() {
-
 	for digest := range rbft.storeMgr.missingReqBatches {
 		rbft.logger.Debugf("Replica %d try to fetch missing request batch with digest: %s", rbft.peerPool.ID, digest)
 		frb := &pb.FetchRequestBatch{
@@ -540,8 +539,6 @@ func (rbft *rbftImpl) fetchRequestBatches() {
 		rbft.metrics.fetchRequestBatchCounter.Add(float64(1))
 		rbft.peerPool.broadcast(consensusMsg)
 	}
-
-	return
 }
 
 // recvFetchRequestBatch returns the requested batch
@@ -1149,7 +1146,7 @@ func (rbft *rbftImpl) processNewView(msgList xset) {
 		// prePrepare and Prepare phase in new view because we may lose commit message in the following
 		// normal case(because of elimination rule of PQC), after which, if new node needs to fetchPQC
 		// to recover state after stable checkpoint, it will not get enough commit messages to recover
-		// to latest height.
+		// to the latest height.
 		// NOTE: this is always correct to construct certs of committed batches.
 		if n > rbft.h && n <= rbft.exec.lastExec {
 			rbft.logger.Debugf("Replica %d sending commit for view=%d/seqNo=%d/digest=%s after new view",

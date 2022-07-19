@@ -485,7 +485,7 @@ All notable changes to this project will be documented in this file. See [standa
 
 ### Performance Improvements
 
-* **rbft_impl.go:** batch add requests into txpool to improve the performance of look up bloom_filte ([0c367b2](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/0c367b2)), closes [#flato-3340](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-3340)
+* **rbft_impl.go:** batch add requests into txpool to improve the performance of look up bloom_filter ([0c367b2](http://git.hyperchain.cn/ultramesh/flato-rbft/commits/0c367b2)), closes [#flato-3340](http://git.hyperchain.cn/ultramesh/flato-rbft/issues/flato-3340)
 
 
 

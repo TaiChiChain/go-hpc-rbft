@@ -156,14 +156,17 @@ func (rbft *rbftImpl) maybeSendPrePrepare(batch *pb.RequestBatch, findCache bool
 	nextSeqNo = rbft.batchMgr.getSeqNo() + 1
 	// restrict the speed of sending prePrepare.
 	if rbft.beyondRange(nextSeqNo) {
+		batchHash := "<nil>"
+		if batch != nil {
+			batchHash = batch.BatchHash
+		}
+		rbft.logger.Debugf("Replica %d is primary, not sending prePrepare for request batch %s because "+
+			"next seqNo is out of high watermark %d, while findCache is %t", rbft.peerPool.ID, batchHash, rbft.h+rbft.L, findCache)
+
 		if !findCache {
-			rbft.logger.Debugf("Replica %d is primary, not sending prePrepare for request batch %s because "+
-				"next seqNo is out of high watermark %d", rbft.peerPool.ID, batch.BatchHash, rbft.h+rbft.L)
 			rbft.batchMgr.cacheBatch = append(rbft.batchMgr.cacheBatch, batch)
 			rbft.metrics.cacheBatchNumber.Add(float64(1))
 		}
-		rbft.logger.Debugf("Replica %d is primary, not sending prePrepare for request batch in cache because "+
-			"next seqNo is out of high watermark %d", rbft.peerPool.ID, rbft.h+rbft.L)
 		// the cluster needs to generate a stable checkpoint every K blocks to collect the garbage.
 		// here, the primary is trying to send a pre-prepare out of high-watermark, we need to start a timer for it
 		// in order to generate the stable checkpoint
@@ -182,7 +185,7 @@ func (rbft *rbftImpl) maybeSendPrePrepare(batch *pb.RequestBatch, findCache bool
 
 	digest := nextBatch.BatchHash
 	// check for other PRE-PREPARE for same digest, but different seqNo
-	if rbft.storeMgr.existedDigest(nextSeqNo, rbft.view, digest) {
+	if rbft.storeMgr.existedDigest(rbft.view, nextSeqNo, digest) {
 		return
 	}
 
@@ -208,46 +211,49 @@ func (rbft *rbftImpl) maybeSendPrePrepare(batch *pb.RequestBatch, findCache bool
 	}
 }
 
-// findNextCommitBatch used by backup nodes finds batch and commits
-func (rbft *rbftImpl) findNextCommitBatch(digest string, v uint64, n uint64) error {
-	cert := rbft.storeMgr.getCert(v, n, digest)
+// findNextPrepareBatch is used by the backup nodes to ensure that the batch corresponding to this cert exists.
+// If it exists, then prepare it.
+func (rbft *rbftImpl) findNextPrepareBatch(v uint64, n uint64, d string) error {
+	rbft.logger.Debugf("Replica %d findNextPrepareBatch in cert with for view=%d/seqNo=%d/digest=%s", rbft.peerPool.ID, v, n, d)
+
 	if v != rbft.view {
-		rbft.logger.Debugf("Replica %d find incorrect view in prepared cert with view=%d/seqNo=%d", rbft.peerPool.ID, v, n)
+		rbft.logger.Debugf("Replica %d excepts the cert with view=%d, but actually the cert is view=%d/seqNo=%d/digest=%s", rbft.peerPool.ID, rbft.view, v, n, d)
 		return nil
 	}
 
+	cert := rbft.storeMgr.getCert(v, n, d)
 	if cert.prePrepare == nil {
 		rbft.logger.Errorf("Replica %d get prePrepare failed for view=%d/seqNo=%d/digest=%s",
-			rbft.peerPool.ID, v, n, digest)
+			rbft.peerPool.ID, v, n, d)
 		return nil
 	}
 
 	if rbft.in(SkipInProgress) {
-		rbft.logger.Debugf("Replica %d do not try to send commit because it's in stateUpdate", rbft.peerPool.ID)
+		rbft.logger.Debugf("Replica %d do not try to send prepare because it's in stateUpdate", rbft.peerPool.ID)
 		return nil
 	}
 
-	if digest == "" {
-		rbft.logger.Infof("Replica %d send commit for no-op batch with view=%d/seqNo=%d", rbft.peerPool.ID, v, n)
-		return rbft.sendCommit(digest, v, n)
+	if d == "" {
+		rbft.logger.Infof("Replica %d send prepare for no-op batch with view=%d/seqNo=%d", rbft.peerPool.ID, v, n)
+		return rbft.sendPrepare(v, n, d)
 	}
-	// when system restart or finished vc/recovery, we need to resend commit for cert
-	// with seqNo <= lastExec. However, those batches may have been deleted from requestPool
+	// when system restart or finished vc/recovery, we need to resend prepare for cert
+	// with seqNo <= lastExec. However, those batches may have been deleted from requestPool,
 	// so we can get those batches from batchStore first.
-	if existBatch, ok := rbft.storeMgr.batchStore[digest]; ok {
-		rbft.logger.Debugf("Replica %d commit batch for view=%d/seqNo=%d, batch size: %d", rbft.peerPool.ID, v, n, len(existBatch.RequestHashList))
-		return rbft.sendCommit(digest, v, n)
+	if existBatch, ok := rbft.storeMgr.batchStore[d]; ok {
+		rbft.logger.Debugf("Replica %d prepare batch for view=%d/seqNo=%d, batch size: %d", rbft.peerPool.ID, v, n, len(existBatch.RequestHashList))
+		return rbft.sendPrepare(v, n, d)
 	}
 	prePrep := cert.prePrepare
 
-	txList, localList, missingTxs, err := rbft.batchMgr.requestPool.GetRequestsByHashList(digest, prePrep.HashBatch.Timestamp, prePrep.HashBatch.RequestHashList, prePrep.HashBatch.DeDuplicateRequestHashList)
+	txList, localList, missingTxs, err := rbft.batchMgr.requestPool.GetRequestsByHashList(d, prePrep.HashBatch.Timestamp, prePrep.HashBatch.RequestHashList, prePrep.HashBatch.DeDuplicateRequestHashList)
 	if err != nil {
 		rbft.logger.Warningf("Replica %d get error when get txList, err: %v", rbft.peerPool.ID, err)
 		rbft.sendViewChange()
 		return nil
 	}
 	if missingTxs != nil {
-		_ = rbft.fetchMissingTxs(prePrep, missingTxs)
+		rbft.fetchMissingTxs(prePrep, missingTxs)
 		return nil
 	}
 
@@ -257,13 +263,13 @@ func (rbft *rbftImpl) findNextCommitBatch(digest string, v uint64, n uint64) err
 		Timestamp:       prePrep.HashBatch.Timestamp,
 		SeqNo:           prePrep.SequenceNumber,
 		LocalList:       localList,
-		BatchHash:       digest,
+		BatchHash:       d,
 	}
 
 	// store batch to outstandingReqBatches until execute this batch
-	rbft.storeMgr.outstandingReqBatches[digest] = batch
-	rbft.storeMgr.batchStore[digest] = batch
-	rbft.persistBatch(digest)
+	rbft.storeMgr.outstandingReqBatches[d] = batch
+	rbft.storeMgr.batchStore[d] = batch
+	rbft.persistBatch(d)
 	rbft.metrics.batchesGauge.Add(float64(1))
 	rbft.metrics.outstandingBatchesGauge.Add(float64(1))
 
@@ -273,8 +279,9 @@ func (rbft *rbftImpl) findNextCommitBatch(digest string, v uint64, n uint64) err
 		rbft.metrics.statusGaugeInConfChange.Set(InConfChange)
 	}
 
-	rbft.logger.Debugf("Replica %d commit batch for view=%d/seqNo=%d, batch size: %d", rbft.peerPool.ID, v, n, len(txList))
-	return rbft.sendCommit(digest, v, n)
+	rbft.logger.Debugf("Replica %d prepare batch for view=%d/seqNo=%d, batch size: %d", rbft.peerPool.ID, v, n, len(txList))
+
+	return rbft.sendPrepare(v, n, d)
 }
 
 // primaryResubmitTransactions tries to submit transactions for primary after abnormal

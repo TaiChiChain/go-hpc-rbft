@@ -87,7 +87,7 @@ func TestTimerMgr_stopTimer(t *testing.T) {
 	assert.Equal(t, 0, timeMgr.tTimers["test1"].count())
 }
 
-func TestTimerMgr_getTimeoutValue(t *testing.T) {
+func TestTimerMgr_stopOneTimer(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -109,7 +109,7 @@ func TestTimerMgr_getTimeoutValue(t *testing.T) {
 	assert.Equal(t, false, timeMgr.tTimers["test1"].has("key1"))
 }
 
-func TestTimerMgr_stopOneTimer(t *testing.T) {
+func TestTimerMgr_getTimeoutValue(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 

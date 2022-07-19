@@ -61,7 +61,7 @@ type Crypto interface {
 //    which will be submitted to application service. After application submitted the given batch,
 //    application should call ServiceInbound.ReportExecuted to inform RBFT library the latest
 //    service state.
-// 2. StateUpdate is invoked when RBFT core finds current node out-of-date from other nodes by too may
+// 2. StateUpdate is invoked when RBFT core finds current node out-of-date from other nodes by too many
 //    seqNos, it's applications responsibility to implement a fast sync algorithm to ensure node
 //    can catch up as soon as possible. Applications should call ServiceInbound.ReportStateUpdated
 //    to inform RBFT library the latest service state after StateUpdate.

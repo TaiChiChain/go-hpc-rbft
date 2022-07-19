@@ -177,14 +177,14 @@ func TestHelper_Check(t *testing.T) {
 	}
 	rbfts[0].storeMgr.certStore[IDTmp] = certTmp
 
-	assert.True(t, rbfts[0].prePrepared("msg", uint64(1), uint64(20)))
-	assert.False(t, rbfts[0].prePrepared("error msg", uint64(1), uint64(20)))
+	assert.True(t, rbfts[0].prePrepared(uint64(1), uint64(20), "msg"))
+	assert.False(t, rbfts[0].prePrepared(uint64(1), uint64(20), "error msg"))
 
-	assert.False(t, rbfts[0].prepared("no prePrepared", 1, 20))
-	assert.True(t, rbfts[0].prepared("msg", 1, 20))
+	assert.False(t, rbfts[0].prepared(1, 20, "no prePrepared"))
+	assert.True(t, rbfts[0].prepared(1, 20, "msg"))
 
-	assert.False(t, rbfts[0].committed("no prepared", 1, 20))
-	assert.True(t, rbfts[0].committed("msg", 1, 20))
+	assert.False(t, rbfts[0].committed(1, 20, "no prepared"))
+	assert.True(t, rbfts[0].committed(1, 20, "msg"))
 }
 
 // =============================================================================

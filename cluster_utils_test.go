@@ -6,14 +6,13 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/gogo/protobuf/proto"
-
 	"github.com/hyperchain/go-hpc-common/fancylogger"
 	hpcCommonTypes "github.com/hyperchain/go-hpc-common/types"
 	"github.com/hyperchain/go-hpc-common/types/protos"
 	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
 	"github.com/hyperchain/go-hpc-rbft/types"
 
+	"github.com/gogo/protobuf/proto"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -251,8 +250,8 @@ func newBasicClusterInstance() ([]*testNode, []*rbftImpl) {
 	var rbfts []*rbftImpl
 	var nodes []*testNode
 	for _, tn := range tf.TestNode {
-		nodes = append(nodes, tn)
 		rbfts = append(rbfts, tn.n.rbft)
+		nodes = append(nodes, tn)
 		_ = tn.n.rbft.batchMgr.requestPool.Start()
 	}
 
@@ -342,10 +341,7 @@ func (rbft *rbftImpl) consensusMessagePacker(e consensusEvent) *pb.ConsensusMess
 }
 
 func (tm *timerManager) getTimer(name string) bool {
-	if tm.tTimers[name].count() != 0 {
-		return true
-	}
-	return false
+	return tm.tTimers[name].count() != 0
 }
 
 // checkNilElems checks if provided struct has nil elements, returns error if provided
