@@ -13,7 +13,7 @@ require (
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/golang/protobuf v1.5.1 // indirect
-	github.com/json-iterator/go v1.1.10 // indirect
+	github.com/json-iterator/go v1.1.11 // indirect
 	github.com/meshplus/crypto v0.0.9 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.1 // indirect
@@ -22,9 +22,9 @@ require (
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/willf/bitset v1.1.11 // indirect
 	github.com/willf/bloom v2.0.3+incompatible // indirect
-	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9 // indirect
-	golang.org/x/net v0.0.0-20210405180319-a5a99cb37ef4 // indirect
-	golang.org/x/sys v0.0.0-20210510120138-977fb7262007 // indirect
+	golang.org/x/crypto v0.0.0-20220518034528-6f7dac969898 // indirect
+	golang.org/x/net v0.0.0-20211209124913-491a49abca63 // indirect
+	golang.org/x/sys v0.0.0-20220412211240-33da011f77ad // indirect
 	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/genproto v0.0.0-20200526211855-cb27e3aa2013 // indirect
 	google.golang.org/grpc v1.38.0 // indirect
@@ -37,3 +37,5 @@ replace github.com/hyperchain/go-hpc-common => git.hyperchain.cn/hyperchain/go-h
 replace github.com/hyperchain/go-hpc-txpool => git.hyperchain.cn/hyperchain/go-hpc-txpool.git v0.3.0
 
 replace gopkg.in/yaml.v2 => github.com/go-yaml/yaml v0.0.0-20200121171940-53403b58ad1b
+
+replace github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.11.1

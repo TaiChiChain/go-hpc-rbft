@@ -260,7 +260,7 @@ func TestExec_handleRecoveryEvent_SyncStateRestartTimerEvent(t *testing.T) {
 	assert.False(t, rbfts[1].timerMgr.getTimer(syncStateRestartTimer))
 
 	rbfts[1].handleRecoveryEvent(ev)
-	assert.True(t, rbfts[1].timerMgr.getTimer(syncStateRestartTimer))
+	assert.False(t, rbfts[1].timerMgr.getTimer(syncStateRestartTimer))
 }
 
 func TestExec_handleViewChangeEvent_ViewChangeTimerEvent(t *testing.T) {
