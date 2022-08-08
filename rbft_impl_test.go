@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/hyperchain/go-hpc-common/metrics/disabled"
+	commonTypes "github.com/hyperchain/go-hpc-common/types"
 	"github.com/hyperchain/go-hpc-common/types/protos"
 	mockexternal "github.com/hyperchain/go-hpc-rbft/mock/mock_external"
 	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
@@ -337,8 +338,7 @@ func TestRBFT_fetchMissingTxs(t *testing.T) {
 	missingTxHashes := map[uint64]string{
 		uint64(0): "transaction",
 	}
-	err := rbfts[0].fetchMissingTxs(prePrep, missingTxHashes)
-	assert.Nil(t, err)
+	rbfts[0].fetchMissingTxs(prePrep, missingTxHashes)
 
 	fetch := &pb.FetchMissingRequests{
 		View:                 prePrep.View,
@@ -490,9 +490,12 @@ func TestRBFT_recvPrePrepare_WrongSeqNo(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	tx := newTx()
+	txHash := commonTypes.GetHash(tx).String()
+
 	nodes, rbfts := newBasicClusterInstance()
 	hashBatch := &pb.HashBatch{
-		RequestHashList: []string{"tx-hash"},
+		RequestHashList: []string{txHash},
 	}
 	preprep := &pb.PrePrepare{
 		View:           rbfts[0].view,
@@ -500,10 +503,26 @@ func TestRBFT_recvPrePrepare_WrongSeqNo(t *testing.T) {
 		HashBatch:      hashBatch,
 		ReplicaId:      rbfts[0].peerPool.ID,
 	}
-	preprep.BatchDigest = calculateMD5Hash(preprep.HashBatch.RequestHashList, preprep.HashBatch.Timestamp)
+	batchHash := calculateMD5Hash(preprep.HashBatch.RequestHashList, preprep.HashBatch.Timestamp)
+	preprep.BatchDigest = batchHash
 
 	err := rbfts[1].recvPrePrepare(preprep)
 	assert.Nil(t, err)
+	assert.Equal(t, pb.Type_FETCH_MISSING_REQUESTS, nodes[1].unicastMessageCache.Type) // fetching missing tx for preprepare message
+
+	rbfts[1].recvSendMissingTxs(&pb.SendMissingRequests{
+		ReplicaId:      rbfts[0].peerPool.ID,
+		View:           rbfts[0].view,
+		SequenceNumber: uint64(1),
+		BatchDigest:    batchHash,
+		MissingRequestHashes: map[uint64]string{
+			0: txHash,
+		},
+		MissingRequests: map[uint64]*protos.Transaction{
+			0: tx,
+		},
+	})
+
 	assert.Equal(t, pb.Type_PREPARE, nodes[1].broadcastMessageCache.Type)
 
 	hashBatchWrong := &pb.HashBatch{
@@ -527,8 +546,12 @@ func TestRBFT_recvFetchMissingTxs(t *testing.T) {
 	defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance()
+
+	tx := newTx()
+	txHash := commonTypes.GetHash(tx).String()
+
 	hashBatch := &pb.HashBatch{
-		RequestHashList: []string{"tx-hash"},
+		RequestHashList: []string{txHash},
 	}
 	preprep := &pb.PrePrepare{
 		View:           rbfts[0].view,
@@ -542,7 +565,7 @@ func TestRBFT_recvFetchMissingTxs(t *testing.T) {
 		View:                 preprep.View,
 		SequenceNumber:       preprep.SequenceNumber,
 		BatchDigest:          preprep.BatchDigest,
-		MissingRequestHashes: map[uint64]string{uint64(0): "tx-hash"},
+		MissingRequestHashes: map[uint64]string{0: txHash},
 		ReplicaId:            rbfts[1].peerPool.ID,
 	}
 
@@ -550,9 +573,8 @@ func TestRBFT_recvFetchMissingTxs(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Nil(t, nodes[0].unicastMessageCache)
 
-	tx := newTx()
 	rbfts[0].storeMgr.batchStore[fetch.BatchDigest] = &pb.RequestBatch{
-		RequestHashList: []string{"tx-hash"},
+		RequestHashList: []string{txHash},
 		RequestList:     []*protos.Transaction{tx},
 		SeqNo:           uint64(1),
 		LocalList:       []bool{true},
@@ -566,7 +588,7 @@ func TestRBFT_recvFetchMissingTxs(t *testing.T) {
 		SequenceNumber:       fetch.SequenceNumber,
 		BatchDigest:          fetch.BatchDigest,
 		MissingRequestHashes: fetch.MissingRequestHashes,
-		MissingRequests:      map[uint64]*protos.Transaction{},
+		MissingRequests:      map[uint64]*protos.Transaction{0: tx},
 		ReplicaId:            rbfts[0].peerPool.ID,
 	}
 
@@ -594,8 +616,8 @@ func TestRBFT_recvFetchMissingTxs(t *testing.T) {
 	assert.Nil(t, ret)
 
 	_ = rbfts[1].recvPrePrepare(preprep)
-	assert.Equal(t, pb.Type_PREPARE, nodes[1].broadcastMessageCache.Type)
 	ret = rbfts[1].recvSendMissingTxs(re)
+	assert.Equal(t, pb.Type_PREPARE, nodes[1].broadcastMessageCache.Type)
 	assert.Nil(t, ret)
 
 	cert := rbfts[1].storeMgr.getCert(re.View, re.SequenceNumber, re.BatchDigest)

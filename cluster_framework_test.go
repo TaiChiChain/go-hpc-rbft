@@ -161,7 +161,6 @@ func (lookup *defaultTxpoolSupportSmokeTest) IsRequestsExist(txs []*protos.Trans
 }
 
 func (lookup *defaultTxpoolSupportSmokeTest) CheckSigns(txs []*protos.Transaction) {
-	return
 }
 
 //=============================================================================

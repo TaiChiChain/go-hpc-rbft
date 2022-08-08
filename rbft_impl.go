@@ -307,8 +307,7 @@ func newRBFT(cpChan chan *types.ServiceState, confC chan *types.ReloadFinished, 
 
 // start initializes and starts the consensus service
 func (rbft *rbftImpl) start() error {
-	var err error
-	err = rbft.batchMgr.requestPool.Start()
+	err := rbft.batchMgr.requestPool.Start()
 	if err != nil {
 		return err
 	}
@@ -352,7 +351,7 @@ func (rbft *rbftImpl) start() error {
 	return nil
 }
 
-// stop stops the consensus service
+// stop the consensus service
 func (rbft *rbftImpl) stop() {
 	rbft.logger.Notice("RBFT stopping...")
 
@@ -390,7 +389,7 @@ func (rbft *rbftImpl) stop() {
 	rbft.logger.Noticef("RBFT stopped!")
 }
 
-// RecvMsg receives and processes messages from other peers
+// step receives and processes messages from other peers
 func (rbft *rbftImpl) step(msg *pb.ConsensusMessage) {
 	if rbft.atomicIn(Pending) {
 		if rbft.atomicIn(Stopped) {
@@ -477,7 +476,6 @@ func (rbft *rbftImpl) postConfState(cc *types.ConfState) {
 	}
 	rbft.peerPool.initPeers(cc.QuorumRouter.Peers)
 	rbft.metrics.idGauge.Set(float64(rbft.peerPool.ID))
-	return
 }
 
 // postMsg posts messages to main loop.
@@ -550,7 +548,6 @@ func (rbft *rbftImpl) listenEvent() {
 					rbft.logger.Notice("exit RBFT event listener")
 					return
 				default:
-					break
 				}
 				next = rbft.processEvent(next)
 				if next == nil {
@@ -789,9 +786,9 @@ func (rbft *rbftImpl) processReqSetEvent(req *pb.RequestSet) consensusEvent {
 					rbft.logger.Warningf("Replica %d completion batch with hash %s but not found missing record",
 						rbft.peerPool.ID, batchHash)
 				} else {
-					rbft.logger.Infof("Replica %d completion batch with hash %s, try to commit this batch",
+					rbft.logger.Infof("Replica %d completion batch with hash %s, try to prepare this batch",
 						rbft.peerPool.ID, batchHash)
-					_ = rbft.findNextCommitBatch(idx.d, idx.v, idx.n)
+					_ = rbft.findNextPrepareBatch(idx.v, idx.n, idx.d)
 				}
 				delete(rbft.storeMgr.missingBatchesInFetching, batchHash)
 			}
@@ -1043,24 +1040,26 @@ func (rbft *rbftImpl) recvPrePrepare(preprep *pb.PrePrepare) error {
 
 	rbft.persistQSet(preprep)
 
-	if !rbft.isPrimary(rbft.peerPool.ID) && !cert.sentPrepare &&
-		rbft.prePrepared(preprep.BatchDigest, preprep.View, preprep.SequenceNumber) {
-		cert.sentPrepare = true
-		return rbft.sendPrepare(preprep)
+	if !rbft.isPrimary(rbft.peerPool.ID) && !cert.sentPrepare {
+		return rbft.findNextPrepareBatch(preprep.View, preprep.SequenceNumber, preprep.BatchDigest)
 	}
 
 	return nil
 }
 
 // sendPrepare send prepare message.
-func (rbft *rbftImpl) sendPrepare(preprep *pb.PrePrepare) error {
-	rbft.logger.Debugf("Replica %d sending prepare for view=%d/seqNo=%d", rbft.peerPool.ID, preprep.View, preprep.SequenceNumber)
+func (rbft *rbftImpl) sendPrepare(v uint64, n uint64, d string) error {
+	cert := rbft.storeMgr.getCert(v, n, d)
+	cert.sentPrepare = true
+
+	rbft.logger.Debugf("Replica %d sending prepare for view=%d/seqNo=%d", rbft.peerPool.ID, v, n)
 	prep := &pb.Prepare{
-		View:           preprep.View,
-		SequenceNumber: preprep.SequenceNumber,
-		BatchDigest:    preprep.BatchDigest,
+		View:           v,
+		SequenceNumber: n,
+		BatchDigest:    d,
 		ReplicaId:      rbft.peerPool.ID,
 	}
+
 	payload, err := proto.Marshal(prep)
 	if err != nil {
 		rbft.logger.Errorf("ConsensusMessage_PREPARE Marshal Error: %s", err)
@@ -1104,29 +1103,34 @@ func (rbft *rbftImpl) recvPrepare(prep *pb.Prepare) error {
 
 	cert.prepare[*prep] = true
 
-	return rbft.maybeSendCommit(prep.BatchDigest, prep.View, prep.SequenceNumber)
+	return rbft.maybeSendCommit(prep.View, prep.SequenceNumber, prep.BatchDigest)
 }
 
 // maybeSendCommit check if we could send commit. if no problem,
 // primary and replica would send commit.
-func (rbft *rbftImpl) maybeSendCommit(digest string, v uint64, n uint64) error {
-
+func (rbft *rbftImpl) maybeSendCommit(v uint64, n uint64, d string) error {
 	if rbft.in(SkipInProgress) {
 		rbft.logger.Debugf("Replica %d do not try to send commit because it's in stateUpdate", rbft.peerPool.ID)
 		return nil
 	}
 
-	cert := rbft.storeMgr.getCert(v, n, digest)
+	cert := rbft.storeMgr.getCert(v, n, d)
 	if cert == nil {
-		rbft.logger.Errorf("Replica %d can't get the cert for the view=%d/seqNo=%d/digest=%s", rbft.peerPool.ID, v, n, digest)
+		rbft.logger.Errorf("Replica %d can't get the cert for the view=%d/seqNo=%d/digest=%s", rbft.peerPool.ID, v, n, d)
 		return nil
 	}
 
-	if !rbft.prepared(digest, v, n) {
+	if !rbft.prepared(v, n, d) {
+		return nil
+	}
+
+	if !rbft.isPrimary(rbft.peerPool.ID) && !cert.sentPrepare {
+		rbft.logger.Warningf("Replica %d cert hasn't sent prepare, cancel maybeSendCommit", rbft.peerPool.ID)
 		return nil
 	}
 
 	if cert.sentCommit {
+		rbft.logger.Warningf("Replica %d cert is committed, cancel maybeSendCommit", rbft.peerPool.ID)
 		return nil
 	}
 
@@ -1135,28 +1139,23 @@ func (rbft *rbftImpl) maybeSendCommit(digest string, v uint64, n uint64) error {
 		duration := time.Duration(cert.preparedTime - cert.prePreparedTime).Seconds()
 		rbft.metrics.prePreparedToPrepared.Observe(duration)
 	}
-
-	if rbft.isPrimary(rbft.peerPool.ID) {
-		return rbft.sendCommit(digest, v, n)
-	}
-
-	return rbft.findNextCommitBatch(digest, v, n)
+	return rbft.sendCommit(v, n, d)
 }
 
 // sendCommit send commit message.
-func (rbft *rbftImpl) sendCommit(digest string, v uint64, n uint64) error {
-	cert := rbft.storeMgr.getCert(v, n, digest)
+func (rbft *rbftImpl) sendCommit(v uint64, n uint64, d string) error {
+	cert := rbft.storeMgr.getCert(v, n, d)
+	cert.sentCommit = true
 
 	rbft.logger.Debugf("Replica %d sending commit for view=%d/seqNo=%d", rbft.peerPool.ID, v, n)
 	commit := &pb.Commit{
 		View:           v,
 		SequenceNumber: n,
-		BatchDigest:    digest,
+		BatchDigest:    d,
 		ReplicaId:      rbft.peerPool.ID,
 	}
-	cert.sentCommit = true
 
-	rbft.persistPSet(v, n, digest)
+	rbft.persistPSet(v, n, d)
 
 	payload, err := proto.Marshal(commit)
 	if err != nil {
@@ -1202,7 +1201,7 @@ func (rbft *rbftImpl) recvCommit(commit *pb.Commit) error {
 
 	cert.commit[*commit] = true
 
-	if rbft.committed(commit.BatchDigest, commit.View, commit.SequenceNumber) {
+	if rbft.committed(commit.View, commit.SequenceNumber, commit.BatchDigest) {
 		idx := msgID{v: commit.View, n: commit.SequenceNumber, d: commit.BatchDigest}
 		if metrics.EnableExpensive() {
 			cert.committedTime = time.Now().UnixNano()
@@ -1228,10 +1227,10 @@ func (rbft *rbftImpl) recvCommit(commit *pb.Commit) error {
 }
 
 // fetchMissingTxs fetch missing txs from primary which this node didn't receive but primary received
-func (rbft *rbftImpl) fetchMissingTxs(prePrep *pb.PrePrepare, missingTxHashes map[uint64]string) error {
+func (rbft *rbftImpl) fetchMissingTxs(prePrep *pb.PrePrepare, missingTxHashes map[uint64]string) {
 	// avoid fetch the same batch again.
 	if _, ok := rbft.storeMgr.missingBatchesInFetching[prePrep.BatchDigest]; ok {
-		return nil
+		return
 	}
 
 	rbft.logger.Debugf("Replica %d try to fetch missing txs for view=%d/seqNo=%d/digest=%s from primary %d",
@@ -1248,7 +1247,7 @@ func (rbft *rbftImpl) fetchMissingTxs(prePrep *pb.PrePrepare, missingTxHashes ma
 	payload, err := proto.Marshal(fetch)
 	if err != nil {
 		rbft.logger.Errorf("ConsensusMessage_FETCH_MISSING_TXS Marshal Error: %s", err)
-		return nil
+		return
 	}
 	consensusMsg := &pb.ConsensusMessage{
 		Type:    pb.Type_FETCH_MISSING_REQUESTS,
@@ -1263,7 +1262,7 @@ func (rbft *rbftImpl) fetchMissingTxs(prePrep *pb.PrePrepare, missingTxHashes ma
 		d: prePrep.BatchDigest,
 	}
 	rbft.peerPool.unicast(consensusMsg, prePrep.ReplicaId)
-	return nil
+	return
 }
 
 // recvFetchMissingTxs returns txs to a node which didn't receive some txs and ask primary for them.
@@ -1325,6 +1324,7 @@ func (rbft *rbftImpl) recvFetchMissingTxs(fetch *pb.FetchMissingRequests) error 
 // recvSendMissingTxs processes SendMissingTxs from primary.
 // Add these transaction txs to requestPool and see if it has correct transaction txs.
 func (rbft *rbftImpl) recvSendMissingTxs(re *pb.SendMissingRequests) consensusEvent {
+
 	if _, ok := rbft.storeMgr.missingBatchesInFetching[re.BatchDigest]; !ok {
 		rbft.logger.Debugf("Replica %d ignore return missing txs with batch hash %s",
 			rbft.peerPool.ID, re.BatchDigest)
@@ -1359,7 +1359,7 @@ func (rbft *rbftImpl) recvSendMissingTxs(re *pb.SendMissingRequests) consensusEv
 	cert := rbft.storeMgr.getCert(re.View, re.SequenceNumber, re.BatchDigest)
 	if cert.sentCommit {
 		rbft.logger.Debugf("Replica %d received return missing transactions which has been committed with "+
-			"batch seqNo=%d, ignore it", rbft.peerPool.ID, re.SequenceNumber)
+			"cert view=%d/seqNo=%d/digest=%s, ignore it", rbft.peerPool.ID, re.View, re.SequenceNumber, re.BatchDigest)
 		return nil
 	}
 	if cert.prePrepare == nil {
@@ -1382,7 +1382,7 @@ func (rbft *rbftImpl) recvSendMissingTxs(re *pb.SendMissingRequests) consensusEv
 		rbft.setFull()
 	}
 
-	_ = rbft.findNextCommitBatch(re.BatchDigest, re.View, re.SequenceNumber)
+	_ = rbft.findNextPrepareBatch(re.View, re.SequenceNumber, re.BatchDigest)
 	return nil
 }
 
@@ -1452,7 +1452,7 @@ func (rbft *rbftImpl) commitPendingBlocks() {
 	rbft.startTimerIfOutstandingRequests()
 }
 
-// flattenArray flatten txs into txs and kick out duplicate txs with hash included in deDuplicateTxHashes.
+// filterExecutableTxs flatten txs into txs and kick out duplicate txs with hash included in deDuplicateTxHashes.
 func (rbft *rbftImpl) filterExecutableTxs(digest string, deDuplicateRequestHashes []string) ([]*protos.Transaction, []bool) {
 	var (
 		txList, executableTxs          []*protos.Transaction
@@ -1488,7 +1488,7 @@ func (rbft *rbftImpl) findNextCommitTx() (find bool, idx msgID, cert *msgCert) {
 		}
 
 		// check if already executed
-		if cert.sentExecute == true {
+		if cert.sentExecute {
 			rbft.logger.Debugf("Replica %d already execute for view=%d/seqNo=%d", rbft.peerPool.ID, idx.v, idx.n)
 			continue
 		}
@@ -1505,7 +1505,7 @@ func (rbft *rbftImpl) findNextCommitTx() (find bool, idx msgID, cert *msgCert) {
 		}
 
 		// check if committed
-		if !rbft.committed(idx.d, idx.v, idx.n) {
+		if !rbft.committed(idx.v, idx.n, idx.d) {
 			continue
 		}
 
@@ -1527,7 +1527,7 @@ func (rbft *rbftImpl) findNextCommitTx() (find bool, idx msgID, cert *msgCert) {
 	return
 }
 
-// afterCommitTx processes logic after commit transaction, update lastExec,
+// afterCommitBlock processes logic after commit block, update lastExec,
 // and generate checkpoint when lastExec % K == 0
 func (rbft *rbftImpl) afterCommitBlock(idx msgID, isConfig bool) {
 	if rbft.exec.currentExec != nil {
@@ -2230,25 +2230,25 @@ func (rbft *rbftImpl) recvStateUpdatedEvent(ss *types.ServiceState) consensusEve
 		}
 	}
 
-	rbft.executeAfterStateUpdate()
+	rbft.afterStateUpdate()
 	return nil
 }
 
-// executeAfterStateUpdate processes logic after state update
-func (rbft *rbftImpl) executeAfterStateUpdate() {
+// afterStateUpdate processes logic after state update
+func (rbft *rbftImpl) afterStateUpdate() {
 
 	if rbft.isPrimary(rbft.peerPool.ID) {
-		rbft.logger.Debugf("Replica %d is primary, not execute after stateUpdate", rbft.peerPool.ID)
+		rbft.logger.Debugf("Replica %d is primary, not prepare after stateUpdate", rbft.peerPool.ID)
 		return
 	}
 
-	rbft.logger.Debugf("Replica %d try to execute after stateUpdate", rbft.peerPool.ID)
+	rbft.logger.Debugf("Replica %d try to prepare after stateUpdate", rbft.peerPool.ID)
 
 	for idx, cert := range rbft.storeMgr.certStore {
-		// If this node is not primary, it would commit pending transactions.
-		if rbft.prepared(idx.d, idx.v, idx.n) && !cert.sentCommit {
-			rbft.logger.Debugf("Replica %d try to commit batch %s", rbft.peerPool.ID, idx.d)
-			_ = rbft.findNextCommitBatch(idx.d, idx.v, idx.n)
+		// If this node is not primary, it would prepare pending transactions.
+		if rbft.prePrepared(idx.v, idx.n, idx.d) && !cert.sentPrepare {
+			rbft.logger.Debugf("Replica %d try to prepare batch %s", rbft.peerPool.ID, idx.d)
+			_ = rbft.findNextPrepareBatch(idx.v, idx.n, idx.d)
 		}
 	}
 }

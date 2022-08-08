@@ -48,8 +48,9 @@ func TestNode_Stop(t *testing.T) {
 	_ = n.Start()
 
 	var wg sync.WaitGroup
+
+	wg.Add(1)
 	go func() {
-		wg.Add(1)
 		for i := 1; i < 100; i++ {
 			txs := &pb.RequestSet{
 				Requests: []*protos.Transaction{newTx(), newTx()},
@@ -59,21 +60,24 @@ func TestNode_Stop(t *testing.T) {
 		}
 		wg.Done()
 	}()
+
+	wg.Add(1)
 	go func() {
-		wg.Add(1)
 		for i := 1; i < 100; i++ {
 			con := &pb.ConsensusMessage{}
 			n.Step(con)
 		}
 		wg.Done()
 	}()
+	
+	wg.Add(1)
 	go func() {
-		wg.Add(1)
 		<-r.cpChan
 		wg.Done()
 	}()
+
+	wg.Add(1)
 	go func() {
-		wg.Add(1)
 		<-r.confChan
 		wg.Done()
 	}()

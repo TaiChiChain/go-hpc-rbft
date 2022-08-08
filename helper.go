@@ -115,13 +115,13 @@ func (rbft *rbftImpl) oneCorrectQuorum() int {
 // pre-prepare/prepare/commit check helper
 // =============================================================================
 
-// prePrepared returns if there existed a pre-prepare message in certStore with the given digest,view,seqNo
-func (rbft *rbftImpl) prePrepared(digest string, v uint64, n uint64) bool {
-	cert := rbft.storeMgr.certStore[msgID{v, n, digest}]
+// prePrepared returns if there existed a pre-prepare message in certStore with the given view,seqNo,digest
+func (rbft *rbftImpl) prePrepared(v uint64, n uint64, d string) bool {
+	cert := rbft.storeMgr.certStore[msgID{v, n, d}]
 
 	if cert != nil {
 		p := cert.prePrepare
-		if p != nil && p.View == v && p.SequenceNumber == n && p.BatchDigest == digest {
+		if p != nil && p.View == v && p.SequenceNumber == n && p.BatchDigest == d {
 			return true
 		}
 	}
@@ -133,13 +133,13 @@ func (rbft *rbftImpl) prePrepared(digest string, v uint64, n uint64) bool {
 
 // prepared firstly checks if the cert with the given msgID has been prePrepared,
 // then checks if this node has collected enough prepare messages for the cert with given msgID
-func (rbft *rbftImpl) prepared(digest string, v uint64, n uint64) bool {
+func (rbft *rbftImpl) prepared(v uint64, n uint64, d string) bool {
 
-	if !rbft.prePrepared(digest, v, n) {
+	if !rbft.prePrepared(v, n, d) {
 		return false
 	}
 
-	cert := rbft.storeMgr.certStore[msgID{v, n, digest}]
+	cert := rbft.storeMgr.certStore[msgID{v, n, d}]
 
 	prepCount := len(cert.prepare)
 
@@ -151,13 +151,13 @@ func (rbft *rbftImpl) prepared(digest string, v uint64, n uint64) bool {
 
 // committed firstly checks if the cert with the given msgID has been prepared,
 // then checks if this node has collected enough commit messages for the cert with given msgID
-func (rbft *rbftImpl) committed(digest string, v uint64, n uint64) bool {
+func (rbft *rbftImpl) committed(v uint64, n uint64, d string) bool {
 
-	if !rbft.prepared(digest, v, n) {
+	if !rbft.prepared(v, n, d) {
 		return false
 	}
 
-	cert := rbft.storeMgr.certStore[msgID{v, n, digest}]
+	cert := rbft.storeMgr.certStore[msgID{v, n, d}]
 
 	cmtCount := len(cert.commit)
 
@@ -597,7 +597,7 @@ func (rbft *rbftImpl) calcQSet() map[qidx]*pb.Vc_PQ {
 
 	for idx := range rbft.storeMgr.certStore {
 
-		if !rbft.prePrepared(idx.d, idx.v, idx.n) {
+		if !rbft.prePrepared(idx.v, idx.n, idx.d) {
 			continue
 		}
 
@@ -629,7 +629,7 @@ func (rbft *rbftImpl) calcPSet() map[uint64]*pb.Vc_PQ {
 
 	for idx := range rbft.storeMgr.certStore {
 
-		if !rbft.prepared(idx.d, idx.v, idx.n) {
+		if !rbft.prepared(idx.v, idx.n, idx.d) {
 			continue
 		}
 
@@ -764,7 +764,7 @@ func (rbft *rbftImpl) putBackRequestBatches(xset xset) {
 	// don't remove those batches which are not contained in xSet from batchStore as they may be useful
 	// in next viewChange round.
 	for digest := range rbft.storeMgr.batchStore {
-		if hashListMap[digest] == false {
+		if !hashListMap[digest] {
 			rbft.logger.Debugf("Replica %d finds temporarily useless batch %s which is not contained in xSet", rbft.peerPool.ID, digest)
 		}
 	}

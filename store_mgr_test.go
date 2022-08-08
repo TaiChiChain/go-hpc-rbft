@@ -118,6 +118,6 @@ func TestStoreMgr_existedDigest(t *testing.T) {
 	}
 	s.certStore[msgIDTmp] = certTmp
 
-	assert.Equal(t, false, s.existedDigest(20, 0, "tmp"))
-	assert.Equal(t, true, s.existedDigest(10, 0, "tmp"))
+	assert.Equal(t, false, s.existedDigest(0, 20, "tmp"))
+	assert.Equal(t, true, s.existedDigest(0, 10, "tmp"))
 }
