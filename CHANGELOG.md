@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.4.1](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v0.4.0...v0.4.1) (2022-08-08)
+
+
+### Bug Fixes
+
+* #flato-4804, fetchMissing immediately after receiving the PrePrepare message ([0d7e583](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/0d7e58320e165d17b39ca34de8e93bdecbf764b5)), closes [#flato-4804](/git.hyperchain.cn/hyperchain/go-hpc-rbft/issues/flato-4804)
+
 ## [0.4.0](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v0.3.1...v0.4.0) (2022-07-05)
 
 
