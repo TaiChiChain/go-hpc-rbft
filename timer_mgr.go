@@ -121,50 +121,33 @@ func (tm *timerManager) Stop() {
 
 // startTimer starts the timer with the given name and default timeout, then sets the event which will be triggered
 // after this timeout
-func (tm *timerManager) startTimer(name string, event *LocalEvent) string {
-	tm.stopTimer(name)
-
-	timestamp := time.Now().UnixNano()
-	key := strconv.FormatInt(timestamp, 10)
-	tm.tTimers[name].store(key, true)
-
-	send := func() {
-		if tm.tTimers[name].has(key) {
-			tm.eventChan <- event
-		}
-	}
-	time.AfterFunc(tm.tTimers[name].timeout, send)
-	return key
+func (tm *timerManager) startTimer(name string, event *LocalEvent) (key string) {
+	return tm.startTimerWithNewTT(name, tm.tTimers[name].timeout, event)
 }
 
 // startTimerWithNewTT starts the timer with the given name and timeout, then sets the event which will be triggered
 // after this timeout
-func (tm *timerManager) startTimerWithNewTT(name string, d time.Duration, event *LocalEvent) string {
+func (tm *timerManager) startTimerWithNewTT(name string, timeout time.Duration, event *LocalEvent) (key string) {
 	tm.stopTimer(name)
 
-	timestamp := time.Now().UnixNano()
-	key := strconv.FormatInt(timestamp, 10)
-	tm.tTimers[name].store(key, true)
-
-	send := func() {
-		if tm.tTimers[name].has(key) {
-			tm.eventChan <- event
-		}
-	}
-	time.AfterFunc(d, send)
-	return key
+	return tm.createTimer(name, timeout, event)
 }
 
 // softStartTimerWithNewTT first checks if there exists some running timer with
 // the given name, if existed, not start, else start a new timer with the given
 // timeout.
-func (tm *timerManager) softStartTimerWithNewTT(name string, d time.Duration, event *LocalEvent) (bool, string) {
+func (tm *timerManager) softStartTimerWithNewTT(name string, timeout time.Duration, event *LocalEvent) (existed bool, key string) {
 	if tm.tTimers[name].count() != 0 {
 		return true, ""
 	}
 
+	return false, tm.createTimer(name, timeout, event)
+}
+
+// createTimer creates a goroutine and waits for timeout. Then check if the timer is active. If so, send event.
+func (tm *timerManager) createTimer(name string, timeout time.Duration, event *LocalEvent) (key string) {
 	timestamp := time.Now().UnixNano()
-	key := strconv.FormatInt(timestamp, 10)
+	key = strconv.FormatInt(timestamp, 10)
 	tm.tTimers[name].store(key, true)
 
 	send := func() {
@@ -172,27 +155,27 @@ func (tm *timerManager) softStartTimerWithNewTT(name string, d time.Duration, ev
 			tm.eventChan <- event
 		}
 	}
-	time.AfterFunc(d, send)
-	return false, key
+	time.AfterFunc(timeout, send)
+	return key
 }
 
 // stopTimer stops all timers with the same timerName.
-func (tm *timerManager) stopTimer(name string) {
-	if !tm.containsTimer(name) {
-		tm.logger.Errorf("Stop timer failed, timer %s not created yet!", name)
+func (tm *timerManager) stopTimer(timerName string) {
+	if !tm.containsTimer(timerName) {
+		tm.logger.Errorf("Stop timer failed, timer %s not created yet!", timerName)
 		return
 	}
 
-	tm.tTimers[name].clear()
+	tm.tTimers[timerName].clear()
 }
 
-// stopOneTimer stops one timer by the timerName and index.
-func (tm *timerManager) stopOneTimer(tname string, key string) {
-	if !tm.containsTimer(tname) {
-		tm.logger.Errorf("Stop timer failed!, timer %s not created yet!", tname)
+// stopOneTimer stops one timer by the timerName and key.
+func (tm *timerManager) stopOneTimer(timerName string, key string) {
+	if !tm.containsTimer(timerName) {
+		tm.logger.Errorf("Stop timer failed!, timer %s not created yet!", timerName)
 		return
 	}
-	tm.tTimers[tname].delete(key)
+	tm.tTimers[timerName].delete(key)
 }
 
 // containsTimer returns true if there exists a timer named timerName
@@ -211,12 +194,12 @@ func (tm *timerManager) getTimeoutValue(timerName string) time.Duration {
 }
 
 // setTimeoutValue sets the default timeout of the given timer with a new timeout
-func (tm *timerManager) setTimeoutValue(timerName string, d time.Duration) {
+func (tm *timerManager) setTimeoutValue(timerName string, timeout time.Duration) {
 	if !tm.containsTimer(timerName) {
 		tm.logger.Warningf("Set timeout failed!, timer %s not created yet!", timerName)
 		return
 	}
-	tm.tTimers[timerName].timeout = d
+	tm.tTimers[timerName].timeout = timeout
 }
 
 // initTimers creates timers when start up
@@ -257,7 +240,7 @@ func (rbft *rbftImpl) initTimers() {
 	rbft.logger.Infof("RBFT high watermark timeout = %v", rbft.timerMgr.getTimeoutValue(highWatermarkTimer))
 }
 
-// makeNullRequestTimeoutLegal checks if nullrequestTimeout is legal or not, if not, make it
+// makeNullRequestTimeoutLegal checks if nullRequestTimeout is legal or not, if not, make it
 // legal, which, nullRequest timeout must be larger than requestTimeout
 func (tm *timerManager) makeNullRequestTimeoutLegal() {
 	nullRequestTimeout := tm.getTimeoutValue(nullRequestTimer)
@@ -277,7 +260,7 @@ func (tm *timerManager) makeNullRequestTimeoutLegal() {
 }
 
 // makeCleanVcTimeoutLegal checks if requestTimeout is legal or not, if not, make it
-// legal, which, request timeout must be lager than batch timeout
+// legal, which, request timeout must be larger than batch timeout
 func (tm *timerManager) makeRequestTimeoutLegal() {
 	requestTimeout := tm.getTimeoutValue(requestTimer)
 	batchTimeout := tm.getTimeoutValue(batchTimer)
@@ -307,7 +290,7 @@ func (tm *timerManager) makeCleanVcTimeoutLegal() {
 }
 
 // makeSyncStateTimeoutLegal checks if syncStateRspTimeout is legal or not, if not, make it
-// legal, which, syncStateRestartTimeout should more then 10 * syncStateRspTimeout
+// legal, which, syncStateRestartTimeout should more than 10 * syncStateRspTimeout
 func (tm *timerManager) makeSyncStateTimeoutLegal() {
 	rspTimeout := tm.getTimeoutValue(syncStateRspTimer)
 	restartTimeout := tm.getTimeoutValue(syncStateRestartTimer)
@@ -322,11 +305,11 @@ func (tm *timerManager) makeSyncStateTimeoutLegal() {
 	tm.logger.Infof("RBFT sync state restart timeout = %v", tm.getTimeoutValue(syncStateRestartTimer))
 }
 
-// softStartHighWatermarkTimer starts a high-watermark timer to get latest stable checkpoint, in following conditions:
+// softStartHighWatermarkTimer starts a high-watermark timer to get the latest stable checkpoint, in following conditions:
 // 1) primary is trying to send pre-prepare out of range
 // 2) replica received pre-prepare out of range
 // 3) replica is trying to send checkpoint equal to high-watermark
-// 4) replica received f+1 checkpoints out of range but it has already executed blocks larger than thesr checkpoints
+// 4) replica received f+1 checkpoints out of range, but it has already executed blocks larger than these checkpoints
 func (rbft *rbftImpl) softStartHighWatermarkTimer(reason string) {
 
 	rbft.logger.Debugf("Replica %d soft start high-watermark timer, current low-watermark is %d, reason: %s", rbft.peerPool.ID, rbft.h, reason)

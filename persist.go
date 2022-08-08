@@ -434,7 +434,7 @@ func (rbft *rbftImpl) persistBatch(digest string) {
 	if err != nil {
 		rbft.logger.Errorf("Persist batch failed with err: %s ", err)
 	}
-	duration := time.Now().Sub(start).Seconds()
+	duration := time.Since(start).Seconds()
 	rbft.metrics.batchPersistDuration.Observe(duration)
 }
 

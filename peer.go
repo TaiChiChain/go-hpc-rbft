@@ -63,13 +63,10 @@ func (pool *peerPool) initPeers(peers []*types.Peer) {
 			pool.logger.Errorf("Something wrong with peer[id=%d], peer id cannot be larger than peers' amount %d", p.ID, length)
 			return
 		}
-		//if p.Hash == pool.hash {
 		if p.Hostname == pool.hostname {
 			pool.ID = p.ID
 		}
-		//pool.logger.Infof("ID: %d, Hash: %s", p.ID, p.Hash)
 		pool.logger.Infof("ID: %d, Hostname: %s", p.ID, p.Hostname)
-		//pool.routerMap.HostMap[p.Hash] = p.ID
 		pool.routerMap.HostMap[p.Hostname] = p.ID
 	}
 	if preID != pool.ID {

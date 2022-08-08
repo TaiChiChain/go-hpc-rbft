@@ -168,7 +168,6 @@ func (n *node) Step(msg *pb.ConsensusMessage) {
 // ApplyConfChange applies config change to the local node.
 func (n *node) ApplyConfChange(cc *types.ConfState) {
 	n.rbft.postConfState(cc)
-	return
 }
 
 // ReportExecuted reports to RBFT core that application service has finished height one batch with
