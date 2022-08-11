@@ -1125,12 +1125,12 @@ func (rbft *rbftImpl) maybeSendCommit(v uint64, n uint64, d string) error {
 	}
 
 	if !rbft.isPrimary(rbft.peerPool.ID) && !cert.sentPrepare {
-		rbft.logger.Warningf("Replica %d cert hasn't sent prepare, cancel maybeSendCommit", rbft.peerPool.ID)
+		rbft.logger.Debugf("Replica %d cert hasn't sent prepare, cancel maybeSendCommit", rbft.peerPool.ID)
 		return nil
 	}
 
 	if cert.sentCommit {
-		rbft.logger.Warningf("Replica %d cert is committed, cancel maybeSendCommit", rbft.peerPool.ID)
+		rbft.logger.Debugf("Replica %d cert is committed, cancel maybeSendCommit", rbft.peerPool.ID)
 		return nil
 	}
 
