@@ -5,8 +5,8 @@ go 1.17
 require (
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/mock v1.6.0
-	github.com/hyperchain/go-hpc-common v0.3.2
-	github.com/hyperchain/go-hpc-txpool v0.3.1
+	github.com/hyperchain/go-hpc-common v0.3.3
+	github.com/hyperchain/go-hpc-txpool v0.3.2
 	github.com/stretchr/testify v1.8.0
 )
 
@@ -33,6 +33,6 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/hyperchain/go-hpc-common => git.hyperchain.cn/hyperchain/go-hpc-common.git v0.3.2
+replace github.com/hyperchain/go-hpc-common => git.hyperchain.cn/hyperchain/go-hpc-common.git v0.3.3
 
-replace github.com/hyperchain/go-hpc-txpool => git.hyperchain.cn/hyperchain/go-hpc-txpool.git v0.3.1
+replace github.com/hyperchain/go-hpc-txpool => git.hyperchain.cn/hyperchain/go-hpc-txpool.git v0.3.2
