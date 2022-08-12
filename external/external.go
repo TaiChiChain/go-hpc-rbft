@@ -43,9 +43,6 @@ type Network interface {
 	Unicast(msg *pb.ConsensusMessage, to uint64) error
 	// UnicastByHostname delivers messages to given node with specified hostname.
 	UnicastByHostname(msg *pb.ConsensusMessage, to string) error
-	// UpdateTable updates routing table according to given confChangeType
-	// It's application's responsibility to ensure update routing table synchronously.
-	UpdateTable(change *types.ConfChange)
 }
 
 // Crypto is used to access the sign/verify methods from the crypto package
@@ -83,6 +80,9 @@ type EpochService interface {
 
 	// GetNodeInfos returns the full node info with public key.
 	GetNodeInfos() []*protos.NodeInfo
+
+	// GetAlgorithmVersion returns current algorithm version
+	GetAlgorithmVersion() string
 
 	// GetEpoch returns the current epoch.
 	GetEpoch() uint64

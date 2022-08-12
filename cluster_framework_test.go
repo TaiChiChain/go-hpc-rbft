@@ -786,24 +786,6 @@ func (ext *testExternal) UnicastByHostname(msg *pb.ConsensusMessage, to string) 
 	return nil
 }
 
-func (ext *testExternal) UpdateTable(update *types.ConfChange) {
-	router := update.Router
-	var newPeers []*types.Peer
-	for _, peer := range router.Peers {
-		newPeer := &types.Peer{
-			ID:       peer.ID,
-			Hostname: peer.Hostname,
-			Hash:     calHash(peer.Hostname),
-		}
-		newPeers = append(newPeers, newPeer)
-	}
-	newRouter := &types.Router{Peers: newPeers}
-	ext.testNode.Router = getRouter(router)
-	ext.tf.log.Noticef("[Cluster_Service %s update] router: %+v", ext.testNode.Hostname, newRouter)
-	cc := &types.ConfState{QuorumRouter: newRouter}
-	ext.testNode.N.ApplyConfChange(cc)
-}
-
 // Crypto
 func (ext *testExternal) Sign(msg []byte) ([]byte, error) {
 	return nil, nil
@@ -939,6 +921,10 @@ func (ext *testExternal) Reconfiguration() uint64 {
 
 func (ext *testExternal) GetNodeInfos() []*protos.NodeInfo {
 	return ext.testNode.VSet
+}
+
+func (ext *testExternal) GetAlgorithmVersion() string {
+	return "RBFT"
 }
 
 func (ext *testExternal) GetEpoch() uint64 {

@@ -930,8 +930,9 @@ func (rbft *rbftImpl) generateSignedCheckpoint(state *types.ServiceState, isConf
 			}
 		}
 		checkpoint.SetValidatorSet(rbft.external.GetNodeInfos())
-		rbft.logger.Noticef("Replica %d generate a checkpoint with new validator set: %+v",
-			rbft.peerPool.ID, checkpoint.ValidatorSet())
+		checkpoint.SetVersion(rbft.external.GetAlgorithmVersion())
+		rbft.logger.Noticef("Replica %d generate a checkpoint with new validator set: %+v, new version: %s",
+			rbft.peerPool.ID, checkpoint.ValidatorSet(), checkpoint.Version())
 	}
 	signedCheckpoint.Checkpoint = checkpoint
 

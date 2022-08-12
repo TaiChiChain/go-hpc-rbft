@@ -71,7 +71,7 @@ func TestRBFT_newRBFT(t *testing.T) {
 
 	// Nil Peers
 	conf.Peers = nil
-	rbft, err = newRBFT(cpChan, confC, conf)
+	_, err = newRBFT(cpChan, confC, conf)
 	assert.Equal(t, errors.New("nil peers"), err)
 
 	// Is a New Node

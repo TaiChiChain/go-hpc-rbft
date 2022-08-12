@@ -74,13 +74,6 @@ func (pool *peerPool) initPeers(peers []*types.Peer) {
 	}
 }
 
-func (pool *peerPool) updateRouter(router *types.Router) {
-	cc := &types.ConfChange{
-		Router: router,
-	}
-	pool.network.UpdateTable(cc)
-}
-
 func (pool *peerPool) broadcast(msg *pb.ConsensusMessage) {
 	err := pool.network.Broadcast(msg)
 	if err != nil {
