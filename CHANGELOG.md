@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.4.2](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v0.4.1...v0.4.2) (2022-08-12)
+
+
+### Features
+
+* switch consensus algorithm online ([2f78e73](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/2f78e73c89b46dce6ad00323b0cc95416244539b))
+
 ### [0.4.1](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v0.4.0...v0.4.1) (2022-08-08)
 
 
