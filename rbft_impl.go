@@ -358,14 +358,16 @@ func (rbft *rbftImpl) start() error {
 }
 
 // stop the consensus service
-func (rbft *rbftImpl) stop() {
+func (rbft *rbftImpl) stop() []*protos.Transaction {
 	rbft.logger.Notice("RBFT stopping...")
 
 	rbft.atomicOn(Pending)
 	rbft.atomicOn(Stopped)
 	rbft.metrics.statusGaugePending.Set(Pending)
 	rbft.setAbNormal()
-	drainChannel(rbft.recvChan)
+	remainTxs := drainChannel(rbft.recvChan)
+
+	rbft.logger.Debugf("get %d txs from recvChan", len(remainTxs))
 
 	// stop listen consensus event
 	select {
@@ -393,6 +395,8 @@ func (rbft *rbftImpl) stop() {
 	rbft.logger.Notice("Waiting...")
 	rbft.wg.Wait()
 	rbft.logger.Noticef("RBFT stopped!")
+
+	return remainTxs
 }
 
 // step receives and processes messages from other peers

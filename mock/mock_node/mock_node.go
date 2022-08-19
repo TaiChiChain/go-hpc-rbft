@@ -8,6 +8,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
+	protos "github.com/hyperchain/go-hpc-common/types/protos"
 	rbft "github.com/hyperchain/go-hpc-rbft"
 	rbftpb "github.com/hyperchain/go-hpc-rbft/rbftpb"
 	types "github.com/hyperchain/go-hpc-rbft/types"
@@ -153,9 +154,11 @@ func (mr *MockNodeMockRecorder) Step(msg interface{}) *gomock.Call {
 }
 
 // Stop mocks base method.
-func (m *MockNode) Stop() {
+func (m *MockNode) Stop() []*protos.Transaction {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Stop")
+	ret := m.ctrl.Call(m, "Stop")
+	ret0, _ := ret[0].([]*protos.Transaction)
+	return ret0
 }
 
 // Stop indicates an expected call of Stop.
