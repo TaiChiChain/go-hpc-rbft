@@ -16,6 +16,13 @@ All notable changes to this project will be documented in this file. See [standa
 
 * #flato-4804, fetchMissing immediately after receiving the PrePrepare message ([0d7e583](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/0d7e58320e165d17b39ca34de8e93bdecbf764b5)), closes [#flato-4804](/git.hyperchain.cn/hyperchain/go-hpc-rbft/issues/flato-4804)
 
+## [0.4.0-1](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v0.4.0...v0.4.0-1) (2022-08-01)
+
+
+### Bug Fixes
+
+* **recovery_mgr.go:** exit sync state when node status is abnormal ([cf94cb5](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/cf94cb57caf22bcac79f69f1350f8927040e4905)), closes [#flato-4969](/git.hyperchain.cn/hyperchain/go-hpc-rbft/issues/flato-4969)
+
 ## [0.4.0](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v0.3.1...v0.4.0) (2022-07-05)
 
 

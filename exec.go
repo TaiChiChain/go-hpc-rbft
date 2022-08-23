@@ -283,16 +283,19 @@ func (rbft *rbftImpl) handleRecoveryEvent(e *LocalEvent) consensusEvent {
 		return rbft.restartRecovery()
 	case RecoverySyncStateRspTimerEvent:
 		rbft.logger.Noticef("Replica %d sync state response timer expired", rbft.peerPool.ID)
+		rbft.exitSyncState()
 		if !rbft.isNormal() {
 			rbft.logger.Noticef("Replica %d is in abnormal, not restart recovery", rbft.peerPool.ID)
 			return nil
 		}
-		rbft.off(InSyncState)
-		rbft.exitSyncState()
 		return rbft.initRecovery()
 	case RecoverySyncStateRestartTimerEvent:
 		rbft.logger.Debugf("Replica %d sync state restart timer expired", rbft.peerPool.ID)
 		rbft.exitSyncState()
+		if !rbft.isNormal() {
+			rbft.logger.Debugf("Replica %d is in abnormal, not restart sync state", rbft.peerPool.ID)
+			return nil
+		}
 		return rbft.restartSyncState()
 	case NotificationQuorumEvent:
 		rbft.logger.Infof("Replica %d received notification quorum, processing new view", rbft.peerPool.ID)
