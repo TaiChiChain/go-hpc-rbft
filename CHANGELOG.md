@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.4.3](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v0.4.2...v0.4.3) (2022-08-23)
+
+## [0.4.0-1](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v0.4.0...v0.4.0-1) (2022-08-01)
+
+
+### Bug Fixes
+
+* **recovery_mgr.go:** exit sync state when node status is abnormal ([cf94cb5](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/cf94cb57caf22bcac79f69f1350f8927040e4905)), closes [#flato-4969](/git.hyperchain.cn/hyperchain/go-hpc-rbft/issues/flato-4969)
+
 ### [0.4.2](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v0.4.1...v0.4.2) (2022-08-12)
 
 
