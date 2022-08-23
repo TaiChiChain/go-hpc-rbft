@@ -326,14 +326,20 @@ func (rbft *rbftImpl) start() error {
 	}
 
 	// if the stable-checkpoint recovered from consensus-database is equal to the config-batch-to-check,
-	// current state has already been checked to be stable, and we need not to check it again
-	metaS := &types.MetaState{
-		Height: rbft.h,
-		Digest: rbft.storeMgr.localCheckpoints[rbft.h].Checkpoint.Digest(),
-	}
-	if rbft.equalMetaState(rbft.epochMgr.configBatchToCheck, metaS) {
-		rbft.logger.Info("Config batch to check has already been stable, reset it")
-		rbft.epochMgr.configBatchToCheck = nil
+	// current state has already been checked to be stable, and we need not to check it again.
+
+	// The checkpoint is nil if the block cannot be recovered from another node for reasons such as archiving.
+
+	localCheckpoint := rbft.storeMgr.localCheckpoints[rbft.h]
+	if localCheckpoint != nil {
+		metaS := &types.MetaState{
+			Height: rbft.h,
+			Digest: localCheckpoint.Checkpoint.Digest(),
+		}
+		if rbft.equalMetaState(rbft.epochMgr.configBatchToCheck, metaS) {
+			rbft.logger.Info("Config batch to check has already been stable, reset it")
+			rbft.epochMgr.configBatchToCheck = nil
+		}
 	}
 
 	// start listen consensus event
@@ -643,9 +649,9 @@ func (rbft *rbftImpl) dispatchCoreRbftMsg(e consensusEvent) consensusEvent {
 	return nil
 }
 
-//=============================================================================
+// =============================================================================
 // null request methods
-//=============================================================================
+// =============================================================================
 // processNullRequest process null request when it come
 func (rbft *rbftImpl) processNullRequest(msg *pb.NullRequest) consensusEvent {
 
@@ -915,9 +921,9 @@ func (rbft *rbftImpl) recvRequestBatch(reqBatch *txpool.RequestHashBatch) error 
 	return nil
 }
 
-//=============================================================================
+// =============================================================================
 // normal case: pre-prepare, prepare, commit methods
-//=============================================================================
+// =============================================================================
 // sendPrePrepare send prePrepare message.
 func (rbft *rbftImpl) sendPrePrepare(seqNo uint64, digest string, reqBatch *pb.RequestBatch) {
 
