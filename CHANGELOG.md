@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.4.3-1](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v0.4.3...v0.4.3-1) (2022-08-24)
+
+
+### Bug Fixes
+
+* **rbft_impl:** checkpoint nil panic ([5942584](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/5942584177d783d86e2ce1942223d994c74e7a72))
+
 ### [0.4.3](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v0.4.2...v0.4.3) (2022-08-23)
 
 ## [0.4.0-1](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v0.4.0...v0.4.0-1) (2022-08-01)
