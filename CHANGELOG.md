@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.4.3-2](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v0.4.3-1...v0.4.3-2) (2022-08-25)
+
+
+### Bug Fixes
+
+* return txs in recvChan before rbft stop ([e7504e6](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/e7504e69998e953631c4fa46b1ffe66603d27970))
+
 ### [0.4.3-1](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v0.4.3...v0.4.3-1) (2022-08-24)
 
 
