@@ -889,15 +889,21 @@ func calculateMD5Hash(list []string, timestamp int64) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-func drainChannel(ch chan interface{}) {
-DrainLoop:
-	for {
+func drainChannel(ch chan interface{}) protos.Transactions {
+	remainTxs := make(protos.Transactions, 0)
+
+	for len(ch) > 0 {
 		select {
-		case <-ch:
+		case ee := <-ch:
+			switch e := ee.(type) {
+			case *pb.RequestSet:
+				remainTxs = append(remainTxs, e.Requests...)
+			default:
+			}
 		default:
-			break DrainLoop
 		}
 	}
+	return remainTxs
 }
 
 // generateSignedCheckpoint generates a signed checkpoint using given service state.
