@@ -16,6 +16,7 @@ package rbft
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -254,6 +255,47 @@ func newRBFT(cpChan chan *types.ServiceState, confC chan *types.ReloadFinished, 
 
 	// new store manager
 	rbft.storeMgr = newStoreMgr(c)
+
+	go func() {
+		sm := rbft.storeMgr
+		for {
+			sm.logger.Debug("dump storeManager")
+			sm.logger.Debugf("v = %d, lastExec = %d", rbft.view, rbft.exec.lastExec)
+			msgList := make([]msgID, 0)
+			for msgID := range sm.certStore {
+				msgList = append(msgList, msgID)
+			}
+			sort.Slice(msgList[:], func(i, j int) bool {
+				if msgList[i].v != msgList[j].v {
+					return msgList[i].v < msgList[j].v
+				}
+				if msgList[i].n != msgList[j].n {
+					return msgList[i].n < msgList[j].n
+				}
+				return msgList[i].d < msgList[j].d
+			})
+
+			sm.logger.Debugf("certStore = %v", msgList)
+
+			msgList = make([]msgID, 0)
+			for msgID := range sm.committedCert {
+				msgList = append(msgList, msgID)
+			}
+			sort.Slice(msgList[:], func(i, j int) bool {
+				if msgList[i].v != msgList[j].v {
+					return msgList[i].v < msgList[j].v
+				}
+				if msgList[i].n != msgList[j].n {
+					return msgList[i].n < msgList[j].n
+				}
+				return msgList[i].d < msgList[j].d
+			})
+
+			sm.logger.Debugf("committedCert = %v", msgList)
+
+			time.Sleep(time.Second)
+		}
+	}()
 
 	// mock an initial checkpoint.
 	state := &types.ServiceState{
