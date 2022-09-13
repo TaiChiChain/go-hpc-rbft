@@ -325,8 +325,7 @@ func (rbft *rbftImpl) isPrepareLegal(prep *pb.Prepare) bool {
 	return true
 }
 
-// isCommitLegal firstly checks if current status can receive commit or not, then checks commit message itself is legal
-// or not
+// isCommitLegal checks commit message is legal or not
 func (rbft *rbftImpl) isCommitLegal(commit *pb.Commit) bool {
 
 	if !rbft.inWV(commit.View, commit.SequenceNumber) {

@@ -2158,10 +2158,28 @@ func (rbft *rbftImpl) recvStateUpdatedEvent(ss *types.ServiceState) consensusEve
 		return nil
 	}
 
+	rbft.logger.Debugf("lastExec = %d, seqNo = %d", rbft.exec.lastExec, seqNo)
+
 	// 1. finished state update
-	rbft.logger.Noticef("======== Replica %d finished stateUpdate, height: %d", rbft.peerPool.ID, seqNo)
 	finishMsg := fmt.Sprintf("======== Replica %d finished stateUpdate, height: %d", rbft.peerPool.ID, seqNo)
+	rbft.logger.Noticef(finishMsg)
 	rbft.external.SendFilterEvent(types.InformTypeFilterFinishStateUpdate, finishMsg)
+	if seqNo < rbft.exec.lastExec {
+		rbft.logger.Debug("cut down blocks occurred because seqNo < rbft.exec.lastExec")
+
+		// rebuild committedCert cache
+		rbft.storeMgr.committedCert = make(map[msgID]string)
+
+		for msgID, msgCert := range rbft.storeMgr.certStore {
+			if msgID.n > seqNo {
+				msgCert.sentExecute = false
+				rbft.logger.Debugf("set msg %v, sentExecute = false", msgID)
+				if msgID.v == rbft.view && rbft.committed(msgID.v, msgID.n, msgID.d) && msgCert.sentCommit && !msgCert.sentExecute {
+					rbft.storeMgr.committedCert[msgID] = msgID.d
+				}
+			}
+		}
+	}
 	rbft.exec.setLastExec(seqNo)
 	rbft.batchMgr.setSeqNo(seqNo)
 	rbft.storeMgr.missingBatchesInFetching = make(map[string]msgID)
