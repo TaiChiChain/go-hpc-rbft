@@ -266,6 +266,7 @@ func (rbft *rbftImpl) handleRecoveryEvent(e *LocalEvent) consensusEvent {
 				EventType: CoreFirstRequestTimerEvent,
 			}
 
+			rbft.logger.Debugf("Replica %d start firstRequestTimer", rbft.peerPool.ID)
 			rbft.timerMgr.startTimer(firstRequestTimer, event)
 		}
 
