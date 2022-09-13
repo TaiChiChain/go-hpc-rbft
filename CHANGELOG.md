@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.4.3-3](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v0.4.3-2...v0.4.3-3) (2022-09-13)
+
+
+### Bug Fixes
+
+* #flato-5095, update certStore after cut blocks to continue consensus ([c59e99e](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/c59e99eb57e70a4c789b34d6e128f14398af8d10)), closes [#flato-5095](/git.hyperchain.cn/hyperchain/go-hpc-rbft/issues/flato-5095)
+
 ### [0.4.3-2](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v0.4.3-1...v0.4.3-2) (2022-08-25)
 
 
