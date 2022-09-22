@@ -326,14 +326,20 @@ func (rbft *rbftImpl) start() error {
 	}
 
 	// if the stable-checkpoint recovered from consensus-database is equal to the config-batch-to-check,
-	// current state has already been checked to be stable, and we need not to check it again
-	metaS := &types.MetaState{
-		Height: rbft.h,
-		Digest: rbft.storeMgr.localCheckpoints[rbft.h].Checkpoint.Digest(),
-	}
-	if rbft.equalMetaState(rbft.epochMgr.configBatchToCheck, metaS) {
-		rbft.logger.Info("Config batch to check has already been stable, reset it")
-		rbft.epochMgr.configBatchToCheck = nil
+	// current state has already been checked to be stable, and we need not to check it again.
+
+	// The checkpoint is nil if the block cannot be recovered from another node for reasons such as archiving.
+
+	localCheckpoint := rbft.storeMgr.localCheckpoints[rbft.h]
+	if localCheckpoint != nil {
+		metaS := &types.MetaState{
+			Height: rbft.h,
+			Digest: localCheckpoint.Checkpoint.Digest(),
+		}
+		if rbft.equalMetaState(rbft.epochMgr.configBatchToCheck, metaS) {
+			rbft.logger.Info("Config batch to check has already been stable, reset it")
+			rbft.epochMgr.configBatchToCheck = nil
+		}
 	}
 
 	// start listen consensus event
@@ -352,14 +358,16 @@ func (rbft *rbftImpl) start() error {
 }
 
 // stop the consensus service
-func (rbft *rbftImpl) stop() {
+func (rbft *rbftImpl) stop() []*protos.Transaction {
 	rbft.logger.Notice("RBFT stopping...")
 
 	rbft.atomicOn(Pending)
 	rbft.atomicOn(Stopped)
 	rbft.metrics.statusGaugePending.Set(Pending)
 	rbft.setAbNormal()
-	drainChannel(rbft.recvChan)
+	remainTxs := drainChannel(rbft.recvChan)
+
+	rbft.logger.Debugf("get %d txs from recvChan", len(remainTxs))
 
 	// stop listen consensus event
 	select {
@@ -387,6 +395,8 @@ func (rbft *rbftImpl) stop() {
 	rbft.logger.Notice("Waiting...")
 	rbft.wg.Wait()
 	rbft.logger.Noticef("RBFT stopped!")
+
+	return remainTxs
 }
 
 // step receives and processes messages from other peers
@@ -643,9 +653,9 @@ func (rbft *rbftImpl) dispatchCoreRbftMsg(e consensusEvent) consensusEvent {
 	return nil
 }
 
-//=============================================================================
+// =============================================================================
 // null request methods
-//=============================================================================
+// =============================================================================
 // processNullRequest process null request when it come
 func (rbft *rbftImpl) processNullRequest(msg *pb.NullRequest) consensusEvent {
 
@@ -915,9 +925,9 @@ func (rbft *rbftImpl) recvRequestBatch(reqBatch *txpool.RequestHashBatch) error 
 	return nil
 }
 
-//=============================================================================
+// =============================================================================
 // normal case: pre-prepare, prepare, commit methods
-//=============================================================================
+// =============================================================================
 // sendPrePrepare send prePrepare message.
 func (rbft *rbftImpl) sendPrePrepare(seqNo uint64, digest string, reqBatch *pb.RequestBatch) {
 
@@ -2148,10 +2158,28 @@ func (rbft *rbftImpl) recvStateUpdatedEvent(ss *types.ServiceState) consensusEve
 		return nil
 	}
 
+	rbft.logger.Debugf("lastExec = %d, seqNo = %d", rbft.exec.lastExec, seqNo)
+
 	// 1. finished state update
-	rbft.logger.Noticef("======== Replica %d finished stateUpdate, height: %d", rbft.peerPool.ID, seqNo)
 	finishMsg := fmt.Sprintf("======== Replica %d finished stateUpdate, height: %d", rbft.peerPool.ID, seqNo)
+	rbft.logger.Noticef(finishMsg)
 	rbft.external.SendFilterEvent(types.InformTypeFilterFinishStateUpdate, finishMsg)
+	if seqNo < rbft.exec.lastExec {
+		rbft.logger.Debug("cut down blocks occurred because seqNo < rbft.exec.lastExec")
+
+		// rebuild committedCert cache
+		rbft.storeMgr.committedCert = make(map[msgID]string)
+
+		for msgID, msgCert := range rbft.storeMgr.certStore {
+			if msgID.n > seqNo {
+				msgCert.sentExecute = false
+				rbft.logger.Debugf("set msg %v, sentExecute = false", msgID)
+				if msgID.v == rbft.view && rbft.committed(msgID.v, msgID.n, msgID.d) && msgCert.sentCommit && !msgCert.sentExecute {
+					rbft.storeMgr.committedCert[msgID] = msgID.d
+				}
+			}
+		}
+	}
 	rbft.exec.setLastExec(seqNo)
 	rbft.batchMgr.setSeqNo(seqNo)
 	rbft.storeMgr.missingBatchesInFetching = make(map[string]msgID)
