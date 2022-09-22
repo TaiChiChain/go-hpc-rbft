@@ -17,6 +17,7 @@ package rbft
 import (
 	"sync"
 
+	"github.com/hyperchain/go-hpc-common/types/protos"
 	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
 	"github.com/hyperchain/go-hpc-rbft/types"
 )
@@ -26,7 +27,7 @@ type Node interface {
 	// Start starts a RBFT node instance.
 	Start() error
 	// Stop performs any necessary termination of the Node.
-	Stop()
+	Stop() []*protos.Transaction
 	// Propose proposes requests to RBFT core, requests are ensured to be eventually
 	// submitted to all non-fault nodes unless current node crash down.
 	Propose(requests *pb.RequestSet) error
@@ -124,7 +125,7 @@ func (n *node) Start() error {
 }
 
 // Stop stops a Node instance.
-func (n *node) Stop() {
+func (n *node) Stop() []*protos.Transaction {
 	select {
 	case <-n.cpChan:
 	default:
@@ -139,11 +140,13 @@ func (n *node) Stop() {
 		close(n.confChan)
 	}
 
-	n.rbft.stop()
+	remainTxs := n.rbft.stop()
 
 	n.stateLock.Lock()
 	n.currentState = nil
 	n.stateLock.Unlock()
+
+	return remainTxs
 }
 
 // Propose proposes requests to RBFT core, requests are ensured to be eventually

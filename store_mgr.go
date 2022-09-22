@@ -20,7 +20,7 @@ import (
 )
 
 /**
-This file provide a mechanism to manage the memory storage in RBFT
+This file provides a mechanism to manage the memory storage in RBFT
 */
 
 // storeManager manages common store data structures for RBFT.
