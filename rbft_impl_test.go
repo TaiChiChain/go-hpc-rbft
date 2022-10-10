@@ -159,7 +159,7 @@ func TestRBFT_processReqSetEvent(t *testing.T) {
 	rbfts[1].atomicOn(InConfChange)
 	rbfts[1].processEvent(req)
 	batch := rbfts[1].batchMgr.requestPool.GenerateRequestBatch()
-	assert.Nil(t, batch)
+	assert.NotNil(t, batch)
 }
 
 //============================================
