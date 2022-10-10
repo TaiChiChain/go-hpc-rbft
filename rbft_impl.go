@@ -750,9 +750,7 @@ func (rbft *rbftImpl) processReqSetEvent(req *pb.RequestSet) consensusEvent {
 	if rbft.atomicIn(InConfChange) {
 		for _, tx := range req.Requests {
 			if hpcCommonTypes.IsConfigTx(tx) {
-				rbft.logger.Debugf("Replica %d is processing a ctx, reject another one", rbft.peerPool.ID)
-				rbft.rejectRequestSet(req)
-				return nil
+				rbft.logger.Debugf("Replica %d is processing a ctx, add another one into txpool", rbft.peerPool.ID)
 			}
 		}
 	}
