@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.4.4-2](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v0.4.4-1...v0.4.4-2) (2022-10-26)
+
+### [0.4.4-1](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v0.4.4...v0.4.4-1) (2022-10-10)
+
+
+### Bug Fixes
+
+* **rbft_impl:** [#5126](null/git.hyperchain.cn/hyperchain/go-hpc-rbft/issues/5126), cache ctx when in config change ([e0b8193](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/e0b819363f40e511e75fbba8afca2fbd2963252a))
+
 ### [0.4.4](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v0.4.3-3...v0.4.4) (2022-09-22)
 
 ### [0.4.3-3](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v0.4.3-2...v0.4.3-3) (2022-09-13)
