@@ -2,6 +2,8 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.4.5](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v0.4.4-2...v0.4.5) (2022-11-01)
+
 ### [0.4.4-2](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v0.4.4-1...v0.4.4-2) (2022-10-26)
 
 ### [0.4.4-1](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v0.4.4...v0.4.4-1) (2022-10-10)
