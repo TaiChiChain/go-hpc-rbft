@@ -1919,7 +1919,8 @@ func (rbft *rbftImpl) moveWatermarks(n uint64, newEpoch bool) {
 	if pos <= rbft.K {
 		target = 0
 	} else {
-		target = pos - rbft.K
+		// delete all batch lower than current checkpoint height
+		target = h
 	}
 
 	// clean batches every K interval
