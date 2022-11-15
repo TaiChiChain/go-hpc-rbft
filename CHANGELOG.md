@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.0.0](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v0.4.5...v1.0.0) (2022-11-15)
+
+
+### Features
+
+* support algorithm upgrade ([f9b69b0](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/f9b69b09e4bd97527a53725c82e7d5fec394c9a5))
+
 ### [0.4.5](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v0.4.4-2...v0.4.5) (2022-11-01)
 
 ### [0.4.4-2](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v0.4.4-1...v0.4.4-2) (2022-10-26)
