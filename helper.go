@@ -929,7 +929,7 @@ func (rbft *rbftImpl) generateSignedCheckpoint(state *types.ServiceState, isConf
 			ledgerStableCheckpointHeight := ledgerStableCheckpoint.Height()
 			currentHeight := state.MetaState.Height
 			if currentHeight <= ledgerStableCheckpointHeight {
-				rbft.logger.Noticef("Replica %d decrease epoch as current height %d is lower "+
+				rbft.logger.Infof("Replica %d decrease epoch as current height %d is lower "+
 					"than the last stable checkpoint height %d", rbft.peerPool.ID, currentHeight, ledgerStableCheckpointHeight)
 				checkpoint.Epoch--
 			}
