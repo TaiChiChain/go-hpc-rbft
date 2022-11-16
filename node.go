@@ -40,6 +40,8 @@ type Node interface {
 	ApplyConfChange(cc *types.ConfState)
 	// Status returns the current node status of the RBFT state machine.
 	Status() NodeStatus
+	// GetUncommittedTransactions returns uncommitted txs
+	GetUncommittedTransactions(maxsize uint64) []*protos.Transaction
 	// ServiceInbound receives and records modifications from application service.
 	ServiceInbound
 }
@@ -235,6 +237,21 @@ func (n *node) ReportReloadFinished(reload *types.ReloadMessage) {
 // Status returns the current node status of the RBFT state machine.
 func (n *node) Status() NodeStatus {
 	return n.rbft.getStatus()
+}
+
+func (n *node) GetUncommittedTransactions(maxsize uint64) []*protos.Transaction {
+	// get hash of transactions that had committed
+	var digestList []string
+	committedHeight := n.rbft.h
+	for digest, batch := range n.rbft.storeMgr.batchStore {
+		if batch.SeqNo <= committedHeight {
+			digestList = append(digestList, digest)
+		}
+	}
+	// remove committed transactions
+	n.rbft.batchMgr.requestPool.RemoveBatches(digestList)
+
+	return n.rbft.batchMgr.requestPool.GetUncommittedTransactions(maxsize)
 }
 
 // getCurrentState retrieves the current application state.
