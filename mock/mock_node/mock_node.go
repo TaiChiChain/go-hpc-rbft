@@ -49,6 +49,20 @@ func (mr *MockNodeMockRecorder) ApplyConfChange(cc interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ApplyConfChange", reflect.TypeOf((*MockNode)(nil).ApplyConfChange), cc)
 }
 
+// GetUncommittedTransactions mocks base method.
+func (m *MockNode) GetUncommittedTransactions(maxsize uint64) []*protos.Transaction {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetUncommittedTransactions", maxsize)
+	ret0, _ := ret[0].([]*protos.Transaction)
+	return ret0
+}
+
+// GetUncommittedTransactions indicates an expected call of GetUncommittedTransactions.
+func (mr *MockNodeMockRecorder) GetUncommittedTransactions(maxsize interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUncommittedTransactions", reflect.TypeOf((*MockNode)(nil).GetUncommittedTransactions), maxsize)
+}
+
 // Propose mocks base method.
 func (m *MockNode) Propose(requests *rbftpb.RequestSet) error {
 	m.ctrl.T.Helper()
