@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.0.1](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v1.0.0...v1.0.1) (2022-11-21)
+
+
+### Bug Fixes
+
+* **node.go:** remove committed txs in GetUncommittedTransactions() ([809cab5](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/809cab5761d3cd8702375ce399351e43f317b24f))
+
 ## [1.0.0](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v0.4.5...v1.0.0) (2022-11-15)
 
 
