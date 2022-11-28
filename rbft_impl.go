@@ -1599,6 +1599,7 @@ func (rbft *rbftImpl) checkpoint(state *types.ServiceState, isConfig bool) {
 	rbft.logger.Infof("Replica %d sending checkpoint for view=%d/seqNo=%d and digest=%s",
 		rbft.peerPool.ID, rbft.view, seqNo, digest)
 
+	rbft.logger.Noticef("===start generate signed checkpoint[%v:%v]", time.Now().Second(), time.Now().Nanosecond())
 	signedCheckpoint, err := rbft.generateSignedCheckpoint(state, isConfig)
 	if err != nil {
 		rbft.logger.Errorf("Replica %d generate signed checkpoint error: %s", rbft.peerPool.ID, err)
