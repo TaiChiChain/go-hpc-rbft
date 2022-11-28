@@ -1639,6 +1639,10 @@ func (rbft *rbftImpl) checkpoint(state *types.ServiceState, isConfig bool) {
 
 // recvCheckpoint processes logic after receive checkpoint.
 func (rbft *rbftImpl) recvCheckpoint(signedCheckpoint *pb.SignedCheckpoint, local bool) consensusEvent {
+	changeAlgo := false
+	if signedCheckpoint.GetCheckpoint().GetNextEpochState().GetConsensusVersion() == "NoxBFT" {
+		changeAlgo = true
+	}
 	if signedCheckpoint.Checkpoint.Epoch < rbft.epoch {
 		rbft.logger.Debugf("Replica %d received checkpoint from expired epoch %d, current epoch %d, ignore it.",
 			rbft.peerPool.ID, signedCheckpoint.Checkpoint.Epoch, rbft.epoch)
@@ -1709,13 +1713,13 @@ func (rbft *rbftImpl) recvCheckpoint(signedCheckpoint *pb.SignedCheckpoint, loca
 
 	// the checkpoint is trigger by config batch
 	if rbft.epochMgr.configBatchToCheck != nil {
-		return rbft.finishConfigCheckpoint(checkpointHeight, checkpointDigest, matchingCheckpoints)
+		return rbft.finishConfigCheckpoint(changeAlgo, checkpointHeight, checkpointDigest, matchingCheckpoints)
 	}
 
 	return rbft.finishNormalCheckpoint(checkpointHeight, checkpointDigest, matchingCheckpoints)
 }
 
-func (rbft *rbftImpl) finishConfigCheckpoint(checkpointHeight uint64, checkpointDigest string,
+func (rbft *rbftImpl) finishConfigCheckpoint(changeAlgo bool, checkpointHeight uint64, checkpointDigest string,
 	matchingCheckpoints []*pb.SignedCheckpoint) consensusEvent {
 	if checkpointHeight != rbft.epochMgr.configBatchToCheck.Height {
 		rbft.logger.Warningf("Replica %d received a non-expected checkpoint for config batch, "+
@@ -1756,7 +1760,7 @@ func (rbft *rbftImpl) finishConfigCheckpoint(checkpointHeight uint64, checkpoint
 	chainEpoch := rbft.external.GetEpoch()
 	epochChanged := chainEpoch != rbft.epoch
 	if epochChanged {
-		rbft.turnIntoEpoch()
+		rbft.turnIntoEpoch(changeAlgo)
 	} else {
 		rbft.logger.Noticef("Replica %d don't change epoch as epoch %d has not been changed",
 			rbft.peerPool.ID, rbft.epoch)
@@ -2187,7 +2191,7 @@ func (rbft *rbftImpl) recvStateUpdatedEvent(ss *types.ServiceState) consensusEve
 	// 2. process epoch-info
 	epochChanged := ss.Epoch != rbft.epoch
 	if epochChanged {
-		rbft.turnIntoEpoch()
+		rbft.turnIntoEpoch(false)
 		rbft.logger.Noticef("======== Replica %d updated epoch, epoch=%d.", rbft.peerPool.ID, rbft.epoch)
 		// TODO(YC): send InformTypeFilterFinishConfigChange event
 	}

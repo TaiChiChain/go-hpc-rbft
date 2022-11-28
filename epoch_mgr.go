@@ -160,9 +160,14 @@ func (rbft *rbftImpl) checkIfOutOfEpoch(msg *pb.ConsensusMessage) consensusEvent
 	return nil
 }
 
-func (rbft *rbftImpl) turnIntoEpoch() {
+func (rbft *rbftImpl) turnIntoEpoch(changeAlgo bool) {
 	// validator set has been changed, start a new epoch and check new epoch
-	epoch := rbft.external.Reconfiguration()
+	var epoch uint64
+	if changeAlgo == false {
+		epoch = rbft.external.Reconfiguration()
+	} else {
+		epoch = rbft.external.GetEpoch()
+	}
 
 	// set the latest epoch
 	rbft.setEpoch(epoch)
