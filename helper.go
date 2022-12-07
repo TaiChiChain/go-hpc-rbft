@@ -770,7 +770,7 @@ func (rbft *rbftImpl) putBackRequestBatches(xset xset) {
 }
 
 // checkIfNeedStateUpdate checks if a replica needs to do state update
-func (rbft *rbftImpl) checkIfNeedStateUpdate(meta *types.MetaState, checkpointSet []*pb.SignedCheckpoint) (bool, error) {
+func (rbft *rbftImpl) checkIfNeedStateUpdate(meta *types.MetaState, checkpointSet []*pb.SignedCheckpoint) bool {
 
 	lastExec := rbft.exec.lastExec
 	seq := meta.Height
@@ -803,14 +803,14 @@ func (rbft *rbftImpl) checkIfNeedStateUpdate(meta *types.MetaState, checkpointSe
 			rbft.peerPool.ID, meta.Height, meta.Digest, lastExec)
 		rbft.updateHighStateTarget(meta, checkpointSet)
 		rbft.tryStateTransfer()
-		return true, nil
+		return true
 	} else if rbft.atomicIn(InRecovery) && rbft.recoveryMgr.needSyncEpoch {
 		rbft.logger.Infof("Replica %d in wrong epoch %d needs to state update", rbft.peerPool.ID, rbft.epoch)
 		rbft.updateHighStateTarget(meta, checkpointSet)
 		rbft.tryStateTransfer()
-		return true, nil
+		return true
 	} else {
-		return false, nil
+		return false
 	}
 }
 

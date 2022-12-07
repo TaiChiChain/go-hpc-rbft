@@ -397,6 +397,11 @@ func (rbft *rbftImpl) recvNotificationResponse(nr *pb.NotificationResponse) cons
 func (rbft *rbftImpl) resetStateForRecovery() consensusEvent {
 	rbft.logger.Debugf("Replica %d reset state in recovery for view=%d", rbft.peerPool.ID, rbft.view)
 
+	if rbft.recoveryMgr.recoveryHandled {
+		rbft.logger.Debugf("Replica %d enter resetStateForRecovery again, ignore it", rbft.peerPool.ID)
+		return nil
+	}
+
 	var basis []*pb.VcBasis
 	if rbft.recoveryMgr.needSyncEpoch {
 		basis = rbft.getDifferentEpochBasis()
@@ -411,18 +416,20 @@ func (rbft *rbftImpl) resetStateForRecovery() consensusEvent {
 	}
 	rbft.logger.Debugf("initial checkpoint: %+v", meta)
 
-	// after checked initial checkpoint, set recoveryHandled active to avoid resetStateForRecovery again.
-	if rbft.recoveryMgr.recoveryHandled {
-		rbft.logger.Debugf("Replica %d enter resetStateForRecovery again, ignore it", rbft.peerPool.ID)
-		return nil
+	// Check if the xset is built correctly by the basis
+	msgList := rbft.assignSequenceNumbers(basis, meta.Height)
+	if msgList == nil {
+		rbft.logger.Infof("Replica %d could not assign sequence numbers: %+v",
+			rbft.peerPool.ID, rbft.vcMgr.viewChangeStore)
+		return rbft.sendViewChange()
 	}
+	rbft.logger.Debugf("x-set: %+v", msgList)
+
+	// after checked initial checkpoint, set recoveryHandled active to avoid resetStateForRecovery again.
 	rbft.recoveryMgr.recoveryHandled = true
 	// check if we need state update
-	need, err := rbft.checkIfNeedStateUpdate(meta, checkpointSet)
-	if err != nil {
-		return nil
-	}
-	if need {
+	needStateUpdate := rbft.checkIfNeedStateUpdate(meta, checkpointSet)
+	if needStateUpdate {
 		// if we are behind by checkpoint, move watermark and state transfer to the target
 		rbft.logger.Debugf("Replica %d in recovery find itself fall behind, "+
 			"move watermark to %d and state transfer.", rbft.peerPool.ID, meta.Height)
@@ -432,57 +439,22 @@ func (rbft *rbftImpl) resetStateForRecovery() consensusEvent {
 		return nil
 	}
 
-	rbft.cleanOutstandingAndCert()
-
-	// clear all cert with different view.
-	for idx := range rbft.storeMgr.certStore {
-		if idx.v != rbft.view {
-			rbft.logger.Debugf("Replica %d clear cert with view=%d/seqNo=%d/digest=%s when reset state for recovery",
-				rbft.peerPool.ID, idx.v, idx.n, idx.d)
-			delete(rbft.storeMgr.certStore, idx)
-			delete(rbft.storeMgr.seqMap, idx.n)
-			rbft.persistDelQPCSet(idx.v, idx.n, idx.d)
-		}
+	// construct a fake NewView message by self.
+	rbft.vcMgr.newViewStore[rbft.view] = &pb.NewView{
+		ReplicaId: rbft.peerPool.ID,
+		View: rbft.view,
+		Xset: msgList,
+		Bset: basis,
 	}
 
-	var (
-		// remove all the batches that smaller than initial checkpoint.
-		deleteList []string
-		// NOTE!!! save batches with seqNo larger than initial checkpoint because those
-		// batches may be useful in PQList.
-		saveBatches []string
-	)
-	for digest, batch := range rbft.storeMgr.batchStore {
-		if batch.SeqNo <= rbft.h {
-			rbft.logger.Debugf("Replica %d clear batch %s with seqNo %d <= initial checkpoint %d", rbft.peerPool.ID, digest, batch.SeqNo, rbft.h)
-			delete(rbft.storeMgr.batchStore, digest)
-			rbft.persistDelBatch(digest)
-			deleteList = append(deleteList, digest)
-		} else {
-			rbft.logger.Debugf("Replica %d save batch %s with seqNo %d > initial checkpoint %d", rbft.peerPool.ID, digest, batch.SeqNo, rbft.h)
-			saveBatches = append(saveBatches, digest)
-		}
+	// replica checks if we have all request batch in xSet
+	needFetchMissingReqBatch := rbft.checkIfNeedFetchMissingReqBatch(msgList)
+	if needFetchMissingReqBatch {
+		// try to fetch missing batches, if received all batches, jump into resetStateForNewView
+		rbft.fetchRequestBatches()
+		return nil
 	}
-	rbft.metrics.batchesGauge.Set(float64(len(rbft.storeMgr.batchStore)))
-	rbft.batchMgr.requestPool.RemoveBatches(deleteList)
-
-	if !rbft.batchMgr.requestPool.IsPoolFull() {
-		rbft.setNotFull()
-	}
-
-	// directly restore all batchedTxs back into non-batched txs except those in batchStore.
-	rbft.logger.Noticef("Replica %d reset txpool when reset state in recovery", rbft.peerPool.ID)
-	rbft.batchMgr.requestPool.Reset(saveBatches)
-
-	// clear cacheBatch as they are useless and all related batches have been restored in requestPool.
-	rbft.batchMgr.cacheBatch = nil
-
-	rbft.metrics.cacheBatchNumber.Set(float64(0))
-
-	return &LocalEvent{
-		Service:   RecoveryService,
-		EventType: RecoveryDoneEvent,
-	}
+	return rbft.resetStateForNewView()
 }
 
 // fetchRecoveryPQC always fetches PQC info after recovery done to fetch PQC info after target checkpoint
