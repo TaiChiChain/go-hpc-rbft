@@ -293,7 +293,7 @@ func (rbft *rbftImpl) sendNewView(notification bool) consensusEvent {
 		return nil
 	}
 	rbft.logger.Debugf("initial checkpoint: %+v", meta)
-	//select suitable pqcCerts for later recovery.Their sequence is greater then cp
+	//select suitable pqcCerts for later recovery.Their sequence is greater than cp
 	//if msgList is nil, must some bug happened
 	msgList := rbft.assignSequenceNumbers(basis, meta.Height)
 	if msgList == nil {
@@ -776,6 +776,14 @@ func (rbft *rbftImpl) selectInitialCheckpoint(set []*pb.VcBasis) (*types.MetaSta
 		// Need weak certificate for the checkpoint
 		if len(signedCheckpoints) < rbft.oneCorrectQuorum() {
 			rbft.logger.Debugf("Replica %d has no weak certificate for n:%d, signedCheckpoints was %d long",
+				rbft.peerPool.ID, idx.Height, len(signedCheckpoints))
+			continue
+		}
+
+		// for config checkpoint, we need at least quorum signatures as this
+		isConfigCheckpoint := signedCheckpoints[0].GetCheckpoint().EndsEpoch()
+		if isConfigCheckpoint && len(signedCheckpoints) < rbft.commonCaseQuorum() {
+			rbft.logger.Warningf("Replica %d has no quorum for n:%d, config signedCheckpoints was %d long",
 				rbft.peerPool.ID, idx.Height, len(signedCheckpoints))
 			continue
 		}

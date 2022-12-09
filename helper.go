@@ -781,7 +781,7 @@ func (rbft *rbftImpl) checkIfNeedStateUpdate(meta *types.MetaState, checkpointSe
 	}
 
 	if rbft.h < seq && rbft.storeMgr.localCheckpoints[seq] != nil {
-		// if we have reached this checkpoint height locally but haven't move h to
+		// if we have reached this checkpoint height locally but haven't moved h to
 		// this height(maybe caused by missing checkpoint msg from other nodes),
 		// directly move watermarks to this checkpoint height as we have reached
 		// this stable checkpoint normally.
