@@ -892,11 +892,7 @@ func (ext *testExternal) SendFilterEvent(informType types.InformType, message ..
 
 		switch informType {
 		case types.InformTypeFilterStableCheckpoint:
-			re := &types.ReloadMessage{
-				Type:   types.ReloadTypeFinishReloadCommitDB,
-				Height: height,
-			}
-			go ext.testNode.N.ReportReloadFinished(re)
+			go ext.testNode.N.ReportStableCheckpointFinished(height)
 		}
 	}
 }

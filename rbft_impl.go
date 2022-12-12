@@ -166,11 +166,11 @@ type rbftImpl struct {
 
 	external external.ExternalStack // manage interaction with application layer
 
-	recvChan chan interface{}           // channel to receive ordered consensus messages and local events
-	cpChan   chan *types.ServiceState   // channel to wait for local checkpoint event
-	confChan chan *types.ReloadFinished // channel to track config transaction execute
-	delFlag  chan bool                  // channel to stop namespace when there is a non-recoverable error
-	close    chan bool                  // channel to close this event process
+	recvChan chan interface{}         // channel to receive ordered consensus messages and local events
+	cpChan   chan *types.ServiceState // channel to wait for local checkpoint event
+	confChan chan uint64              // channel to track config checkpoint process
+	delFlag  chan bool                // channel to stop namespace when there is a non-recoverable error
+	close    chan bool                // channel to close this event process
 
 	flowControl       bool // whether limit flow or not
 	flowControlMaxMem int  // the max memory size of txs in request set
@@ -191,7 +191,7 @@ type rbftImpl struct {
 var once sync.Once
 
 // newRBFT init the RBFT instance
-func newRBFT(cpChan chan *types.ServiceState, confC chan *types.ReloadFinished, c Config) (*rbftImpl, error) {
+func newRBFT(cpChan chan *types.ServiceState, confC chan uint64, c Config) (*rbftImpl, error) {
 	var err error
 
 	// init message event converter
@@ -1448,7 +1448,7 @@ func (rbft *rbftImpl) commitPendingBlocks() {
 			rbft.metrics.outstandingBatchesGauge.Set(float64(len(rbft.storeMgr.outstandingReqBatches)))
 			cert.sentExecute = true
 
-			// if it is a config batch, start to wait for reload after the batch committed
+			// if it is a config batch, start to wait for stable checkpoint process after the batch committed
 			rbft.afterCommitBlock(idx, isConfig)
 		} else {
 			hasTxToExec = false
@@ -1717,36 +1717,33 @@ func (rbft *rbftImpl) recvCheckpoint(signedCheckpoint *pb.SignedCheckpoint, loca
 
 func (rbft *rbftImpl) finishConfigCheckpoint(checkpointHeight uint64, checkpointDigest string,
 	matchingCheckpoints []*pb.SignedCheckpoint) consensusEvent {
-	if checkpointHeight != rbft.epochMgr.configBatchToCheck.Height {
-		rbft.logger.Warningf("Replica %d received a non-expected checkpoint for config batch, "+
-			"received %d, expected %d", rbft.peerPool.ID, checkpointHeight, rbft.epochMgr.configBatchToCheck.Height)
-		return nil
-	}
+	// stop the fetch config checkpoint timer.
 	rbft.stopFetchCheckpointTimer()
 
 	rbft.logger.Infof("Replica %d found config checkpoint quorum for seqNo %d, digest %s",
 		rbft.peerPool.ID, checkpointHeight, checkpointDigest)
 
-	// waiting for commit db finish the reload
+	// waiting for stable checkpoint finish
 	if rbft.atomicIn(InConfChange) {
 		rbft.logger.Infof("Replica %d post stable checkpoint event for seqNo %d after "+
 			"executed to the height with the same digest", rbft.peerPool.ID, checkpointHeight)
 		rbft.external.SendFilterEvent(types.InformTypeFilterStableCheckpoint, matchingCheckpoints)
 		rbft.epochMgr.configBatchToCheck = nil
 
-		rbft.logger.Noticef("Replica %d is waiting for commit-db finished...", rbft.peerPool.ID)
-		ev, ok := <-rbft.confChan
+		rbft.logger.Noticef("Replica %d is waiting for stable checkpoint finished...", rbft.peerPool.ID)
+		height, ok := <-rbft.confChan
 		if !ok {
 			rbft.logger.Info("Config Channel Closed")
 			return nil
 		}
-		rbft.logger.Debugf("Replica %d received a commit-db finished target at height %d", rbft.peerPool.ID, ev.Height)
-		if ev.Height != checkpointHeight {
-			rbft.logger.Errorf("Wrong commit-db height: %d", ev.Height)
+		rbft.logger.Debugf("Replica %d received a stable checkpoint finished event at height %d", rbft.peerPool.ID, height)
+		if height != checkpointHeight {
+			rbft.logger.Errorf("Wrong stable checkpoint finished height: %d", height)
 			rbft.stopNamespace()
 			return nil
 		}
 	} else {
+		// TODO(DH): need ?
 		rbft.logger.Warningf("Replica %d isn't in config-change when finishConfigCheckpoint", rbft.peerPool.ID)
 	}
 

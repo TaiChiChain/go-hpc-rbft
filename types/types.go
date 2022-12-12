@@ -58,27 +58,6 @@ func (state *ServiceState) String() string {
 	return s
 }
 
-// ----------- Reload related structs-----------------
-
-// ReloadType indicates different reload event types.
-type ReloadType int32
-
-const (
-	// ReloadTypeFinishReloadCommitDB indicates the reload event of commit-db finished.
-	ReloadTypeFinishReloadCommitDB ReloadType = 1
-)
-
-// ReloadMessage is the event message after reload process finished.
-type ReloadMessage struct {
-	Type   ReloadType
-	Height uint64
-}
-
-// ReloadFinished is the reload finished event.
-type ReloadFinished struct {
-	Height uint64
-}
-
 // ----------- Router related structs-----------------
 
 // Router is the router info.
