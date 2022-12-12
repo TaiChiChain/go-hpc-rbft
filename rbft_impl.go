@@ -326,7 +326,7 @@ func (rbft *rbftImpl) start() error {
 	}
 
 	// if the stable-checkpoint recovered from consensus-database is equal to the config-batch-to-check,
-	// current state has already been checked to be stable, and we need not to check it again.
+	// current state has already been checked to be stable, and we need not check it again.
 
 	// The checkpoint is nil if the block cannot be recovered from another node for reasons such as archiving.
 
@@ -1609,8 +1609,8 @@ func (rbft *rbftImpl) checkpoint(state *types.ServiceState, isConfig bool) {
 	rbft.storeMgr.saveCheckpoint(seqNo, signedCheckpoint)
 	rbft.persistCheckpoint(seqNo, []byte(digest))
 
-	if rbft.epochMgr.configBatchToCheck != nil {
-		// use fetchCheckpointTimer to fetch the missing checkpoint
+	if isConfig {
+		// use fetchCheckpointTimer to fetch the missing config checkpoint
 		rbft.startFetchCheckpointTimer()
 	} else {
 		// if our lastExec is equal to high watermark, it means there is something wrong with checkpoint procedure, so that
@@ -1708,7 +1708,7 @@ func (rbft *rbftImpl) recvCheckpoint(signedCheckpoint *pb.SignedCheckpoint, loca
 	}
 
 	// the checkpoint is trigger by config batch
-	if rbft.epochMgr.configBatchToCheck != nil {
+	if signedCheckpoint.Checkpoint.Reconfiguration() {
 		return rbft.finishConfigCheckpoint(checkpointHeight, checkpointDigest, matchingCheckpoints)
 	}
 
@@ -1727,13 +1727,13 @@ func (rbft *rbftImpl) finishConfigCheckpoint(checkpointHeight uint64, checkpoint
 	rbft.logger.Infof("Replica %d found config checkpoint quorum for seqNo %d, digest %s",
 		rbft.peerPool.ID, checkpointHeight, checkpointDigest)
 
-	rbft.logger.Infof("Replica %d post stable checkpoint event for seqNo %d after "+
-		"executed to the height with the same digest", rbft.peerPool.ID, checkpointHeight)
-	rbft.external.SendFilterEvent(types.InformTypeFilterStableCheckpoint, matchingCheckpoints)
-	rbft.epochMgr.configBatchToCheck = nil
-
 	// waiting for commit db finish the reload
 	if rbft.atomicIn(InConfChange) {
+		rbft.logger.Infof("Replica %d post stable checkpoint event for seqNo %d after "+
+			"executed to the height with the same digest", rbft.peerPool.ID, checkpointHeight)
+		rbft.external.SendFilterEvent(types.InformTypeFilterStableCheckpoint, matchingCheckpoints)
+		rbft.epochMgr.configBatchToCheck = nil
+
 		rbft.logger.Noticef("Replica %d is waiting for commit-db finished...", rbft.peerPool.ID)
 		ev, ok := <-rbft.confChan
 		if !ok {
@@ -1747,7 +1747,7 @@ func (rbft *rbftImpl) finishConfigCheckpoint(checkpointHeight uint64, checkpoint
 			return nil
 		}
 	} else {
-		rbft.logger.Warningf("Replica %d isn't in config-change", rbft.peerPool.ID)
+		rbft.logger.Warningf("Replica %d isn't in config-change when finishConfigCheckpoint", rbft.peerPool.ID)
 	}
 
 	// two types of config transaction:
