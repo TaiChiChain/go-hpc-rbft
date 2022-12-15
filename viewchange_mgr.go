@@ -1023,7 +1023,7 @@ func (rbft *rbftImpl) processNewView(msgList xset) {
 		d := msgList[n]
 
 		if n <= rbft.h {
-			rbft.logger.Debugf("Replica %d not process seqNo %d in view %d", rbft.peerPool.ID, n, rbft.view)
+			rbft.logger.Debugf("Replica %d not process seqNo %d which is lower than h: %d", rbft.peerPool.ID, n, rbft.view, rbft.h)
 			continue
 		}
 
@@ -1094,11 +1094,30 @@ func (rbft *rbftImpl) processNewView(msgList xset) {
 			maxN = n
 		}
 
-		if rbft.batchMgr.requestPool.IsConfigBatch(d) && n > rbft.exec.lastExec {
-			rbft.logger.Infof("Replica %d is processing a config batch, reject the following", rbft.peerPool.ID)
-			if rbft.isPrimary(rbft.peerPool.ID) {
+		if rbft.batchMgr.requestPool.IsConfigBatch(d) {
+			rbft.logger.Noticef("Replica %d is processing a config batch %d, skip the following", rbft.peerPool.ID, n)
+			if n == rbft.exec.lastExec {
 				rbft.atomicOn(InConfChange)
 				rbft.metrics.statusGaugeInConfChange.Set(InConfChange)
+				// we have executed a config batch in old view, but we haven't reached stable checkpoint
+				// for that batch, so we need to fetch the missing config checkpoint.
+				state := rbft.node.getCurrentState()
+				if n == state.MetaState.Height {
+					rbft.epochMgr.configBatchToCheck = state.MetaState
+					rbft.logger.Infof("Replica %d try to fetch config checkpoint", rbft.peerPool.ID)
+					rbft.fetchCheckpoint()
+				} else {
+					rbft.logger.Errorf("Replica %d has an incorrect state: %+v", rbft.peerPool.ID, state)
+				}
+			} else if n > rbft.exec.lastExec {
+				// we have batched but not executed the config batch, turn into ConfChange status and
+				// execute this config batch later.
+				rbft.atomicOn(InConfChange)
+				rbft.metrics.statusGaugeInConfChange.Set(InConfChange)
+				rbft.logger.Infof("Replica %d finds config batch in x-set", rbft.peerPool.ID)
+			} else {
+				rbft.logger.Warningf("Replica %d finds config batch %d in x-set, which is lower than lastExec %d",
+					rbft.peerPool.ID, n, rbft.exec.lastExec)
 			}
 			break
 		}

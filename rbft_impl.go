@@ -1397,15 +1397,10 @@ func (rbft *rbftImpl) recvSendMissingTxs(re *pb.SendMissingRequests) consensusEv
 
 // commitPendingBlocks commit all available transactions by order
 func (rbft *rbftImpl) commitPendingBlocks() {
-
-	if rbft.exec.currentExec != nil {
-		rbft.logger.Debugf("Replica %d not attempting to commitTransactions because it is currently executing %d",
-			rbft.peerPool.ID, rbft.exec.currentExec)
-	}
 	rbft.logger.Debugf("Replica %d attempting to commitTransactions", rbft.peerPool.ID)
 
 	for hasTxToExec := true; hasTxToExec; {
-		if find, idx, cert := rbft.findNextCommitTx(); find {
+		if find, idx, cert := rbft.findNextCommitBatch(); find {
 			rbft.metrics.committedBlockNumber.Add(float64(1))
 			rbft.persistCSet(idx.v, idx.n, idx.d)
 			// stop new view timer after one batch has been call executed
@@ -1428,7 +1423,7 @@ func (rbft *rbftImpl) commitPendingBlocks() {
 				// we may clear outstandingBatch and save all batches in batchStore.
 				// kick out de-duplicate txs if needed.
 				if isConfig {
-					rbft.logger.Debugf("Replica %d found a config batch, set epoch start seq no %d",
+					rbft.logger.Debugf("Replica %d found a config batch, set config batch number to %d",
 						rbft.peerPool.ID, idx.n)
 					rbft.setConfigBatchToExecute(idx.n)
 					rbft.atomicOn(InConfChange)
@@ -1481,8 +1476,8 @@ func (rbft *rbftImpl) filterExecutableTxs(digest string, deDuplicateRequestHashe
 	return executableTxs, executableLocalList
 }
 
-// findNextCommitTx find next msgID which is able to commit.
-func (rbft *rbftImpl) findNextCommitTx() (find bool, idx msgID, cert *msgCert) {
+// findNextCommitBatch find next msgID which is able to commit.
+func (rbft *rbftImpl) findNextCommitBatch() (find bool, idx msgID, cert *msgCert) {
 
 	for idx = range rbft.storeMgr.committedCert {
 		cert = rbft.storeMgr.certStore[idx]
@@ -1522,9 +1517,6 @@ func (rbft *rbftImpl) findNextCommitTx() (find bool, idx msgID, cert *msgCert) {
 			}
 		}
 
-		currentExec := idx.n
-		rbft.exec.setCurrentExec(&currentExec)
-
 		find = true
 		break
 	}
@@ -1535,55 +1527,48 @@ func (rbft *rbftImpl) findNextCommitTx() (find bool, idx msgID, cert *msgCert) {
 // afterCommitBlock processes logic after commit block, update lastExec,
 // and generate checkpoint when lastExec % K == 0
 func (rbft *rbftImpl) afterCommitBlock(idx msgID, isConfig bool) {
-	if rbft.exec.currentExec != nil {
-		rbft.logger.Debugf("Replica %d finished execution %d, trying next", rbft.peerPool.ID, *rbft.exec.currentExec)
-		rbft.exec.setLastExec(*rbft.exec.currentExec)
-		delete(rbft.storeMgr.committedCert, idx)
+	rbft.logger.Debugf("Replica %d finished execution %d, trying next", rbft.peerPool.ID, idx.n)
+	rbft.exec.setLastExec(idx.n)
+	delete(rbft.storeMgr.committedCert, idx)
 
-		// after committed block, there are 3 cases:
-		// 1. a config transaction: waiting for checkpoint channel and turn into epoch process
-		// 2. a normal transaction in checkpoint: waiting for checkpoint channel and turn into checkpoint process
-		// 3. a normal transaction not in checkpoint: finish directly
-		if isConfig {
-			state, ok := <-rbft.cpChan
-			if !ok {
-				rbft.logger.Info("checkpoint channel closed")
-				return
-			}
-
-			// reset config transaction to execute
-			rbft.resetConfigBatchToExecute()
-
-			if state.MetaState.Height == rbft.exec.lastExec {
-				rbft.logger.Debugf("Call the checkpoint for config batch, seqNo=%d", rbft.exec.lastExec)
-				rbft.epochMgr.configBatchToCheck = state.MetaState
-				rbft.checkpoint(state, isConfig)
-			} else {
-				// reqBatch call execute but have not done with execute
-				rbft.logger.Errorf("Fail to call the checkpoint, seqNo=%d", rbft.exec.lastExec)
-			}
-
-		} else if rbft.exec.lastExec%rbft.K == 0 {
-			state, ok := <-rbft.cpChan
-			if !ok {
-				rbft.logger.Info("checkpoint channel closed")
-				return
-			}
-
-			if state.MetaState.Height == rbft.exec.lastExec {
-				rbft.logger.Debugf("Call the checkpoint for normal, seqNo=%d", rbft.exec.lastExec)
-				rbft.checkpoint(state, isConfig)
-			} else {
-				// reqBatch call execute but have not done with execute
-				rbft.logger.Errorf("Fail to call the checkpoint, seqNo=%d", rbft.exec.lastExec)
-			}
+	// after committed block, there are 3 cases:
+	// 1. a config transaction: waiting for checkpoint channel and turn into epoch process
+	// 2. a normal transaction in checkpoint: waiting for checkpoint channel and turn into checkpoint process
+	// 3. a normal transaction not in checkpoint: finish directly
+	if isConfig {
+		state, ok := <-rbft.cpChan
+		if !ok {
+			rbft.logger.Info("checkpoint channel closed")
+			return
 		}
-	} else {
-		rbft.logger.Warningf("Replica %d had execDoneSync called, flagging ourselves as out of data", rbft.peerPool.ID)
-		rbft.on(SkipInProgress)
-	}
 
-	rbft.exec.currentExec = nil
+		// reset config transaction to execute
+		rbft.resetConfigBatchToExecute()
+
+		if state.MetaState.Height == rbft.exec.lastExec {
+			rbft.logger.Debugf("Call the checkpoint for config batch, seqNo=%d", rbft.exec.lastExec)
+			rbft.epochMgr.configBatchToCheck = state.MetaState
+			rbft.checkpoint(state, isConfig)
+		} else {
+			// reqBatch call execute but have not done with execute
+			rbft.logger.Errorf("Fail to call the checkpoint, seqNo=%d", rbft.exec.lastExec)
+		}
+
+	} else if rbft.exec.lastExec%rbft.K == 0 {
+		state, ok := <-rbft.cpChan
+		if !ok {
+			rbft.logger.Info("checkpoint channel closed")
+			return
+		}
+
+		if state.MetaState.Height == rbft.exec.lastExec {
+			rbft.logger.Debugf("Call the checkpoint for normal, seqNo=%d", rbft.exec.lastExec)
+			rbft.checkpoint(state, isConfig)
+		} else {
+			// reqBatch call execute but have not done with execute
+			rbft.logger.Errorf("Fail to call the checkpoint, seqNo=%d", rbft.exec.lastExec)
+		}
+	}
 }
 
 //=============================================================================
@@ -1717,6 +1702,12 @@ func (rbft *rbftImpl) recvCheckpoint(signedCheckpoint *pb.SignedCheckpoint, loca
 
 func (rbft *rbftImpl) finishConfigCheckpoint(checkpointHeight uint64, checkpointDigest string,
 	matchingCheckpoints []*pb.SignedCheckpoint) consensusEvent {
+	// only process config checkpoint in ConfChange status.
+	if !rbft.atomicIn(InConfChange) {
+		rbft.logger.Warningf("Replica %d isn't in config-change when finishConfigCheckpoint", rbft.peerPool.ID)
+		return nil
+	}
+
 	// stop the fetch config checkpoint timer.
 	rbft.stopFetchCheckpointTimer()
 
@@ -1724,27 +1715,22 @@ func (rbft *rbftImpl) finishConfigCheckpoint(checkpointHeight uint64, checkpoint
 		rbft.peerPool.ID, checkpointHeight, checkpointDigest)
 
 	// waiting for stable checkpoint finish
-	if rbft.atomicIn(InConfChange) {
-		rbft.logger.Infof("Replica %d post stable checkpoint event for seqNo %d after "+
-			"executed to the height with the same digest", rbft.peerPool.ID, checkpointHeight)
-		rbft.external.SendFilterEvent(types.InformTypeFilterStableCheckpoint, matchingCheckpoints)
-		rbft.epochMgr.configBatchToCheck = nil
+	rbft.logger.Infof("Replica %d post stable checkpoint event for seqNo %d after "+
+		"executed to the height with the same digest", rbft.peerPool.ID, checkpointHeight)
+	rbft.external.SendFilterEvent(types.InformTypeFilterStableCheckpoint, matchingCheckpoints)
+	rbft.epochMgr.configBatchToCheck = nil
 
-		rbft.logger.Noticef("Replica %d is waiting for stable checkpoint finished...", rbft.peerPool.ID)
-		height, ok := <-rbft.confChan
-		if !ok {
-			rbft.logger.Info("Config Channel Closed")
-			return nil
-		}
-		rbft.logger.Debugf("Replica %d received a stable checkpoint finished event at height %d", rbft.peerPool.ID, height)
-		if height != checkpointHeight {
-			rbft.logger.Errorf("Wrong stable checkpoint finished height: %d", height)
-			rbft.stopNamespace()
-			return nil
-		}
-	} else {
-		// TODO(DH): need ?
-		rbft.logger.Warningf("Replica %d isn't in config-change when finishConfigCheckpoint", rbft.peerPool.ID)
+	rbft.logger.Noticef("Replica %d is waiting for stable checkpoint finished...", rbft.peerPool.ID)
+	height, ok := <-rbft.confChan
+	if !ok {
+		rbft.logger.Info("Config Channel Closed")
+		return nil
+	}
+	rbft.logger.Debugf("Replica %d received a stable checkpoint finished event at height %d", rbft.peerPool.ID, height)
+	if height != checkpointHeight {
+		rbft.logger.Errorf("Wrong stable checkpoint finished height: %d", height)
+		rbft.stopNamespace()
+		return nil
 	}
 
 	// two types of config transaction:

@@ -194,7 +194,7 @@ func (rbft *rbftImpl) broadcastReqSet(set *pb.RequestSet) {
 // startTimerIfOutstandingRequests soft starts a new view timer if there exists some outstanding request batches,
 // else reset the null request timer
 func (rbft *rbftImpl) startTimerIfOutstandingRequests() {
-	if rbft.in(SkipInProgress) || rbft.exec.currentExec != nil {
+	if rbft.in(SkipInProgress) {
 		// Do not start the view change timer if we are executing or state transferring, these take arbitrarily long amounts of time
 		return
 	}
@@ -776,10 +776,6 @@ func (rbft *rbftImpl) checkIfNeedStateUpdate(meta *types.MetaState, checkpointSe
 	seq := meta.Height
 	dig := meta.Digest
 
-	if rbft.exec.currentExec != nil {
-		lastExec = *rbft.exec.currentExec
-	}
-
 	if rbft.h < seq && rbft.storeMgr.localCheckpoints[seq] != nil {
 		// if we have reached this checkpoint height locally but haven't moved h to
 		// this height(maybe caused by missing checkpoint msg from other nodes),
@@ -788,12 +784,6 @@ func (rbft *rbftImpl) checkIfNeedStateUpdate(meta *types.MetaState, checkpointSe
 		if rbft.storeMgr.localCheckpoints[seq].Checkpoint.Digest() == dig {
 			rbft.moveWatermarks(seq, false)
 			rbft.external.SendFilterEvent(types.InformTypeFilterStableCheckpoint, checkpointSet)
-		}
-
-		if rbft.epochMgr.configBatchToCheck != nil {
-			if seq == rbft.epochMgr.configBatchToCheck.Height {
-				rbft.epochMgr.configBatchToCheck = nil
-			}
 		}
 	}
 

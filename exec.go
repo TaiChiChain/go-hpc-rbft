@@ -25,8 +25,7 @@ import (
 
 // executor manages exec related params
 type executor struct {
-	lastExec    uint64
-	currentExec *uint64
+	lastExec uint64
 }
 
 // newExecutor initializes an instance of executor
@@ -38,11 +37,6 @@ func newExecutor() *executor {
 // setLastExec sets the value of lastExec
 func (e *executor) setLastExec(l uint64) {
 	e.lastExec = l
-}
-
-// setCurrentExec sets the value of pointer currentExec
-func (e *executor) setCurrentExec(c *uint64) {
-	e.currentExec = c
 }
 
 // msgToEvent converts ConsensusMessage to the corresponding consensus event.
