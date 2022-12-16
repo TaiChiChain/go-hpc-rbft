@@ -174,7 +174,7 @@ func TestVC_recvViewChange_Quorum(t *testing.T) {
 	rbfts[2].restartRecovery()
 	assert.Equal(t, true, rbfts[2].atomicIn(InRecovery))
 	ret2 := rbfts[2].recvViewChange(vc0)
-	assert.Equal(t, exp, ret2)
+	assert.Equal(t, nil, ret2)
 	assert.Equal(t, false, rbfts[2].atomicIn(InRecovery))
 }
 

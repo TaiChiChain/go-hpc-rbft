@@ -111,7 +111,7 @@ func (rbft *rbftImpl) sendNotification(keepCurrentVote bool) consensusEvent {
 	}
 
 	// as viewChange and recovery are mutually exclusive, we need to ensure
-	// we have totally exit viewChange before send notification.
+	// we have totally exited viewChange before send notification.
 	if rbft.atomicIn(InViewChange) {
 		rbft.logger.Infof("Replica %d in viewChange changes to recovery status", rbft.peerPool.ID)
 		rbft.atomicOff(InViewChange)
