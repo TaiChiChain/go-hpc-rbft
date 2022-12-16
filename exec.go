@@ -247,6 +247,16 @@ func (rbft *rbftImpl) handleRecoveryEvent(e *LocalEvent) consensusEvent {
 `)
 		finishMsg := fmt.Sprintf("======== Replica %d finished recovery, primary=%d, epoch=%d/n=%d/f=%d/view=%d/h=%d/lastExec=%d", rbft.peerPool.ID, rbft.primaryID(rbft.view), rbft.epoch, rbft.N, rbft.f, rbft.view, rbft.h, rbft.exec.lastExec)
 		rbft.external.SendFilterEvent(types.InformTypeFilterFinishRecovery, finishMsg)
+
+		// check if epoch has been changed, if changed, trigger another round of recovery
+		// after epoch change to find correct view-number
+		epochChanged := rbft.syncEpoch()
+		if epochChanged {
+			// trigger another round of recovery after epoch change to find correct view-number
+			rbft.timerMgr.stopTimer(recoveryRestartTimer)
+			return rbft.initRecovery()
+		}
+
 		// after recovery, new primary need to send null request as a heartbeat, and non-primary will start a
 		// first request timer which must be longer than null request timer in which non-primary must receive a
 		// request from primary(null request or pre-prepare...), or this node will send viewChange.
@@ -368,6 +378,15 @@ func (rbft *rbftImpl) handleViewChangeEvent(e *LocalEvent) consensusEvent {
 
 		// send viewchange result to web socket API
 		rbft.external.SendFilterEvent(types.InformTypeFilterFinishViewChange, finishMsg)
+
+		// check if epoch has been changed, if changed, trigger another round of recovery
+		// after epoch change to find correct view-number
+		epochChanged := rbft.syncEpoch()
+		if epochChanged {
+			// trigger another round of recovery after epoch change to find correct view-number
+			rbft.timerMgr.stopTimer(recoveryRestartTimer)
+			return rbft.initRecovery()
+		}
 
 		rbft.primaryResubmitTransactions()
 

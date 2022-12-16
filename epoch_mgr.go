@@ -150,8 +150,8 @@ func (rbft *rbftImpl) checkIfOutOfEpoch(msg *pb.ConsensusMessage) consensusEvent
 	}
 
 	rbft.epochMgr.checkOutOfEpoch[msg.From] = msg.Epoch
-	rbft.logger.Debugf("Replica %d in epoch %d received message from epoch %d, now %d messages with larger epoch",
-		rbft.peerPool.ID, rbft.epoch, msg.Epoch, len(rbft.epochMgr.checkOutOfEpoch))
+	rbft.logger.Debugf("Replica %d in epoch %d received message from %d in epoch %d, now %d messages "+
+		"with larger epoch", rbft.peerPool.ID, rbft.epoch, msg.From, msg.Epoch, len(rbft.epochMgr.checkOutOfEpoch))
 	if len(rbft.epochMgr.checkOutOfEpoch) >= rbft.oneCorrectQuorum() {
 		rbft.epochMgr.checkOutOfEpoch = make(map[uint64]uint64)
 		return rbft.initRecovery()

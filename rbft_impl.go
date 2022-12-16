@@ -606,8 +606,8 @@ func (rbft *rbftImpl) consensusMessageFilter(msg *pb.ConsensusMessage) consensus
 			pb.Type_SIGNED_CHECKPOINT,
 			pb.Type_FETCH_CHECKPOINT:
 		default:
-			rbft.logger.Debugf("Replica %d in epoch %d reject msg from epoch %d",
-				rbft.peerPool.ID, rbft.epoch, msg.Epoch)
+			rbft.logger.Debugf("Replica %d in epoch %d reject msg from %d in epoch %d",
+				rbft.peerPool.ID, rbft.epoch, msg.From, msg.Epoch)
 			// if the consensus message comes from larger epoch and current node isn't a new node,
 			// track the message for that current node might be out of epoch
 			if msg.Epoch > rbft.epoch {
@@ -1714,39 +1714,15 @@ func (rbft *rbftImpl) finishConfigCheckpoint(checkpointHeight uint64, checkpoint
 	rbft.logger.Infof("Replica %d found config checkpoint quorum for seqNo %d, digest %s",
 		rbft.peerPool.ID, checkpointHeight, checkpointDigest)
 
-	// waiting for stable checkpoint finish
-	rbft.logger.Infof("Replica %d post stable checkpoint event for seqNo %d after "+
-		"executed to the height with the same digest", rbft.peerPool.ID, checkpointHeight)
-	rbft.external.SendFilterEvent(types.InformTypeFilterStableCheckpoint, matchingCheckpoints)
-	rbft.epochMgr.configBatchToCheck = nil
-
-	rbft.logger.Noticef("Replica %d is waiting for stable checkpoint finished...", rbft.peerPool.ID)
-	height, ok := <-rbft.confChan
-	if !ok {
-		rbft.logger.Info("Config Channel Closed")
-		return nil
-	}
-	rbft.logger.Debugf("Replica %d received a stable checkpoint finished event at height %d", rbft.peerPool.ID, height)
-	if height != checkpointHeight {
-		rbft.logger.Errorf("Wrong stable checkpoint finished height: %d", height)
-		rbft.stopNamespace()
+	// sync config checkpoint with ledger.
+	success := rbft.syncConfigCheckpoint(checkpointHeight, matchingCheckpoints)
+	if !success {
+		rbft.logger.Warningf("Replica %d failed to sync config checkpoint", rbft.peerPool.ID)
 		return nil
 	}
 
-	// two types of config transaction:
-	// 1. epoch changed: try to start a new epoch
-	// 2. epoch not changed: do not start a new epoch
-	chainEpoch := rbft.external.GetEpoch()
-	epochChanged := chainEpoch != rbft.epoch
-	if epochChanged {
-		rbft.turnIntoEpoch()
-	} else {
-		rbft.logger.Noticef("Replica %d don't change epoch as epoch %d has not been changed",
-			rbft.peerPool.ID, rbft.epoch)
-	}
-
-	// NOTE! move watermark after turnIntoEpoch.
-	rbft.moveWatermarks(checkpointHeight, true)
+	// sync epoch with ledger.
+	rbft.syncEpoch()
 
 	// finish config change and restart consensus
 	rbft.atomicOff(InConfChange)
@@ -1788,7 +1764,7 @@ func (rbft *rbftImpl) finishNormalCheckpoint(checkpointHeight uint64, checkpoint
 	// make sure node is in normal status before try to batch, as we may reach stable
 	// checkpoint in vc/recovery.
 	if rbft.isNormal() {
-		// for primary, we can try resubmit transactions after stable checkpoint as we
+		// for primary, we can try to resubmit transactions after stable checkpoint as we
 		// may block pre-prepare before because of high watermark limit.
 		rbft.primaryResubmitTransactions()
 	}
@@ -2169,6 +2145,7 @@ func (rbft *rbftImpl) recvStateUpdatedEvent(ss *types.ServiceState) consensusEve
 	// 2. process epoch-info
 	epochChanged := ss.Epoch != rbft.epoch
 	if epochChanged {
+		rbft.logger.Infof("epoch changed from %d to %d", rbft.epoch, ss.Epoch)
 		rbft.turnIntoEpoch()
 		rbft.logger.Noticef("======== Replica %d updated epoch, epoch=%d.", rbft.peerPool.ID, rbft.epoch)
 		// TODO(YC): send InformTypeFilterFinishConfigChange event

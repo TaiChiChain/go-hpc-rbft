@@ -409,15 +409,15 @@ func (rbft *rbftImpl) resetStateForRecovery() consensusEvent {
 		basis = rbft.getOutOfElectionBasis()
 	}
 
-	meta, checkpointSet, ok := rbft.selectInitialCheckpoint(basis)
+	checkpointState, checkpointSet, ok := rbft.selectInitialCheckpoint(basis)
 	if !ok {
 		rbft.logger.Infof("Replica %d could not find consistent checkpoint.", rbft.peerPool.ID)
 		return nil
 	}
-	rbft.logger.Debugf("initial checkpoint: %+v", meta)
+	rbft.logger.Debugf("initial checkpoint: %+v", checkpointState)
 
 	// Check if the xset is built correctly by the basis
-	msgList := rbft.assignSequenceNumbers(basis, meta.Height)
+	msgList := rbft.assignSequenceNumbers(basis, checkpointState.Meta.Height)
 	if msgList == nil {
 		rbft.logger.Infof("Replica %d could not assign sequence numbers: %+v",
 			rbft.peerPool.ID, rbft.vcMgr.viewChangeStore)
@@ -428,11 +428,11 @@ func (rbft *rbftImpl) resetStateForRecovery() consensusEvent {
 	// after checked initial checkpoint, set recoveryHandled active to avoid resetStateForRecovery again.
 	rbft.recoveryMgr.recoveryHandled = true
 	// check if we need state update
-	needStateUpdate := rbft.checkIfNeedStateUpdate(meta, checkpointSet)
+	needStateUpdate := rbft.checkIfNeedStateUpdate(checkpointState, checkpointSet)
 	if needStateUpdate {
 		// if we are behind by checkpoint, move watermark and state transfer to the target
 		rbft.logger.Debugf("Replica %d in recovery find itself fall behind, "+
-			"move watermark to %d and state transfer.", rbft.peerPool.ID, meta.Height)
+			"move watermark to %d and state transfer.", rbft.peerPool.ID, checkpointState.Meta.Height)
 
 		// clear useless outstanding batch to avoid viewChange caused by outstanding batches after recovery.
 		rbft.cleanOutstandingAndCert()
@@ -442,9 +442,9 @@ func (rbft *rbftImpl) resetStateForRecovery() consensusEvent {
 	// construct a fake NewView message by self.
 	rbft.vcMgr.newViewStore[rbft.view] = &pb.NewView{
 		ReplicaId: rbft.peerPool.ID,
-		View: rbft.view,
-		Xset: msgList,
-		Bset: basis,
+		View:      rbft.view,
+		Xset:      msgList,
+		Bset:      basis,
 	}
 
 	// replica checks if we have all request batch in xSet

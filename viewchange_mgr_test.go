@@ -5,6 +5,7 @@ import (
 
 	"github.com/hyperchain/go-hpc-common/types/protos"
 	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
+	"github.com/hyperchain/go-hpc-rbft/types"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/golang/mock/gomock"
@@ -347,6 +348,168 @@ func TestVC_processNewView_AfterViewChanged_ReplicaNormal(t *testing.T) {
 	rbfts[0].exec.setLastExec(uint64(3))
 	rbfts[0].processNewView(msgList)
 	assert.Equal(t, uint64(3), rbfts[0].batchMgr.seqNo)
+	assert.Equal(t, pb.Type_COMMIT, nodes[0].broadcastMessageCache.Type)
+}
+
+func TestVC_processNewView_AfterViewChanged_LargerConfig(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	nodes, rbfts := newBasicClusterInstance()
+
+	tx := newTx()
+	rbfts[0].batchMgr.requestPool.AddNewRequests([]*protos.Transaction{tx}, true, true)
+	batch := rbfts[0].batchMgr.requestPool.GenerateRequestBatch()[0]
+
+	ctx := newCTX(defaultValidatorSet)
+	batch1, _ := rbfts[0].batchMgr.requestPool.AddNewRequests([]*protos.Transaction{ctx}, true, true)
+	configBatch := batch1[0]
+
+	// a message list
+	msgList := xset{
+		uint64(0): "XXX GENESIS",
+		uint64(1): "",
+		uint64(2): "",
+		uint64(3): batch.BatchHash,
+		uint64(4): configBatch.BatchHash,
+	}
+
+	rbfts[0].putBackRequestBatches(msgList)
+
+	requestBatch := &pb.RequestBatch{
+		RequestHashList: batch.TxHashList,
+		RequestList:     batch.TxList,
+		Timestamp:       batch.Timestamp,
+		LocalList:       batch.LocalList,
+		BatchHash:       batch.BatchHash,
+		SeqNo:           uint64(3),
+	}
+	rbfts[0].storeMgr.batchStore[batch.BatchHash] = requestBatch
+
+	configRequestBatch := &pb.RequestBatch{
+		RequestHashList: configBatch.TxHashList,
+		RequestList:     configBatch.TxList,
+		Timestamp:       configBatch.Timestamp,
+		LocalList:       configBatch.LocalList,
+		BatchHash:       configBatch.BatchHash,
+		SeqNo:           uint64(4),
+	}
+	rbfts[0].storeMgr.batchStore[configBatch.BatchHash] = configRequestBatch
+
+	rbfts[0].setView(uint64(1))
+	rbfts[0].exec.setLastExec(uint64(5))
+	rbfts[0].processNewView(msgList)
+	assert.Equal(t, uint64(5), rbfts[0].batchMgr.seqNo)
+	assert.Equal(t, pb.Type_COMMIT, nodes[0].broadcastMessageCache.Type)
+}
+
+func TestVC_processNewView_AfterViewChanged_LowerConfig(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	nodes, rbfts := newBasicClusterInstance()
+
+	tx := newTx()
+	rbfts[0].batchMgr.requestPool.AddNewRequests([]*protos.Transaction{tx}, true, true)
+	batch := rbfts[0].batchMgr.requestPool.GenerateRequestBatch()[0]
+
+	ctx := newCTX(defaultValidatorSet)
+	batch1, _ := rbfts[0].batchMgr.requestPool.AddNewRequests([]*protos.Transaction{ctx}, true, true)
+	configBatch := batch1[0]
+
+	// a message list
+	msgList := xset{
+		uint64(0): "XXX GENESIS",
+		uint64(1): "",
+		uint64(2): "",
+		uint64(3): batch.BatchHash,
+		uint64(4): configBatch.BatchHash,
+	}
+
+	rbfts[0].putBackRequestBatches(msgList)
+
+	requestBatch := &pb.RequestBatch{
+		RequestHashList: batch.TxHashList,
+		RequestList:     batch.TxList,
+		Timestamp:       batch.Timestamp,
+		LocalList:       batch.LocalList,
+		BatchHash:       batch.BatchHash,
+		SeqNo:           uint64(3),
+	}
+	rbfts[0].storeMgr.batchStore[batch.BatchHash] = requestBatch
+
+	configRequestBatch := &pb.RequestBatch{
+		RequestHashList: configBatch.TxHashList,
+		RequestList:     configBatch.TxList,
+		Timestamp:       configBatch.Timestamp,
+		LocalList:       configBatch.LocalList,
+		BatchHash:       configBatch.BatchHash,
+		SeqNo:           uint64(4),
+	}
+	rbfts[0].storeMgr.batchStore[configBatch.BatchHash] = configRequestBatch
+
+	rbfts[0].setView(uint64(2))
+	rbfts[0].exec.setLastExec(uint64(3))
+	rbfts[0].processNewView(msgList)
+	assert.Equal(t, uint64(4), rbfts[0].batchMgr.seqNo)
+	assert.Equal(t, pb.Type_PREPARE, nodes[0].broadcastMessageCache.Type)
+}
+
+func TestVC_processNewView_AfterViewChanged_EqualConfig(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	nodes, rbfts := newBasicClusterInstance()
+
+	tx := newTx()
+	rbfts[0].batchMgr.requestPool.AddNewRequests([]*protos.Transaction{tx}, true, true)
+	batch := rbfts[0].batchMgr.requestPool.GenerateRequestBatch()[0]
+
+	ctx := newCTX(defaultValidatorSet)
+	batch1, _ := rbfts[0].batchMgr.requestPool.AddNewRequests([]*protos.Transaction{ctx}, true, true)
+	configBatch := batch1[0]
+
+	// a message list
+	msgList := xset{
+		uint64(0): "XXX GENESIS",
+		uint64(1): "",
+		uint64(2): "",
+		uint64(3): batch.BatchHash,
+		uint64(4): configBatch.BatchHash,
+	}
+
+	rbfts[0].putBackRequestBatches(msgList)
+
+	requestBatch := &pb.RequestBatch{
+		RequestHashList: batch.TxHashList,
+		RequestList:     batch.TxList,
+		Timestamp:       batch.Timestamp,
+		LocalList:       batch.LocalList,
+		BatchHash:       batch.BatchHash,
+		SeqNo:           uint64(3),
+	}
+	rbfts[0].storeMgr.batchStore[batch.BatchHash] = requestBatch
+
+	configRequestBatch := &pb.RequestBatch{
+		RequestHashList: configBatch.TxHashList,
+		RequestList:     configBatch.TxList,
+		Timestamp:       configBatch.Timestamp,
+		LocalList:       configBatch.LocalList,
+		BatchHash:       configBatch.BatchHash,
+		SeqNo:           uint64(4),
+	}
+	rbfts[0].storeMgr.batchStore[configBatch.BatchHash] = configRequestBatch
+
+	rbfts[0].setView(uint64(3))
+	rbfts[0].exec.setLastExec(uint64(4))
+	rbfts[0].node.ReportExecuted(&types.ServiceState{
+		MetaState: &types.MetaState{
+			Height: 4,
+			Digest: "digest-4",
+		},
+	})
+	rbfts[0].processNewView(msgList)
+	assert.Equal(t, uint64(4), rbfts[0].batchMgr.seqNo)
 	assert.Equal(t, pb.Type_COMMIT, nodes[0].broadcastMessageCache.Type)
 }
 

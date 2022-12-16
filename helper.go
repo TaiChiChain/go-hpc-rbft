@@ -770,38 +770,62 @@ func (rbft *rbftImpl) putBackRequestBatches(xset xset) {
 }
 
 // checkIfNeedStateUpdate checks if a replica needs to do state update
-func (rbft *rbftImpl) checkIfNeedStateUpdate(meta *types.MetaState, checkpointSet []*pb.SignedCheckpoint) bool {
+func (rbft *rbftImpl) checkIfNeedStateUpdate(checkpointState *types.CheckpointState, checkpointSet []*pb.SignedCheckpoint) bool {
+	// TODO(DH): refactor epoch sync, use EpochChangeProof to sync epoch.
+	if rbft.atomicIn(InRecovery) && rbft.recoveryMgr.needSyncEpoch {
+		rbft.logger.Infof("Replica %d in wrong epoch %d needs to state update", rbft.peerPool.ID, rbft.epoch)
+		rbft.updateHighStateTarget(&checkpointState.Meta, checkpointSet)
+		rbft.tryStateTransfer()
+		return true
+	}
 
-	lastExec := rbft.exec.lastExec
-	seq := meta.Height
-	dig := meta.Digest
+	// initial checkpoint height and digest.
+	initialCheckpointHeight := checkpointState.Meta.Height
+	initialCheckpointDigest := checkpointState.Meta.Digest
 
-	if rbft.h < seq && rbft.storeMgr.localCheckpoints[seq] != nil {
+	// if current low watermark is lower than initial checkpoint, but we have executed to
+	// initial checkpoint height.
+	if rbft.h < initialCheckpointHeight && rbft.storeMgr.localCheckpoints[initialCheckpointHeight] != nil {
 		// if we have reached this checkpoint height locally but haven't moved h to
 		// this height(maybe caused by missing checkpoint msg from other nodes),
-		// directly move watermarks to this checkpoint height as we have reached
-		// this stable checkpoint normally.
-		if rbft.storeMgr.localCheckpoints[seq].Checkpoint.Digest() == dig {
-			rbft.moveWatermarks(seq, false)
-			rbft.external.SendFilterEvent(types.InformTypeFilterStableCheckpoint, checkpointSet)
+		// sync config checkpoint directly to avoid missing some config checkpoint
+		// on ledger.
+		localDigest := rbft.storeMgr.localCheckpoints[initialCheckpointHeight].Checkpoint.Digest()
+		if localDigest == initialCheckpointDigest {
+			if checkpointState.IsConfig {
+				rbft.logger.Noticef("Replica %d finds config checkpoint %d when checkIfNeedStateUpdate",
+					rbft.peerPool.ID, initialCheckpointHeight)
+				rbft.atomicOn(InConfChange)
+				rbft.metrics.statusGaugeInConfChange.Set(InConfChange)
+				// sync config checkpoint with ledger.
+				success := rbft.syncConfigCheckpoint(initialCheckpointHeight, checkpointSet)
+				if !success {
+					rbft.logger.Warningf("Replica %d failed to sync config checkpoint", rbft.peerPool.ID)
+				}
+				rbft.atomicOff(InConfChange)
+				rbft.metrics.statusGaugeInConfChange.Set(0)
+			} else {
+				rbft.logger.Debugf("Replica %d finds normal checkpoint %d when checkIfNeedStateUpdate",
+					rbft.peerPool.ID, initialCheckpointHeight)
+				rbft.moveWatermarks(initialCheckpointHeight, false)
+			}
+		} else {
+			rbft.logger.Warningf("Replica %d finds mismatch checkpoint %d when checkIfNeedStateUpdate, "+
+				"local digest: %s, quorum digest %s", rbft.peerPool.ID, initialCheckpointHeight, localDigest, initialCheckpointDigest)
 		}
+		return false
 	}
 
 	// If replica's lastExec < initial checkpoint, replica is out of date
-	if lastExec < meta.Height {
+	lastExec := rbft.exec.lastExec
+	if lastExec < initialCheckpointHeight {
 		rbft.logger.Warningf("Replica %d missing base checkpoint %d (%s), our most recent execution %d",
-			rbft.peerPool.ID, meta.Height, meta.Digest, lastExec)
-		rbft.updateHighStateTarget(meta, checkpointSet)
+			rbft.peerPool.ID, initialCheckpointHeight, initialCheckpointDigest, lastExec)
+		rbft.updateHighStateTarget(&checkpointState.Meta, checkpointSet)
 		rbft.tryStateTransfer()
 		return true
-	} else if rbft.atomicIn(InRecovery) && rbft.recoveryMgr.needSyncEpoch {
-		rbft.logger.Infof("Replica %d in wrong epoch %d needs to state update", rbft.peerPool.ID, rbft.epoch)
-		rbft.updateHighStateTarget(meta, checkpointSet)
-		rbft.tryStateTransfer()
-		return true
-	} else {
-		return false
 	}
+	return false
 }
 
 func (rbft *rbftImpl) getNodeInfo() *pb.NodeInfo {
@@ -959,4 +983,48 @@ func (rbft *rbftImpl) signCheckpoint(checkpoint *protos.Checkpoint) ([]byte, err
 func (rbft *rbftImpl) verifySignedCheckpoint(signedCheckpoint *pb.SignedCheckpoint) error {
 	msg := signedCheckpoint.Checkpoint.Hash()
 	return rbft.external.Verify(signedCheckpoint.NodeInfo.ReplicaHost, signedCheckpoint.Signature, msg)
+}
+
+// syncConfigCheckpoint posts config checkpoint out and wait for its completion synchronously.
+func (rbft *rbftImpl) syncConfigCheckpoint(checkpointHeight uint64, quorumCheckpoints []*pb.SignedCheckpoint) bool {
+	// waiting for stable checkpoint finish
+	rbft.logger.Infof("Replica %d post stable checkpoint event for seqNo %d after "+
+		"executed to the height with the same digest", rbft.peerPool.ID, checkpointHeight)
+
+	rbft.external.SendFilterEvent(types.InformTypeFilterStableCheckpoint, quorumCheckpoints)
+	rbft.epochMgr.configBatchToCheck = nil
+
+	rbft.logger.Noticef("Replica %d is waiting for stable checkpoint finished...", rbft.peerPool.ID)
+	height, ok := <-rbft.confChan
+	if !ok {
+		rbft.logger.Info("Config Channel Closed")
+		return false
+	}
+	rbft.logger.Debugf("Replica %d received a stable checkpoint finished event at height %d", rbft.peerPool.ID, height)
+	if height != checkpointHeight {
+		rbft.logger.Errorf("Wrong stable checkpoint finished height: %d", height)
+		rbft.stopNamespace()
+		return false
+	}
+
+	return true
+}
+
+// syncEpoch tries to sync rbft.Epoch with current latest epoch on ledger and returns
+// if epoch has been changed.
+// turn into new epoch when epoch has been changed.
+func (rbft *rbftImpl) syncEpoch() bool {
+	lastEpochCheckpoint := rbft.external.GetLastCheckpoint()
+	chainEpoch := lastEpochCheckpoint.NextEpoch()
+	epochChanged := chainEpoch != rbft.epoch
+	if epochChanged {
+		rbft.logger.Infof("epoch changed from %d to %d", rbft.epoch, chainEpoch)
+		rbft.turnIntoEpoch()
+		rbft.moveWatermarks(lastEpochCheckpoint.Height(), true)
+	} else {
+		rbft.logger.Debugf("Replica %d don't change epoch as epoch %d has not been changed",
+			rbft.peerPool.ID, rbft.epoch)
+	}
+
+	return epochChanged
 }

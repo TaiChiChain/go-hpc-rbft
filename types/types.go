@@ -17,8 +17,6 @@ package types
 
 import (
 	"fmt"
-
-	"github.com/hyperchain/go-hpc-common/types/protos"
 )
 
 // ----------- ServiceState related structs-----------------
@@ -35,11 +33,10 @@ type MetaState struct {
 	Digest string
 }
 
-// EpochInfo is the information for epoch, including the epoch number, last configuration block height, and validator set.
-type EpochInfo struct {
-	Epoch      uint64
-	VSet       []*protos.NodeInfo
-	LastConfig uint64
+// CheckpointState is the basic info for checkpoint.
+type CheckpointState struct {
+	Meta     MetaState
+	IsConfig bool
 }
 
 // String implement the Stringer interface.
