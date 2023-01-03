@@ -109,19 +109,29 @@ func TestRecovery_ReplicaRecovery(t *testing.T) {
 		if index == 3 {
 			continue
 		}
-		recoveryDone := rbfts[3].processEvent(notificationRsp[index])
-		if recoveryDone != nil {
-			recoveryDoneTag := &LocalEvent{
-				Service:   RecoveryService,
-				EventType: RecoveryDoneEvent,
-			}
-			assert.Equal(t, recoveryDoneTag, recoveryDone)
-			rbfts[3].processEvent(recoveryDone)
-			node4FetchPQC = nodes[3].broadcastMessageCache
-			assert.Equal(t, pb.Type_RECOVERY_FETCH_QPC, node4FetchPQC.Type)
-			break
-		}
+		rbfts[3].processEvent(notificationRsp[index])
 	}
+
+	// replica 3 fetch missing request batch 1
+	fetchMissingReqBatch := nodes[3].broadcastMessageCache
+	assert.Equal(t, pb.Type_FETCH_REQUEST_BATCH, fetchMissingReqBatch.Type)
+	rbfts[0].processEvent(fetchMissingReqBatch)
+
+	// primary 1 return fetch request batch 1
+	sendReqBatch := nodes[0].unicastMessageCache
+	assert.Equal(t, pb.Type_SEND_REQUEST_BATCH, sendReqBatch.Type)
+
+	// replica 3 receive send request batch and finish recovery.
+	recoveryDone := rbfts[3].processEvent(sendReqBatch)
+
+	recoveryDoneTag := &LocalEvent{
+		Service:   RecoveryService,
+		EventType: RecoveryDoneEvent,
+	}
+	assert.Equal(t, recoveryDoneTag, recoveryDone)
+	rbfts[3].processEvent(recoveryDone)
+	node4FetchPQC = nodes[3].broadcastMessageCache
+	assert.Equal(t, pb.Type_RECOVERY_FETCH_QPC, node4FetchPQC.Type)
 
 	returnRecoveryPQC := make([]*pb.ConsensusMessage, 4)
 	for index := range rbfts {
@@ -139,17 +149,6 @@ func TestRecovery_ReplicaRecovery(t *testing.T) {
 		}
 		rbfts[3].processEvent(returnRecoveryPQC[index])
 	}
-
-	// replica 3 fetch missing txs of batch 1
-	fetchMissingReq := nodes[3].unicastMessageCache
-	assert.Equal(t, pb.Type_FETCH_MISSING_REQUESTS, fetchMissingReq.Type)
-	rbfts[0].processEvent(fetchMissingReq)
-
-	// primary 1 return fetch missing txs of batch 1
-	sendMissingTxs := nodes[0].unicastMessageCache
-	assert.Equal(t, pb.Type_SEND_MISSING_REQUESTS, sendMissingTxs.Type)
-	// replica 3 execute batch 1 and 2.
-	rbfts[3].processEvent(sendMissingTxs)
 
 	assert.Equal(t, uint64(2), rbfts[3].exec.lastExec)
 }
@@ -307,6 +306,9 @@ func TestRecovery_EpochCheckpointFailing_Recovery(t *testing.T) {
 	}
 
 	ev1 := <-rbfts[3].recvChan
+	lv, isLocalEvent := ev1.(*LocalEvent)
+	assert.Equal(t, true, isLocalEvent)
+	assert.Equal(t, CoreStateUpdatedEvent, lv.EventType)
 	rbfts[3].processEvent(ev1)
 
 	notificationNode4 := nodes[3].broadcastMessageCache
@@ -323,26 +325,52 @@ func TestRecovery_EpochCheckpointFailing_Recovery(t *testing.T) {
 		assert.Equal(t, pb.Type_NOTIFICATION_RESPONSE, notificationRsp[index].Type)
 	}
 
-	done := false
-	recoveryDoneEv := &LocalEvent{
-		Service:   RecoveryService,
-		EventType: RecoveryDoneEvent,
-	}
 	for index := range notificationRsp {
 		if index == 3 {
 			continue
 		}
-		retEv := rbfts[3].processEvent(notificationRsp[index])
-		if retEv != nil {
-			assert.Equal(t, recoveryDoneEv, retEv)
-			done = true
-		}
+		rbfts[3].processEvent(notificationRsp[index])
 	}
-	assert.True(t, done)
 
-	rbfts[3].processEvent(recoveryDoneEv)
-	fetch := nodes[3].broadcastMessageCache
-	assert.Equal(t, pb.Type_RECOVERY_FETCH_QPC, fetch.Type)
+	// replica 3 fetch missing request batch 2
+	fetchMissingReqBatch := nodes[3].broadcastMessageCache
+	assert.Equal(t, pb.Type_FETCH_REQUEST_BATCH, fetchMissingReqBatch.Type)
+	rbfts[0].processEvent(fetchMissingReqBatch)
+
+	// primary 1 return fetch request batch 2
+	sendReqBatch := nodes[0].unicastMessageCache
+	assert.Equal(t, pb.Type_SEND_REQUEST_BATCH, sendReqBatch.Type)
+
+	// replica 3 receive send request batch and finish recovery.
+	recoveryDone := rbfts[3].processEvent(sendReqBatch)
+
+	recoveryDoneTag := &LocalEvent{
+		Service:   RecoveryService,
+		EventType: RecoveryDoneEvent,
+	}
+	assert.Equal(t, recoveryDoneTag, recoveryDone)
+	rbfts[3].processEvent(recoveryDone)
+	node4FetchPQC := nodes[3].broadcastMessageCache
+	assert.Equal(t, pb.Type_RECOVERY_FETCH_QPC, node4FetchPQC.Type)
+
+	returnRecoveryPQC := make([]*pb.ConsensusMessage, 4)
+	for index := range rbfts {
+		if index == 3 {
+			continue
+		}
+		rbfts[index].processEvent(node4FetchPQC)
+		returnRecoveryPQC[index] = nodes[index].unicastMessageCache
+		assert.Equal(t, pb.Type_RECOVERY_RETURN_QPC, returnRecoveryPQC[index].Type)
+	}
+
+	for index := range returnRecoveryPQC {
+		if index == 3 {
+			continue
+		}
+		rbfts[3].processEvent(returnRecoveryPQC[index])
+	}
+
+	assert.Equal(t, uint64(2), rbfts[3].exec.lastExec)
 }
 
 func TestRecovery_SyncStateToStateUpdate(t *testing.T) {

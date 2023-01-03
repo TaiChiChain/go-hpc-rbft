@@ -310,11 +310,8 @@ func (rbft *rbftImpl) sendNewView(notification bool) consensusEvent {
 	}
 
 	// Check if primary need state update
-	need, err := rbft.checkIfNeedStateUpdate(meta, checkpointSet)
-	if err != nil {
-		return nil
-	}
-	if need {
+	needStateUpdate := rbft.checkIfNeedStateUpdate(meta, checkpointSet)
+	if needStateUpdate {
 		rbft.logger.Debugf("Primary %d needs to catch up in viewChange", rbft.peerPool.ID)
 		return nil
 	}
@@ -377,16 +374,14 @@ func (rbft *rbftImpl) primaryCheckNewView(xSet xset) consensusEvent {
 
 	rbft.logger.Infof("New primary %d try to check new view", rbft.peerPool.ID)
 
-	//check if we have all request batch in xSet
-	newReqBatchMissing := rbft.feedMissingReqBatchIfNeeded(xSet)
-	if len(rbft.storeMgr.missingReqBatches) == 0 {
-		return rbft.resetStateForNewView()
-	} else if newReqBatchMissing {
+	// check if we have all request batch in xSet
+	needFetchMissingReqBatch := rbft.checkIfNeedFetchMissingReqBatch(xSet)
+	if needFetchMissingReqBatch {
 		// try to fetch missing batches, if received all batches, jump into resetStateForNewView
 		rbft.fetchRequestBatches()
+		return nil
 	}
-
-	return nil
+	return rbft.resetStateForNewView()
 }
 
 // replicaCheckNewView checks this newView message and see if it's legal.
@@ -449,26 +444,20 @@ func (rbft *rbftImpl) replicaCheckNewView() consensusEvent {
 	}
 
 	// Check if replica need state update
-	need, err := rbft.checkIfNeedStateUpdate(meta, checkpointSet)
-	if err != nil {
-		return nil
-	}
-	if need {
-		// TODO(DH): is backup need to ensure state update before finishing viewChange?
+	needStateUpdate := rbft.checkIfNeedStateUpdate(meta, checkpointSet)
+	if needStateUpdate {
 		rbft.logger.Debugf("Replica %d needs to catch up in viewChange/recovery", rbft.peerPool.ID)
 		return nil
 	}
 
 	// replica checks if we have all request batch in xSet
-	newReqBatchMissing := rbft.feedMissingReqBatchIfNeeded(msgList)
-	if len(rbft.storeMgr.missingReqBatches) == 0 {
-		return rbft.resetStateForNewView()
-	} else if newReqBatchMissing {
+	needFetchMissingReqBatch := rbft.checkIfNeedFetchMissingReqBatch(msgList)
+	if needFetchMissingReqBatch {
 		// try to fetch missing batches, if received all batches, jump into resetStateForNewView
 		rbft.fetchRequestBatches()
+		return nil
 	}
-
-	return nil
+	return rbft.resetStateForNewView()
 }
 
 // resetStateForNewView reset all states for new view
@@ -970,9 +959,9 @@ func (rbft *rbftImpl) updateViewChangeSeqNo(seqNo, K uint64) {
 	rbft.vcMgr.viewChangeSeqNo = seqNo - seqNo%K + rbft.vcMgr.viewChangePeriod*K
 }
 
-// feedMissingReqBatchIfNeeded feeds needed reqBatch when this node
+// checkIfNeedFetchMissingReqBatch checks if we need fetch missing reqBatch when this node
 // doesn't have all reqBatch in xset.
-func (rbft *rbftImpl) feedMissingReqBatchIfNeeded(xset xset) (newReqBatchMissing bool) {
+func (rbft *rbftImpl) checkIfNeedFetchMissingReqBatch(xset xset) (newReqBatchMissing bool) {
 
 	// clear missingReqBatches to ensure it's only valid in one recovery round.
 	rbft.storeMgr.missingReqBatches = make(map[string]bool)
@@ -990,7 +979,7 @@ func (rbft *rbftImpl) feedMissingReqBatchIfNeeded(xset xset) (newReqBatchMissing
 
 			if _, ok := rbft.storeMgr.batchStore[d]; !ok {
 				rbft.logger.Debugf("Replica %d missing assigned, non-checkpointed request batch %s", rbft.peerPool.ID, d)
-				if _, ok := rbft.storeMgr.missingReqBatches[d]; !ok {
+				if _, missing := rbft.storeMgr.missingReqBatches[d]; !missing {
 					rbft.logger.Infof("Replica %v needs to fetch batch %s", rbft.peerPool.ID, d)
 					newReqBatchMissing = true
 					rbft.storeMgr.missingReqBatches[d] = true

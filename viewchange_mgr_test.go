@@ -379,11 +379,11 @@ func TestVC_feedMissingReqBatchIfNeeded(t *testing.T) {
 	}
 	rbfts[0].storeMgr.batchStore[batch[0].BatchHash] = batch3
 
-	flag1 := rbfts[0].feedMissingReqBatchIfNeeded(msgList)
+	flag1 := rbfts[0].checkIfNeedFetchMissingReqBatch(msgList)
 	assert.Equal(t, false, flag1)
 
 	delete(rbfts[0].storeMgr.batchStore, batch3.BatchHash)
-	flag2 := rbfts[0].feedMissingReqBatchIfNeeded(msgList)
+	flag2 := rbfts[0].checkIfNeedFetchMissingReqBatch(msgList)
 	assert.Equal(t, true, flag2)
 }
 
