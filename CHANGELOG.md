@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.0.2](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v1.0.1...v1.0.2) (2023-01-03)
+
+
+### Bug Fixes
+
+* **recovery:** reuse process resetStateForNewView in resetStateForRecovery to avoid cache some unuse ([86627d2](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/86627d2981fbe7845048120317f74acd67b75990)), closes [#flato-5322](/git.hyperchain.cn/hyperchain/go-hpc-rbft/issues/flato-5322) [#flato-4326](/git.hyperchain.cn/hyperchain/go-hpc-rbft/issues/flato-4326)
+
 ### [1.0.1](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v1.0.0...v1.0.1) (2022-11-21)
 
 
