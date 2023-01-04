@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.0.3](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v1.0.2...v1.0.3) (2023-01-04)
+
+
+### Bug Fixes
+
+* not generate initial config checkpoint with no quorum signatures ([cf6cfba](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/cf6cfba76ec90c6cfd5d28b96b7185ea1152d1b1)), closes [#flato-5321](/git.hyperchain.cn/hyperchain/go-hpc-rbft/issues/flato-5321)
+* process config checkpoint when received quorum config checkpoint ([1892070](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/18920700d3809ae7637c7527bec18d51d3965801))
+* remove ReloadFinished related events ([f221cab](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/f221cab84e33b831972bda739aa61eaee9cebee6))
+* **view_change:** fetch config checkpoint when found a config batch in x-set ([d770177](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/d7701774651cd6da944a835a72d89c2725a4afe0))
+* **viewchange:** sync config checkpoint when checkIfNeedStateUpdate and always syncEpoch after vc/re ([8d45f71](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/8d45f713dad16658e8587d1073daa83507055ecd))
+* **viewchange:** trigger viewchange when received quorum viewchanges in recovery status ([5b41287](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/5b4128714fb3a02a3af1a5618378686045493c0d))
+
 ### [1.0.2](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v1.0.1...v1.0.2) (2023-01-03)
 
 
