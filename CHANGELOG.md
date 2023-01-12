@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.0.4](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v1.0.3...v1.0.4) (2023-01-12)
+
+
+### Bug Fixes
+
+* **helper.go:** try to rollback when find mismatch in checkIfNeedStateUpdate ([5d222fd](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/5d222fd4910c857242e47bcda97ccb9488b72d69))
+
 ### [1.0.3](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v1.0.2...v1.0.3) (2023-01-04)
 
 
