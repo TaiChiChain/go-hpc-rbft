@@ -510,7 +510,7 @@ func TestHelper_CheckIfNeedStateUpdate(t *testing.T) {
 		IsConfig: true,
 	}
 	need = rbfts[0].checkIfNeedStateUpdate(mockCheckpointState20, mockCheckpointSet20)
-	assert.False(t, need, "no need to sync chain as local checkpoint not equal to checkpoint set")
+	assert.True(t, need, "need to sync chain as local checkpoint not equal to checkpoint set")
 
 	selfCheckpoint20 = &pb.SignedCheckpoint{
 		NodeInfo: &pb.NodeInfo{ReplicaId: 1, ReplicaHost: "node1"},

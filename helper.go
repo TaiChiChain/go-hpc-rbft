@@ -809,11 +809,14 @@ func (rbft *rbftImpl) checkIfNeedStateUpdate(checkpointState *types.CheckpointSt
 					rbft.peerPool.ID, initialCheckpointHeight)
 				rbft.moveWatermarks(initialCheckpointHeight, false)
 			}
-		} else {
-			rbft.logger.Warningf("Replica %d finds mismatch checkpoint %d when checkIfNeedStateUpdate, "+
-				"local digest: %s, quorum digest %s", rbft.peerPool.ID, initialCheckpointHeight, localDigest, initialCheckpointDigest)
+			return false
 		}
-		return false
+		rbft.logger.Warningf("Replica %d finds mismatch checkpoint %d when checkIfNeedStateUpdate, "+
+			"local digest: %s, quorum digest %s, try to sync chain", rbft.peerPool.ID, initialCheckpointHeight,
+			localDigest, initialCheckpointDigest)
+		rbft.updateHighStateTarget(&checkpointState.Meta, checkpointSet)
+		rbft.tryStateTransfer()
+		return true
 	}
 
 	// If replica's lastExec < initial checkpoint, replica is out of date
