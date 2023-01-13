@@ -149,6 +149,13 @@ func (rbft *rbftImpl) checkIfOutOfEpoch(msg *pb.ConsensusMessage) consensusEvent
 		return nil
 	}
 
+	// delete old record in checkOutOfEpoch which has a lower epoch than current epoch.
+	for from, epoch := range rbft.epochMgr.checkOutOfEpoch {
+		if epoch <= rbft.epoch {
+			delete(rbft.epochMgr.checkOutOfEpoch, from)
+		}
+	}
+
 	rbft.epochMgr.checkOutOfEpoch[msg.From] = msg.Epoch
 	rbft.logger.Debugf("Replica %d in epoch %d received message from %d in epoch %d, now %d messages "+
 		"with larger epoch", rbft.peerPool.ID, rbft.epoch, msg.From, msg.Epoch, len(rbft.epochMgr.checkOutOfEpoch))
@@ -173,6 +180,9 @@ func (rbft *rbftImpl) turnIntoEpoch() {
 			delete(rbft.recoveryMgr.notificationStore, key)
 		}
 	}
+
+	// clear checkOutOfEpoch record.
+	rbft.epochMgr.checkOutOfEpoch = make(map[uint64]uint64)
 
 	// initial the view, start from view=0
 	rbft.setView(uint64(0))
