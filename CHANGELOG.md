@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.0.5](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v1.0.4...v1.0.5) (2023-01-13)
+
+
+### Bug Fixes
+
+* **epoch:** clear lower epoch record as soon as possible ([487611b](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/487611bdabd29f74dd5291ffd41a60227e207fc7))
+
 ### [1.0.4](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v1.0.3...v1.0.4) (2023-01-12)
 
 
