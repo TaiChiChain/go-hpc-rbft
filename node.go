@@ -130,16 +130,16 @@ func (n *node) Stop() []*protos.Transaction {
 	select {
 	case <-n.cpChan:
 	default:
-		n.logger.Notice("close channel: checkpoint")
-		close(n.cpChan)
 	}
+	n.logger.Notice("close channel: checkpoint")
+	close(n.cpChan)
 
 	select {
 	case <-n.confChan:
 	default:
-		n.logger.Notice("close channel: config")
-		close(n.confChan)
 	}
+	n.logger.Notice("close channel: config")
+	close(n.confChan)
 
 	remainTxs := n.rbft.stop()
 
