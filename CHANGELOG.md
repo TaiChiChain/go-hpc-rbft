@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.0.7](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v1.0.6...v1.0.7) (2023-02-07)
+
+
+### Bug Fixes
+
+* **node.go:** always close cpChan and confChan when stop node ([fc527e1](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/fc527e1d5f2bf087aef19cee39afa956a63073d8))
+
 ### [1.0.6](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v1.0.5...v1.0.6) (2023-02-07)
 
 
