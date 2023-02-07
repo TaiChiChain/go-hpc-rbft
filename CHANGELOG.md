@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.0.6](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v1.0.5...v1.0.6) (2023-02-07)
+
+
+### Bug Fixes
+
+* **rbft_impl.go:** reset status when stop rbft ([a2f6905](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/a2f6905860c9cb471f29e9744e3a4b1d187f5b9d))
+
 ### [1.0.5](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v1.0.4...v1.0.5) (2023-01-13)
 
 
