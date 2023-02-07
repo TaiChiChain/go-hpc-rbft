@@ -361,10 +361,9 @@ func (rbft *rbftImpl) start() error {
 func (rbft *rbftImpl) stop() []*protos.Transaction {
 	rbft.logger.Notice("RBFT stopping...")
 
-	rbft.atomicOn(Pending)
+	// reset status to pending.
+	rbft.initStatus()
 	rbft.atomicOn(Stopped)
-	rbft.metrics.statusGaugePending.Set(Pending)
-	rbft.setAbNormal()
 	remainTxs := drainChannel(rbft.recvChan)
 
 	rbft.logger.Debugf("get %d txs from recvChan", len(remainTxs))
