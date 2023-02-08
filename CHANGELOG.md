@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.0.8](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v1.0.7...v1.0.8) (2023-02-08)
+
+
+### Bug Fixes
+
+* **rbft_impl.go:** only generate checkpoint and move watermark when epochChanged or reach checkpoint ([45f9e0a](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/45f9e0a2fec3d258676de2abd7b3fde6c4f662bf)), closes [#flato-5420](/git.hyperchain.cn/hyperchain/go-hpc-rbft/issues/flato-5420)
+
 ### [1.0.7](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v1.0.6...v1.0.7) (2023-02-07)
 
 
