@@ -2151,31 +2151,33 @@ func (rbft *rbftImpl) recvStateUpdatedEvent(ss *types.ServiceState) consensusEve
 	}
 
 	// 3. sign and cache local checkpoint.
-	checkpointSet := rbft.storeMgr.highStateTarget.checkpointSet
-	if len(checkpointSet) == 0 {
-		rbft.logger.Warningf("Replica %d found an empty checkpoint set", rbft.peerPool.ID)
-		rbft.stopNamespace()
-		return nil
-	}
+	// NOTE! generate checkpoint and move watermark when epochChanged or reach checkpoint height.
+	if epochChanged || seqNo%rbft.config.K == 0 {
+		checkpointSet := rbft.storeMgr.highStateTarget.checkpointSet
+		if len(checkpointSet) == 0 {
+			rbft.logger.Warningf("Replica %d found an empty checkpoint set", rbft.peerPool.ID)
+			rbft.stopNamespace()
+			return nil
+		}
 
-	// NOTE! don't generate local checkpoint using current epoch, use remote consistent checkpoint
-	// to generate a signed checkpoint as this consistent checkpoint may be generated in an old epoch.
-	checkpoint := checkpointSet[0].Checkpoint
-	signature, sErr := rbft.signCheckpoint(checkpoint)
-	if sErr != nil {
-		rbft.logger.Errorf("Replica %d generate signed checkpoint error: %s", rbft.peerPool.ID, sErr)
-		rbft.stopNamespace()
-		return nil
+		// NOTE! don't generate local checkpoint using current epoch, use remote consistent checkpoint
+		// to generate a signed checkpoint as this consistent checkpoint may be generated in an old epoch.
+		checkpoint := checkpointSet[0].Checkpoint
+		signature, sErr := rbft.signCheckpoint(checkpoint)
+		if sErr != nil {
+			rbft.logger.Errorf("Replica %d generate signed checkpoint error: %s", rbft.peerPool.ID, sErr)
+			rbft.stopNamespace()
+			return nil
+		}
+		signedCheckpoint := &pb.SignedCheckpoint{
+			NodeInfo:   rbft.getNodeInfo(),
+			Checkpoint: checkpoint,
+			Signature:  signature,
+		}
+		rbft.storeMgr.saveCheckpoint(seqNo, signedCheckpoint)
+		rbft.persistCheckpoint(seqNo, []byte(digest))
+		rbft.moveWatermarks(seqNo, epochChanged)
 	}
-	signedCheckpoint := &pb.SignedCheckpoint{
-		NodeInfo:   rbft.getNodeInfo(),
-		Checkpoint: checkpoint,
-		Signature:  signature,
-	}
-	rbft.storeMgr.saveCheckpoint(seqNo, signedCheckpoint)
-	rbft.persistCheckpoint(seqNo, []byte(digest))
-	// NOTE! move watermark after turnIntoEpoch if epochChanged.
-	rbft.moveWatermarks(seqNo, epochChanged)
 
 	// 4. process recovery/vc.
 	if epochChanged {
