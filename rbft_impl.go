@@ -728,8 +728,8 @@ func (rbft *rbftImpl) sendNullRequest() {
 
 // processReqSetEvent process received requestSet event, reject txs in following situations:
 // 1. pool is full, reject txs relayed from other nodes
-// 2. node is is in config change, add another config tx into txpool
-// 3. node is in skipInProgress, rejects any txs from other nodes or API
+// 2. node is in config change, add another config tx into txpool
+// 3. node is in skipInProgress, rejects any txs from other nodes
 func (rbft *rbftImpl) processReqSetEvent(req *pb.RequestSet) consensusEvent {
 	// if pool already full, rejects the tx, unless it's from RPC because of time difference or we have opened flow control
 	if rbft.isPoolFull() && !req.Local && !rbft.flowControl {
@@ -746,8 +746,8 @@ func (rbft *rbftImpl) processReqSetEvent(req *pb.RequestSet) consensusEvent {
 		}
 	}
 
-	// if current node is in skipInProgress, it cannot handle txs anymore
-	if rbft.in(SkipInProgress) {
+	// if current node is in skipInProgress, it should reject the transactions coming from other nodes, but has the responsibility to keep its own transactions
+	if rbft.in(SkipInProgress) && !req.Local {
 		rbft.rejectRequestSet(req)
 		return nil
 	}
@@ -2044,31 +2044,6 @@ func (rbft *rbftImpl) tryStateTransfer() {
 		}
 	}
 	rbft.metrics.outstandingBatchesGauge.Set(float64(len(rbft.storeMgr.outstandingReqBatches)))
-	for d, batch := range rbft.storeMgr.batchStore {
-		if batch.SeqNo <= target.metaState.Height {
-			rbft.logger.Debugf("Replica %d clean batch with seqNo %d <= target %d, "+
-				"digest=%s, before state update", rbft.peerPool.ID, batch.SeqNo, target.metaState.Height, d)
-			delete(rbft.storeMgr.batchStore, d)
-			rbft.persistDelBatch(d)
-		}
-	}
-	rbft.metrics.batchesGauge.Set(float64(len(rbft.storeMgr.batchStore)))
-	// NOTE!!! save batches with seqNo larger than target height because those
-	// batches may be useful in PQList.
-	var saveBatches []string
-	for digest := range rbft.storeMgr.batchStore {
-		saveBatches = append(saveBatches, digest)
-	}
-
-	rbft.batchMgr.requestPool.Reset(saveBatches)
-	// reset the status of PoolFull
-	if !rbft.batchMgr.requestPool.IsPoolFull() {
-		rbft.setNotFull()
-	}
-
-	// clear cacheBatch as they are useless and all related batches have been reset in requestPool.
-	rbft.batchMgr.cacheBatch = nil
-	rbft.metrics.cacheBatchNumber.Set(float64(0))
 
 	rbft.logger.Noticef("Replica %d try state update to %d", rbft.peerPool.ID, target.metaState.Height)
 
@@ -2113,7 +2088,34 @@ func (rbft *rbftImpl) recvStateUpdatedEvent(ss *types.ServiceState) consensusEve
 
 	rbft.logger.Debugf("lastExec = %d, seqNo = %d", rbft.exec.lastExec, seqNo)
 
-	// 1. finished state update
+	// 1. clear useless txs in txpool
+	for d, batch := range rbft.storeMgr.batchStore {
+		if batch.SeqNo <= seqNo {
+			rbft.logger.Debugf("Replica %d clean batch with seqNo %d <= target %d, "+
+				"digest=%s, before state update", rbft.peerPool.ID, batch.SeqNo, seqNo, d)
+			delete(rbft.storeMgr.batchStore, d)
+			rbft.persistDelBatch(d)
+		}
+	}
+	rbft.metrics.batchesGauge.Set(float64(len(rbft.storeMgr.batchStore)))
+	// NOTE!!! save batches with seqNo larger than target height because those
+	// batches may be useful in PQList.
+	var saveBatches []string
+	for digest := range rbft.storeMgr.batchStore {
+		saveBatches = append(saveBatches, digest)
+	}
+
+	rbft.batchMgr.requestPool.Reset(saveBatches)
+	// reset the status of PoolFull
+	if !rbft.batchMgr.requestPool.IsPoolFull() {
+		rbft.setNotFull()
+	}
+
+	// clear cacheBatch as they are useless and all related batches have been reset in requestPool.
+	rbft.batchMgr.cacheBatch = nil
+	rbft.metrics.cacheBatchNumber.Set(float64(0))
+
+	// 2. finished state update
 	finishMsg := fmt.Sprintf("======== Replica %d finished stateUpdate, height: %d", rbft.peerPool.ID, seqNo)
 	rbft.logger.Noticef(finishMsg)
 	rbft.external.SendFilterEvent(types.InformTypeFilterFinishStateUpdate, finishMsg)
@@ -2141,7 +2143,7 @@ func (rbft *rbftImpl) recvStateUpdatedEvent(ss *types.ServiceState) consensusEve
 	rbft.metrics.statusGaugeStateTransferring.Set(0)
 	rbft.maybeSetNormal()
 
-	// 2. process epoch-info
+	// 3. process epoch-info
 	epochChanged := ss.Epoch != rbft.epoch
 	if epochChanged {
 		rbft.logger.Infof("epoch changed from %d to %d", rbft.epoch, ss.Epoch)
