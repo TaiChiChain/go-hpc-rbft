@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.0.9](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v1.0.8...v1.0.9) (2023-02-11)
+
+
+### Bug Fixes
+
+* **rbft_impl.go:** #flato-5419, no lost transactions after Order ([a7d0076](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/a7d0076aac9ab0b02ffdb3983131f400d70db372)), closes [#flato-5419](/git.hyperchain.cn/hyperchain/go-hpc-rbft/issues/flato-5419)
+
 ### [1.0.8](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v1.0.7...v1.0.8) (2023-02-08)
 
 
