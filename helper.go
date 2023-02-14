@@ -997,20 +997,25 @@ func (rbft *rbftImpl) syncConfigCheckpoint(checkpointHeight uint64, quorumCheckp
 	rbft.external.SendFilterEvent(types.InformTypeFilterStableCheckpoint, quorumCheckpoints)
 	rbft.epochMgr.configBatchToCheck = nil
 
-	rbft.logger.Noticef("Replica %d is waiting for stable checkpoint finished...", rbft.peerPool.ID)
-	height, ok := <-rbft.confChan
-	if !ok {
-		rbft.logger.Info("Config Channel Closed")
-		return false
+	rbft.logger.Noticef("Replica %d is waiting for stable checkpoint %d finished...", rbft.peerPool.ID, checkpointHeight)
+	for {
+		select {
+		case <-rbft.close:
+			rbft.logger.Error("stop waiting stable checkpoint finished because of close")
+			return false
+		case height, ok := <-rbft.confChan:
+			if !ok {
+				rbft.logger.Notice("Config Channel Closed")
+				return false
+			}
+			rbft.logger.Debugf("Replica %d received a stable checkpoint finished event at height %d", rbft.peerPool.ID, height)
+			if height != checkpointHeight {
+				rbft.logger.Noticef("mismatch stable checkpoint finished height: %d, retry", height)
+				continue
+			}
+			return true
+		}
 	}
-	rbft.logger.Debugf("Replica %d received a stable checkpoint finished event at height %d", rbft.peerPool.ID, height)
-	if height != checkpointHeight {
-		rbft.logger.Errorf("Wrong stable checkpoint finished height: %d", height)
-		rbft.stopNamespace()
-		return false
-	}
-
-	return true
 }
 
 // syncEpoch tries to sync rbft.Epoch with current latest epoch on ledger and returns
