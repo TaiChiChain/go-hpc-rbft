@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.0.10](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v1.0.9...v1.0.10) (2023-02-14)
+
+
+### Bug Fixes
+
+* **helper.go:** retry waiting checkpoint when received mismatch height ([79ad588](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/79ad5887fe75414d80fd0e24a4860b6910656a5b))
+
 ### [1.0.9](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v1.0.8...v1.0.9) (2023-02-11)
 
 
