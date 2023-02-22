@@ -40,6 +40,8 @@ type Node interface {
 	ApplyConfChange(cc *types.ConfState)
 	// Status returns the current node status of the RBFT state machine.
 	Status() NodeStatus
+	// GetUncommittedTransactions returns uncommitted txs
+	GetUncommittedTransactions(maxsize uint64) []*protos.Transaction
 	// ServiceInbound receives and records modifications from application service.
 	ServiceInbound
 }
@@ -62,9 +64,8 @@ type ServiceInbound interface {
 	// finished successfully or not, otherwise, RBFT core will enter abnormal status infinitely.
 	ReportStateUpdated(state *types.ServiceState)
 
-	// ReportReloadFinished report router updated:
-	// If validator set was changed after reload, service reports the latest router info to RBFT by ReportReloadFinished
-	ReportReloadFinished(reload *types.ReloadMessage)
+	// ReportStableCheckpointFinished reports stable checkpoint event has been processed successfully.
+	ReportStableCheckpointFinished(height uint64)
 }
 
 // node implements the Node interface and track application service synchronously to help RBFT core
@@ -79,8 +80,8 @@ type node struct {
 	currentState *types.ServiceState
 	// cpChan is used between node and RBFT service to deliver checkpoint state.
 	cpChan chan *types.ServiceState
-	// confChan is used to track if config transaction execution was finished by CommitDB
-	confChan chan *types.ReloadFinished
+	// confChan is used to track if config checkpoint has been processed successfully.
+	confChan chan uint64
 
 	config Config
 	logger Logger
@@ -91,10 +92,10 @@ func NewNode(conf Config) (Node, error) {
 	return newNode(conf)
 }
 
-// newNode help to initializes a Node service.
+// newNode help to initialize a Node service.
 func newNode(conf Config) (*node, error) {
 	cpChan := make(chan *types.ServiceState)
-	confC := make(chan *types.ReloadFinished)
+	confC := make(chan uint64)
 
 	rbft, err := newRBFT(cpChan, confC, conf)
 	if err != nil {
@@ -129,16 +130,16 @@ func (n *node) Stop() []*protos.Transaction {
 	select {
 	case <-n.cpChan:
 	default:
-		n.logger.Notice("close channel: checkpoint")
-		close(n.cpChan)
 	}
+	n.logger.Notice("close channel: checkpoint")
+	close(n.cpChan)
 
 	select {
 	case <-n.confChan:
 	default:
-		n.logger.Notice("close channel: config")
-		close(n.confChan)
 	}
+	n.logger.Notice("close channel: config")
+	close(n.confChan)
 
 	remainTxs := n.rbft.stop()
 
@@ -217,24 +218,34 @@ func (n *node) ReportStateUpdated(state *types.ServiceState) {
 	n.rbft.reportStateUpdated(state)
 }
 
-// ReportReloadFinished report router updated
-func (n *node) ReportReloadFinished(reload *types.ReloadMessage) {
-	switch reload.Type {
-	case types.ReloadTypeFinishReloadCommitDB:
-		n.logger.Noticef("Commit-DB finished, recv height: %d", reload.Height)
-		if n.rbft.atomicIn(InConfChange) && n.confChan != nil {
-			rf := &types.ReloadFinished{Height: reload.Height}
-			n.confChan <- rf
-		} else {
-			n.logger.Info("Current node isn't in config-change")
-		}
+// ReportStableCheckpointFinished reports stable checkpoint event has been processed successfully.
+func (n *node) ReportStableCheckpointFinished(height uint64) {
+	n.logger.Noticef("process stable checkpoint finished, height: %d", height)
+	if n.rbft.atomicIn(InConfChange) && n.confChan != nil {
+		n.confChan <- height
+	} else {
+		n.logger.Info("Current node isn't in config-change")
 	}
-
 }
 
 // Status returns the current node status of the RBFT state machine.
 func (n *node) Status() NodeStatus {
 	return n.rbft.getStatus()
+}
+
+func (n *node) GetUncommittedTransactions(maxsize uint64) []*protos.Transaction {
+	// get hash of transactions that had committed
+	var digestList []string
+	committedHeight := n.rbft.h
+	for digest, batch := range n.rbft.storeMgr.batchStore {
+		if batch.SeqNo <= committedHeight {
+			digestList = append(digestList, digest)
+		}
+	}
+	// remove committed transactions
+	n.rbft.batchMgr.requestPool.RemoveBatches(digestList)
+
+	return n.rbft.batchMgr.requestPool.GetUncommittedTransactions(maxsize)
 }
 
 // getCurrentState retrieves the current application state.

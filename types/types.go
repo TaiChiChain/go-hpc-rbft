@@ -17,8 +17,6 @@ package types
 
 import (
 	"fmt"
-
-	"github.com/hyperchain/go-hpc-common/types/protos"
 )
 
 // ----------- ServiceState related structs-----------------
@@ -35,11 +33,10 @@ type MetaState struct {
 	Digest string
 }
 
-// EpochInfo is the information for epoch, including the epoch number, last configuration block height, and validator set.
-type EpochInfo struct {
-	Epoch      uint64
-	VSet       []*protos.NodeInfo
-	LastConfig uint64
+// CheckpointState is the basic info for checkpoint.
+type CheckpointState struct {
+	Meta     MetaState
+	IsConfig bool
 }
 
 // String implement the Stringer interface.
@@ -56,27 +53,6 @@ func (state *ServiceState) String() string {
 		return s
 	}
 	return s
-}
-
-// ----------- Reload related structs-----------------
-
-// ReloadType indicates different reload event types.
-type ReloadType int32
-
-const (
-	// ReloadTypeFinishReloadCommitDB indicates the reload event of commit-db finished.
-	ReloadTypeFinishReloadCommitDB ReloadType = 1
-)
-
-// ReloadMessage is the event message after reload process finished.
-type ReloadMessage struct {
-	Type   ReloadType
-	Height uint64
-}
-
-// ReloadFinished is the reload finished event.
-type ReloadFinished struct {
-	Height uint64
 }
 
 // ----------- Router related structs-----------------

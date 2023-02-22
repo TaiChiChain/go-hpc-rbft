@@ -6,6 +6,7 @@ import (
 
 	"github.com/hyperchain/go-hpc-common/types/protos"
 	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
+	"github.com/hyperchain/go-hpc-rbft/types"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
@@ -418,4 +419,117 @@ func TestHelper_compareCheckpointWithWeakSet(t *testing.T) {
 	legal, matchingCheckpoints = rbfts[0].compareCheckpointWithWeakSet(mockCheckpoint4)
 	assert.False(t, legal)
 	assert.Nil(t, matchingCheckpoints)
+}
+
+func TestHelper_CheckIfNeedStateUpdate(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	_, rbfts := newBasicClusterInstance()
+	rbfts[0].storeMgr.localCheckpoints = make(map[uint64]*pb.SignedCheckpoint)
+
+	selfCheckpoint10 := &pb.SignedCheckpoint{
+		NodeInfo:   &pb.NodeInfo{ReplicaId: 1, ReplicaHost: "node1"},
+		Checkpoint: &protos.Checkpoint{Epoch: 0, ExecuteState: &protos.Checkpoint_ExecuteState{Height: 10, Digest: "block-hash-10"}},
+		Signature:  nil,
+	}
+	rbfts[0].storeMgr.localCheckpoints[10] = selfCheckpoint10
+	// mock move to stable checkpoint 10.
+	rbfts[0].moveWatermarks(10, false)
+	// mock execute to 15.
+	rbfts[0].exec.lastExec = 15
+
+	mockCheckpointSet10 := make([]*pb.SignedCheckpoint, 0)
+	// mock checkpoint 10 from node2.
+	mockCheckpoint10OfNode2 := &pb.SignedCheckpoint{
+		NodeInfo:   &pb.NodeInfo{ReplicaId: 2, ReplicaHost: "node2"},
+		Checkpoint: &protos.Checkpoint{Epoch: 0, ExecuteState: &protos.Checkpoint_ExecuteState{Height: 10, Digest: "block-hash-10"}},
+		Signature:  nil,
+	}
+	// mock checkpoint 10 from node3.
+	mockCheckpoint10OfNode3 := &pb.SignedCheckpoint{
+		NodeInfo:   &pb.NodeInfo{ReplicaId: 3, ReplicaHost: "node3"},
+		Checkpoint: &protos.Checkpoint{Epoch: 0, ExecuteState: &protos.Checkpoint_ExecuteState{Height: 10, Digest: "block-hash-10"}},
+		Signature:  nil,
+	}
+	// mock checkpoint 10 from node4.
+	mockCheckpoint10OfNode4 := &pb.SignedCheckpoint{
+		NodeInfo:   &pb.NodeInfo{ReplicaId: 4, ReplicaHost: "node4"},
+		Checkpoint: &protos.Checkpoint{Epoch: 0, ExecuteState: &protos.Checkpoint_ExecuteState{Height: 10, Digest: "block-hash-10"}},
+		Signature:  nil,
+	}
+	mockCheckpointSet10 = append(mockCheckpointSet10, mockCheckpoint10OfNode2)
+	mockCheckpointSet10 = append(mockCheckpointSet10, mockCheckpoint10OfNode3)
+	mockCheckpointSet10 = append(mockCheckpointSet10, mockCheckpoint10OfNode4)
+	mockCheckpointState10 := &types.CheckpointState{
+		Meta: types.MetaState{
+			Height: 10,
+			Digest: "block-hash-10",
+		},
+		IsConfig: false,
+	}
+	need := rbfts[0].checkIfNeedStateUpdate(mockCheckpointState10, mockCheckpointSet10)
+	assert.False(t, need, "no need to sync chain as local height has exceeded checkpoint set")
+
+	// mock execute to 20.
+	rbfts[0].exec.lastExec = 20
+	selfCheckpoint20 := &pb.SignedCheckpoint{
+		NodeInfo: &pb.NodeInfo{ReplicaId: 1, ReplicaHost: "node1"},
+		// mock incorrect hash.
+		Checkpoint: &protos.Checkpoint{Epoch: 0, ExecuteState: &protos.Checkpoint_ExecuteState{Height: 20, Digest: "block-hash-20XXX"}},
+		Signature:  nil,
+	}
+	rbfts[0].storeMgr.localCheckpoints[20] = selfCheckpoint20
+	mockCheckpointSet20 := make([]*pb.SignedCheckpoint, 0)
+	// mock checkpoint 20 from node2.
+	mockCheckpoint20OfNode2 := &pb.SignedCheckpoint{
+		NodeInfo:   &pb.NodeInfo{ReplicaId: 2, ReplicaHost: "node2"},
+		Checkpoint: &protos.Checkpoint{Epoch: 0, ExecuteState: &protos.Checkpoint_ExecuteState{Height: 20, Digest: "block-hash-20"}},
+		Signature:  nil,
+	}
+	// mock checkpoint 20 from node3.
+	mockCheckpoint20OfNode3 := &pb.SignedCheckpoint{
+		NodeInfo:   &pb.NodeInfo{ReplicaId: 3, ReplicaHost: "node3"},
+		Checkpoint: &protos.Checkpoint{Epoch: 0, ExecuteState: &protos.Checkpoint_ExecuteState{Height: 20, Digest: "block-hash-20"}},
+		Signature:  nil,
+	}
+	// mock checkpoint 20 from node4.
+	mockCheckpoint20OfNode4 := &pb.SignedCheckpoint{
+		NodeInfo:   &pb.NodeInfo{ReplicaId: 4, ReplicaHost: "node4"},
+		Checkpoint: &protos.Checkpoint{Epoch: 0, ExecuteState: &protos.Checkpoint_ExecuteState{Height: 20, Digest: "block-hash-20"}},
+		Signature:  nil,
+	}
+	mockCheckpointSet20 = append(mockCheckpointSet20, mockCheckpoint20OfNode2)
+	mockCheckpointSet20 = append(mockCheckpointSet20, mockCheckpoint20OfNode3)
+	mockCheckpointSet20 = append(mockCheckpointSet20, mockCheckpoint20OfNode4)
+	mockCheckpointState20 := &types.CheckpointState{
+		Meta: types.MetaState{
+			Height: 20,
+			Digest: "block-hash-20",
+		},
+		IsConfig: true,
+	}
+	need = rbfts[0].checkIfNeedStateUpdate(mockCheckpointState20, mockCheckpointSet20)
+	assert.True(t, need, "need to sync chain as local checkpoint not equal to checkpoint set")
+
+	selfCheckpoint20 = &pb.SignedCheckpoint{
+		NodeInfo: &pb.NodeInfo{ReplicaId: 1, ReplicaHost: "node1"},
+		// mock correct hash.
+		Checkpoint: &protos.Checkpoint{Epoch: 0, ExecuteState: &protos.Checkpoint_ExecuteState{Height: 20, Digest: "block-hash-20"}},
+		Signature:  nil,
+	}
+	rbfts[0].storeMgr.localCheckpoints[20] = selfCheckpoint20
+	need = rbfts[0].checkIfNeedStateUpdate(mockCheckpointState20, mockCheckpointSet20)
+	assert.False(t, need, "no need to sync chain as local config checkpoint equal to checkpoint set")
+
+	mockCheckpointState20 = &types.CheckpointState{
+		Meta: types.MetaState{
+			Height: 20,
+			Digest: "block-hash-20",
+		},
+		IsConfig: false,
+	}
+	need = rbfts[0].checkIfNeedStateUpdate(mockCheckpointState20, mockCheckpointSet20)
+	assert.False(t, need, "no need to sync chain as local checkpoint equal to checkpoint set")
+	assert.Equal(t, uint64(20), rbfts[0].h)
 }
