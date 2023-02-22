@@ -59,7 +59,7 @@ func TestRBFT_newRBFT(t *testing.T) {
 		LatestConfig: nil,
 	}
 	cpChan := make(chan *types.ServiceState)
-	confC := make(chan *types.ReloadFinished)
+	confC := make(chan uint64)
 	rbft, _ := newRBFT(cpChan, confC, conf)
 
 	// Normal case

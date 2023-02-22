@@ -314,7 +314,7 @@ func (rbft *rbftImpl) primaryResubmitTransactions() {
 			batches := rbft.batchMgr.requestPool.GenerateRequestBatch()
 			rbft.postBatches(batches)
 
-			// if we have just generated a config batch, we need to break the resubmit
+			// if we have just generated a config batch, we need to break resubmit
 			if rbft.atomicIn(InConfChange) {
 				rbft.logger.Debug("Primary has just generated a config batch, break the resubmit")
 				break

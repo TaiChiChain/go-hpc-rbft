@@ -49,6 +49,20 @@ func (mr *MockNodeMockRecorder) ApplyConfChange(cc interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ApplyConfChange", reflect.TypeOf((*MockNode)(nil).ApplyConfChange), cc)
 }
 
+// GetUncommittedTransactions mocks base method.
+func (m *MockNode) GetUncommittedTransactions(maxsize uint64) []*protos.Transaction {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetUncommittedTransactions", maxsize)
+	ret0, _ := ret[0].([]*protos.Transaction)
+	return ret0
+}
+
+// GetUncommittedTransactions indicates an expected call of GetUncommittedTransactions.
+func (mr *MockNodeMockRecorder) GetUncommittedTransactions(maxsize interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUncommittedTransactions", reflect.TypeOf((*MockNode)(nil).GetUncommittedTransactions), maxsize)
+}
+
 // Propose mocks base method.
 func (m *MockNode) Propose(requests *rbftpb.RequestSet) error {
 	m.ctrl.T.Helper()
@@ -89,16 +103,16 @@ func (mr *MockNodeMockRecorder) ReportExecuted(state interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReportExecuted", reflect.TypeOf((*MockNode)(nil).ReportExecuted), state)
 }
 
-// ReportReloadFinished mocks base method.
-func (m *MockNode) ReportReloadFinished(reload *types.ReloadMessage) {
+// ReportStableCheckpointFinished mocks base method.
+func (m *MockNode) ReportStableCheckpointFinished(height uint64) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "ReportReloadFinished", reload)
+	m.ctrl.Call(m, "ReportStableCheckpointFinished", height)
 }
 
-// ReportReloadFinished indicates an expected call of ReportReloadFinished.
-func (mr *MockNodeMockRecorder) ReportReloadFinished(reload interface{}) *gomock.Call {
+// ReportStableCheckpointFinished indicates an expected call of ReportStableCheckpointFinished.
+func (mr *MockNodeMockRecorder) ReportStableCheckpointFinished(height interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReportReloadFinished", reflect.TypeOf((*MockNode)(nil).ReportReloadFinished), reload)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReportStableCheckpointFinished", reflect.TypeOf((*MockNode)(nil).ReportStableCheckpointFinished), height)
 }
 
 // ReportStateUpdated mocks base method.
@@ -202,16 +216,16 @@ func (mr *MockServiceInboundMockRecorder) ReportExecuted(state interface{}) *gom
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReportExecuted", reflect.TypeOf((*MockServiceInbound)(nil).ReportExecuted), state)
 }
 
-// ReportReloadFinished mocks base method.
-func (m *MockServiceInbound) ReportReloadFinished(reload *types.ReloadMessage) {
+// ReportStableCheckpointFinished mocks base method.
+func (m *MockServiceInbound) ReportStableCheckpointFinished(height uint64) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "ReportReloadFinished", reload)
+	m.ctrl.Call(m, "ReportStableCheckpointFinished", height)
 }
 
-// ReportReloadFinished indicates an expected call of ReportReloadFinished.
-func (mr *MockServiceInboundMockRecorder) ReportReloadFinished(reload interface{}) *gomock.Call {
+// ReportStableCheckpointFinished indicates an expected call of ReportStableCheckpointFinished.
+func (mr *MockServiceInboundMockRecorder) ReportStableCheckpointFinished(height interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReportReloadFinished", reflect.TypeOf((*MockServiceInbound)(nil).ReportReloadFinished), reload)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReportStableCheckpointFinished", reflect.TypeOf((*MockServiceInbound)(nil).ReportStableCheckpointFinished), height)
 }
 
 // ReportStateUpdated mocks base method.

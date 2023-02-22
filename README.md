@@ -84,8 +84,8 @@ Report Block Executed State to RBFT Core
 Report State Updated to RBFT Core
 ```ReportStateUpdated(state *types.ServiceState)```
 
-Report Config Checkpoint Reload Finished to RBFT Core
-```ReportReloadFinished(reload *types.ReloadMessage)```
+Report Config Checkpoint Process Finished to RBFT Core
+```ReportStableCheckpointFinished(height uint64)```
 
 ## Mockgen
 

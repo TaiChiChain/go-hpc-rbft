@@ -115,7 +115,7 @@ func TestCluster_SyncSmallEpochWithCheckpoint(t *testing.T) {
 	// then state update to 60
 	ev = <-rbfts[2].recvChan
 	rbfts[2].processEvent(ev)
-	assert.Equal(t, uint64(1), rbfts[2].epoch)
+	assert.Equal(t, uint64(2), rbfts[2].epoch)
 	assert.Equal(t, uint64(60), rbfts[2].h)
 }
 
@@ -177,6 +177,6 @@ func TestCluster_SyncLargeEpochWithCheckpoint(t *testing.T) {
 	// then state update to 51
 	ev = <-rbfts[2].recvChan
 	rbfts[2].processEvent(ev)
-	assert.Equal(t, uint64(51), rbfts[2].epoch)
+	assert.Equal(t, uint64(2), rbfts[2].epoch)
 	assert.Equal(t, uint64(51), rbfts[2].exec.lastExec)
 }

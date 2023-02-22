@@ -60,10 +60,6 @@ type testFramework struct {
 	// we could regard it as the routerInfo of epoch in trusted node
 	Router types.Router
 
-	// mem chain for framework
-	Epoch uint64
-	VSet  map[uint64]types.Router
-
 	// Channel to close this event process.
 	close chan bool
 
@@ -136,6 +132,9 @@ type testExternal struct {
 
 	// Channel to receive messages sent from nodes in cluster.
 	clusterChan chan *channelMsg
+
+	// mem chain for framework
+	lastConfigCheckpoint *protos.QuorumCheckpoint
 }
 
 // channelMsg is the form of data in cluster network.
@@ -217,19 +216,19 @@ func newTestFramework(account int, loggerFile bool) *testFramework {
 func (tf *testFramework) newNodeConfig(
 	id uint64,
 	hostname string,
-	isNew bool,
 	log Logger,
 	ext external.ExternalStack,
 	pool txpool.TxPool,
-	epochInfo *types.EpochInfo,
+	epoch uint64,
+	vSet []*protos.NodeInfo,
 	lastConfig *types.MetaState) Config {
 
-	if len(epochInfo.VSet) < 4 {
-		epochInfo.VSet = defaultValidatorSet
+	if len(vSet) < 4 {
+		vSet = defaultValidatorSet
 	}
 
 	var peers []*types.Peer
-	for index, info := range epochInfo.VSet {
+	for index, info := range vSet {
 		peer := &types.Peer{
 			ID:       uint64(index + 1),
 			Hostname: info.Hostname,
@@ -243,7 +242,7 @@ func (tf *testFramework) newNodeConfig(
 		Hash:     calHash(hostname),
 		Hostname: hostname,
 
-		EpochInit:    epochInfo.Epoch,
+		EpochInit:    epoch,
 		Peers:        peers,
 		LatestConfig: lastConfig,
 
@@ -305,20 +304,15 @@ func (tf *testFramework) newTestNode(id uint64, hostname string, cc chan *channe
 	dtps := &defaultTxpoolSupportSmokeTest{}
 	namespace := "global"
 	pool := txpool.NewTxPool(namespace, dtps, confTxPool)
-
-	epochInfo := &types.EpochInfo{
-		Epoch: uint64(0),
-		VSet:  defaultValidatorSet,
-	}
-	conf := tf.newNodeConfig(id, hostname, false, log, ext, pool, epochInfo, nil)
+	conf := tf.newNodeConfig(id, hostname, log, ext, pool, 1, defaultValidatorSet, nil)
 	n, _ := newNode(conf)
 	N := n
-	routers := vSetToRouters(epochInfo.VSet)
+	routers := vSetToRouters(defaultValidatorSet)
 	tn := &testNode{
 		N:          N,
 		n:          n,
 		Router:     routers,
-		Epoch:      epochInfo.Epoch,
+		Epoch:      0,
 		ID:         id,
 		Hash:       calHash(hostname),
 		Hostname:   hostname,
@@ -568,16 +562,11 @@ func (tf *testFramework) frameworkAddNode(hostname string, loggerFile bool, vSet
 		senderHost  string
 		senderIndex int
 	)
-
-	epochInfo := &types.EpochInfo{
-		Epoch: uint64(0),
-		VSet:  vSet,
-	}
-	conf := tf.newNodeConfig(id, hostname, true, log, ext, pool, epochInfo, nil)
+	conf := tf.newNodeConfig(id, hostname, log, ext, pool, 1, vSet, nil)
 	n, _ := newNode(conf)
 	N := n
 
-	routers := vSetToRouters(epochInfo.VSet)
+	routers := vSetToRouters(vSet)
 	tn := &testNode{
 		N:        N,
 		n:        n,
@@ -609,7 +598,7 @@ func (tf *testFramework) frameworkAddNode(hostname string, loggerFile bool, vSet
 		tf.log.Infof("[Cluster_Service %d:%s] Add Node Req: %s", senderIndex, senderHost, newPeer.Hash)
 		tf.log.Infof("[Cluster_Service %d:%s] Target Validator Set: %+v", senderIndex, senderHost, vSet)
 
-		info, _ := json.Marshal(epochInfo)
+		info, _ := json.Marshal(0)
 		tx := &protos.Transaction{
 			Timestamp: time.Now().UnixNano(),
 			Id:        2,
@@ -655,11 +644,7 @@ func newTx() *protos.Transaction {
 }
 
 func newCTX(vSet []*protos.NodeInfo) *protos.Transaction {
-	epochInfo := &types.EpochInfo{
-		Epoch: uint64(0),
-		VSet:  vSet,
-	}
-	info, _ := json.Marshal(epochInfo)
+	info, _ := json.Marshal(vSet)
 	return &protos.Transaction{
 		Timestamp: time.Now().UnixNano(),
 		Id:        2,
@@ -673,11 +658,7 @@ func newCTX(vSet []*protos.NodeInfo) *protos.Transaction {
 func (tf *testFramework) sendInitCtx() {
 	tf.log.Info("Send init ctx")
 	senderID3 := uint64(rand.Int()%tf.N + 1)
-	epochInfo := &types.EpochInfo{
-		Epoch: uint64(0),
-		VSet:  defaultValidatorSet,
-	}
-	info, _ := json.Marshal(epochInfo)
+	info, _ := json.Marshal(defaultValidatorSet)
 	tx := &protos.Transaction{
 		Timestamp: time.Now().UnixNano(),
 		Id:        2,
@@ -818,10 +799,11 @@ func (ext *testExternal) Execute(requests []*protos.Transaction, localList []boo
 		//report latest validator set
 		if len(requests) != 0 {
 			if hpcCommonTypes.IsConfigTx(requests[0]) {
-				info := &types.EpochInfo{}
-				_ = json.Unmarshal(requests[0].Value, info)
+				var vSet []*protos.NodeInfo
+				tmp := &vSet
+				_ = json.Unmarshal(requests[0].Value, tmp)
 				var peers []*types.Peer
-				for index, nodeInfo := range info.VSet {
+				for index, nodeInfo := range vSet {
 					peer := &types.Peer{
 						ID:       uint64(index + 1),
 						Hostname: nodeInfo.Hostname,
@@ -833,9 +815,8 @@ func (ext *testExternal) Execute(requests []*protos.Transaction, localList []boo
 				}
 
 				ext.testNode.Epoch = state.MetaState.Height
-				ext.testNode.VSet = info.VSet
+				ext.testNode.VSet = vSet
 
-				ext.testNode.n.logger.Debugf("Epoch Number %d", state.MetaState.Height)
 				ext.testNode.n.logger.Debugf("Validator Set %+v", router)
 				ext.tf.log.Infof("router: %+v", router)
 			}
@@ -857,7 +838,7 @@ func (ext *testExternal) Execute(requests []*protos.Transaction, localList []boo
 		}
 	}
 }
-func (ext *testExternal) StateUpdate(seqNo uint64, digest string, ckpts []*pb.SignedCheckpoint) {
+func (ext *testExternal) StateUpdate(seqNo uint64, digest string, signedCheckpoints []*pb.SignedCheckpoint) {
 	for key, val := range ext.tf.TestNode[0].blocks {
 		if key <= seqNo {
 			ext.testNode.blocks[key] = val
@@ -873,30 +854,66 @@ func (ext *testExternal) StateUpdate(seqNo uint64, digest string, ckpts []*pb.Si
 	ext.testNode.VSet = ext.tf.TestNode[0].VSet
 	ext.testNode.Epoch = ext.tf.TestNode[0].Epoch
 
+	var checkpoint *protos.Checkpoint
+	signatures := make(map[string][]byte, len(signedCheckpoints))
+	for _, signedCheckpoint := range signedCheckpoints {
+		if checkpoint == nil {
+			checkpoint = signedCheckpoint.Checkpoint
+		} else {
+			if !checkpoint.Equals(signedCheckpoint.Checkpoint) {
+				ext.testNode.n.logger.Errorf("inconsistent checkpoint, one: %+v, another: %+v",
+					checkpoint, signedCheckpoint.Checkpoint)
+				return
+			}
+		}
+		signatures[signedCheckpoint.NodeInfo.ReplicaHost] = signedCheckpoint.Signature
+	}
+
+	quorumCheckpoint := &protos.QuorumCheckpoint{
+		Checkpoint: checkpoint,
+		Signatures: signatures,
+	}
+	ext.lastConfigCheckpoint = quorumCheckpoint
+
 	state := &types.ServiceState{}
-	state.Epoch = ext.tf.TestNode[0].Epoch
+	state.Epoch = ext.GetEpoch()
 	state.MetaState = &types.MetaState{
 		Height: ext.testNode.Applied,
 		Digest: ext.testNode.Digest,
 	}
-	ext.tf.log.Infof("state: %+v", state)
+	ext.tf.log.Infof("report state updated state: %+v", state)
 	ext.testNode.N.ReportStateUpdated(state)
 }
 func (ext *testExternal) SendFilterEvent(informType types.InformType, message ...interface{}) {
-	if ext.testNode.n.rbft.atomicIn(InConfChange) {
+	switch informType {
+	case types.InformTypeFilterStableCheckpoint:
 		signedCheckpoints, ok := message[0].([]*pb.SignedCheckpoint)
 		if !ok {
 			return
 		}
-		height := signedCheckpoints[0].Checkpoint.Height()
-
-		switch informType {
-		case types.InformTypeFilterStableCheckpoint:
-			re := &types.ReloadMessage{
-				Type:   types.ReloadTypeFinishReloadCommitDB,
-				Height: height,
+		var checkpoint *protos.Checkpoint
+		signatures := make(map[string][]byte, len(signedCheckpoints))
+		for _, signedCheckpoint := range signedCheckpoints {
+			if checkpoint == nil {
+				checkpoint = signedCheckpoint.Checkpoint
+			} else {
+				if !checkpoint.Equals(signedCheckpoint.Checkpoint) {
+					ext.testNode.n.logger.Errorf("inconsistent checkpoint, one: %+v, another: %+v",
+						checkpoint, signedCheckpoint.Checkpoint)
+					return
+				}
 			}
-			go ext.testNode.N.ReportReloadFinished(re)
+			signatures[signedCheckpoint.NodeInfo.ReplicaHost] = signedCheckpoint.Signature
+		}
+
+		quorumCheckpoint := &protos.QuorumCheckpoint{
+			Checkpoint: checkpoint,
+			Signatures: signatures,
+		}
+		ext.lastConfigCheckpoint = quorumCheckpoint
+		height := signedCheckpoints[0].Checkpoint.Height()
+		if ext.testNode.n.rbft.atomicIn(InConfChange) {
+			go ext.testNode.N.ReportStableCheckpointFinished(height)
 		}
 	}
 }
@@ -916,7 +933,7 @@ func (ext *testExternal) Reconfiguration() uint64 {
 	ext.tf.log.Noticef("[Cluster_Service %s update] router: %+v", ext.testNode.Hostname, newRouter)
 	cc := &types.ConfState{QuorumRouter: newRouter}
 	ext.testNode.N.ApplyConfChange(cc)
-	return ext.testNode.Epoch
+	return ext.GetEpoch()
 }
 
 func (ext *testExternal) GetNodeInfos() []*protos.NodeInfo {
@@ -928,7 +945,7 @@ func (ext *testExternal) GetAlgorithmVersion() string {
 }
 
 func (ext *testExternal) GetEpoch() uint64 {
-	return ext.testNode.Epoch
+	return ext.GetLastCheckpoint().NextEpoch()
 }
 
 func (ext *testExternal) IsConfigBlock(height uint64) bool {
@@ -937,13 +954,16 @@ func (ext *testExternal) IsConfigBlock(height uint64) bool {
 
 // GetLastCheckpoint return the last QuorumCheckpoint in ledger
 func (ext *testExternal) GetLastCheckpoint() *protos.QuorumCheckpoint {
+	if ext.lastConfigCheckpoint != nil {
+		return ext.lastConfigCheckpoint
+	}
 	return &protos.QuorumCheckpoint{
 		Checkpoint: &protos.Checkpoint{
 			Epoch:          ext.testNode.Epoch,
 			ConsensusState: &protos.Checkpoint_ConsensusState{},
 			ExecuteState: &protos.Checkpoint_ExecuteState{
-				Height: ext.testNode.Applied,
-				Digest: ext.testNode.Digest,
+				Height: 0,
+				Digest: "XXX GENESIS",
 			},
 			NextEpochState: &protos.Checkpoint_NextEpochState{},
 		},

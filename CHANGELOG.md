@@ -2,6 +2,81 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.0.10](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v1.0.9...v1.0.10) (2023-02-14)
+
+
+### Bug Fixes
+
+* **helper.go:** retry waiting checkpoint when received mismatch height ([79ad588](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/79ad5887fe75414d80fd0e24a4860b6910656a5b))
+
+### [1.0.9](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v1.0.8...v1.0.9) (2023-02-11)
+
+
+### Bug Fixes
+
+* **rbft_impl.go:** #flato-5419, no lost transactions after Order ([a7d0076](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/a7d0076aac9ab0b02ffdb3983131f400d70db372)), closes [#flato-5419](/git.hyperchain.cn/hyperchain/go-hpc-rbft/issues/flato-5419)
+
+### [1.0.8](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v1.0.7...v1.0.8) (2023-02-08)
+
+
+### Bug Fixes
+
+* **rbft_impl.go:** only generate checkpoint and move watermark when epochChanged or reach checkpoint ([45f9e0a](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/45f9e0a2fec3d258676de2abd7b3fde6c4f662bf)), closes [#flato-5420](/git.hyperchain.cn/hyperchain/go-hpc-rbft/issues/flato-5420)
+
+### [1.0.7](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v1.0.6...v1.0.7) (2023-02-07)
+
+
+### Bug Fixes
+
+* **node.go:** always close cpChan and confChan when stop node ([fc527e1](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/fc527e1d5f2bf087aef19cee39afa956a63073d8))
+
+### [1.0.6](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v1.0.5...v1.0.6) (2023-02-07)
+
+
+### Bug Fixes
+
+* **rbft_impl.go:** reset status when stop rbft ([a2f6905](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/a2f6905860c9cb471f29e9744e3a4b1d187f5b9d))
+
+### [1.0.5](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v1.0.4...v1.0.5) (2023-01-13)
+
+
+### Bug Fixes
+
+* **epoch:** clear lower epoch record as soon as possible ([487611b](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/487611bdabd29f74dd5291ffd41a60227e207fc7))
+
+### [1.0.4](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v1.0.3...v1.0.4) (2023-01-12)
+
+
+### Bug Fixes
+
+* **helper.go:** try to rollback when find mismatch in checkIfNeedStateUpdate ([5d222fd](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/5d222fd4910c857242e47bcda97ccb9488b72d69))
+
+### [1.0.3](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v1.0.2...v1.0.3) (2023-01-04)
+
+
+### Bug Fixes
+
+* not generate initial config checkpoint with no quorum signatures ([cf6cfba](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/cf6cfba76ec90c6cfd5d28b96b7185ea1152d1b1)), closes [#flato-5321](/git.hyperchain.cn/hyperchain/go-hpc-rbft/issues/flato-5321)
+* process config checkpoint when received quorum config checkpoint ([1892070](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/18920700d3809ae7637c7527bec18d51d3965801))
+* remove ReloadFinished related events ([f221cab](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/f221cab84e33b831972bda739aa61eaee9cebee6))
+* **view_change:** fetch config checkpoint when found a config batch in x-set ([d770177](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/d7701774651cd6da944a835a72d89c2725a4afe0))
+* **viewchange:** sync config checkpoint when checkIfNeedStateUpdate and always syncEpoch after vc/re ([8d45f71](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/8d45f713dad16658e8587d1073daa83507055ecd))
+* **viewchange:** trigger viewchange when received quorum viewchanges in recovery status ([5b41287](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/5b4128714fb3a02a3af1a5618378686045493c0d))
+
+### [1.0.2](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v1.0.1...v1.0.2) (2023-01-03)
+
+
+### Bug Fixes
+
+* **recovery:** reuse process resetStateForNewView in resetStateForRecovery to avoid cache some unuse ([86627d2](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/86627d2981fbe7845048120317f74acd67b75990)), closes [#flato-5322](/git.hyperchain.cn/hyperchain/go-hpc-rbft/issues/flato-5322) [#flato-4326](/git.hyperchain.cn/hyperchain/go-hpc-rbft/issues/flato-4326)
+
+### [1.0.1](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v1.0.0...v1.0.1) (2022-11-21)
+
+
+### Bug Fixes
+
+* **node.go:** remove committed txs in GetUncommittedTransactions() ([809cab5](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/809cab5761d3cd8702375ce399351e43f317b24f))
+
 ## [1.0.0](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v0.4.5...v1.0.0) (2022-11-15)
 
 
