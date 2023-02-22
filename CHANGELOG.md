@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.1.0](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v1.0.10...v1.1.0) (2023-02-22)
+
+
+### Features
+
+* **go.mod:** update common and txpool ([7f0821e](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/7f0821e86ede698032087af13eed33946f7ec22f))
+
 ### [1.0.10](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v1.0.9...v1.0.10) (2023-02-14)
 
 
