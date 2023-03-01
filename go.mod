@@ -1,13 +1,14 @@
-module github.com/hyperchain/go-hpc-rbft
+module github.com/hyperchain/go-hpc-rbft/v2
 
-go 1.17
+go 1.18
 
 require (
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/mock v1.6.0
-	github.com/hyperchain/go-hpc-common v0.3.21
+	github.com/hyperchain/go-hpc-common v0.3.29
 	github.com/hyperchain/go-hpc-txpool v1.1.0
 	github.com/stretchr/testify v1.8.0
+	golang.org/x/crypto v0.0.0-20220622213112-05595931fe9d
 )
 
 require (
@@ -29,7 +30,6 @@ require (
 	github.com/willf/bloom v2.0.3+incompatible // indirect
 	github.com/xdg/scram v1.0.5 // indirect
 	github.com/xdg/stringprep v1.0.3 // indirect
-	golang.org/x/crypto v0.0.0-20220622213112-05595931fe9d // indirect
 	golang.org/x/net v0.7.0 // indirect
 	golang.org/x/sys v0.5.0 // indirect
 	golang.org/x/text v0.7.0 // indirect
@@ -39,6 +39,6 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/hyperchain/go-hpc-common => git.hyperchain.cn/hyperchain/go-hpc-common.git v0.3.21
+replace github.com/hyperchain/go-hpc-common => git.hyperchain.cn/hyperchain/go-hpc-common.git v0.3.29
 
 replace github.com/hyperchain/go-hpc-txpool => git.hyperchain.cn/hyperchain/go-hpc-txpool.git v1.1.0

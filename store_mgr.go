@@ -15,8 +15,8 @@
 package rbft
 
 import (
-	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
-	"github.com/hyperchain/go-hpc-rbft/types"
+	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
+	"github.com/hyperchain/go-hpc-rbft/v2/types"
 )
 
 /**
@@ -62,7 +62,7 @@ type storeManager struct {
 	localCheckpoints map[uint64]*pb.SignedCheckpoint
 
 	// checkpoint numbers received from others which are bigger than our
-	// H(=h+L); map replicaHash to the last checkpoint number received from
+	// H(=h+L); map author to the last checkpoint number received from
 	// that replica bigger than H
 	higherCheckpoints map[string]*pb.SignedCheckpoint
 
@@ -95,20 +95,19 @@ func newStoreMgr(c Config) *storeManager {
 	return sm
 }
 
-// saveCheckpoint saves checkpoint information to localCheckpoints, whose key is lastExec, value is the global nodeHost of current
-// BlockchainInfo
+// saveCheckpoint saves checkpoint information to localCheckpoints
 func (sm *storeManager) saveCheckpoint(height uint64, signedCheckpoint *pb.SignedCheckpoint) {
 	sm.localCheckpoints[height] = signedCheckpoint
 }
 
 // Given a digest/view/seq, is there an entry in the certStore?
 // If so, return it else, create a new entry
-func (sm *storeManager) getCert(v uint64, n uint64, d string) (cert *msgCert) {
+func (sm *storeManager) getCert(v uint64, n uint64, d string) *msgCert {
 	idx := msgID{v, n, d}
 	cert, ok := sm.certStore[idx]
 
 	if ok {
-		return
+		return cert
 	}
 
 	prepare := make(map[pb.Prepare]bool)
@@ -118,7 +117,7 @@ func (sm *storeManager) getCert(v uint64, n uint64, d string) (cert *msgCert) {
 		commit:  commit,
 	}
 	sm.certStore[idx] = cert
-	return
+	return cert
 }
 
 // existedDigest checks if there exists another PRE-PREPARE message in certStore which has the same digest, same view,
@@ -136,4 +135,102 @@ func (sm *storeManager) existedDigest(v uint64, n uint64, d string) bool {
 		}
 	}
 	return false
+}
+
+// =============================================================================
+// helper functions for check the validity of consensus messages
+// =============================================================================
+// isPrePrepareLegal firstly checks if current status can receive pre-prepare or not, then checks pre-prepare message
+// itself is legal or not
+func (rbft *rbftImpl) isPrePrepareLegal(preprep *pb.PrePrepare) bool {
+
+	if rbft.atomicIn(InViewChange) {
+		rbft.logger.Debugf("Replica %d try to receive prePrepare, but it's in viewChange", rbft.peerPool.ID)
+		return false
+	}
+
+	if rbft.atomicIn(InConfChange) {
+		rbft.logger.Debugf("Replica %d try to receive prePrepare, but it's in confChange", rbft.peerPool.ID)
+		return false
+	}
+
+	// replica rejects prePrepare sent from non-primary.
+	if !rbft.isPrimary(preprep.ReplicaId) {
+		primaryID := rbft.primaryID(rbft.view)
+		rbft.logger.Warningf("Replica %d received prePrepare from non-primary: got %d, should be %d",
+			rbft.peerPool.ID, preprep.ReplicaId, primaryID)
+		return false
+	}
+
+	// primary reject prePrepare sent from itself.
+	if rbft.isPrimary(rbft.peerPool.ID) {
+		rbft.logger.Warningf("Primary %d reject prePrepare sent from itself", rbft.peerPool.ID)
+		return false
+	}
+
+	if !rbft.inWV(preprep.View, preprep.SequenceNumber) {
+		if preprep.SequenceNumber != rbft.h && !rbft.in(SkipInProgress) {
+			rbft.logger.Warningf("Replica %d received prePrepare with a different view or sequence "+
+				"number outside watermarks: prePrep.View %d, expected.View %d, seqNo %d, low water mark %d",
+				rbft.peerPool.ID, preprep.View, rbft.view, preprep.SequenceNumber, rbft.h)
+		} else {
+			// This is perfectly normal
+			rbft.logger.Debugf("Replica %d received prePrepare with a different view or sequence "+
+				"number outside watermarks: preprep.View %d, expected.View %d, seqNo %d, low water mark %d",
+				rbft.peerPool.ID, preprep.View, rbft.view, preprep.SequenceNumber, rbft.h)
+		}
+		return false
+	}
+
+	if preprep.SequenceNumber <= rbft.exec.lastExec &&
+		rbft.prePrepared(preprep.View, preprep.SequenceNumber, preprep.BatchDigest) {
+		rbft.logger.Debugf("Replica %d received a prePrepare with seqNo %d lower than lastExec %d and "+
+			"we have pre-prepare cert for it, ignore", rbft.peerPool.ID, preprep.SequenceNumber, rbft.exec.lastExec)
+		return false
+	}
+
+	return true
+}
+
+// isPrepareLegal firstly checks if current status can receive prepare or not, then checks prepare message itself is
+// legal or not
+func (rbft *rbftImpl) isPrepareLegal(prep *pb.Prepare) bool {
+
+	// if we receive prepare from primary, which means primary behavior as a byzantine, we don't send view change here,
+	// because in this case, replicas will eventually find primary abnormal in other cases.
+	if rbft.isPrimary(prep.ReplicaId) {
+		rbft.logger.Debugf("Replica %d received prepare from primary, ignore it", rbft.peerPool.ID)
+		return false
+	}
+
+	if !rbft.inWV(prep.View, prep.SequenceNumber) {
+		if prep.SequenceNumber != rbft.h && !rbft.in(SkipInProgress) {
+			rbft.logger.Warningf("Replica %d ignore prepare from replica %d for view=%d/seqNo=%d: not inWv, in view: %d, h: %d",
+				rbft.peerPool.ID, prep.ReplicaId, prep.View, prep.SequenceNumber, rbft.view, rbft.h)
+		} else {
+			// This is perfectly normal
+			rbft.logger.Debugf("Replica %d ignore prepare from replica %d for view=%d/seqNo=%d: not inWv, in view: %d, h: %d",
+				rbft.peerPool.ID, prep.ReplicaId, prep.View, prep.SequenceNumber, rbft.view, rbft.h)
+		}
+
+		return false
+	}
+	return true
+}
+
+// isCommitLegal checks commit message is legal or not
+func (rbft *rbftImpl) isCommitLegal(commit *pb.Commit) bool {
+
+	if !rbft.inWV(commit.View, commit.SequenceNumber) {
+		if commit.SequenceNumber != rbft.h && !rbft.in(SkipInProgress) {
+			rbft.logger.Warningf("Replica %d ignore commit from replica %d for view=%d/seqNo=%d: not inWv, in view: %d, h: %d",
+				rbft.peerPool.ID, commit.ReplicaId, commit.View, commit.SequenceNumber, rbft.view, rbft.h)
+		} else {
+			// This is perfectly normal
+			rbft.logger.Debugf("Replica %d ignore commit from replica %d for view=%d/seqNo=%d: not inWv, in view: %d, h: %d",
+				rbft.peerPool.ID, commit.ReplicaId, commit.View, commit.SequenceNumber, rbft.view, rbft.h)
+		}
+		return false
+	}
+	return true
 }

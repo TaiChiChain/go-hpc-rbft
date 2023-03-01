@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/hyperchain/go-hpc-common/metrics/disabled"
-	"github.com/hyperchain/go-hpc-rbft/external"
-	mockexternal "github.com/hyperchain/go-hpc-rbft/mock/mock_external"
-	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
+	"github.com/hyperchain/go-hpc-rbft/v2/external"
+	mockexternal "github.com/hyperchain/go-hpc-rbft/v2/mock/mock_external"
+	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
 	txpool "github.com/hyperchain/go-hpc-txpool"
 	txpoolmock "github.com/hyperchain/go-hpc-txpool/mock"
 
@@ -33,10 +33,8 @@ func newPersistTestReplica(ctrl *gomock.Controller, pool txpool.TxPool, log Logg
 		VcResendTimeout:         10 * time.Second,
 		CleanVCTimeout:          60 * time.Second,
 		NewViewTimeout:          8 * time.Second,
-		FirstRequestTimeout:     30 * time.Second,
 		SyncStateTimeout:        1 * time.Second,
 		SyncStateRestartTimeout: 10 * time.Second,
-		RecoveryTimeout:         10 * time.Second,
 		FetchCheckpointTimeout:  5 * time.Second,
 		CheckPoolTimeout:        3 * time.Minute,
 
@@ -58,40 +56,22 @@ func TestPersist_restoreView(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
-	log := FrameworkNewRawLogger()
+	log := newRawLogger()
 	ext := mockexternal.NewMockExternalStack(ctrl)
 	ext.EXPECT().Sign(gomock.Any()).Return([]byte("sig"), nil).AnyTimes()
 	node := newPersistTestReplica(ctrl, pool, log, ext)
 
-	node.rbft.setView(2)
-
-	var ret []byte
-
-	ret = []byte("test")
-	ext.EXPECT().ReadState("setView").Return(ret, nil)
-	ext.EXPECT().DelState(gomock.Any()).Return(nil)
-	ext.EXPECT().ReadState("view").Return(nil, errors.New("err"))
-
-	flag := node.rbft.restoreView()
-	assert.Equal(t, false, flag)
+	ext.EXPECT().ReadState("new-view").Return(nil, errors.New("err"))
+	node.rbft.restoreView()
 	assert.Equal(t, uint64(0), node.rbft.view)
 
-	ret = []byte("1")
-	ext.EXPECT().ReadState("setView").Return(ret, nil)
-	ext.EXPECT().DelState(gomock.Any()).Return(nil)
+	nv := &pb.NewView{
+		View: 1,
+	}
+	nvb, _ := proto.Marshal(nv)
+	ext.EXPECT().ReadState("new-view").Return(nvb, nil)
 
-	flag = node.rbft.restoreView()
-	assert.Equal(t, true, flag)
-	assert.Equal(t, uint64(1), node.rbft.view)
-
-	var b = make([]byte, 8)
-	binary.LittleEndian.PutUint64(b, uint64(1))
-	ext.EXPECT().ReadState("setView").Return(nil, errors.New("err"))
-	ext.EXPECT().DelState(gomock.Any()).Return(nil)
-	ext.EXPECT().ReadState("view").Return(b, nil)
-
-	flag = node.rbft.restoreView()
-	assert.Equal(t, false, flag)
+	node.rbft.restoreView()
 	assert.Equal(t, uint64(1), node.rbft.view)
 }
 
@@ -99,7 +79,7 @@ func TestPersist_restoreQList(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
-	log := FrameworkNewRawLogger()
+	log := newRawLogger()
 	ext := mockexternal.NewMockExternalStack(ctrl)
 	ext.EXPECT().Sign(gomock.Any()).Return([]byte("sig"), nil).AnyTimes()
 	node := newPersistTestReplica(ctrl, pool, log, ext)
@@ -137,7 +117,7 @@ func TestPersist_restorePList(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
-	log := FrameworkNewRawLogger()
+	log := newRawLogger()
 	ext := mockexternal.NewMockExternalStack(ctrl)
 	ext.EXPECT().Sign(gomock.Any()).Return([]byte("sig"), nil).AnyTimes()
 	node := newPersistTestReplica(ctrl, pool, log, ext)
@@ -170,7 +150,7 @@ func TestPersist_restoreBatchStore(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
-	log := FrameworkNewRawLogger()
+	log := newRawLogger()
 	ext := mockexternal.NewMockExternalStack(ctrl)
 	ext.EXPECT().Sign(gomock.Any()).Return([]byte("sig"), nil).AnyTimes()
 	node := newPersistTestReplica(ctrl, pool, log, ext)
@@ -187,7 +167,7 @@ func TestPersist_restoreQSet(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
-	log := FrameworkNewRawLogger()
+	log := newRawLogger()
 	ext := mockexternal.NewMockExternalStack(ctrl)
 	ext.EXPECT().Sign(gomock.Any()).Return([]byte("sig"), nil).AnyTimes()
 	node := newPersistTestReplica(ctrl, pool, log, ext)
@@ -215,7 +195,7 @@ func TestPersist_restorePSet(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
-	log := FrameworkNewRawLogger()
+	log := newRawLogger()
 	ext := mockexternal.NewMockExternalStack(ctrl)
 	ext.EXPECT().Sign(gomock.Any()).Return([]byte("sig"), nil).AnyTimes()
 	node := newPersistTestReplica(ctrl, pool, log, ext)
@@ -243,7 +223,7 @@ func TestPersist_restoreCSet(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
-	log := FrameworkNewRawLogger()
+	log := newRawLogger()
 	ext := mockexternal.NewMockExternalStack(ctrl)
 	ext.EXPECT().Sign(gomock.Any()).Return([]byte("sig"), nil).AnyTimes()
 	node := newPersistTestReplica(ctrl, pool, log, ext)
@@ -271,7 +251,7 @@ func TestPersist_restoreCert(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
-	log := FrameworkNewRawLogger()
+	log := newRawLogger()
 	ext := mockexternal.NewMockExternalStack(ctrl)
 	ext.EXPECT().Sign(gomock.Any()).Return([]byte("sig"), nil).AnyTimes()
 	node := newPersistTestReplica(ctrl, pool, log, ext)
@@ -316,28 +296,19 @@ func TestPersist_restoreCert(t *testing.T) {
 	ext.EXPECT().ReadStateSet("cset.").Return(retCset, nil)
 
 	ext.EXPECT().DelState(gomock.Any()).Return(nil).AnyTimes()
-	ext.EXPECT().ReadState(gomock.Any()).Return(nil, errors.New("ReadState Error"))
 	ext.EXPECT().ReadStateSet("qlist.").Return(map[string][]byte{"qlist.": []byte("QList")}, nil).AnyTimes()
 	ext.EXPECT().ReadStateSet("plist.").Return(map[string][]byte{"plist.": []byte("PList")}, nil).AnyTimes()
 
 	node.rbft.restoreCert()
 	exp := &msgCert{prePrepare: q, prepare: map[pb.Prepare]bool{*p: true}, commit: map[pb.Commit]bool{*c: true}}
 	assert.Equal(t, exp, node.rbft.storeMgr.certStore[msgID{1, 2, "msg"}])
-
-	node.rbft.storeMgr.certStore[msgID{1, 2, "msg"}] = nil
-	ext.EXPECT().ReadState("cleanCert").Return([]byte("true"), nil)
-	ext.EXPECT().ReadStateSet("qset.").Return(retQset, nil)
-	ext.EXPECT().ReadStateSet("pset.").Return(retPset, nil)
-	ext.EXPECT().ReadStateSet("cset.").Return(retCset, nil)
-	node.rbft.restoreCert()
-	assert.Equal(t, (*msgCert)(nil), node.rbft.storeMgr.certStore[msgID{1, 2, "msg"}])
 }
 
 func TestPersist_restoreState(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
-	log := FrameworkNewRawLogger()
+	log := newRawLogger()
 	ext := mockexternal.NewMockExternalStack(ctrl)
 	ext.EXPECT().Sign(gomock.Any()).Return([]byte("sig"), nil).AnyTimes()
 	node := newPersistTestReplica(ctrl, pool, log, ext)
@@ -351,13 +322,15 @@ func TestPersist_restoreState(t *testing.T) {
 
 	var buff = make([]byte, 8)
 	binary.LittleEndian.PutUint64(buff, uint64(1))
+	nv := &pb.NewView{
+		View: 1,
+	}
+	nvb, _ := proto.Marshal(nv)
 	ext.EXPECT().SendFilterEvent(gomock.Any(), gomock.Any()).Return().AnyTimes()
 	ext.EXPECT().DelState(gomock.Any()).Return(nil).AnyTimes()
 
-	ext.EXPECT().ReadState("view").Return(buff, nil).AnyTimes()
-	ext.EXPECT().ReadState("setView").Return([]byte("1"), nil)
+	ext.EXPECT().ReadState("new-view").Return(nvb, nil).AnyTimes()
 	ext.EXPECT().ReadState("nodes").Return(buff, nil)
-	ext.EXPECT().ReadState("cleanCert").Return([]byte("true"), nil)
 	ext.EXPECT().ReadState("rbft.h").Return([]byte("10"), nil)
 	ext.EXPECT().ReadState("latestConfigBatchHeight").Return(buff, nil).AnyTimes()
 	ext.EXPECT().ReadState("stableC").Return(buff, nil).AnyTimes()
@@ -377,51 +350,6 @@ func TestPersist_restoreState(t *testing.T) {
 	// move h from 0 to 10
 	assert.Nil(t, node.rbft.restoreState())
 	assert.Equal(t, uint64(10), node.rbft.h)
-}
-
-func TestPersist_parseCertStore(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	_, rbfts := newBasicClusterInstance()
-	rbfts[0].setView(3)
-
-	msgID1 := msgID{
-		v: 3,
-		n: 2,
-		d: "msg1",
-	}
-	cert1 := &msgCert{}
-
-	msgID2 := msgID{
-		v: 1,
-		n: 2,
-		d: "msg1",
-	}
-	cert2 := &msgCert{}
-
-	rbfts[0].storeMgr.certStore[msgID1] = cert1
-	rbfts[0].storeMgr.certStore[msgID2] = cert2
-
-	assert.Equal(t, map[msgID]*msgCert{msgID1: cert1, msgID2: cert2}, rbfts[0].storeMgr.certStore)
-	rbfts[0].parseCertStore()
-	assert.Equal(t, map[msgID]*msgCert{msgID1: cert1}, rbfts[0].storeMgr.certStore)
-
-	persistPrePrepare := &pb.PrePrepare{}
-	cert1.prePrepare = persistPrePrepare
-
-	persistPrepare := pb.Prepare{}
-	cert1.prepare[persistPrepare] = true
-
-	persistCommit := pb.Commit{}
-	cert1.commit[persistCommit] = true
-
-	rbfts[0].storeMgr.certStore[msgID1] = cert1
-	rbfts[0].storeMgr.certStore[msgID2] = cert2
-
-	assert.Equal(t, map[msgID]*msgCert{msgID1: cert1, msgID2: cert2}, rbfts[0].storeMgr.certStore)
-	rbfts[0].parseCertStore()
-	assert.Equal(t, map[msgID]*msgCert{msgID1: cert1}, rbfts[0].storeMgr.certStore)
 }
 
 func TestPersist_parseQPCKey(t *testing.T) {

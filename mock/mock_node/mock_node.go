@@ -9,9 +9,9 @@ import (
 
 	gomock "github.com/golang/mock/gomock"
 	protos "github.com/hyperchain/go-hpc-common/types/protos"
-	rbft "github.com/hyperchain/go-hpc-rbft"
-	rbftpb "github.com/hyperchain/go-hpc-rbft/rbftpb"
-	types "github.com/hyperchain/go-hpc-rbft/types"
+	rbft "github.com/hyperchain/go-hpc-rbft/v2"
+	rbftpb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
+	types "github.com/hyperchain/go-hpc-rbft/v2/types"
 )
 
 // MockNode is a mock of Node interface.
@@ -75,20 +75,6 @@ func (m *MockNode) Propose(requests *rbftpb.RequestSet) error {
 func (mr *MockNodeMockRecorder) Propose(requests interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Propose", reflect.TypeOf((*MockNode)(nil).Propose), requests)
-}
-
-// ProposeConfChange mocks base method.
-func (m *MockNode) ProposeConfChange(cc *types.ConfChange) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ProposeConfChange", cc)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// ProposeConfChange indicates an expected call of ProposeConfChange.
-func (mr *MockNodeMockRecorder) ProposeConfChange(cc interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProposeConfChange", reflect.TypeOf((*MockNode)(nil).ProposeConfChange), cc)
 }
 
 // ReportExecuted mocks base method.

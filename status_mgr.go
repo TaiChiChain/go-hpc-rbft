@@ -41,6 +41,7 @@ const (
 	NeedSyncState  // node need to sync state
 	SkipInProgress // node try to state update
 	byzantine      // byzantine
+	inEpochSyncing // in epoch syncing, used to block consensus progress until sync to epoch change height.
 )
 
 // NodeStatus reflects the internal consensus status.
@@ -184,7 +185,7 @@ func (rbft *rbftImpl) setNormal() {
 
 // maybeSetNormal checks if system is in normal or not, if in normal, set status to normal.
 func (rbft *rbftImpl) maybeSetNormal() {
-	if !rbft.atomicInOne(InRecovery, InViewChange, Pending) && !rbft.inOne(SkipInProgress) {
+	if !rbft.atomicInOne(InViewChange, Pending, SkipInProgress) {
 		rbft.setNormal()
 		rbft.startCheckPoolTimer()
 	} else {
@@ -192,8 +193,7 @@ func (rbft *rbftImpl) maybeSetNormal() {
 	}
 }
 
-// setAbNormal sets system to abnormal which means system may be in viewChange,
-// recovery, state update...
+// setAbNormal sets system to abnormal which means system may be in viewChange, state update...
 // we can't do sync state when we are in abnormal.
 func (rbft *rbftImpl) setAbNormal() {
 	rbft.exitSyncState()

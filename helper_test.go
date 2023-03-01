@@ -1,12 +1,13 @@
 package rbft
 
 import (
+	"github.com/gogo/protobuf/proto"
 	"testing"
 	"time"
 
 	"github.com/hyperchain/go-hpc-common/types/protos"
-	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
-	"github.com/hyperchain/go-hpc-rbft/types"
+	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
+	"github.com/hyperchain/go-hpc-rbft/v2/types"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
@@ -206,10 +207,6 @@ func TestHelper_isPrePrepareLegal(t *testing.T) {
 		HashBatch:      nil,
 	}
 
-	rbfts[0].atomicOn(InRecovery)
-	assert.False(t, rbfts[0].isPrePrepareLegal(preprep))
-	rbfts[0].atomicOff(InRecovery)
-
 	rbfts[0].atomicOn(InViewChange)
 	assert.False(t, rbfts[0].isPrePrepareLegal(preprep))
 	rbfts[0].atomicOff(InViewChange)
@@ -222,6 +219,10 @@ func TestHelper_isPrePrepareLegal(t *testing.T) {
 
 	assert.True(t, rbfts[3].isPrePrepareLegal(preprep))
 
+	preprep.ReplicaId = 2
+	assert.False(t, rbfts[3].isPrePrepareLegal(preprep))
+	preprep.ReplicaId = 1
+
 	rbfts[3].h = 20
 	assert.False(t, rbfts[3].isPrePrepareLegal(preprep))
 
@@ -230,6 +231,11 @@ func TestHelper_isPrePrepareLegal(t *testing.T) {
 
 	rbfts[3].h = 10
 	rbfts[3].exec.setLastExec(uint64(21))
+	assert.True(t, rbfts[3].isPrePrepareLegal(preprep))
+	mc := &msgCert{
+		prePrepare: preprep,
+	}
+	rbfts[3].storeMgr.certStore[msgID{preprep.View, preprep.SequenceNumber, preprep.BatchDigest}] = mc
 	assert.False(t, rbfts[3].isPrePrepareLegal(preprep))
 }
 
@@ -314,19 +320,19 @@ func TestHelper_compareCheckpointWithWeakSet(t *testing.T) {
 	_, rbfts := newBasicClusterInstance()
 
 	mockCheckpoint2 := &pb.SignedCheckpoint{
-		NodeInfo:   &pb.NodeInfo{ReplicaId: 2, ReplicaHost: "node2"},
+		Author:     "node2",
 		Checkpoint: &protos.Checkpoint{Epoch: 0, ExecuteState: &protos.Checkpoint_ExecuteState{Height: 10, Digest: "block-hash-10"}},
 		Signature:  nil,
 	}
 	mockCheckpoint3 := &pb.SignedCheckpoint{
-		NodeInfo:   &pb.NodeInfo{ReplicaId: 3, ReplicaHost: "node3"},
+		Author:     "node3",
 		Checkpoint: &protos.Checkpoint{Epoch: 0, ExecuteState: &protos.Checkpoint_ExecuteState{Height: 10, Digest: "block-hash-10"}},
 		Signature:  nil,
 	}
 
 	// out of watermark
 	mockCheckpoint4 := &pb.SignedCheckpoint{
-		NodeInfo:   &pb.NodeInfo{ReplicaId: 4, ReplicaHost: "node4"},
+		Author:     "node4",
 		Checkpoint: &protos.Checkpoint{Epoch: 0, ExecuteState: &protos.Checkpoint_ExecuteState{Height: 0, Digest: "block-hash-0"}},
 		Signature:  nil,
 	}
@@ -337,7 +343,7 @@ func TestHelper_compareCheckpointWithWeakSet(t *testing.T) {
 
 	// in watermark, but don't have enough checkpoint
 	mockCheckpoint4 = &pb.SignedCheckpoint{
-		NodeInfo:   &pb.NodeInfo{ReplicaId: 4, ReplicaHost: "node4"},
+		Author:     "node4",
 		Checkpoint: &protos.Checkpoint{Epoch: 0, ExecuteState: &protos.Checkpoint_ExecuteState{Height: 10, Digest: "block-hash-10"}},
 		Signature:  nil,
 	}
@@ -347,10 +353,10 @@ func TestHelper_compareCheckpointWithWeakSet(t *testing.T) {
 	assert.Nil(t, matchingCheckpoints)
 
 	// in watermark, but don't have self checkpoint
-	rbfts[0].storeMgr.checkpointStore[chkptID{nodeHost: "node2", sequence: 10}] = mockCheckpoint2
-	rbfts[0].storeMgr.checkpointStore[chkptID{nodeHost: "node3", sequence: 10}] = mockCheckpoint3
+	rbfts[0].storeMgr.checkpointStore[chkptID{author: "node2", sequence: 10}] = mockCheckpoint2
+	rbfts[0].storeMgr.checkpointStore[chkptID{author: "node3", sequence: 10}] = mockCheckpoint3
 	mockCheckpoint4 = &pb.SignedCheckpoint{
-		NodeInfo:   &pb.NodeInfo{ReplicaId: 4, ReplicaHost: "node4"},
+		Author:     "node4",
 		Checkpoint: &protos.Checkpoint{Epoch: 0, ExecuteState: &protos.Checkpoint_ExecuteState{Height: 10, Digest: "block-hash-10"}},
 		Signature:  nil,
 	}
@@ -361,7 +367,7 @@ func TestHelper_compareCheckpointWithWeakSet(t *testing.T) {
 
 	// in watermark, have self valid checkpoint
 	selfCheckpoint := &pb.SignedCheckpoint{
-		NodeInfo:   &pb.NodeInfo{ReplicaId: 1, ReplicaHost: "node1"},
+		Author:     "node1",
 		Checkpoint: &protos.Checkpoint{Epoch: 0, ExecuteState: &protos.Checkpoint_ExecuteState{Height: 10, Digest: "block-hash-10"}},
 		Signature:  nil,
 	}
@@ -373,7 +379,7 @@ func TestHelper_compareCheckpointWithWeakSet(t *testing.T) {
 
 	// in watermark, have self invalid checkpoint(incorrect block hash)
 	selfCheckpoint = &pb.SignedCheckpoint{
-		NodeInfo:   &pb.NodeInfo{ReplicaId: 1, ReplicaHost: "node1"},
+		Author:     "node1",
 		Checkpoint: &protos.Checkpoint{Epoch: 0, ExecuteState: &protos.Checkpoint_ExecuteState{Height: 10, Digest: "block-hash-20"}},
 		Signature:  nil,
 	}
@@ -389,7 +395,7 @@ func TestHelper_compareCheckpointWithWeakSet(t *testing.T) {
 	rbfts[0].setNormal()
 	mockCheckpoint2.Checkpoint = &protos.Checkpoint{Epoch: 0, ExecuteState: &protos.Checkpoint_ExecuteState{Height: 10, Digest: "block-hash-0"}}
 	mockCheckpoint4 = &pb.SignedCheckpoint{
-		NodeInfo:   &pb.NodeInfo{ReplicaId: 4, ReplicaHost: "node4"},
+		Author:     "node4",
 		Checkpoint: &protos.Checkpoint{Epoch: 0, ExecuteState: &protos.Checkpoint_ExecuteState{Height: 10, Digest: "block-hash-20"}},
 		Signature:  nil,
 	}
@@ -407,11 +413,11 @@ func TestHelper_compareCheckpointWithWeakSet(t *testing.T) {
 	rbfts[0].setNormal()
 	mockCheckpoint2.Checkpoint = &protos.Checkpoint{Epoch: 0, ExecuteState: &protos.Checkpoint_ExecuteState{Height: 10, Digest: "block-hash-10"}}
 	mockCheckpoint4 = &pb.SignedCheckpoint{
-		NodeInfo:   &pb.NodeInfo{ReplicaId: 4, ReplicaHost: "node4"},
+		Author:     "node4",
 		Checkpoint: &protos.Checkpoint{Epoch: 0, ExecuteState: &protos.Checkpoint_ExecuteState{Height: 10, Digest: "block-hash-20"}},
 		Signature:  nil,
 	}
-	rbfts[0].storeMgr.checkpointStore[chkptID{nodeHost: "node1", sequence: 10}] = selfCheckpoint
+	rbfts[0].storeMgr.checkpointStore[chkptID{author: "node1", sequence: 10}] = selfCheckpoint
 
 	go func() {
 		<-rbfts[0].delFlag
@@ -430,32 +436,32 @@ func TestHelper_CheckIfNeedStateUpdate(t *testing.T) {
 	rbfts[0].storeMgr.localCheckpoints = make(map[uint64]*pb.SignedCheckpoint)
 
 	selfCheckpoint10 := &pb.SignedCheckpoint{
-		NodeInfo:   &pb.NodeInfo{ReplicaId: 1, ReplicaHost: "node1"},
+		Author:     "node1",
 		Checkpoint: &protos.Checkpoint{Epoch: 0, ExecuteState: &protos.Checkpoint_ExecuteState{Height: 10, Digest: "block-hash-10"}},
 		Signature:  nil,
 	}
 	rbfts[0].storeMgr.localCheckpoints[10] = selfCheckpoint10
 	// mock move to stable checkpoint 10.
-	rbfts[0].moveWatermarks(10, false)
+	rbfts[0].moveWatermarks(10)
 	// mock execute to 15.
 	rbfts[0].exec.lastExec = 15
 
 	mockCheckpointSet10 := make([]*pb.SignedCheckpoint, 0)
 	// mock checkpoint 10 from node2.
 	mockCheckpoint10OfNode2 := &pb.SignedCheckpoint{
-		NodeInfo:   &pb.NodeInfo{ReplicaId: 2, ReplicaHost: "node2"},
+		Author:     "node2",
 		Checkpoint: &protos.Checkpoint{Epoch: 0, ExecuteState: &protos.Checkpoint_ExecuteState{Height: 10, Digest: "block-hash-10"}},
 		Signature:  nil,
 	}
 	// mock checkpoint 10 from node3.
 	mockCheckpoint10OfNode3 := &pb.SignedCheckpoint{
-		NodeInfo:   &pb.NodeInfo{ReplicaId: 3, ReplicaHost: "node3"},
+		Author:     "node3",
 		Checkpoint: &protos.Checkpoint{Epoch: 0, ExecuteState: &protos.Checkpoint_ExecuteState{Height: 10, Digest: "block-hash-10"}},
 		Signature:  nil,
 	}
 	// mock checkpoint 10 from node4.
 	mockCheckpoint10OfNode4 := &pb.SignedCheckpoint{
-		NodeInfo:   &pb.NodeInfo{ReplicaId: 4, ReplicaHost: "node4"},
+		Author:     "node4",
 		Checkpoint: &protos.Checkpoint{Epoch: 0, ExecuteState: &protos.Checkpoint_ExecuteState{Height: 10, Digest: "block-hash-10"}},
 		Signature:  nil,
 	}
@@ -475,7 +481,7 @@ func TestHelper_CheckIfNeedStateUpdate(t *testing.T) {
 	// mock execute to 20.
 	rbfts[0].exec.lastExec = 20
 	selfCheckpoint20 := &pb.SignedCheckpoint{
-		NodeInfo: &pb.NodeInfo{ReplicaId: 1, ReplicaHost: "node1"},
+		Author: "node1",
 		// mock incorrect hash.
 		Checkpoint: &protos.Checkpoint{Epoch: 0, ExecuteState: &protos.Checkpoint_ExecuteState{Height: 20, Digest: "block-hash-20XXX"}},
 		Signature:  nil,
@@ -484,19 +490,19 @@ func TestHelper_CheckIfNeedStateUpdate(t *testing.T) {
 	mockCheckpointSet20 := make([]*pb.SignedCheckpoint, 0)
 	// mock checkpoint 20 from node2.
 	mockCheckpoint20OfNode2 := &pb.SignedCheckpoint{
-		NodeInfo:   &pb.NodeInfo{ReplicaId: 2, ReplicaHost: "node2"},
+		Author:     "node2",
 		Checkpoint: &protos.Checkpoint{Epoch: 0, ExecuteState: &protos.Checkpoint_ExecuteState{Height: 20, Digest: "block-hash-20"}},
 		Signature:  nil,
 	}
 	// mock checkpoint 20 from node3.
 	mockCheckpoint20OfNode3 := &pb.SignedCheckpoint{
-		NodeInfo:   &pb.NodeInfo{ReplicaId: 3, ReplicaHost: "node3"},
+		Author:     "node3",
 		Checkpoint: &protos.Checkpoint{Epoch: 0, ExecuteState: &protos.Checkpoint_ExecuteState{Height: 20, Digest: "block-hash-20"}},
 		Signature:  nil,
 	}
 	// mock checkpoint 20 from node4.
 	mockCheckpoint20OfNode4 := &pb.SignedCheckpoint{
-		NodeInfo:   &pb.NodeInfo{ReplicaId: 4, ReplicaHost: "node4"},
+		Author:     "node4",
 		Checkpoint: &protos.Checkpoint{Epoch: 0, ExecuteState: &protos.Checkpoint_ExecuteState{Height: 20, Digest: "block-hash-20"}},
 		Signature:  nil,
 	}
@@ -514,7 +520,7 @@ func TestHelper_CheckIfNeedStateUpdate(t *testing.T) {
 	assert.True(t, need, "need to sync chain as local checkpoint not equal to checkpoint set")
 
 	selfCheckpoint20 = &pb.SignedCheckpoint{
-		NodeInfo: &pb.NodeInfo{ReplicaId: 1, ReplicaHost: "node1"},
+		Author: "node1",
 		// mock correct hash.
 		Checkpoint: &protos.Checkpoint{Epoch: 0, ExecuteState: &protos.Checkpoint_ExecuteState{Height: 20, Digest: "block-hash-20"}},
 		Signature:  nil,
@@ -533,4 +539,21 @@ func TestHelper_CheckIfNeedStateUpdate(t *testing.T) {
 	need = rbfts[0].checkIfNeedStateUpdate(mockCheckpointState20, mockCheckpointSet20)
 	assert.False(t, need, "no need to sync chain as local checkpoint equal to checkpoint set")
 	assert.Equal(t, uint64(20), rbfts[0].h)
+}
+
+func unMarshalVcBasis(vc *pb.ViewChange) *pb.VcBasis {
+	vcBasis := &pb.VcBasis{}
+	err := proto.Unmarshal(vc.Basis, vcBasis)
+	if err != nil {
+		return nil
+	}
+	return vcBasis
+}
+
+func marshalVcBasis(vcBasis *pb.VcBasis) []byte {
+	vcb, err := proto.Marshal(vcBasis)
+	if err != nil {
+		return nil
+	}
+	return vcb
 }

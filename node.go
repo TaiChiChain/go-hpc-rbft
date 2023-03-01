@@ -18,8 +18,8 @@ import (
 	"sync"
 
 	"github.com/hyperchain/go-hpc-common/types/protos"
-	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
-	"github.com/hyperchain/go-hpc-rbft/types"
+	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
+	"github.com/hyperchain/go-hpc-rbft/v2/types"
 )
 
 // Node represents a node in a RBFT cluster.
@@ -31,9 +31,6 @@ type Node interface {
 	// Propose proposes requests to RBFT core, requests are ensured to be eventually
 	// submitted to all non-fault nodes unless current node crash down.
 	Propose(requests *pb.RequestSet) error
-	// ProposeConfChange proposes config change.
-	// Application needs to call ApplyConfChange when applying EntryConfChange type entry.
-	ProposeConfChange(cc *types.ConfChange) error
 	// Step advances the state machine using the given message.
 	Step(msg *pb.ConsensusMessage)
 	// ApplyConfChange applies config change to the local node.
@@ -133,12 +130,6 @@ func (n *node) Stop() []*protos.Transaction {
 func (n *node) Propose(requests *pb.RequestSet) error {
 	n.rbft.postRequests(requests)
 
-	return nil
-}
-
-// ProposeConfChange proposes config change.
-// Application needs to call ApplyConfChange when applying EntryConfChange type entry.
-func (n *node) ProposeConfChange(cc *types.ConfChange) error {
 	return nil
 }
 

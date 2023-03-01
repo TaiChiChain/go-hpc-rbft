@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/hyperchain/go-hpc-common/types/protos"
-	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
-	"github.com/hyperchain/go-hpc-rbft/types"
+	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
+	"github.com/hyperchain/go-hpc-rbft/v2/types"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/golang/mock/gomock"
@@ -18,20 +18,29 @@ func TestVC_FullProcess(t *testing.T) {
 
 	nodes, rbfts := newBasicClusterInstance()
 	unlockCluster(rbfts)
+	// init recovery to stable view 1, primary is node2
+	clusterInitRecovery(t, nodes, rbfts, -1)
+	assert.Equal(t, uint64(1), rbfts[1].view)
+	assert.Equal(t, uint64(1), rbfts[2].view)
+	assert.Equal(t, uint64(1), rbfts[3].view)
 
 	tx := newTx()
-	rbfts[1].batchMgr.requestPool.AddNewRequests([]*protos.Transaction{tx}, false, true)
+	// node3 cache some txs.
+	rbfts[2].batchMgr.requestPool.AddNewRequests([]*protos.Transaction{tx}, false, true)
 
-	rbfts[2].sendViewChange()
-	vcNode3 := nodes[2].broadcastMessageCache
+	// replica 1 send vc
+	rbfts[0].sendViewChange()
+	vcNode3 := nodes[0].broadcastMessageCache
 	assert.Equal(t, pb.Type_VIEW_CHANGE, vcNode3.Type)
 
-	rbfts[3].sendViewChange()
-	vcNode4 := nodes[3].broadcastMessageCache
+	// replica 2 send vc
+	rbfts[1].sendViewChange()
+	vcNode4 := nodes[1].broadcastMessageCache
 	assert.Equal(t, pb.Type_VIEW_CHANGE, vcNode4.Type)
 
-	rbfts[1].processEvent(vcNode3)
-	quorumEvent := rbfts[1].processEvent(vcNode4)
+	// replica 3 received f+1 vc and then enter vc, trigger vc quorum
+	rbfts[2].processEvent(vcNode3)
+	quorumEvent := rbfts[2].processEvent(vcNode4)
 
 	ev := &LocalEvent{
 		Service:   ViewChangeService,
@@ -39,34 +48,26 @@ func TestVC_FullProcess(t *testing.T) {
 	}
 	assert.Equal(t, ev, quorumEvent)
 
-	done := rbfts[1].processEvent(ev)
-	nv := nodes[1].broadcastMessageCache
+	// new primary 3 send new view.
+	done := rbfts[2].processEvent(ev)
+	nv := nodes[2].broadcastMessageCache
 	doneEvent := &LocalEvent{
 		Service:   ViewChangeService,
-		EventType: ViewChangedEvent,
+		EventType: ViewChangeDoneEvent,
 	}
 	assert.Equal(t, pb.Type_NEW_VIEW, nv.Type)
 	assert.Equal(t, doneEvent, done)
 
-	rbfts[2].processEvent(nv)
+	// new backup nodes process new view.
+	rbfts[1].processEvent(nv)
 	rbfts[3].processEvent(nv)
-	assert.Equal(t, uint64(1), rbfts[1].view)
-	assert.Equal(t, uint64(1), rbfts[2].view)
-	assert.Equal(t, uint64(1), rbfts[3].view)
+	assert.Equal(t, uint64(2), rbfts[1].view)
+	assert.Equal(t, uint64(2), rbfts[2].view)
+	assert.Equal(t, uint64(2), rbfts[3].view)
 
-	assert.NotEqual(t, pb.Type_PRE_PREPARE, nodes[1].broadcastMessageCache.Type)
-	rbfts[1].handleViewChangeEvent(doneEvent)
-	assert.Equal(t, pb.Type_PRE_PREPARE, nodes[1].broadcastMessageCache.Type)
-}
-
-func TestVC_sendViewChange(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	nodes, rbfts := newBasicClusterInstance()
-	rbfts[0].sendViewChange()
-	assert.Equal(t, uint64(1), rbfts[0].view)
-	assert.Equal(t, pb.Type_VIEW_CHANGE, nodes[0].broadcastMessageCache.Type)
+	assert.NotEqual(t, pb.Type_PRE_PREPARE, nodes[2].broadcastMessageCache.Type)
+	rbfts[2].handleViewChangeEvent(doneEvent)
+	assert.Equal(t, pb.Type_PRE_PREPARE, nodes[2].broadcastMessageCache.Type)
 }
 
 func TestVC_recvViewChange_FromPrimary(t *testing.T) {
@@ -74,72 +75,23 @@ func TestVC_recvViewChange_FromPrimary(t *testing.T) {
 	defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance()
-	rbfts[0].sendViewChange()
-	assert.Equal(t, uint64(1), rbfts[0].view)
+	unlockCluster(rbfts)
+	// init recovery to stable view 1, primary is node2
+	clusterInitRecovery(t, nodes, rbfts, -1)
 
-	vcPayload := nodes[0].broadcastMessageCache.Payload
+	// primary node2 send vc.
+	rbfts[1].sendViewChange()
+	assert.Equal(t, uint64(2), rbfts[1].view)
+
+	vcPayload := nodes[1].broadcastMessageCache.Payload
 	vc := &pb.ViewChange{}
 	_ = proto.Unmarshal(vcPayload, vc)
 
-	rbfts[1].atomicOff(Pending)
-	rbfts[1].setNormal()
-	rbfts[1].recvViewChange(vc)
+	// backup node3 receive vc and trigger vc.
+	rbfts[2].recvViewChange(vc, unMarshalVcBasis(vc), false)
+	assert.Equal(t, pb.Type_VIEW_CHANGE, nodes[2].broadcastMessageCache.Type)
 
-	assert.Equal(t, pb.Type_VIEW_CHANGE, nodes[1].broadcastMessageCache.Type)
-
-	// resend it
-	ret := rbfts[1].recvViewChange(vc)
-	nodes[1].broadcastMessageCache = nil
-	assert.Nil(t, ret)
-	assert.Nil(t, nodes[1].broadcastMessageCache)
-
-	vc2 := &pb.ViewChange{
-		Basis: &pb.VcBasis{
-			ReplicaId: uint64(1),
-			View:      uint64(1),
-			H:         uint64(0),
-		},
-	}
-	// resend a vc from primary with different values
-	vc2.Basis.Cset = []*pb.Vc_C{
-		{
-			SequenceNumber: uint64(0),
-			Digest:         "XXX GENESIS",
-		},
-	}
-	vc2.Basis.Qset = []*pb.Vc_PQ{
-		{
-			SequenceNumber: uint64(1),
-			BatchDigest:    "batch-number-1",
-			View:           uint64(0),
-		},
-	}
-	nodes[1].broadcastMessageCache = nil
-
-	assert.Equal(t, vc, rbfts[1].vcMgr.viewChangeStore[vcIdx{v: uint64(1), id: uint64(1)}])
-	ret = rbfts[1].recvViewChange(vc2)
-	assert.Nil(t, ret)
-	assert.Equal(t, vc2, rbfts[1].vcMgr.viewChangeStore[vcIdx{v: uint64(1), id: uint64(1)}])
-}
-
-func TestVC_recvViewChange_FromSmallerView(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	nodes, rbfts := newBasicClusterInstance()
-	rbfts[3].sendViewChange()
-
-	vcPayload := nodes[3].broadcastMessageCache.Payload
-	vc := &pb.ViewChange{}
-	_ = proto.Unmarshal(vcPayload, vc)
-
-	rbfts[1].atomicOff(Pending)
-	rbfts[1].setNormal()
-	rbfts[1].setView(uint64(5))
-	ret := rbfts[1].recvViewChange(vc)
-
-	assert.Nil(t, nodes[1].broadcastMessageCache)
-	assert.Nil(t, ret)
+	assert.Equal(t, uint64(2), rbfts[2].view)
 }
 
 func TestVC_recvViewChange_Quorum(t *testing.T) {
@@ -147,6 +99,10 @@ func TestVC_recvViewChange_Quorum(t *testing.T) {
 	defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance()
+	unlockCluster(rbfts)
+	// init recovery to stable view 1, primary is node2
+	clusterInitRecovery(t, nodes, rbfts, -1)
+
 	rbfts[1].sendViewChange()
 	rbfts[3].sendViewChange()
 
@@ -159,24 +115,13 @@ func TestVC_recvViewChange_Quorum(t *testing.T) {
 	_ = proto.Unmarshal(vcPayload3, vc3)
 
 	// get quorum
-	rbfts[2].recvViewChange(vc1)
-	ret := rbfts[2].recvViewChange(vc3)
+	rbfts[2].recvViewChange(vc1, unMarshalVcBasis(vc1), false)
+	ret := rbfts[2].recvViewChange(vc3, unMarshalVcBasis(vc3), false)
 	exp := &LocalEvent{
 		Service:   ViewChangeService,
 		EventType: ViewChangeQuorumEvent,
 	}
 	assert.Equal(t, exp, ret)
-
-	// from recovery to view-change
-	rbfts[0].sendViewChange()
-	vcPayload0 := nodes[0].broadcastMessageCache.Payload
-	vc0 := &pb.ViewChange{}
-	_ = proto.Unmarshal(vcPayload0, vc0)
-	rbfts[2].restartRecovery()
-	assert.Equal(t, true, rbfts[2].atomicIn(InRecovery))
-	ret2 := rbfts[2].recvViewChange(vc0)
-	assert.Equal(t, nil, ret2)
-	assert.Equal(t, false, rbfts[2].atomicIn(InRecovery))
 }
 
 func TestVC_fetchRequestBatches(t *testing.T) {
@@ -184,13 +129,13 @@ func TestVC_fetchRequestBatches(t *testing.T) {
 	defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance()
-
-	rbfts[2].fetchRequestBatches()
-	assert.Nil(t, nodes[2].broadcastMessageCache)
+	unlockCluster(rbfts)
+	// init recovery to stable view 1, primary is node2
+	clusterInitRecovery(t, nodes, rbfts, -1)
 
 	rbfts[2].storeMgr.missingReqBatches["lost-batch"] = true
 	rbfts[2].fetchRequestBatches()
-	assert.Equal(t, pb.Type_FETCH_REQUEST_BATCH, nodes[2].broadcastMessageCache.Type)
+	assert.Equal(t, pb.Type_FETCH_BATCH_REQUEST, nodes[2].broadcastMessageCache.Type)
 }
 
 func TestVC_recvFetchRequestBatch(t *testing.T) {
@@ -198,11 +143,14 @@ func TestVC_recvFetchRequestBatch(t *testing.T) {
 	defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance()
+	unlockCluster(rbfts)
+	// init recovery to stable view 1, primary is node2
+	clusterInitRecovery(t, nodes, rbfts, -1)
 
 	rbfts[2].storeMgr.missingReqBatches["lost-batch"] = true
 	rbfts[2].fetchRequestBatches()
 	fr := nodes[2].broadcastMessageCache
-	assert.Equal(t, pb.Type_FETCH_REQUEST_BATCH, fr.Type)
+	assert.Equal(t, pb.Type_FETCH_BATCH_REQUEST, fr.Type)
 
 	ret1 := rbfts[1].processEvent(fr)
 	assert.Nil(t, ret1)
@@ -211,46 +159,51 @@ func TestVC_recvFetchRequestBatch(t *testing.T) {
 	rbfts[1].storeMgr.batchStore["lost-batch"] = &pb.RequestBatch{}
 	ret2 := rbfts[1].processEvent(fr)
 	assert.Nil(t, ret2)
-	assert.Equal(t, pb.Type_SEND_REQUEST_BATCH, nodes[1].unicastMessageCache.Type)
+	assert.Equal(t, pb.Type_FETCH_BATCH_RESPONSE, nodes[1].unicastMessageCache.Type)
 }
 
-func TestVC_recvSendRequestBatch_AfterViewChanged(t *testing.T) {
+func TestVC_recvFetchBatchResponse_AfterViewChanged(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance()
+	unlockCluster(rbfts)
+	// init recovery to stable view 1, primary is node2
+	clusterInitRecovery(t, nodes, rbfts, -1)
 
-	// a view-change from view=0 to view=1
-	rbfts[2].sendViewChange()
-	rbfts[3].sendViewChange()
-	vcPayload2 := nodes[2].broadcastMessageCache.Payload
-	vc2 := &pb.ViewChange{}
-	_ = proto.Unmarshal(vcPayload2, vc2)
-	vcPayload3 := nodes[3].broadcastMessageCache.Payload
-	vc3 := &pb.ViewChange{}
-	_ = proto.Unmarshal(vcPayload3, vc3)
-	rbfts[1].recvViewChange(vc2)
-	ret := rbfts[1].recvViewChange(vc3)
+	// f+1 view-change from view 1 to view 2
+	rbfts[0].sendViewChange()
+	rbfts[1].sendViewChange()
+	vcPayload0 := nodes[0].broadcastMessageCache.Payload
+	vc0 := &pb.ViewChange{}
+	_ = proto.Unmarshal(vcPayload0, vc0)
+	vcPayload1 := nodes[1].broadcastMessageCache.Payload
+	vc1 := &pb.ViewChange{}
+	_ = proto.Unmarshal(vcPayload1, vc1)
+
+	// new primary node3 receive f+1 vc request and trigger vc quorum.
+	rbfts[2].recvViewChange(vc0, unMarshalVcBasis(vc0), false)
+	ret := rbfts[2].recvViewChange(vc1, unMarshalVcBasis(vc1), false)
 	exp := &LocalEvent{
 		Service:   ViewChangeService,
 		EventType: ViewChangeQuorumEvent,
 	}
 	assert.Equal(t, exp, ret)
 
-	// get the new-view
-	rbfts[1].sendNewView(false)
-	nvMessage := nodes[1].broadcastMessageCache
+	// node3 send new view
+	rbfts[2].sendNewView()
+	nvMessage := nodes[2].broadcastMessageCache
 	nv := &pb.NewView{}
 	_ = proto.Unmarshal(nvMessage.Payload, nv)
 
-	// store the new-view from primary
-	rbfts[2].vcMgr.newViewStore[nv.View] = nv
+	// mock node1 store the new-view from primary
+	rbfts[0].vcMgr.newViewStore[nv.View] = nv
 
-	// start the test for recv nil sending request batch
-	ret1 := rbfts[2].recvSendRequestBatch(nil)
+	// start the test for recv nil fetch request batch response
+	ret1 := rbfts[0].recvFetchBatchResponse(nil)
 	assert.Nil(t, ret1)
 
-	// construct a sending request batch message
+	// construct a fetch request batch response
 	tx := newTx()
 	batch := &pb.RequestBatch{
 		RequestHashList: []string{"tx-hash"},
@@ -259,27 +212,27 @@ func TestVC_recvSendRequestBatch_AfterViewChanged(t *testing.T) {
 		LocalList:       []bool{true},
 		BatchHash:       "lost-batch",
 	}
-	sr := &pb.SendRequestBatch{
+	sr := &pb.FetchBatchResponse{
 		ReplicaId:   uint64(2),
 		Batch:       batch,
 		BatchDigest: batch.BatchHash,
 	}
 
 	// the request batch is not the one we want
-	rbfts[2].storeMgr.missingReqBatches["lost-batch-another"] = true
-	rbfts[2].recvSendRequestBatch(sr)
-	assert.Equal(t, true, rbfts[2].storeMgr.missingReqBatches["lost-batch-another"])
-	delete(rbfts[2].storeMgr.missingReqBatches, "lost-batch-another")
+	rbfts[0].storeMgr.missingReqBatches["lost-batch-another"] = true
+	rbfts[0].recvFetchBatchResponse(sr)
+	assert.Equal(t, true, rbfts[0].storeMgr.missingReqBatches["lost-batch-another"])
+	delete(rbfts[0].storeMgr.missingReqBatches, "lost-batch-another")
 
 	// recv the request batch we want
-	rbfts[2].storeMgr.missingReqBatches["lost-batch"] = true
-	rbfts[2].atomicOn(InViewChange)
-	ret3 := rbfts[2].recvSendRequestBatch(sr)
+	rbfts[0].storeMgr.missingReqBatches["lost-batch"] = true
+	rbfts[0].atomicOn(InViewChange)
+	ret3 := rbfts[0].recvFetchBatchResponse(sr)
 	exp3 := &LocalEvent{
 		Service:   ViewChangeService,
-		EventType: ViewChangedEvent,
+		EventType: ViewChangeDoneEvent,
 	}
-	assert.Equal(t, false, rbfts[1].storeMgr.missingReqBatches["lost-batch"])
+	assert.Equal(t, false, rbfts[0].storeMgr.missingReqBatches["lost-batch"])
 	assert.Equal(t, exp3, ret3)
 }
 
@@ -288,19 +241,24 @@ func TestVC_processNewView_AfterViewChanged_PrimaryNormal(t *testing.T) {
 	defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance()
+	unlockCluster(rbfts)
+	// init recovery to stable view 1, primary is node2
+	clusterInitRecovery(t, nodes, rbfts, -1)
 
+	// mock primary node2 cached some txs.
+	nodes[1].broadcastMessageCache = nil
 	tx := newTx()
-	rbfts[0].batchMgr.requestPool.AddNewRequests([]*protos.Transaction{tx}, false, true)
-	batch := rbfts[0].batchMgr.requestPool.GenerateRequestBatch()
+	rbfts[1].batchMgr.requestPool.AddNewRequests([]*protos.Transaction{tx}, false, true)
+	batch := rbfts[1].batchMgr.requestPool.GenerateRequestBatch()
 
 	// a message list
-	msgList := xset{
-		uint64(1): "",
-		uint64(2): "",
-		uint64(3): batch[0].BatchHash,
+	msgList := []*pb.Vc_PQ{
+		{SequenceNumber: 1, BatchDigest: ""},
+		{SequenceNumber: 2, BatchDigest: ""},
+		{SequenceNumber: 3, BatchDigest: batch[0].BatchHash},
 	}
 
-	rbfts[0].putBackRequestBatches(msgList)
+	rbfts[1].putBackRequestBatches(msgList)
 
 	batch3 := &pb.RequestBatch{
 		RequestHashList: batch[0].TxHashList,
@@ -310,10 +268,10 @@ func TestVC_processNewView_AfterViewChanged_PrimaryNormal(t *testing.T) {
 		BatchHash:       batch[0].BatchHash,
 		SeqNo:           uint64(3),
 	}
-	rbfts[0].storeMgr.batchStore[batch[0].BatchHash] = batch3
-	rbfts[0].processNewView(msgList)
-	assert.Equal(t, uint64(3), rbfts[0].batchMgr.seqNo)
-	assert.Nil(t, nodes[0].broadcastMessageCache)
+	rbfts[1].storeMgr.batchStore[batch[0].BatchHash] = batch3
+	rbfts[1].processNewView(msgList)
+	assert.Equal(t, uint64(3), rbfts[1].batchMgr.seqNo)
+	assert.Nil(t, nodes[1].broadcastMessageCache)
 }
 
 func TestVC_processNewView_AfterViewChanged_ReplicaNormal(t *testing.T) {
@@ -321,16 +279,20 @@ func TestVC_processNewView_AfterViewChanged_ReplicaNormal(t *testing.T) {
 	defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance()
+	unlockCluster(rbfts)
+	// init recovery to stable view 1, primary is node2
+	clusterInitRecovery(t, nodes, rbfts, -1)
 
+	// mock backup node1 cached some txs.
 	tx := newTx()
 	rbfts[0].batchMgr.requestPool.AddNewRequests([]*protos.Transaction{tx}, false, true)
 	batch := rbfts[0].batchMgr.requestPool.GenerateRequestBatch()
 
 	// a message list
-	msgList := xset{
-		uint64(1): "",
-		uint64(2): "",
-		uint64(3): batch[0].BatchHash,
+	msgList := []*pb.Vc_PQ{
+		{SequenceNumber: 1, BatchDigest: ""},
+		{SequenceNumber: 2, BatchDigest: ""},
+		{SequenceNumber: 3, BatchDigest: batch[0].BatchHash},
 	}
 
 	rbfts[0].putBackRequestBatches(msgList)
@@ -366,12 +328,12 @@ func TestVC_processNewView_AfterViewChanged_LargerConfig(t *testing.T) {
 	configBatch := batch1[0]
 
 	// a message list
-	msgList := xset{
-		uint64(0): "XXX GENESIS",
-		uint64(1): "",
-		uint64(2): "",
-		uint64(3): batch.BatchHash,
-		uint64(4): configBatch.BatchHash,
+	msgList := []*pb.Vc_PQ{
+		{SequenceNumber: 0, BatchDigest: "XXX GENESIS"},
+		{SequenceNumber: 1, BatchDigest: ""},
+		{SequenceNumber: 2, BatchDigest: ""},
+		{SequenceNumber: 3, BatchDigest: batch.BatchHash},
+		{SequenceNumber: 4, BatchDigest: configBatch.BatchHash},
 	}
 
 	rbfts[0].putBackRequestBatches(msgList)
@@ -418,12 +380,12 @@ func TestVC_processNewView_AfterViewChanged_LowerConfig(t *testing.T) {
 	configBatch := batch1[0]
 
 	// a message list
-	msgList := xset{
-		uint64(0): "XXX GENESIS",
-		uint64(1): "",
-		uint64(2): "",
-		uint64(3): batch.BatchHash,
-		uint64(4): configBatch.BatchHash,
+	msgList := []*pb.Vc_PQ{
+		{SequenceNumber: 0, BatchDigest: "XXX GENESIS"},
+		{SequenceNumber: 1, BatchDigest: ""},
+		{SequenceNumber: 2, BatchDigest: ""},
+		{SequenceNumber: 3, BatchDigest: batch.BatchHash},
+		{SequenceNumber: 4, BatchDigest: configBatch.BatchHash},
 	}
 
 	rbfts[0].putBackRequestBatches(msgList)
@@ -470,12 +432,12 @@ func TestVC_processNewView_AfterViewChanged_EqualConfig(t *testing.T) {
 	configBatch := batch1[0]
 
 	// a message list
-	msgList := xset{
-		uint64(0): "XXX GENESIS",
-		uint64(1): "",
-		uint64(2): "",
-		uint64(3): batch.BatchHash,
-		uint64(4): configBatch.BatchHash,
+	msgList := []*pb.Vc_PQ{
+		{SequenceNumber: 0, BatchDigest: "XXX GENESIS"},
+		{SequenceNumber: 1, BatchDigest: ""},
+		{SequenceNumber: 2, BatchDigest: ""},
+		{SequenceNumber: 3, BatchDigest: batch.BatchHash},
+		{SequenceNumber: 4, BatchDigest: configBatch.BatchHash},
 	}
 
 	rbfts[0].putBackRequestBatches(msgList)
@@ -513,7 +475,7 @@ func TestVC_processNewView_AfterViewChanged_EqualConfig(t *testing.T) {
 	assert.Equal(t, pb.Type_COMMIT, nodes[0].broadcastMessageCache.Type)
 }
 
-func TestVC_feedMissingReqBatchIfNeeded(t *testing.T) {
+func TestVC_fetchMissingReqBatchIfNeeded(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -524,10 +486,10 @@ func TestVC_feedMissingReqBatchIfNeeded(t *testing.T) {
 	batch := rbfts[0].batchMgr.requestPool.GenerateRequestBatch()
 
 	// a message list
-	msgList := xset{
-		uint64(1): "",
-		uint64(2): "",
-		uint64(3): batch[0].BatchHash,
+	msgList := []*pb.Vc_PQ{
+		{SequenceNumber: 1, BatchDigest: ""},
+		{SequenceNumber: 2, BatchDigest: ""},
+		{SequenceNumber: 3, BatchDigest: batch[0].BatchHash},
 	}
 
 	rbfts[0].putBackRequestBatches(msgList)
@@ -561,7 +523,7 @@ func TestVC_correctViewChange(t *testing.T) {
 	vc := &pb.ViewChange{}
 	_ = proto.Unmarshal(vcPayload, vc)
 
-	flag1 := rbfts[0].correctViewChange(vc)
+	flag1 := rbfts[0].correctViewChange(unMarshalVcBasis(vc))
 	assert.Equal(t, true, flag1)
 
 	p := &pb.Vc_PQ{
@@ -571,29 +533,29 @@ func TestVC_correctViewChange(t *testing.T) {
 	}
 	pSet := []*pb.Vc_PQ{p}
 
-	vcError1 := &pb.ViewChange{
-		Basis: &pb.VcBasis{
-			View: uint64(1),
-			H:    uint64(20),
-			Pset: pSet,
-		},
+	vcBasisError1 := &pb.VcBasis{
+		View: uint64(1),
+		H:    uint64(20),
+		Pset: pSet,
 	}
-	flag2 := rbfts[0].correctViewChange(vcError1)
+	flag2 := rbfts[0].correctViewChange(vcBasisError1)
 	assert.Equal(t, false, flag2)
 
-	c := &pb.Vc_C{
-		SequenceNumber: uint64(10),
-		Digest:         "block-number-10",
-	}
-	cSet := []*pb.Vc_C{c}
-	vcError2 := &pb.ViewChange{
-		Basis: &pb.VcBasis{
-			View: uint64(1),
-			H:    uint64(60),
-			Cset: cSet,
+	c := &pb.SignedCheckpoint{
+		Checkpoint: &protos.Checkpoint{
+			ExecuteState: &protos.Checkpoint_ExecuteState{
+				Height: uint64(10),
+				Digest: "block-number-10",
+			},
 		},
 	}
-	flag3 := rbfts[0].correctViewChange(vcError2)
+	cSet := []*pb.SignedCheckpoint{c}
+	vcBasisError2 := &pb.VcBasis{
+		View: uint64(1),
+		H:    uint64(60),
+		Cset: cSet,
+	}
+	flag3 := rbfts[0].correctViewChange(vcBasisError2)
 	assert.Equal(t, false, flag3)
 }
 
@@ -605,11 +567,15 @@ func TestVC_assignSequenceNumbers(t *testing.T) {
 
 	//Quorum = 3
 	//oneQuorum = 2
-	C := &pb.Vc_C{
-		SequenceNumber: 5,
-		Digest:         "msg",
+	C := &pb.SignedCheckpoint{
+		Checkpoint: &protos.Checkpoint{
+			ExecuteState: &protos.Checkpoint_ExecuteState{
+				Height: uint64(5),
+				Digest: "msg",
+			},
+		},
 	}
-	CSet := []*pb.Vc_C{C}
+	CSet := []*pb.SignedCheckpoint{C}
 	P1 := &pb.Vc_PQ{
 		SequenceNumber: 5,
 		BatchDigest:    "msg",
@@ -650,16 +616,16 @@ func TestVC_assignSequenceNumbers(t *testing.T) {
 		Qset:      QSet,
 	}
 	set := []*pb.VcBasis{BasisHighH, Basis, Basis, Basis}
-
 	list := rbfts[1].assignSequenceNumbers(set, 4)
-	ret := map[uint64]string{
-		uint64(5):  "msg",
-		uint64(6):  "",
-		uint64(7):  "",
-		uint64(8):  "",
-		uint64(9):  "",
-		uint64(10): "msgHigh",
+
+	expectList := []*pb.Vc_PQ{
+		{SequenceNumber: 5, BatchDigest: "msg"},
+		{SequenceNumber: 6, BatchDigest: ""},
+		{SequenceNumber: 7, BatchDigest: ""},
+		{SequenceNumber: 8, BatchDigest: ""},
+		{SequenceNumber: 9, BatchDigest: ""},
+		{SequenceNumber: 10, BatchDigest: "msgHigh"},
 	}
 
-	assert.Equal(t, ret, list)
+	assert.EqualValues(t, expectList, list)
 }

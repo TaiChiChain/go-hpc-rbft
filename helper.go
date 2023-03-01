@@ -23,10 +23,11 @@ import (
 
 	hpcCommonTypes "github.com/hyperchain/go-hpc-common/types"
 	"github.com/hyperchain/go-hpc-common/types/protos"
-	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
-	"github.com/hyperchain/go-hpc-rbft/types"
+	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
+	"github.com/hyperchain/go-hpc-rbft/v2/types"
 
 	"github.com/gogo/protobuf/proto"
+	"golang.org/x/crypto/sha3"
 )
 
 // =============================================================================
@@ -180,8 +181,6 @@ func (rbft *rbftImpl) broadcastReqSet(set *pb.RequestSet) {
 	}
 	consensusMsg := &pb.ConsensusMessage{
 		Type:    pb.Type_REQUEST_SET,
-		From:    rbft.peerPool.ID,
-		Epoch:   rbft.epoch,
 		Payload: payload,
 	}
 	rbft.peerPool.broadcast(consensusMsg)
@@ -233,115 +232,6 @@ func (rbft *rbftImpl) nullReqTimerReset() {
 	rbft.timerMgr.startTimerWithNewTT(nullRequestTimer, timeout, event)
 }
 
-// stopFirstRequestTimer stops the first request timer event if current node is not primary
-func (rbft *rbftImpl) stopFirstRequestTimer() {
-	if !rbft.isPrimary(rbft.peerPool.ID) {
-		rbft.timerMgr.stopTimer(firstRequestTimer)
-	}
-}
-
-// =============================================================================
-// helper functions for check the validity of consensus messages
-// =============================================================================
-// isPrePrepareLegal firstly checks if current status can receive pre-prepare or not, then checks pre-prepare message
-// itself is legal or not
-func (rbft *rbftImpl) isPrePrepareLegal(preprep *pb.PrePrepare) bool {
-
-	if rbft.atomicIn(InRecovery) {
-		rbft.logger.Debugf("Replica %d try to receive prePrepare, but it's in recovery", rbft.peerPool.ID)
-		return false
-	}
-
-	if rbft.atomicIn(InViewChange) {
-		rbft.logger.Debugf("Replica %d try to receive prePrepare, but it's in viewChange", rbft.peerPool.ID)
-		return false
-	}
-
-	if rbft.atomicIn(InConfChange) {
-		rbft.logger.Debugf("Replica %d try to receive prePrepare, but it's in confChange", rbft.peerPool.ID)
-		return false
-	}
-
-	// replica rejects prePrepare sent from non-primary.
-	if !rbft.isPrimary(preprep.ReplicaId) {
-		primaryID := rbft.primaryID(rbft.view)
-		rbft.logger.Warningf("Replica %d received prePrepare from non-primary: got %d, should be %d",
-			rbft.peerPool.ID, preprep.ReplicaId, primaryID)
-		return false
-	}
-
-	// primary reject prePrepare sent from itself.
-	if rbft.isPrimary(rbft.peerPool.ID) {
-		rbft.logger.Warningf("Primary %d reject prePrepare sent from itself", rbft.peerPool.ID)
-		return false
-	}
-
-	if !rbft.inWV(preprep.View, preprep.SequenceNumber) {
-		if preprep.SequenceNumber != rbft.h && !rbft.in(SkipInProgress) {
-			rbft.logger.Warningf("Replica %d received prePrepare with a different view or sequence "+
-				"number outside watermarks: prePrep.View %d, expected.View %d, seqNo %d, low water mark %d",
-				rbft.peerPool.ID, preprep.View, rbft.view, preprep.SequenceNumber, rbft.h)
-		} else {
-			// This is perfectly normal
-			rbft.logger.Debugf("Replica %d received prePrepare with a different view or sequence "+
-				"number outside watermarks: preprep.View %d, expected.View %d, seqNo %d, low water mark %d",
-				rbft.peerPool.ID, preprep.View, rbft.view, preprep.SequenceNumber, rbft.h)
-		}
-		return false
-	}
-
-	if preprep.SequenceNumber <= rbft.exec.lastExec {
-		rbft.logger.Debugf("Replica %d received a prePrepare with seqNo %d lower than lastExec %d, "+
-			"ignore it...", rbft.peerPool.ID, preprep.SequenceNumber, rbft.exec.lastExec)
-		return false
-	}
-
-	return true
-}
-
-// isPrepareLegal firstly checks if current status can receive prepare or not, then checks prepare message itself is
-// legal or not
-func (rbft *rbftImpl) isPrepareLegal(prep *pb.Prepare) bool {
-
-	// if we are not in recovery, but receive prepare from primary, which means primary behavior as a byzantine,
-	// we don't send viewchange here, because in this case, replicas will eventually find primary abnormal in other cases.
-	if rbft.isPrimary(prep.ReplicaId) {
-		rbft.logger.Debugf("Replica %d received prepare from primary, ignore it", rbft.peerPool.ID)
-		return false
-	}
-
-	if !rbft.inWV(prep.View, prep.SequenceNumber) {
-		if prep.SequenceNumber != rbft.h && !rbft.in(SkipInProgress) {
-			rbft.logger.Warningf("Replica %d ignore prepare from replica %d for view=%d/seqNo=%d: not inWv, in view: %d, h: %d",
-				rbft.peerPool.ID, prep.ReplicaId, prep.View, prep.SequenceNumber, rbft.view, rbft.h)
-		} else {
-			// This is perfectly normal
-			rbft.logger.Debugf("Replica %d ignore prepare from replica %d for view=%d/seqNo=%d: not inWv, in view: %d, h: %d",
-				rbft.peerPool.ID, prep.ReplicaId, prep.View, prep.SequenceNumber, rbft.view, rbft.h)
-		}
-
-		return false
-	}
-	return true
-}
-
-// isCommitLegal checks commit message is legal or not
-func (rbft *rbftImpl) isCommitLegal(commit *pb.Commit) bool {
-
-	if !rbft.inWV(commit.View, commit.SequenceNumber) {
-		if commit.SequenceNumber != rbft.h && !rbft.in(SkipInProgress) {
-			rbft.logger.Warningf("Replica %d ignore commit from replica %d for view=%d/seqNo=%d: not inWv, in view: %d, h: %d",
-				rbft.peerPool.ID, commit.ReplicaId, commit.View, commit.SequenceNumber, rbft.view, rbft.h)
-		} else {
-			// This is perfectly normal
-			rbft.logger.Debugf("Replica %d ignore commit from replica %d for view=%d/seqNo=%d: not inWv, in view: %d, h: %d",
-				rbft.peerPool.ID, commit.ReplicaId, commit.View, commit.SequenceNumber, rbft.view, rbft.h)
-		}
-		return false
-	}
-	return true
-}
-
 // compareCheckpointWithWeakSet first checks the legality of this checkpoint, which seqNo
 // must between [h, H] and we haven't received a same checkpoint message, then find the
 // weak set with more than f + 1 members who have sent a checkpoint with the same seqNo
@@ -364,13 +254,14 @@ func (rbft *rbftImpl) compareCheckpointWithWeakSet(signedCheckpoint *pb.SignedCh
 	}
 
 	cID := chkptID{
-		nodeHost: signedCheckpoint.NodeInfo.ReplicaHost,
+		author:   signedCheckpoint.GetAuthor(),
 		sequence: checkpointHeight,
 	}
 
 	_, ok := rbft.storeMgr.checkpointStore[cID]
 	if ok {
-		rbft.logger.Warningf("Replica %d received duplicate checkpoint from replica %s for seqNo %d, update storage", rbft.peerPool.ID, cID.nodeHost, cID.sequence)
+		rbft.logger.Warningf("Replica %d received duplicate checkpoint from replica %s "+
+			"for seqNo %d, update storage", rbft.peerPool.ID, cID.author, cID.sequence)
 	}
 	rbft.storeMgr.checkpointStore[cID] = signedCheckpoint
 
@@ -455,28 +346,24 @@ func (rbft *rbftImpl) compareCheckpointWithWeakSet(signedCheckpoint *pb.SignedCh
 	return true, correctCheckpoints
 }
 
-// compareWholeStates compares whole networks' current status during recovery or sync state
+// compareWholeStates compares whole networks' current status during sync state
 // including :
-// 1. epoch: current epoch of bft network
-// 3. view: current view of bft network
-// 3. height(only compared in sync state): current latest blockChain height
-// 4. digest(only compared in sync state): current latest blockChain hash
+// 1. view: current view of bft network
+// 2. height: current latest blockChain height
+// 3. digest: current latest blockChain hash
 func (rbft *rbftImpl) compareWholeStates(states wholeStates) consensusEvent {
-	// track all replica hash with same state used to update routing table if needed
+	// track all replica with same state used to find quorum consistent state
 	sameRespRecord := make(map[nodeState][]*pb.SignedCheckpoint)
 
-	// check if we can find quorum nodeState who have the same epoch and view, height and digest, if we can
-	// find, which means quorum nodes agree to same state, save to quorumRsp, set canFind to true and update
-	// epoch, view if needed
+	// check if we can find quorum nodeState who have the same view, height and digest, if we can
+	// find, which means quorum nodes agree to same state, save to quorumRsp, set canFind to true
+	// and update view if needed
 	var quorumResp nodeState
 	canFind := false
 
 	// find the quorum nodeState
 	for key, state := range states {
 		sameRespRecord[state] = append(sameRespRecord[state], key)
-		// If quorum agree with a same N,view,epoch, check if we need to update routing table first.
-		// As for quorum will be changed according to validator set, and we cannot be sure that router info of
-		// the node is correct, we should calculate the commonCaseQuorum with the N of state.
 		if len(sameRespRecord[state]) >= rbft.commonCaseQuorum() {
 			rbft.logger.Debugf("Replica %d find quorum states, try to process", rbft.peerPool.ID)
 			quorumResp = state
@@ -485,99 +372,63 @@ func (rbft *rbftImpl) compareWholeStates(states wholeStates) consensusEvent {
 		}
 	}
 
-	// we can find the quorum nodeState with the same N and view, judge if the response.view equals to the
-	// current view, if so, just update N and view, else update N, view and then re-constructs certStore
+	// we can find the quorum nodeState with the same view, judge if the response.view equals to the
+	// current view, if so, trigger recovery view change to recover view.
 	if canFind {
-		// update view if we need it and we needn't sync epoch
-		if rbft.view != quorumResp.view && !rbft.recoveryMgr.needSyncEpoch {
-			rbft.setView(quorumResp.view)
-			rbft.logger.Infof("Replica %d persist view=%d after found quorum same response.", rbft.peerPool.ID, rbft.view)
-			rbft.persistView(rbft.view)
+		// trigger recovery view change if current view is incorrect.
+		if rbft.view != quorumResp.view {
+			rbft.logger.Noticef("Replica %d try to view change to quorum view %d in view %d",
+				rbft.peerPool.ID, quorumResp.view, rbft.view)
+			return rbft.initRecovery()
 		}
 
-		if rbft.in(InSyncState) {
-			// get self-state to compare
-			state := rbft.node.getCurrentState()
-			if state == nil {
-				rbft.logger.Warningf("Replica %d has a nil state", rbft.peerPool.ID)
-				return nil
-			}
-
-			// we could stop sync-state timer here as we has already found quorum sync-state-response
-			rbft.timerMgr.stopTimer(syncStateRspTimer)
-			rbft.off(InSyncState)
-
-			// case 1) wrong epoch [sync]:
-			// self epoch is lower than the others and we need to find correct epoch-info at first
-			// trigger state-update
-			if quorumResp.epoch > rbft.epoch {
-				rbft.logger.Warningf("Replica %d finds quorum same epoch %d, which is lager than self epoch %d, "+
-					"need to state update", rbft.peerPool.ID, quorumResp.epoch, rbft.epoch)
-
-				target := &types.MetaState{
-					Height: quorumResp.height,
-					Digest: quorumResp.digest,
-				}
-				rbft.updateHighStateTarget(target, sameRespRecord[quorumResp])
-				rbft.tryStateTransfer()
-				return nil
-			}
-
-			// case 2) wrong height [sync]:
-			// self height of blocks is lower than others
-			// trigger recovery
-			if state.MetaState.Height != quorumResp.height {
-				rbft.logger.Noticef("Replica %d finds quorum same block state which is different from self,"+
-					"self height: %d, quorum height: %d",
-					rbft.peerPool.ID, state.MetaState.Height, quorumResp.height)
-
-				// node in lower height cannot become a primary node
-				if rbft.isPrimary(rbft.peerPool.ID) {
-					rbft.logger.Warningf("Primary %d finds itself not sync with quorum replicas, sending viewChange", rbft.peerPool.ID)
-					return rbft.sendViewChange()
-				}
-				rbft.logger.Infof("Replica %d finds itself not sync with quorum replicas, try to recovery", rbft.peerPool.ID)
-				return rbft.initRecovery()
-			}
-
-			// case 3) wrong block hash [error]:
-			// we have correct epoch and block-height, but the hash of latest block is wrong
-			// trigger state-update
-			if state.MetaState.Height == quorumResp.height && state.MetaState.Digest != quorumResp.digest {
-				rbft.logger.Errorf("Replica %d finds quorum same block state whose hash is different from self,"+
-					"in height: %d, selfHash: %s, quorumDigest: %s, need to state update",
-					rbft.peerPool.ID, quorumResp.height, state.MetaState.Digest, quorumResp.digest)
-
-				target := &types.MetaState{
-					Height: quorumResp.height,
-					Digest: quorumResp.digest,
-				}
-				rbft.updateHighStateTarget(target, sameRespRecord[quorumResp])
-				rbft.tryStateTransfer()
-				return nil
-			}
-
-			rbft.logger.Infof("======== Replica %d finished sync state for height: %d, current epoch: %d, current view %d",
-				rbft.peerPool.ID, state.MetaState.Height, rbft.epoch, rbft.view)
-			rbft.external.SendFilterEvent(types.InformTypeFilterStableCheckpoint, sameRespRecord[quorumResp])
+		// get self-state to compare
+		state := rbft.node.getCurrentState()
+		if state == nil {
+			rbft.logger.Warningf("Replica %d has a nil state", rbft.peerPool.ID)
 			return nil
 		}
 
-		if rbft.atomicIn(InRecovery) {
-			// if current node finds itself become primary, but quorum other replicas
-			// are in normal status, directly send viewChange as we don't want to
-			// resend prePrepares after sync view.
-			if rbft.isPrimary(rbft.peerPool.ID) {
-				rbft.logger.Warningf("Replica %d become primary after sync view, sending viewChange", rbft.peerPool.ID)
-				rbft.timerMgr.stopTimer(recoveryRestartTimer)
-				rbft.atomicOff(InRecovery)
-				rbft.metrics.statusGaugeInRecovery.Set(0)
-				rbft.sendViewChange()
-				return nil
-			}
+		// we could stop sync-state timer here as we have already found quorum sync-state-response
+		rbft.timerMgr.stopTimer(syncStateRspTimer)
+		rbft.off(InSyncState)
 
-			return rbft.resetStateForRecovery()
+		// case 1) wrong height [sync]:
+		// self height of blocks is lower than others
+		// trigger recovery
+		if state.MetaState.Height != quorumResp.height {
+			rbft.logger.Noticef("Replica %d finds quorum same block state which is different from self,"+
+				"self height: %d, quorum height: %d", rbft.peerPool.ID, state.MetaState.Height, quorumResp.height)
+
+			// node in lower height cannot become a primary node
+			if rbft.isPrimary(rbft.peerPool.ID) {
+				rbft.logger.Warningf("Primary %d finds itself not sync with quorum replicas, sending viewChange", rbft.peerPool.ID)
+				return rbft.sendViewChange()
+			}
+			rbft.logger.Infof("Replica %d finds itself not sync with quorum replicas, try to recovery", rbft.peerPool.ID)
+			return rbft.initRecovery()
 		}
+
+		// case 2) wrong block hash [error]:
+		// we have correct block-height, but the hash of the latest block is wrong
+		// trigger state-update
+		if state.MetaState.Height == quorumResp.height && state.MetaState.Digest != quorumResp.digest {
+			rbft.logger.Errorf("Replica %d finds quorum same block state whose hash is different from self,"+
+				"in height: %d, selfHash: %s, quorumDigest: %s, need to state update",
+				rbft.peerPool.ID, quorumResp.height, state.MetaState.Digest, quorumResp.digest)
+
+			target := &types.MetaState{
+				Height: quorumResp.height,
+				Digest: quorumResp.digest,
+			}
+			rbft.updateHighStateTarget(target, sameRespRecord[quorumResp])
+			rbft.tryStateTransfer()
+			return nil
+		}
+
+		rbft.logger.Infof("======== Replica %d finished sync state for height: %d, epoch: %d, view %d",
+			rbft.peerPool.ID, state.MetaState.Height, rbft.epoch, rbft.view)
+		rbft.external.SendFilterEvent(types.InformTypeFilterStableCheckpoint, sameRespRecord[quorumResp])
 	}
 
 	return nil
@@ -661,10 +512,10 @@ func (rbft *rbftImpl) getVcBasis() *pb.VcBasis {
 	rbft.vcMgr.plist = rbft.calcPSet()
 	rbft.vcMgr.qlist = rbft.calcQSet()
 
-	// Note. before vc/recovery, we need to persist QPList to ensure we can restore committed entries after
-	// above abnormal situations as we will delete all PQCSet when we enter abnormal, after finish vc/recovery
+	// Note. before vc, we need to persist QPList to ensure we can restore committed entries after
+	// above abnormal situations as we will delete all PQCSet when we enter abnormal, after finish vc,
 	// we will re-broadcast and persist PQCSet which is enough to ensure continuity of committed entries in
-	// next vc/recovery. However, QPList cannot be deleted immediately after finish vc/recovery as we may loss
+	// next vc. However, QPList cannot be deleted immediately after finish vc as we may have missed
 	// some committed entries after crash down in normal status.
 	// So:
 	// 1. during normal status, we have: QPSet with pre-prepare certs and prepare certs and QPList generated in
@@ -683,20 +534,16 @@ func (rbft *rbftImpl) getVcBasis() *pb.VcBasis {
 		}
 	}
 
-	basis.Cset, basis.Pset, basis.Qset, basis.SignedCheckpoints = rbft.gatherPQC()
+	basis.Pset, basis.Qset, basis.Cset = rbft.gatherPQC()
 
 	return basis
 }
 
 // gatherPQC just gather all checkpoints, p entries and q entries.
-func (rbft *rbftImpl) gatherPQC() (cset []*pb.Vc_C, pset []*pb.Vc_PQ, qset []*pb.Vc_PQ, signedCheckpoints []*pb.SignedCheckpoint) {
+func (rbft *rbftImpl) gatherPQC() (pset []*pb.Vc_PQ, qset []*pb.Vc_PQ, signedCheckpoints []*pb.SignedCheckpoint) {
 	// Gather all the checkpoints
 	rbft.logger.Debugf("Replica %d gather CSet:", rbft.peerPool.ID)
 	for n, signedCheckpoint := range rbft.storeMgr.localCheckpoints {
-		cset = append(cset, &pb.Vc_C{
-			SequenceNumber: n,
-			Digest:         signedCheckpoint.Checkpoint.Digest(),
-		})
 		signedCheckpoints = append(signedCheckpoints, signedCheckpoint)
 		rbft.logger.Debugf("seqNo: %d, ID: %s", n, signedCheckpoint.Checkpoint.Digest())
 	}
@@ -726,7 +573,7 @@ func (rbft *rbftImpl) gatherPQC() (cset []*pb.Vc_C, pset []*pb.Vc_PQ, qset []*pb
 }
 
 // putBackRequestBatches reset all txs into 'non-batched' state in requestPool to prepare re-arrange by order.
-func (rbft *rbftImpl) putBackRequestBatches(xset xset) {
+func (rbft *rbftImpl) putBackRequestBatches(xset []*pb.Vc_PQ) {
 
 	// remove all the batches that smaller than initial checkpoint.
 	// those batches are the dependency of duplicator,
@@ -756,8 +603,8 @@ func (rbft *rbftImpl) putBackRequestBatches(xset xset) {
 	rbft.metrics.cacheBatchNumber.Set(float64(0))
 
 	hashListMap := make(map[string]bool)
-	for _, hash := range xset {
-		hashListMap[hash] = true
+	for _, msg := range xset {
+		hashListMap[msg.BatchDigest] = true
 	}
 
 	// don't remove those batches which are not contained in xSet from batchStore as they may be useful
@@ -771,14 +618,6 @@ func (rbft *rbftImpl) putBackRequestBatches(xset xset) {
 
 // checkIfNeedStateUpdate checks if a replica needs to do state update
 func (rbft *rbftImpl) checkIfNeedStateUpdate(checkpointState *types.CheckpointState, checkpointSet []*pb.SignedCheckpoint) bool {
-	// TODO(DH): refactor epoch sync, use EpochChangeProof to sync epoch.
-	if rbft.atomicIn(InRecovery) && rbft.recoveryMgr.needSyncEpoch {
-		rbft.logger.Infof("Replica %d in wrong epoch %d needs to state update", rbft.peerPool.ID, rbft.epoch)
-		rbft.updateHighStateTarget(&checkpointState.Meta, checkpointSet)
-		rbft.tryStateTransfer()
-		return true
-	}
-
 	// initial checkpoint height and digest.
 	initialCheckpointHeight := checkpointState.Meta.Height
 	initialCheckpointDigest := checkpointState.Meta.Digest
@@ -807,7 +646,7 @@ func (rbft *rbftImpl) checkIfNeedStateUpdate(checkpointState *types.CheckpointSt
 			} else {
 				rbft.logger.Debugf("Replica %d finds normal checkpoint %d when checkIfNeedStateUpdate",
 					rbft.peerPool.ID, initialCheckpointHeight)
-				rbft.moveWatermarks(initialCheckpointHeight, false)
+				rbft.moveWatermarks(initialCheckpointHeight)
 			}
 			return false
 		}
@@ -828,30 +667,6 @@ func (rbft *rbftImpl) checkIfNeedStateUpdate(checkpointState *types.CheckpointSt
 		rbft.tryStateTransfer()
 		return true
 	}
-	return false
-}
-
-func (rbft *rbftImpl) getNodeInfo() *pb.NodeInfo {
-	return &pb.NodeInfo{
-		ReplicaId:   rbft.peerPool.ID,
-		ReplicaHost: rbft.peerPool.hostname,
-	}
-}
-
-func (rbft *rbftImpl) nodeID(hostname string) uint64 {
-	id, ok := rbft.peerPool.routerMap.HostMap[hostname]
-	if !ok {
-		return 0
-	}
-	return id
-}
-
-func (rbft *rbftImpl) inRouters(hostname string) bool {
-	_, ok := rbft.peerPool.routerMap.HostMap[hostname]
-	if ok {
-		return true
-	}
-	rbft.logger.Warningf("Replica %d cannot find %s in routers,", rbft.peerPool.ID, hostname)
 	return false
 }
 
@@ -925,7 +740,7 @@ func drainChannel(ch chan interface{}) protos.Transactions {
 // generateSignedCheckpoint generates a signed checkpoint using given service state.
 func (rbft *rbftImpl) generateSignedCheckpoint(state *types.ServiceState, isConfig bool) (*pb.SignedCheckpoint, error) {
 	signedCheckpoint := &pb.SignedCheckpoint{
-		NodeInfo: rbft.getNodeInfo(),
+		Author: rbft.peerPool.hostname,
 	}
 
 	checkpoint := &protos.Checkpoint{
@@ -985,7 +800,7 @@ func (rbft *rbftImpl) signCheckpoint(checkpoint *protos.Checkpoint) ([]byte, err
 // verifySignedCheckpoint returns whether given signedCheckpoint contains a valid signature.
 func (rbft *rbftImpl) verifySignedCheckpoint(signedCheckpoint *pb.SignedCheckpoint) error {
 	msg := signedCheckpoint.Checkpoint.Hash()
-	return rbft.external.Verify(signedCheckpoint.NodeInfo.ReplicaHost, signedCheckpoint.Signature, msg)
+	return rbft.external.Verify(signedCheckpoint.GetAuthor(), signedCheckpoint.Signature, msg)
 }
 
 // syncConfigCheckpoint posts config checkpoint out and wait for its completion synchronously.
@@ -1028,11 +843,94 @@ func (rbft *rbftImpl) syncEpoch() bool {
 	if epochChanged {
 		rbft.logger.Infof("epoch changed from %d to %d", rbft.epoch, chainEpoch)
 		rbft.turnIntoEpoch()
-		rbft.moveWatermarks(lastEpochCheckpoint.Height(), true)
+		rbft.moveWatermarks(lastEpochCheckpoint.Height())
 	} else {
 		rbft.logger.Debugf("Replica %d don't change epoch as epoch %d has not been changed",
 			rbft.peerPool.ID, rbft.epoch)
 	}
 
 	return epochChanged
+}
+
+// signViewChange generates a signature of certain ViewChange message.
+func (rbft *rbftImpl) signViewChange(vc *pb.ViewChange) ([]byte, error) {
+	hash, hErr := rbft.calculateViewChangeHash(vc)
+	if hErr != nil {
+		return nil, hErr
+	}
+	sig, sErr := rbft.external.Sign(hash)
+	if sErr != nil {
+		rbft.logger.Warningf("Replica %d sign view change failed: %s", rbft.peerPool.ID, sErr)
+		rbft.stopNamespace()
+		return nil, sErr
+	}
+	return sig, nil
+}
+
+// verifySignedViewChange returns whether given ViewChange contains a valid signature.
+func (rbft *rbftImpl) verifySignedViewChange(vc *pb.ViewChange, replicaID uint64) error {
+	hash, hErr := rbft.calculateViewChangeHash(vc)
+	if hErr != nil {
+		return hErr
+	}
+	host, ok := rbft.peerPool.router[replicaID]
+	if !ok {
+		return fmt.Errorf("invalid node %d not in router", replicaID)
+	}
+	return rbft.external.Verify(host, vc.Signature, hash)
+}
+
+func (rbft *rbftImpl) calculateViewChangeHash(vc *pb.ViewChange) ([]byte, error) {
+	hasher := sha3.NewLegacyKeccak256()
+	//nolint
+	hasher.Write(vc.GetBasis())
+	hash := hasher.Sum(nil)
+	return hash, nil
+}
+
+// signNewView generates a signature of certain NewView message.
+func (rbft *rbftImpl) signNewView(nv *pb.NewView) ([]byte, error) {
+	hash, hErr := rbft.calculateNewViewHash(nv)
+	if hErr != nil {
+		return nil, hErr
+	}
+	sig, sErr := rbft.external.Sign(hash)
+	if sErr != nil {
+		rbft.logger.Warningf("Replica %d sign new view failed: %s", rbft.peerPool.ID, sErr)
+		rbft.stopNamespace()
+		return nil, sErr
+	}
+	return sig, nil
+}
+
+// verifySignedNewView returns whether given NewView contains a valid signature.
+func (rbft *rbftImpl) verifySignedNewView(nv *pb.NewView) ([]byte, error) {
+	hash, hErr := rbft.calculateNewViewHash(nv)
+	if hErr != nil {
+		return nil, hErr
+	}
+	host, ok := rbft.peerPool.router[nv.GetReplicaId()]
+	if !ok {
+		return nil, fmt.Errorf("invalid node %d not in router", nv.GetReplicaId())
+	}
+	return hash, rbft.external.Verify(host, nv.Signature, hash)
+}
+
+func (rbft *rbftImpl) calculateNewViewHash(nv *pb.NewView) ([]byte, error) {
+	signValue := &pb.NewView{
+		ReplicaId: nv.ReplicaId,
+		View:      nv.View,
+		Xset:      nv.Xset,
+	}
+	res, mErr := proto.Marshal(signValue)
+	if mErr != nil {
+		rbft.logger.Warningf("Replica %d marshal new view failed: %s", rbft.peerPool.ID, mErr)
+		rbft.stopNamespace()
+		return nil, mErr
+	}
+	hasher := sha3.NewLegacyKeccak256()
+	//nolint
+	hasher.Write(res)
+	hash := hasher.Sum(nil)
+	return hash, nil
 }

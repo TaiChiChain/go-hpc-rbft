@@ -22,8 +22,8 @@ import (
 	"strings"
 	"time"
 
-	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
-	"github.com/hyperchain/go-hpc-rbft/types"
+	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
+	"github.com/hyperchain/go-hpc-rbft/v2/types"
 
 	"github.com/gogo/protobuf/proto"
 )
@@ -204,7 +204,7 @@ func (rbft *rbftImpl) restoreCSet() (map[msgID]*pb.Cset, error) {
 	return cset, err
 }
 
-// persistQList persists marshaled qList into DB before vc/recovery.
+// persistQList persists marshaled qList into DB before vc.
 func (rbft *rbftImpl) persistQList(ql map[qidx]*pb.Vc_PQ) {
 	for idx, q := range ql {
 		raw, err := proto.Marshal(q)
@@ -220,7 +220,7 @@ func (rbft *rbftImpl) persistQList(ql map[qidx]*pb.Vc_PQ) {
 	}
 }
 
-// persistPList persists marshaled pList into DB before vc/recovery.
+// persistPList persists marshaled pList into DB before vc.
 func (rbft *rbftImpl) persistPList(pl map[uint64]*pb.Vc_PQ) {
 	for idx, p := range pl {
 		raw, err := proto.Marshal(p)
@@ -236,7 +236,7 @@ func (rbft *rbftImpl) persistPList(pl map[uint64]*pb.Vc_PQ) {
 	}
 }
 
-// persistDelQPList deletes all qList and pList stored in DB after finish vc/recovery.
+// persistDelQPList deletes all qList and pList stored in DB after finish vc.
 func (rbft *rbftImpl) persistDelQPList() {
 	qIndex, err := rbft.external.ReadStateSet("qlist.")
 	if err != nil {
@@ -341,25 +341,9 @@ func (rbft *rbftImpl) restorePList() (map[uint64]*pb.Vc_PQ, error) {
 
 // restoreCert restores pre-prepares,prepares,commits from database and remove the messages with seqNo>lastExec
 func (rbft *rbftImpl) restoreCert() {
-	var clean bool
-	cleanCert, err := rbft.storage.ReadState("cleanCert")
-	// delete this key immediately no matter this key exists or not to totally avoid
-	// cleanCert again in next restart.
-	_ = rbft.storage.DelState("cleanCert")
-	// if we have stored key "cleanCert" with value "true" using dbcli, then we need to clean
-	// cert with seqNo > lastExec.
-	if err == nil && string(cleanCert) == "true" {
-		clean = true
-	}
-
 	qset, _ := rbft.restoreQSet()
 	for idx, q := range qset {
 		if idx.n > rbft.exec.lastExec {
-			if clean {
-				rbft.logger.Debugf("Replica %d clean qSet with seqNo %d > lastExec %d", rbft.peerPool.ID, idx.n, rbft.exec.lastExec)
-				rbft.persistDelQSet(idx.v, idx.n, idx.d)
-				continue
-			}
 			rbft.logger.Debugf("Replica %d restore qSet with seqNo %d > lastExec %d", rbft.peerPool.ID, idx.n, rbft.exec.lastExec)
 		}
 		cert := rbft.storeMgr.getCert(idx.v, idx.n, idx.d)
@@ -369,11 +353,6 @@ func (rbft *rbftImpl) restoreCert() {
 	pset, _ := rbft.restorePSet()
 	for idx, prepares := range pset {
 		if idx.n > rbft.exec.lastExec {
-			if clean {
-				rbft.logger.Debugf("Replica %d clean pSet with seqNo %d > lastExec %d", rbft.peerPool.ID, idx.n, rbft.exec.lastExec)
-				rbft.persistDelPSet(idx.v, idx.n, idx.d)
-				continue
-			}
 			rbft.logger.Debugf("Replica %d restore pSet with seqNo %d > lastExec %d", rbft.peerPool.ID, idx.n, rbft.exec.lastExec)
 		}
 		cert := rbft.storeMgr.getCert(idx.v, idx.n, idx.d)
@@ -388,11 +367,6 @@ func (rbft *rbftImpl) restoreCert() {
 	cset, _ := rbft.restoreCSet()
 	for idx, commits := range cset {
 		if idx.n > rbft.exec.lastExec {
-			if clean {
-				rbft.logger.Debugf("Replica %d clean cSet with seqNo %d > lastExec %d", rbft.peerPool.ID, idx.n, rbft.exec.lastExec)
-				rbft.persistDelCSet(idx.v, idx.n, idx.d)
-				continue
-			}
 			rbft.logger.Debugf("Replica %d restore cSet with seqNo %d > lastExec %d", rbft.peerPool.ID, idx.n, rbft.exec.lastExec)
 		}
 		cert := rbft.storeMgr.getCert(idx.v, idx.n, idx.d)
@@ -471,15 +445,23 @@ func (rbft *rbftImpl) persistH(seqNo uint64) {
 	}
 }
 
-// persistView persists current view to database
-func (rbft *rbftImpl) persistView(view uint64) {
-	key := "view"
-	b := make([]byte, 8)
-	binary.LittleEndian.PutUint64(b, view)
-	err := rbft.storage.StoreState(key, b)
+// persistNewView persists current view to database
+func (rbft *rbftImpl) persistNewView(nv *pb.NewView) {
+	key := "new-view"
+	raw, err := proto.Marshal(nv)
 	if err != nil {
-		rbft.logger.Errorf("Persist view failed with err: %s ", err)
+		rbft.logger.Warningf("Replica %d could not persist NewView, error : %s", rbft.peerPool.ID, err)
+		rbft.stopNamespace()
+		return
 	}
+	err = rbft.storage.StoreState(key, raw)
+	if err != nil {
+		rbft.logger.Errorf("Persist NewView failed with err: %s ", err)
+	}
+
+	rbft.setView(nv.View)
+	rbft.vcMgr.latestNewView = nv
+	rbft.vcMgr.latestQuorumViewChange = nil
 }
 
 // persistN persists current N to database
@@ -505,33 +487,24 @@ func (rbft *rbftImpl) restoreN() {
 }
 
 // restoreView restores current view from database and then re-construct certStore
-func (rbft *rbftImpl) restoreView() bool {
-	setView, err := rbft.storage.ReadState("setView")
-	// delete this key immediately no matter this key exists or not to totally avoid
-	// setView again in next restart.
-	_ = rbft.storage.DelState("setView")
-	if err == nil && string(setView) != "" {
-		var nv int
-		nv, err = strconv.Atoi(string(setView))
-		if err != nil {
-			rbft.logger.Warningf("Replica %d could not restore setView %s to a integer", rbft.peerPool.ID, string(setView))
-		} else {
-			rbft.setView(uint64(nv))
-			rbft.logger.Noticef("========= restore set view %d =======", rbft.view)
-			return true
+func (rbft *rbftImpl) restoreView() {
+	raw, err := rbft.storage.ReadState("new-view")
+	if err == nil {
+		nv := &pb.NewView{}
+		err = proto.Unmarshal(raw, nv)
+		if err == nil {
+			rbft.logger.Debugf("Replica %d restore view %d", rbft.peerPool.ID, nv.View)
+			rbft.vcMgr.latestNewView = nv
+			rbft.setView(nv.View)
+			rbft.logger.Noticef("========= restore view %d =======", rbft.view)
+			return
 		}
 	}
-
-	v, err := rbft.storage.ReadState("view")
-	if err == nil {
-		view := binary.LittleEndian.Uint64(v)
-		rbft.setView(view)
-		rbft.logger.Noticef("========= restore view %d =======", rbft.view)
-	} else {
-		rbft.logger.Warningf("Replica %d could not restore view: %s, set to 0", rbft.peerPool.ID, err)
-		rbft.setView(uint64(0))
-	}
-	return false
+	rbft.logger.Warningf("Replica %d could not restore view: %s, set to 0", rbft.peerPool.ID, err)
+	// initial view 0 in new epoch.
+	rbft.vcMgr.latestNewView = initialNewView
+	rbft.setView(uint64(0))
+	return
 }
 
 // restoreBatchStore restores tx batches from database
@@ -562,20 +535,15 @@ func (rbft *rbftImpl) restoreBatchStore() {
 
 // It is application's responsibility to ensure data compatibility, so RBFT core need only trust and restore
 // consensus data from consensus DB.
-// restoreState restores lastExec, certStore, view, transaction batches, checkpoints, h and other add/del node related
+// restoreState restores lastExec, certStore, view, transaction batches, checkpoints, h and other related
 // params from database
 func (rbft *rbftImpl) restoreState() error {
 
 	rbft.batchMgr.setSeqNo(rbft.exec.lastExec)
-	setView := rbft.restoreView()
+	rbft.restoreView()
 	rbft.restoreN()
 
 	rbft.restoreCert()
-
-	// TODO(DH): do we need to save setView?
-	if setView {
-		rbft.parseCertStore()
-	}
 	rbft.restoreBatchStore()
 
 	chkpts, err := rbft.storage.ReadStateSet("chkpt.")
@@ -611,7 +579,7 @@ func (rbft *rbftImpl) restoreState() error {
 			rbft.logger.Warningf("transfer rbft.h from string to uint64 failed with err: %s", err)
 			return err
 		}
-		rbft.moveWatermarks(h, false)
+		rbft.moveWatermarks(h)
 	}
 
 	rbft.logger.Infof("Replica %d restored state: epoch: %d, view: %d, seqNo: %d, "+
@@ -619,69 +587,6 @@ func (rbft *rbftImpl) restoreState() error {
 		len(rbft.storeMgr.batchStore), len(rbft.storeMgr.localCheckpoints))
 
 	return nil
-}
-
-// parseCertStore parses certStore and remove the cert with the same seqNo but
-// a lower view.
-func (rbft *rbftImpl) parseCertStore() {
-	// parse certStore
-	rbft.logger.Debugf("Replica %d parse certStore to view %d", rbft.peerPool.ID, rbft.view)
-	newCertStore := make(map[msgID]*msgCert)
-	for idx, cert := range rbft.storeMgr.certStore {
-		maxIdx := idx
-		maxCert := cert
-		for tmpIdx, tmpCert := range rbft.storeMgr.certStore {
-			if maxIdx.n == tmpIdx.n {
-				if maxIdx.v <= tmpIdx.v {
-					maxIdx = tmpIdx
-					maxCert = tmpCert
-					rbft.persistDelQPCSet(tmpIdx.v, tmpIdx.n, tmpIdx.d)
-				}
-			}
-		}
-		if maxCert.prePrepare != nil {
-			maxCert.prePrepare.View = rbft.view
-			primaryID := rbft.primaryID(rbft.view)
-			maxCert.prePrepare.ReplicaId = primaryID
-			rbft.persistQSet(maxCert.prePrepare)
-		} else {
-			rbft.logger.Debugf("Replica %d finds nil prePrepare with view=%d/seqNo=%d/digest=%s", rbft.peerPool.ID, maxIdx.v, maxIdx.n, maxIdx.d)
-		}
-		preps := make(map[pb.Prepare]bool)
-		for prep := range maxCert.prepare {
-			prep.View = rbft.view
-			preps[prep] = true
-		}
-		maxCert.prepare = preps
-		rbft.persistPSet(maxIdx.v, maxIdx.n, maxIdx.d)
-
-		cmts := make(map[pb.Commit]bool)
-		for cmt := range maxCert.commit {
-			cmt.View = rbft.view
-			cmts[cmt] = true
-		}
-		maxCert.commit = cmts
-		rbft.persistCSet(maxIdx.v, maxIdx.n, maxIdx.d)
-
-		maxIdx.v = rbft.view
-		if maxIdx.n > rbft.exec.lastExec {
-			maxCert.sentPrepare = false
-			maxCert.sentCommit = false
-			maxCert.sentExecute = false
-		}
-		newCertStore[maxIdx] = maxCert
-	}
-	rbft.storeMgr.certStore = newCertStore
-
-	// parse pqlist
-	rbft.logger.Debugf("Replica %d parse pqlist to view %d", rbft.peerPool.ID, rbft.view)
-	for _, prepare := range rbft.vcMgr.plist {
-		prepare.View = rbft.view
-	}
-
-	for _, prePrepare := range rbft.vcMgr.qlist {
-		prePrepare.View = rbft.view
-	}
 }
 
 // parseQPCKey helps parse view, seqNo, digest from given key with prefix.
