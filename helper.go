@@ -951,10 +951,14 @@ func (rbft *rbftImpl) generateSignedCheckpoint(state *types.ServiceState, isConf
 				checkpoint.Epoch--
 			}
 		}
-		checkpoint.SetValidatorSet(rbft.external.GetNodeInfos())
-		checkpoint.SetVersion(rbft.external.GetAlgorithmVersion())
-		rbft.logger.Noticef("Replica %d generate a checkpoint with new validator set: %+v, new version: %s",
-			rbft.peerPool.ID, checkpoint.ValidatorSet(), checkpoint.Version())
+
+		ec := rbft.external.GetLastEpochChange()
+		if ec != nil && ec.Height == checkpoint.Height() {
+			checkpoint.SetValidatorSet(ec.Validators)
+			checkpoint.SetVersion(ec.AlgoVersion)
+			rbft.logger.Noticef("Replica %d generate a checkpoint with new validator set: %+v, new version: %s",
+				rbft.peerPool.ID, checkpoint.ValidatorSet(), checkpoint.Version())
+		}
 	}
 	signedCheckpoint.Checkpoint = checkpoint
 

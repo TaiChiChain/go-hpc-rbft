@@ -81,6 +81,8 @@ type EpochService interface {
 	// GetNodeInfos returns the full node info with public key.
 	GetNodeInfos() []*protos.NodeInfo
 
+	GetLastEpochChange() *types.EpochChange
+
 	// GetAlgorithmVersion returns current algorithm version
 	GetAlgorithmVersion() string
 

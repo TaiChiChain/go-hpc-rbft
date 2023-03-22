@@ -17,6 +17,8 @@ package types
 
 import (
 	"fmt"
+
+	"github.com/hyperchain/go-hpc-common/types/protos"
 )
 
 // ----------- ServiceState related structs-----------------
@@ -123,3 +125,9 @@ const (
 	// InformTypeFilterStableCheckpoint indicates stable checkpoint event.
 	InformTypeFilterStableCheckpoint InformType = 5
 )
+
+type EpochChange struct {
+	Height      uint64
+	Validators  protos.Validators
+	AlgoVersion string
+}
