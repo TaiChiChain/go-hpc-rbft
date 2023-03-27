@@ -1,6 +1,7 @@
 package rbft
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"math/rand"
@@ -15,6 +16,8 @@ import (
 	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
 	"github.com/hyperchain/go-hpc-rbft/types"
 	txpool "github.com/hyperchain/go-hpc-txpool"
+
+	"go.opentelemetry.io/otel/trace"
 )
 
 var (
@@ -162,9 +165,9 @@ func (lookup *defaultTxpoolSupportSmokeTest) IsRequestsExist(txs []*protos.Trans
 func (lookup *defaultTxpoolSupportSmokeTest) CheckSigns(txs []*protos.Transaction) {
 }
 
-//=============================================================================
+// =============================================================================
 // init process
-//=============================================================================
+// =============================================================================
 // newTestFramework init the testFramework instance
 func newTestFramework(account int, loggerFile bool) *testFramework {
 	// Init PeerSet
@@ -268,6 +271,7 @@ func (tf *testFramework) newNodeConfig(
 		External:    ext,
 		RequestPool: pool,
 		MetricsProv: &disabled.Provider{},
+		Tracer:      trace.NewNoopTracerProvider().Tracer("hyperchain"),
 		DelFlag:     make(chan bool),
 	}
 }
@@ -369,7 +373,7 @@ func (tn *testNode) nodeListen() {
 			return
 		case msg := <-tn.recvChan:
 			if tn.normal {
-				tn.N.Step(msg)
+				tn.N.Step(context.Background(), msg)
 			}
 		}
 	}
@@ -674,9 +678,9 @@ func (tf *testFramework) sendInitCtx() {
 	_ = tf.TestNode[senderID3-1].N.Propose(txSet)
 }
 
-//=============================================================================
+// =============================================================================
 // External Interface Implement
-//=============================================================================
+// =============================================================================
 // Storage
 func (ext *testExternal) StoreState(key string, value []byte) error {
 	ext.testNode.stateStore[key] = value
@@ -718,7 +722,7 @@ func (ext *testExternal) Destroy(key string) error {
 func (ext *testExternal) postMsg(msg *channelMsg) {
 	ext.clusterChan <- msg
 }
-func (ext *testExternal) Broadcast(msg *pb.ConsensusMessage) error {
+func (ext *testExternal) Broadcast(ctx context.Context, msg *pb.ConsensusMessage) error {
 	if !ext.testNode.online {
 		return errors.New("node offline")
 	}
@@ -732,7 +736,7 @@ func (ext *testExternal) Broadcast(msg *pb.ConsensusMessage) error {
 	go ext.postMsg(cm)
 	return nil
 }
-func (ext *testExternal) Unicast(msg *pb.ConsensusMessage, to uint64) error {
+func (ext *testExternal) Unicast(ctx context.Context, msg *pb.ConsensusMessage, to uint64) error {
 	if !ext.testNode.online {
 		return errors.New("node offline")
 	}
@@ -752,7 +756,7 @@ func (ext *testExternal) Unicast(msg *pb.ConsensusMessage, to uint64) error {
 	go ext.postMsg(cm)
 	return nil
 }
-func (ext *testExternal) UnicastByHostname(msg *pb.ConsensusMessage, to string) error {
+func (ext *testExternal) UnicastByHostname(ctx context.Context, msg *pb.ConsensusMessage, to string) error {
 	if !ext.testNode.online {
 		return errors.New("node offline")
 	}

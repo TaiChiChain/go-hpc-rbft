@@ -1,6 +1,7 @@
 package rbft
 
 import (
+	"context"
 	"testing"
 
 	"github.com/hyperchain/go-hpc-common/types/protos"
@@ -25,13 +26,13 @@ func TestExec_handleCoreRbftEvent_batchTimerEvent(t *testing.T) {
 	assert.False(t, rbfts[0].timerMgr.getTimer(batchTimer))
 
 	// abnormal state
-	rbfts[0].handleCoreRbftEvent(ev)
+	rbfts[0].handleCoreRbftEvent(context.Background(), ev)
 	assert.False(t, rbfts[0].timerMgr.getTimer(batchTimer))
 
 	// normal
 	rbfts[0].setNormal()
 	rbfts[0].atomicOn(InConfChange)
-	rbfts[0].handleCoreRbftEvent(ev)
+	rbfts[0].handleCoreRbftEvent(context.Background(), ev)
 	assert.True(t, rbfts[0].timerMgr.getTimer(batchTimer))
 	rbfts[0].atomicOff(InConfChange)
 
@@ -47,7 +48,7 @@ func TestExec_handleCoreRbftEvent_batchTimerEvent(t *testing.T) {
 	}
 	rbfts[0].batchMgr.cacheBatch = append(rbfts[0].batchMgr.cacheBatch, batch)
 	rbfts[0].setNormal()
-	rbfts[0].handleCoreRbftEvent(ev)
+	rbfts[0].handleCoreRbftEvent(context.Background(), ev)
 	assert.Equal(t, pb.Type_PRE_PREPARE, nodes[0].broadcastMessageCache.Type)
 }
 
@@ -62,10 +63,10 @@ func TestExec_handleCoreRbftEvent_NullRequestTimerEvent(t *testing.T) {
 		Service:   CoreRbftService,
 		EventType: CoreNullRequestTimerEvent,
 	}
-	rbfts[0].handleCoreRbftEvent(ev)
-	rbfts[1].handleCoreRbftEvent(ev)
-	rbfts[2].handleCoreRbftEvent(ev)
-	rbfts[3].handleCoreRbftEvent(ev)
+	rbfts[0].handleCoreRbftEvent(context.Background(), ev)
+	rbfts[1].handleCoreRbftEvent(context.Background(), ev)
+	rbfts[2].handleCoreRbftEvent(context.Background(), ev)
+	rbfts[3].handleCoreRbftEvent(context.Background(), ev)
 	assert.Equal(t, pb.Type_NULL_REQUEST, nodes[0].broadcastMessageCache.Type)
 	assert.Equal(t, pb.Type_VIEW_CHANGE, nodes[1].broadcastMessageCache.Type)
 	assert.Equal(t, pb.Type_VIEW_CHANGE, nodes[2].broadcastMessageCache.Type)
@@ -83,10 +84,10 @@ func TestExec_handleCoreRbftEvent_FirstRequestTimerEvent(t *testing.T) {
 		Service:   CoreRbftService,
 		EventType: CoreFirstRequestTimerEvent,
 	}
-	rbfts[0].handleCoreRbftEvent(ev)
-	rbfts[1].handleCoreRbftEvent(ev)
-	rbfts[2].handleCoreRbftEvent(ev)
-	rbfts[3].handleCoreRbftEvent(ev)
+	rbfts[0].handleCoreRbftEvent(context.Background(), ev)
+	rbfts[1].handleCoreRbftEvent(context.Background(), ev)
+	rbfts[2].handleCoreRbftEvent(context.Background(), ev)
+	rbfts[3].handleCoreRbftEvent(context.Background(), ev)
 	assert.Equal(t, pb.Type_VIEW_CHANGE, nodes[0].broadcastMessageCache.Type)
 	assert.Equal(t, pb.Type_VIEW_CHANGE, nodes[1].broadcastMessageCache.Type)
 	assert.Equal(t, pb.Type_VIEW_CHANGE, nodes[2].broadcastMessageCache.Type)
@@ -107,12 +108,12 @@ func TestExec_handleCoreRbftEvent_CheckPoolTimerEvent(t *testing.T) {
 	assert.False(t, rbfts[0].timerMgr.getTimer(checkPoolTimer))
 
 	// for abnormal node
-	rbfts[0].handleCoreRbftEvent(ev)
+	rbfts[0].handleCoreRbftEvent(context.Background(), ev)
 	assert.False(t, rbfts[0].timerMgr.getTimer(checkPoolTimer))
 
 	// for normal node
 	rbfts[0].setNormal()
-	rbfts[0].handleCoreRbftEvent(ev)
+	rbfts[0].handleCoreRbftEvent(context.Background(), ev)
 	assert.True(t, rbfts[0].timerMgr.getTimer(checkPoolTimer))
 }
 
@@ -152,7 +153,7 @@ func TestExec_handleCoreRbftEvent_StateUpdatedEvent(t *testing.T) {
 			{NodeInfo: &pb.NodeInfo{ReplicaId: 3, ReplicaHost: "test-hash-3"}, Checkpoint: checkpoint, Signature: []byte("sig-3")},
 		},
 	}
-	rbfts[1].handleCoreRbftEvent(ev)
+	rbfts[1].handleCoreRbftEvent(context.Background(), ev)
 	assert.Equal(t, uint64(10), rbfts[1].exec.lastExec)
 }
 
@@ -204,7 +205,7 @@ func TestExec_handleCoreRbftEvent_ResendMissingTxsEvent(t *testing.T) {
 		EventType: CoreResendMissingTxsEvent,
 		Event:     fetch,
 	}
-	rbfts[0].handleCoreRbftEvent(ev)
+	rbfts[0].handleCoreRbftEvent(context.Background(), ev)
 	assert.Equal(t, pb.Type_SEND_MISSING_REQUESTS, nodes[0].unicastMessageCache.Type)
 }
 
@@ -219,7 +220,7 @@ func TestExec_handleRecoveryEvent_RestartTimerEvent(t *testing.T) {
 		EventType: RecoveryRestartTimerEvent,
 	}
 	assert.False(t, rbfts[1].atomicIn(InRecovery))
-	rbfts[1].handleRecoveryEvent(ev)
+	rbfts[1].handleRecoveryEvent(context.Background(), ev)
 	assert.True(t, rbfts[1].atomicIn(InRecovery))
 	assert.Equal(t, uint64(0), rbfts[1].view)
 }
@@ -237,12 +238,12 @@ func TestExec_handleRecoveryEvent_SyncStateRspTimerEvent(t *testing.T) {
 	assert.False(t, rbfts[1].atomicIn(InRecovery))
 
 	// for abnormal
-	rbfts[1].handleRecoveryEvent(ev)
+	rbfts[1].handleRecoveryEvent(context.Background(), ev)
 	assert.False(t, rbfts[1].atomicIn(InRecovery))
 
 	// for normal
 	rbfts[1].setNormal()
-	rbfts[1].handleRecoveryEvent(ev)
+	rbfts[1].handleRecoveryEvent(context.Background(), ev)
 	assert.True(t, rbfts[1].atomicIn(InRecovery))
 	assert.Equal(t, uint64(1), rbfts[1].view)
 }
@@ -259,7 +260,7 @@ func TestExec_handleRecoveryEvent_SyncStateRestartTimerEvent(t *testing.T) {
 	}
 	assert.False(t, rbfts[1].timerMgr.getTimer(syncStateRestartTimer))
 
-	rbfts[1].handleRecoveryEvent(ev)
+	rbfts[1].handleRecoveryEvent(context.Background(), ev)
 	assert.False(t, rbfts[1].timerMgr.getTimer(syncStateRestartTimer))
 }
 
@@ -278,11 +279,11 @@ func TestExec_handleViewChangeEvent_ViewChangeTimerEvent(t *testing.T) {
 	rbfts[1].restartRecovery()
 	assert.Equal(t, pb.Type_NOTIFICATION, nodes[1].broadcastMessageCache.Type)
 
-	rbfts[1].handleViewChangeEvent(ev)
+	rbfts[1].handleViewChangeEvent(context.Background(), ev)
 	assert.Equal(t, pb.Type_NOTIFICATION, nodes[1].broadcastMessageCache.Type)
 	assert.Equal(t, preView+1, rbfts[1].view)
 
-	rbfts[2].handleViewChangeEvent(ev)
+	rbfts[2].handleViewChangeEvent(context.Background(), ev)
 	assert.Equal(t, pb.Type_VIEW_CHANGE, nodes[2].broadcastMessageCache.Type)
 }
 
@@ -298,7 +299,7 @@ func TestExec_handleViewChangeEvent_ViewChangeResendTimerEvent(t *testing.T) {
 	}
 
 	rbfts[1].atomicOn(InViewChange)
-	rbfts[1].handleViewChangeEvent(ev)
+	rbfts[1].handleViewChangeEvent(context.Background(), ev)
 	assert.Equal(t, pb.Type_NOTIFICATION, nodes[1].broadcastMessageCache.Type)
 }
 
@@ -313,12 +314,12 @@ func TestExec_handleEpochMgrEvent_FetchCheckpointEvent(t *testing.T) {
 		EventType: FetchCheckpointEvent,
 	}
 
-	rbfts[1].handleEpochMgrEvent(ev)
+	rbfts[1].handleEpochMgrEvent(context.Background(), ev)
 
 	rbfts[1].epochMgr.configBatchToCheck = &types.MetaState{
 		Height: 10,
 		Digest: "block-hash-10",
 	}
-	rbfts[1].handleEpochMgrEvent(ev)
+	rbfts[1].handleEpochMgrEvent(context.Background(), ev)
 	assert.Equal(t, pb.Type_FETCH_CHECKPOINT, nodes[1].broadcastMessageCache.Type)
 }

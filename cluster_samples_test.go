@@ -1,6 +1,7 @@
 package rbft
 
 import (
+	"context"
 	"testing"
 
 	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
@@ -80,7 +81,7 @@ func TestCluster_SyncSmallEpochWithCheckpoint(t *testing.T) {
 		if index == 2 {
 			continue
 		}
-		rbfts[2].processEvent(chkpt)
+		rbfts[2].processEvent(context.Background(), chkpt)
 	}
 
 	for _, retMessages := range retMessageSet {
@@ -88,7 +89,7 @@ func TestCluster_SyncSmallEpochWithCheckpoint(t *testing.T) {
 			if index == 2 {
 				continue
 			}
-			rbfts[2].processEvent(chkpt)
+			rbfts[2].processEvent(context.Background(), chkpt)
 		}
 	}
 
@@ -100,21 +101,23 @@ func TestCluster_SyncSmallEpochWithCheckpoint(t *testing.T) {
 		if index == 2 {
 			continue
 		}
-		rbfts[index].processEvent(ntfMsg)
+		rbfts[index].processEvent(context.Background(), ntfMsg)
 		rspMsg := nodes[index].unicastMessageCache
 		assert.Equal(t, pb.Type_NOTIFICATION_RESPONSE, rspMsg.Type)
 		rspList = append(rspList, rspMsg)
 	}
 
 	for _, rsp := range rspList {
-		rbfts[2].processEvent(rsp)
+		rbfts[2].processEvent(context.Background(), rsp)
 	}
 	// first state update to 50( which is larger than initial high watermark 40)
-	ev := <-rbfts[2].recvChan
-	rbfts[2].processEvent(ev)
+
+	w := <-rbfts[2].recvChan
+
+	rbfts[2].processEvent(context.Background(), w.event)
 	// then state update to 60
-	ev = <-rbfts[2].recvChan
-	rbfts[2].processEvent(ev)
+	w = <-rbfts[2].recvChan
+	rbfts[2].processEvent(context.Background(), w.event)
 	assert.Equal(t, uint64(2), rbfts[2].epoch)
 	assert.Equal(t, uint64(60), rbfts[2].h)
 }
@@ -143,7 +146,7 @@ func TestCluster_SyncLargeEpochWithCheckpoint(t *testing.T) {
 			if index == 2 {
 				continue
 			}
-			rbfts[2].processEvent(chkpt)
+			rbfts[2].processEvent(context.Background(), chkpt)
 		}
 	}
 
@@ -151,7 +154,7 @@ func TestCluster_SyncLargeEpochWithCheckpoint(t *testing.T) {
 		if index == 2 {
 			continue
 		}
-		rbfts[2].processEvent(chkpt)
+		rbfts[2].processEvent(context.Background(), chkpt)
 	}
 
 	ntfMsg := nodes[2].broadcastMessageCache
@@ -162,21 +165,21 @@ func TestCluster_SyncLargeEpochWithCheckpoint(t *testing.T) {
 		if index == 2 {
 			continue
 		}
-		rbfts[index].processEvent(ntfMsg)
+		rbfts[index].processEvent(context.Background(), ntfMsg)
 		rspMsg := nodes[index].unicastMessageCache
 		assert.Equal(t, pb.Type_NOTIFICATION_RESPONSE, rspMsg.Type)
 		rspList = append(rspList, rspMsg)
 	}
 
 	for _, rsp := range rspList {
-		rbfts[2].processEvent(rsp)
+		rbfts[2].processEvent(context.Background(), rsp)
 	}
 	// first state update to 50( which is larger than initial high watermark 40)
-	ev := <-rbfts[2].recvChan
-	rbfts[2].processEvent(ev)
+	w := <-rbfts[2].recvChan
+	rbfts[2].processEvent(context.Background(), w.event)
 	// then state update to 51
-	ev = <-rbfts[2].recvChan
-	rbfts[2].processEvent(ev)
+	w = <-rbfts[2].recvChan
+	rbfts[2].processEvent(context.Background(), w.event)
 	assert.Equal(t, uint64(2), rbfts[2].epoch)
 	assert.Equal(t, uint64(51), rbfts[2].exec.lastExec)
 }

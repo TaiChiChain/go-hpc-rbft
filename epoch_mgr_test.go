@@ -1,6 +1,7 @@
 package rbft
 
 import (
+	"context"
 	"testing"
 
 	"github.com/hyperchain/go-hpc-common/types/protos"
@@ -26,7 +27,7 @@ func TestEpoch_fetchCheckpoint_and_recv(t *testing.T) {
 	msg := nodes[0].broadcastMessageCache
 	assert.Equal(t, pb.Type_FETCH_CHECKPOINT, msg.Type)
 
-	rbfts[1].processEvent(msg)
+	rbfts[1].processEvent(context.Background(), msg)
 	msg2 := nodes[1].unicastMessageCache
 	assert.Equal(t, pb.Type_SIGNED_CHECKPOINT, msg2.Type)
 }
@@ -40,7 +41,7 @@ func TestEpoch_recvFetchCheckpoint_RouterNotExist(t *testing.T) {
 		ReplicaHost:    "node5",
 		SequenceNumber: uint64(12),
 	}
-	ret := rbfts[0].recvFetchCheckpoint(fetch)
+	ret := rbfts[0].recvFetchCheckpoint(context.Background(), fetch)
 	assert.Nil(t, ret)
 	assert.Nil(t, nodes[0].unicastMessageCache)
 }
@@ -66,7 +67,7 @@ func TestEpoch_recvFetchCheckpoint_SendBackNormal(t *testing.T) {
 	}
 	rbfts[0].storeMgr.saveCheckpoint(uint64(12), signedC)
 	consensusMsg := rbfts[0].consensusMessagePacker(signedC)
-	ret := rbfts[0].recvFetchCheckpoint(fetch)
+	ret := rbfts[0].recvFetchCheckpoint(context.Background(), fetch)
 	assert.Nil(t, ret)
 	assert.Equal(t, consensusMsg, nodes[0].unicastMessageCache)
 }
@@ -93,7 +94,7 @@ func TestEpoch_recvFetchCheckpoint_SendBackStableCheckpoint(t *testing.T) {
 	}
 	rbfts[0].storeMgr.saveCheckpoint(uint64(50), signedC)
 	consensusMsg := rbfts[0].consensusMessagePacker(signedC)
-	ret := rbfts[0].recvFetchCheckpoint(fetch)
+	ret := rbfts[0].recvFetchCheckpoint(context.Background(), fetch)
 	assert.Nil(t, ret)
 	assert.Equal(t, consensusMsg, nodes[0].unicastMessageCache)
 }

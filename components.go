@@ -19,6 +19,7 @@ This file defines the structs used in RBFT
 */
 
 import (
+	"context"
 	"time"
 
 	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
@@ -108,6 +109,11 @@ type LocalEvent struct {
 
 // Event is a type meant to clearly convey that the return type or parameter to a function will be supplied to/from an events.Manager
 type consensusEvent interface{}
+
+type consensusEventWrapper struct {
+	ctx   context.Context
+	event consensusEvent
+}
 
 // -----------certStore related structs-----------------
 // Preprepare index

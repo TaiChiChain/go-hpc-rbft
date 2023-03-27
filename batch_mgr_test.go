@@ -1,6 +1,7 @@
 package rbft
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -49,8 +50,8 @@ func TestBatchMgr_maybeSendPrePrepare(t *testing.T) {
 	// Be out of range, need usage of catch
 	// And, it is the first one to be in catch
 	rbfts[0].batchMgr.setSeqNo(40)
-	rbfts[0].maybeSendPrePrepare(batchTmp41, false)
-	rbfts[0].maybeSendPrePrepare(batchTmp42, false)
+	rbfts[0].maybeSendPrePrepare(context.Background(), batchTmp41, false)
+	rbfts[0].maybeSendPrePrepare(context.Background(), batchTmp42, false)
 	assert.Equal(t, batchTmp41, rbfts[0].batchMgr.cacheBatch[0])
 	assert.Equal(t, batchTmp42, rbfts[0].batchMgr.cacheBatch[1])
 
@@ -59,7 +60,7 @@ func TestBatchMgr_maybeSendPrePrepare(t *testing.T) {
 	// Now, rbft.batchMgr.cacheBatch[0] has already store a value
 	// Set rbft.h 10, 10~50
 	rbfts[0].moveWatermarks(10, false)
-	rbfts[0].maybeSendPrePrepare(nil, true)
+	rbfts[0].maybeSendPrePrepare(context.Background(), nil, true)
 	//assume that
 	assert.Equal(t, batchTmp41, rbfts[0].storeMgr.batchStore[batchTmp41.BatchHash])
 	assert.Equal(t, batchTmp42, rbfts[0].storeMgr.batchStore[batchTmp42.BatchHash])
@@ -110,18 +111,18 @@ func TestBatchMgr_findNextPrepareBatch(t *testing.T) {
 
 	t.Run("When view is incorrect, exit with nil, without any change", func(t *testing.T) {
 		rbfts[0].setView(1)
-		assert.Nil(t, rbfts[0].findNextPrepareBatch(0, 20, "msg"))
+		assert.Nil(t, rbfts[0].findNextPrepareBatch(context.Background(), 0, 20, "msg"))
 		rbfts[0].setView(0)
 	})
 
 	t.Run("When prePrepare is nil, exit with nil, without any change", func(t *testing.T) {
-		assert.Nil(t, rbfts[0].findNextPrepareBatch(0, 20, "msg"))
+		assert.Nil(t, rbfts[0].findNextPrepareBatch(context.Background(), 0, 20, "msg"))
 		certTmp.prePrepare = prePrepareTmp
 	})
 
 	t.Run("If replica is in stateUpdate, exit with nil, without any change", func(t *testing.T) {
 		rbfts[0].on(SkipInProgress)
-		assert.Nil(t, rbfts[0].findNextPrepareBatch(0, 20, "msg"))
+		assert.Nil(t, rbfts[0].findNextPrepareBatch(context.Background(), 0, 20, "msg"))
 		rbfts[0].off(SkipInProgress)
 	})
 
@@ -131,7 +132,7 @@ func TestBatchMgr_findNextPrepareBatch(t *testing.T) {
 		certTmp.prepare = map[pb.Prepare]bool{prePareTmp: true}
 		certTmp.commit = map[pb.Commit]bool{commitTmp: true}
 
-		assert.Nil(t, rbfts[0].findNextPrepareBatch(0, 20, "msg"))
+		assert.Nil(t, rbfts[0].findNextPrepareBatch(context.Background(), 0, 20, "msg"))
 
 		// verified key: Timestamp
 		assert.Equal(t, int64(10086), rbfts[0].storeMgr.outstandingReqBatches["msg"].Timestamp)
@@ -140,7 +141,7 @@ func TestBatchMgr_findNextPrepareBatch(t *testing.T) {
 
 		// To resend commit
 		rbfts[0].storeMgr.certStore[msgIDTmp].sentPrepare = false
-		assert.Nil(t, rbfts[0].findNextPrepareBatch(0, 20, "msg"))
+		assert.Nil(t, rbfts[0].findNextPrepareBatch(context.Background(), 0, 20, "msg"))
 		assert.Equal(t, true, rbfts[0].storeMgr.certStore[msgIDTmp].sentPrepare)
 		// Digest == ""
 		prePrepareTmpNil := &pb.PrePrepare{
@@ -178,7 +179,7 @@ func TestBatchMgr_findNextPrepareBatch(t *testing.T) {
 		rbfts[0].setView(0)
 		rbfts[0].storeMgr.certStore[msgIDTmpNil] = certTmpNil
 		rbfts[0].storeMgr.certStore[msgIDTmpNil].sentPrepare = false
-		_ = rbfts[0].findNextPrepareBatch(0, 30, "")
+		_ = rbfts[0].findNextPrepareBatch(context.Background(), 0, 30, "")
 		assert.Equal(t, true, rbfts[0].storeMgr.certStore[msgIDTmpNil].sentPrepare)
 		assert.Equal(t, true, rbfts[0].storeMgr.certStore[msgIDTmpNil].sentPrepare)
 	})

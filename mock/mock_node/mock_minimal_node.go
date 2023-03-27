@@ -12,7 +12,7 @@ func NewMockMinimalNode(ctrl *gomock.Controller) *MockNode {
 	mock.EXPECT().Start().Return(nil).AnyTimes()
 	mock.EXPECT().Propose(gomock.Any()).Return(nil).AnyTimes()
 	mock.EXPECT().ProposeConfChange(gomock.Any()).Return(nil).AnyTimes()
-	mock.EXPECT().Step(gomock.Any()).Return().AnyTimes()
+	mock.EXPECT().Step(gomock.Any(), gomock.Any()).Return().AnyTimes()
 	mock.EXPECT().ApplyConfChange(gomock.Any()).Return().AnyTimes()
 	mock.EXPECT().Status().Return(nil).AnyTimes()
 	mock.EXPECT().Stop().Return().AnyTimes()

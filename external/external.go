@@ -15,6 +15,8 @@
 package external
 
 import (
+	"context"
+
 	"github.com/hyperchain/go-hpc-common/types/protos"
 	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
 	"github.com/hyperchain/go-hpc-rbft/types"
@@ -38,11 +40,11 @@ type Storage interface {
 // Network is used to send p2p messages between nodes.
 type Network interface {
 	// Broadcast delivers messages to all other nodes.
-	Broadcast(msg *pb.ConsensusMessage) error
+	Broadcast(ctx context.Context, msg *pb.ConsensusMessage) error
 	// Unicast delivers messages to given node with specified id.
-	Unicast(msg *pb.ConsensusMessage, to uint64) error
+	Unicast(ctx context.Context, msg *pb.ConsensusMessage, to uint64) error
 	// UnicastByHostname delivers messages to given node with specified hostname.
-	UnicastByHostname(msg *pb.ConsensusMessage, to string) error
+	UnicastByHostname(ctx context.Context, msg *pb.ConsensusMessage, to string) error
 }
 
 // Crypto is used to access the sign/verify methods from the crypto package
@@ -54,14 +56,14 @@ type Crypto interface {
 }
 
 // ServiceOutbound is the application service invoked by RBFT library which includes two core events:
-// 1. Execute is invoked when RBFT core has achieved consensus on txs with batch number seqNo,
-//    which will be submitted to application service. After application submitted the given batch,
-//    application should call ServiceInbound.ReportExecuted to inform RBFT library the latest
-//    service state.
-// 2. StateUpdate is invoked when RBFT core finds current node out-of-date from other nodes by too many
-//    seqNos, it's applications responsibility to implement a fast sync algorithm to ensure node
-//    can catch up as soon as possible. Applications should call ServiceInbound.ReportStateUpdated
-//    to inform RBFT library the latest service state after StateUpdate.
+//  1. Execute is invoked when RBFT core has achieved consensus on txs with batch number seqNo,
+//     which will be submitted to application service. After application submitted the given batch,
+//     application should call ServiceInbound.ReportExecuted to inform RBFT library the latest
+//     service state.
+//  2. StateUpdate is invoked when RBFT core finds current node out-of-date from other nodes by too many
+//     seqNos, it's applications responsibility to implement a fast sync algorithm to ensure node
+//     can catch up as soon as possible. Applications should call ServiceInbound.ReportStateUpdated
+//     to inform RBFT library the latest service state after StateUpdate.
 type ServiceOutbound interface {
 	// Execute informs application layer to apply one batch with given request list and batch seqNo.
 	// Users can apply different batches asynchronously but ensure the order by seqNo.

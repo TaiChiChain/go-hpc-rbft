@@ -5,6 +5,7 @@
 package mockexternal
 
 import (
+	context "context"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
@@ -132,45 +133,45 @@ func (m *MockNetwork) EXPECT() *MockNetworkMockRecorder {
 }
 
 // Broadcast mocks base method.
-func (m *MockNetwork) Broadcast(msg *rbftpb.ConsensusMessage) error {
+func (m *MockNetwork) Broadcast(ctx context.Context, msg *rbftpb.ConsensusMessage) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Broadcast", msg)
+	ret := m.ctrl.Call(m, "Broadcast", ctx, msg)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Broadcast indicates an expected call of Broadcast.
-func (mr *MockNetworkMockRecorder) Broadcast(msg interface{}) *gomock.Call {
+func (mr *MockNetworkMockRecorder) Broadcast(ctx, msg interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Broadcast", reflect.TypeOf((*MockNetwork)(nil).Broadcast), msg)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Broadcast", reflect.TypeOf((*MockNetwork)(nil).Broadcast), ctx, msg)
 }
 
 // Unicast mocks base method.
-func (m *MockNetwork) Unicast(msg *rbftpb.ConsensusMessage, to uint64) error {
+func (m *MockNetwork) Unicast(ctx context.Context, msg *rbftpb.ConsensusMessage, to uint64) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Unicast", msg, to)
+	ret := m.ctrl.Call(m, "Unicast", ctx, msg, to)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Unicast indicates an expected call of Unicast.
-func (mr *MockNetworkMockRecorder) Unicast(msg, to interface{}) *gomock.Call {
+func (mr *MockNetworkMockRecorder) Unicast(ctx, msg, to interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Unicast", reflect.TypeOf((*MockNetwork)(nil).Unicast), msg, to)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Unicast", reflect.TypeOf((*MockNetwork)(nil).Unicast), ctx, msg, to)
 }
 
 // UnicastByHostname mocks base method.
-func (m *MockNetwork) UnicastByHostname(msg *rbftpb.ConsensusMessage, to string) error {
+func (m *MockNetwork) UnicastByHostname(ctx context.Context, msg *rbftpb.ConsensusMessage, to string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UnicastByHostname", msg, to)
+	ret := m.ctrl.Call(m, "UnicastByHostname", ctx, msg, to)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // UnicastByHostname indicates an expected call of UnicastByHostname.
-func (mr *MockNetworkMockRecorder) UnicastByHostname(msg, to interface{}) *gomock.Call {
+func (mr *MockNetworkMockRecorder) UnicastByHostname(ctx, msg, to interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UnicastByHostname", reflect.TypeOf((*MockNetwork)(nil).UnicastByHostname), msg, to)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UnicastByHostname", reflect.TypeOf((*MockNetwork)(nil).UnicastByHostname), ctx, msg, to)
 }
 
 // MockCrypto is a mock of Crypto interface.
@@ -420,17 +421,17 @@ func (m *MockExternalStack) EXPECT() *MockExternalStackMockRecorder {
 }
 
 // Broadcast mocks base method.
-func (m *MockExternalStack) Broadcast(msg *rbftpb.ConsensusMessage) error {
+func (m *MockExternalStack) Broadcast(ctx context.Context, msg *rbftpb.ConsensusMessage) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Broadcast", msg)
+	ret := m.ctrl.Call(m, "Broadcast", ctx, msg)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Broadcast indicates an expected call of Broadcast.
-func (mr *MockExternalStackMockRecorder) Broadcast(msg interface{}) *gomock.Call {
+func (mr *MockExternalStackMockRecorder) Broadcast(ctx, msg interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Broadcast", reflect.TypeOf((*MockExternalStack)(nil).Broadcast), msg)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Broadcast", reflect.TypeOf((*MockExternalStack)(nil).Broadcast), ctx, msg)
 }
 
 // DelState mocks base method.
@@ -646,31 +647,31 @@ func (mr *MockExternalStackMockRecorder) StoreState(key, value interface{}) *gom
 }
 
 // Unicast mocks base method.
-func (m *MockExternalStack) Unicast(msg *rbftpb.ConsensusMessage, to uint64) error {
+func (m *MockExternalStack) Unicast(ctx context.Context, msg *rbftpb.ConsensusMessage, to uint64) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Unicast", msg, to)
+	ret := m.ctrl.Call(m, "Unicast", ctx, msg, to)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Unicast indicates an expected call of Unicast.
-func (mr *MockExternalStackMockRecorder) Unicast(msg, to interface{}) *gomock.Call {
+func (mr *MockExternalStackMockRecorder) Unicast(ctx, msg, to interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Unicast", reflect.TypeOf((*MockExternalStack)(nil).Unicast), msg, to)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Unicast", reflect.TypeOf((*MockExternalStack)(nil).Unicast), ctx, msg, to)
 }
 
 // UnicastByHostname mocks base method.
-func (m *MockExternalStack) UnicastByHostname(msg *rbftpb.ConsensusMessage, to string) error {
+func (m *MockExternalStack) UnicastByHostname(ctx context.Context, msg *rbftpb.ConsensusMessage, to string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UnicastByHostname", msg, to)
+	ret := m.ctrl.Call(m, "UnicastByHostname", ctx, msg, to)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // UnicastByHostname indicates an expected call of UnicastByHostname.
-func (mr *MockExternalStackMockRecorder) UnicastByHostname(msg, to interface{}) *gomock.Call {
+func (mr *MockExternalStackMockRecorder) UnicastByHostname(ctx, msg, to interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UnicastByHostname", reflect.TypeOf((*MockExternalStack)(nil).UnicastByHostname), msg, to)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UnicastByHostname", reflect.TypeOf((*MockExternalStack)(nil).UnicastByHostname), ctx, msg, to)
 }
 
 // Verify mocks base method.

@@ -15,6 +15,7 @@
 package rbft
 
 import (
+	"context"
 	"fmt"
 
 	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
@@ -147,7 +148,7 @@ func (rbft *rbftImpl) restartCheckPoolTimer() {
 // flag findCache indicates whether we need to get request batch from cacheBatch or not as
 // we may store batch into cacheBatch temporarily if next demand seqNo is higher than our
 // high watermark. (this is where we restrict the speed of consensus)
-func (rbft *rbftImpl) maybeSendPrePrepare(batch *pb.RequestBatch, findCache bool) {
+func (rbft *rbftImpl) maybeSendPrePrepare(ctx context.Context, batch *pb.RequestBatch, findCache bool) {
 	var (
 		nextSeqNo uint64
 		nextBatch *pb.RequestBatch
@@ -203,17 +204,18 @@ func (rbft *rbftImpl) maybeSendPrePrepare(batch *pb.RequestBatch, findCache bool
 	rbft.softStartNewViewTimer(rbft.timerMgr.getTimeoutValue(requestTimer),
 		fmt.Sprintf("New request batch for view=%d/seqNo=%d", rbft.view, nextSeqNo), false)
 
-	rbft.sendPrePrepare(nextSeqNo, digest, nextBatch)
+	rbft.sendPrePrepare(ctx, nextSeqNo, digest, nextBatch)
 
 	if rbft.sendInW(nextSeqNo+1) && len(rbft.batchMgr.cacheBatch) > 0 {
 		rbft.restartBatchTimer()
-		rbft.maybeSendPrePrepare(nil, true)
+		rbft.maybeSendPrePrepare(ctx, nil, true)
 	}
 }
 
 // findNextPrepareBatch is used by the backup nodes to ensure that the batch corresponding to this cert exists.
 // If it exists, then prepare it.
-func (rbft *rbftImpl) findNextPrepareBatch(v uint64, n uint64, d string) error {
+func (rbft *rbftImpl) findNextPrepareBatch(ctx context.Context, v uint64, n uint64, d string) error {
+
 	rbft.logger.Debugf("Replica %d findNextPrepareBatch in cert with for view=%d/seqNo=%d/digest=%s", rbft.peerPool.ID, v, n, d)
 
 	if v != rbft.view {
@@ -235,14 +237,14 @@ func (rbft *rbftImpl) findNextPrepareBatch(v uint64, n uint64, d string) error {
 
 	if d == "" {
 		rbft.logger.Infof("Replica %d send prepare for no-op batch with view=%d/seqNo=%d", rbft.peerPool.ID, v, n)
-		return rbft.sendPrepare(v, n, d)
+		return rbft.sendPrepare(ctx, v, n, d)
 	}
 	// when system restart or finished vc/recovery, we need to resend prepare for cert
 	// with seqNo <= lastExec. However, those batches may have been deleted from requestPool,
 	// so we can get those batches from batchStore first.
 	if existBatch, ok := rbft.storeMgr.batchStore[d]; ok {
 		rbft.logger.Debugf("Replica %d prepare batch for view=%d/seqNo=%d, batch size: %d", rbft.peerPool.ID, v, n, len(existBatch.RequestHashList))
-		return rbft.sendPrepare(v, n, d)
+		return rbft.sendPrepare(ctx, v, n, d)
 	}
 	prePrep := cert.prePrepare
 
@@ -253,7 +255,7 @@ func (rbft *rbftImpl) findNextPrepareBatch(v uint64, n uint64, d string) error {
 		return nil
 	}
 	if missingTxs != nil {
-		rbft.fetchMissingTxs(prePrep, missingTxs)
+		rbft.fetchMissingTxs(ctx, prePrep, missingTxs)
 		return nil
 	}
 
@@ -281,12 +283,12 @@ func (rbft *rbftImpl) findNextPrepareBatch(v uint64, n uint64, d string) error {
 
 	rbft.logger.Debugf("Replica %d prepare batch for view=%d/seqNo=%d, batch size: %d", rbft.peerPool.ID, v, n, len(txList))
 
-	return rbft.sendPrepare(v, n, d)
+	return rbft.sendPrepare(ctx, v, n, d)
 }
 
 // primaryResubmitTransactions tries to submit transactions for primary after abnormal
 // or stable checkpoint.
-func (rbft *rbftImpl) primaryResubmitTransactions() {
+func (rbft *rbftImpl) primaryResubmitTransactions(ctx context.Context) {
 	if rbft.isPrimary(rbft.peerPool.ID) && !rbft.atomicIn(InConfChange) {
 		// reset lastBatchTime for primary.
 		rbft.batchMgr.lastBatchTime = 0
@@ -301,7 +303,7 @@ func (rbft *rbftImpl) primaryResubmitTransactions() {
 		if len(rbft.batchMgr.cacheBatch) > 0 {
 			rbft.restartBatchTimer()
 			rbft.timerMgr.stopTimer(nullRequestTimer)
-			rbft.maybeSendPrePrepare(nil, true)
+			rbft.maybeSendPrePrepare(ctx, nil, true)
 		}
 
 		// if primary has transactions in requestPool, generate batches of the transactions
@@ -312,7 +314,7 @@ func (rbft *rbftImpl) primaryResubmitTransactions() {
 			}
 
 			batches := rbft.batchMgr.requestPool.GenerateRequestBatch()
-			rbft.postBatches(batches)
+			rbft.postBatches(ctx, batches)
 
 			// if we have just generated a config batch, we need to break resubmit
 			if rbft.atomicIn(InConfChange) {

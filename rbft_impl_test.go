@@ -1,6 +1,7 @@
 package rbft
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -96,7 +97,7 @@ func TestRBFT_consensusMessageFilter(t *testing.T) {
 	sync := nodes[2].broadcastMessageCache
 	assert.Equal(t, pb.Type_SYNC_STATE, sync.Type)
 	sync.Epoch = uint64(5)
-	rbfts[1].consensusMessageFilter(sync)
+	rbfts[1].consensusMessageFilter(context.Background(), sync)
 	assert.Equal(t, 0, len(rbfts[1].epochMgr.checkOutOfEpoch))
 
 	tx := newTx()
@@ -105,11 +106,11 @@ func TestRBFT_consensusMessageFilter(t *testing.T) {
 		Service:   CoreRbftService,
 		EventType: CoreBatchTimerEvent,
 	}
-	rbfts[0].processEvent(batchTimerEvent)
+	rbfts[0].processEvent(context.Background(), batchTimerEvent)
 	preprepMsg := nodes[0].broadcastMessageCache
 	assert.Equal(t, pb.Type_PRE_PREPARE, preprepMsg.Type)
 	preprepMsg.Epoch = uint64(5)
-	rbfts[1].consensusMessageFilter(preprepMsg)
+	rbfts[1].consensusMessageFilter(context.Background(), preprepMsg)
 	assert.Equal(t, 1, len(rbfts[1].epochMgr.checkOutOfEpoch))
 }
 
@@ -137,7 +138,7 @@ func TestRBFT_processReqSetEvent_PrimaryGenerateBatch(t *testing.T) {
 	}
 
 	// for primary
-	rbfts[0].processEvent(req)
+	rbfts[0].processEvent(context.Background(), req)
 	conMsg := nodes[0].broadcastMessageCache
 	assert.Equal(t, pb.Type_PRE_PREPARE, conMsg.Type)
 	assert.True(t, rbfts[0].timerMgr.getTimer(batchTimer))
@@ -157,7 +158,7 @@ func TestRBFT_processReqSetEvent(t *testing.T) {
 	}
 
 	rbfts[1].atomicOn(InConfChange)
-	rbfts[1].processEvent(req)
+	rbfts[1].processEvent(context.Background(), req)
 	batch := rbfts[1].batchMgr.requestPool.GenerateRequestBatch()
 	assert.NotNil(t, batch)
 }
@@ -188,8 +189,8 @@ func TestRBFT_reportStateUpdated(t *testing.T) {
 	}
 
 	rbfts[0].reportStateUpdated(state2)
-	obj := <-rbfts[0].recvChan
-	assert.Equal(t, event, obj)
+	w := <-rbfts[0].recvChan
+	assert.Equal(t, event, w.event)
 }
 
 func TestRBFT_postMsg(t *testing.T) {
@@ -199,9 +200,9 @@ func TestRBFT_postMsg(t *testing.T) {
 	_, rbfts := newBasicClusterInstance()
 	unlockCluster(rbfts)
 
-	rbfts[0].postMsg([]byte("postMsg"))
-	obj := <-rbfts[0].recvChan
-	assert.Equal(t, []byte("postMsg"), obj)
+	rbfts[0].postMsg(context.Background(), []byte("postMsg"))
+	w := <-rbfts[0].recvChan
+	assert.Equal(t, []byte("postMsg"), w.event)
 }
 
 //============================================
@@ -266,7 +267,7 @@ func TestRBFT_processNullRequset(t *testing.T) {
 		EventType: CoreNullRequestTimerEvent,
 	}
 
-	rbfts[0].processEvent(nullRequestEvent)
+	rbfts[0].processEvent(context.Background(), nullRequestEvent)
 	nullRequestMsg := nodes[0].broadcastMessageCache
 	assert.Equal(t, pb.Type_NULL_REQUEST, nullRequestMsg.Type)
 
@@ -274,21 +275,21 @@ func TestRBFT_processNullRequset(t *testing.T) {
 	rbfts[0].on(Normal)
 
 	rbfts[0].atomicOn(InRecovery)
-	rbfts[0].processEvent(nullRequestMsg)
+	rbfts[0].processEvent(context.Background(), nullRequestMsg)
 	assert.Equal(t, false, rbfts[0].in(NeedSyncState))
 	rbfts[0].atomicOff(InRecovery)
 
 	rbfts[0].atomicOn(InViewChange)
-	rbfts[0].processEvent(nullRequestMsg)
+	rbfts[0].processEvent(context.Background(), nullRequestMsg)
 	assert.Equal(t, false, rbfts[0].in(NeedSyncState))
 	rbfts[0].atomicOff(InViewChange)
 
-	rbfts[0].processEvent(nullRequestMsg)
+	rbfts[0].processEvent(context.Background(), nullRequestMsg)
 	assert.Equal(t, true, rbfts[0].in(NeedSyncState))
 
 	// not primary
 	rbfts[1].on(NeedSyncState)
-	rbfts[0].processEvent(nullRequestMsg)
+	rbfts[0].processEvent(context.Background(), nullRequestMsg)
 	event := &LocalEvent{
 		Service:   CoreRbftService,
 		EventType: CoreFirstRequestTimerEvent,
@@ -338,7 +339,7 @@ func TestRBFT_fetchMissingTxs(t *testing.T) {
 	missingTxHashes := map[uint64]string{
 		uint64(0): "transaction",
 	}
-	rbfts[0].fetchMissingTxs(prePrep, missingTxHashes)
+	rbfts[0].fetchMissingTxs(context.Background(), prePrep, missingTxHashes)
 
 	fetch := &pb.FetchMissingRequests{
 		View:                 prePrep.View,
@@ -437,7 +438,7 @@ func TestRBFT_sendNullRequest(t *testing.T) {
 	defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance()
-	rbfts[0].sendNullRequest()
+	rbfts[0].sendNullRequest(context.Background())
 
 	nullRequest := &pb.NullRequest{
 		ReplicaId: rbfts[0].peerPool.ID,
@@ -461,7 +462,7 @@ func TestRBFT_recvPrePrepare_WrongDigest(t *testing.T) {
 		HashBatch:      hashBatch,
 		ReplicaId:      rbfts[0].peerPool.ID,
 	}
-	err := rbfts[1].recvPrePrepare(preprep1)
+	err := rbfts[1].recvPrePrepare(context.Background(), preprep1)
 	assert.Nil(t, err)
 	assert.Equal(t, pb.Type_VIEW_CHANGE, nodes[1].broadcastMessageCache.Type)
 }
@@ -481,7 +482,7 @@ func TestRBFT_recvPrePrepare_EmptyDigest(t *testing.T) {
 		HashBatch:      hashBatch,
 		ReplicaId:      rbfts[0].peerPool.ID,
 	}
-	err := rbfts[1].recvPrePrepare(preprep1)
+	err := rbfts[1].recvPrePrepare(context.Background(), preprep1)
 	assert.Nil(t, err)
 	assert.Equal(t, pb.Type_VIEW_CHANGE, nodes[1].broadcastMessageCache.Type)
 }
@@ -506,11 +507,11 @@ func TestRBFT_recvPrePrepare_WrongSeqNo(t *testing.T) {
 	batchHash := calculateMD5Hash(preprep.HashBatch.RequestHashList, preprep.HashBatch.Timestamp)
 	preprep.BatchDigest = batchHash
 
-	err := rbfts[1].recvPrePrepare(preprep)
+	err := rbfts[1].recvPrePrepare(context.Background(), preprep)
 	assert.Nil(t, err)
 	assert.Equal(t, pb.Type_FETCH_MISSING_REQUESTS, nodes[1].unicastMessageCache.Type) // fetching missing tx for preprepare message
 
-	rbfts[1].recvSendMissingTxs(&pb.SendMissingRequests{
+	rbfts[1].recvSendMissingTxs(context.Background(), &pb.SendMissingRequests{
 		ReplicaId:      rbfts[0].peerPool.ID,
 		View:           rbfts[0].view,
 		SequenceNumber: uint64(1),
@@ -535,7 +536,7 @@ func TestRBFT_recvPrePrepare_WrongSeqNo(t *testing.T) {
 		ReplicaId:      rbfts[0].peerPool.ID,
 	}
 	preprepDup.BatchDigest = calculateMD5Hash(preprepDup.HashBatch.RequestHashList, preprepDup.HashBatch.Timestamp)
-	err = rbfts[1].recvPrePrepare(preprepDup)
+	err = rbfts[1].recvPrePrepare(context.Background(), preprepDup)
 
 	assert.Nil(t, err)
 	assert.Equal(t, pb.Type_VIEW_CHANGE, nodes[1].broadcastMessageCache.Type)
@@ -569,7 +570,7 @@ func TestRBFT_recvFetchMissingTxs(t *testing.T) {
 		ReplicaId:            rbfts[1].peerPool.ID,
 	}
 
-	err := rbfts[0].recvFetchMissingTxs(fetch)
+	err := rbfts[0].recvFetchMissingTxs(context.Background(), fetch)
 	assert.Nil(t, err)
 	assert.Nil(t, nodes[0].unicastMessageCache)
 
@@ -579,7 +580,7 @@ func TestRBFT_recvFetchMissingTxs(t *testing.T) {
 		SeqNo:           uint64(1),
 		LocalList:       []bool{true},
 	}
-	err = rbfts[0].recvFetchMissingTxs(fetch)
+	err = rbfts[0].recvFetchMissingTxs(context.Background(), fetch)
 	assert.Nil(t, err)
 	assert.Equal(t, pb.Type_SEND_MISSING_REQUESTS, nodes[0].unicastMessageCache.Type)
 
@@ -594,7 +595,7 @@ func TestRBFT_recvFetchMissingTxs(t *testing.T) {
 
 	var ret consensusEvent
 	rbfts[1].exec.lastExec = uint64(10)
-	ret = rbfts[1].recvSendMissingTxs(re)
+	ret = rbfts[1].recvSendMissingTxs(context.Background(), re)
 	assert.Nil(t, ret)
 
 	rbfts[1].storeMgr.missingBatchesInFetching[preprep.BatchDigest] = msgID{
@@ -603,29 +604,29 @@ func TestRBFT_recvFetchMissingTxs(t *testing.T) {
 		d: preprep.BatchDigest,
 	}
 	rbfts[1].exec.lastExec = uint64(10)
-	ret = rbfts[1].recvSendMissingTxs(re)
+	ret = rbfts[1].recvSendMissingTxs(context.Background(), re)
 	assert.Nil(t, ret)
 
 	rbfts[1].exec.lastExec = uint64(0)
-	ret = rbfts[1].recvSendMissingTxs(re)
+	ret = rbfts[1].recvSendMissingTxs(context.Background(), re)
 	assert.Nil(t, ret)
 
 	re.MissingRequests = map[uint64]*protos.Transaction{uint64(0): tx}
 	rbfts[1].exec.lastExec = uint64(0)
-	ret = rbfts[1].recvSendMissingTxs(re)
+	ret = rbfts[1].recvSendMissingTxs(context.Background(), re)
 	assert.Nil(t, ret)
 
-	_ = rbfts[1].recvPrePrepare(preprep)
-	ret = rbfts[1].recvSendMissingTxs(re)
+	_ = rbfts[1].recvPrePrepare(context.Background(), preprep)
+	ret = rbfts[1].recvSendMissingTxs(context.Background(), re)
 	assert.Equal(t, pb.Type_PREPARE, nodes[1].broadcastMessageCache.Type)
 	assert.Nil(t, ret)
 
 	cert := rbfts[1].storeMgr.getCert(re.View, re.SequenceNumber, re.BatchDigest)
 	cert.sentCommit = true
-	ret = rbfts[1].recvSendMissingTxs(re)
+	ret = rbfts[1].recvSendMissingTxs(context.Background(), re)
 	assert.Nil(t, ret)
 
 	rbfts[1].setView(uint64(2))
-	ret = rbfts[1].recvSendMissingTxs(re)
+	ret = rbfts[1].recvSendMissingTxs(context.Background(), re)
 	assert.Nil(t, ret)
 }

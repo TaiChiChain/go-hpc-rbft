@@ -15,6 +15,7 @@
 package rbft
 
 import (
+	"context"
 	"strconv"
 	"sync"
 	"time"
@@ -60,12 +61,12 @@ func (tt *titleTimer) clear() {
 // timerManager manages common used timers.
 type timerManager struct {
 	tTimers   map[string]*titleTimer
-	eventChan chan<- interface{}
+	eventChan chan<- consensusEventWrapper
 	logger    Logger
 }
 
 // newTimerMgr news an instance of timerManager.
-func newTimerMgr(eventC chan interface{}, c Config) *timerManager {
+func newTimerMgr(eventC chan consensusEventWrapper, c Config) *timerManager {
 	tm := &timerManager{
 		tTimers:   make(map[string]*titleTimer),
 		eventChan: eventC,
@@ -152,7 +153,10 @@ func (tm *timerManager) createTimer(name string, timeout time.Duration, event *L
 
 	send := func() {
 		if tm.tTimers[name].has(key) {
-			tm.eventChan <- event
+			tm.eventChan <- consensusEventWrapper{
+				ctx:   context.Background(),
+				event: event,
+			}
 		}
 	}
 	time.AfterFunc(timeout, send)

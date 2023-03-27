@@ -1,6 +1,7 @@
 package rbft
 
 import (
+	"context"
 	"testing"
 
 	"github.com/hyperchain/go-hpc-common/types/protos"
@@ -30,8 +31,8 @@ func TestVC_FullProcess(t *testing.T) {
 	vcNode4 := nodes[3].broadcastMessageCache
 	assert.Equal(t, pb.Type_VIEW_CHANGE, vcNode4.Type)
 
-	rbfts[1].processEvent(vcNode3)
-	quorumEvent := rbfts[1].processEvent(vcNode4)
+	rbfts[1].processEvent(context.Background(), vcNode3)
+	quorumEvent := rbfts[1].processEvent(context.Background(), vcNode4)
 
 	ev := &LocalEvent{
 		Service:   ViewChangeService,
@@ -39,7 +40,7 @@ func TestVC_FullProcess(t *testing.T) {
 	}
 	assert.Equal(t, ev, quorumEvent)
 
-	done := rbfts[1].processEvent(ev)
+	done := rbfts[1].processEvent(context.Background(), ev)
 	nv := nodes[1].broadcastMessageCache
 	doneEvent := &LocalEvent{
 		Service:   ViewChangeService,
@@ -48,14 +49,14 @@ func TestVC_FullProcess(t *testing.T) {
 	assert.Equal(t, pb.Type_NEW_VIEW, nv.Type)
 	assert.Equal(t, doneEvent, done)
 
-	rbfts[2].processEvent(nv)
-	rbfts[3].processEvent(nv)
+	rbfts[2].processEvent(context.Background(), nv)
+	rbfts[3].processEvent(context.Background(), nv)
 	assert.Equal(t, uint64(1), rbfts[1].view)
 	assert.Equal(t, uint64(1), rbfts[2].view)
 	assert.Equal(t, uint64(1), rbfts[3].view)
 
 	assert.NotEqual(t, pb.Type_PRE_PREPARE, nodes[1].broadcastMessageCache.Type)
-	rbfts[1].handleViewChangeEvent(doneEvent)
+	rbfts[1].handleViewChangeEvent(context.Background(), doneEvent)
 	assert.Equal(t, pb.Type_PRE_PREPARE, nodes[1].broadcastMessageCache.Type)
 }
 
@@ -83,12 +84,12 @@ func TestVC_recvViewChange_FromPrimary(t *testing.T) {
 
 	rbfts[1].atomicOff(Pending)
 	rbfts[1].setNormal()
-	rbfts[1].recvViewChange(vc)
+	rbfts[1].recvViewChange(context.Background(), vc)
 
 	assert.Equal(t, pb.Type_VIEW_CHANGE, nodes[1].broadcastMessageCache.Type)
 
 	// resend it
-	ret := rbfts[1].recvViewChange(vc)
+	ret := rbfts[1].recvViewChange(context.Background(), vc)
 	nodes[1].broadcastMessageCache = nil
 	assert.Nil(t, ret)
 	assert.Nil(t, nodes[1].broadcastMessageCache)
@@ -117,7 +118,7 @@ func TestVC_recvViewChange_FromPrimary(t *testing.T) {
 	nodes[1].broadcastMessageCache = nil
 
 	assert.Equal(t, vc, rbfts[1].vcMgr.viewChangeStore[vcIdx{v: uint64(1), id: uint64(1)}])
-	ret = rbfts[1].recvViewChange(vc2)
+	ret = rbfts[1].recvViewChange(context.Background(), vc2)
 	assert.Nil(t, ret)
 	assert.Equal(t, vc2, rbfts[1].vcMgr.viewChangeStore[vcIdx{v: uint64(1), id: uint64(1)}])
 }
@@ -136,7 +137,7 @@ func TestVC_recvViewChange_FromSmallerView(t *testing.T) {
 	rbfts[1].atomicOff(Pending)
 	rbfts[1].setNormal()
 	rbfts[1].setView(uint64(5))
-	ret := rbfts[1].recvViewChange(vc)
+	ret := rbfts[1].recvViewChange(context.Background(), vc)
 
 	assert.Nil(t, nodes[1].broadcastMessageCache)
 	assert.Nil(t, ret)
@@ -159,8 +160,8 @@ func TestVC_recvViewChange_Quorum(t *testing.T) {
 	_ = proto.Unmarshal(vcPayload3, vc3)
 
 	// get quorum
-	rbfts[2].recvViewChange(vc1)
-	ret := rbfts[2].recvViewChange(vc3)
+	rbfts[2].recvViewChange(context.Background(), vc1)
+	ret := rbfts[2].recvViewChange(context.Background(), vc3)
 	exp := &LocalEvent{
 		Service:   ViewChangeService,
 		EventType: ViewChangeQuorumEvent,
@@ -174,7 +175,7 @@ func TestVC_recvViewChange_Quorum(t *testing.T) {
 	_ = proto.Unmarshal(vcPayload0, vc0)
 	rbfts[2].restartRecovery()
 	assert.Equal(t, true, rbfts[2].atomicIn(InRecovery))
-	ret2 := rbfts[2].recvViewChange(vc0)
+	ret2 := rbfts[2].recvViewChange(context.Background(), vc0)
 	assert.Equal(t, nil, ret2)
 	assert.Equal(t, false, rbfts[2].atomicIn(InRecovery))
 }
@@ -204,12 +205,12 @@ func TestVC_recvFetchRequestBatch(t *testing.T) {
 	fr := nodes[2].broadcastMessageCache
 	assert.Equal(t, pb.Type_FETCH_REQUEST_BATCH, fr.Type)
 
-	ret1 := rbfts[1].processEvent(fr)
+	ret1 := rbfts[1].processEvent(context.Background(), fr)
 	assert.Nil(t, ret1)
 	assert.Nil(t, nodes[1].unicastMessageCache)
 
 	rbfts[1].storeMgr.batchStore["lost-batch"] = &pb.RequestBatch{}
-	ret2 := rbfts[1].processEvent(fr)
+	ret2 := rbfts[1].processEvent(context.Background(), fr)
 	assert.Nil(t, ret2)
 	assert.Equal(t, pb.Type_SEND_REQUEST_BATCH, nodes[1].unicastMessageCache.Type)
 }
@@ -229,8 +230,8 @@ func TestVC_recvSendRequestBatch_AfterViewChanged(t *testing.T) {
 	vcPayload3 := nodes[3].broadcastMessageCache.Payload
 	vc3 := &pb.ViewChange{}
 	_ = proto.Unmarshal(vcPayload3, vc3)
-	rbfts[1].recvViewChange(vc2)
-	ret := rbfts[1].recvViewChange(vc3)
+	rbfts[1].recvViewChange(context.Background(), vc2)
+	ret := rbfts[1].recvViewChange(context.Background(), vc3)
 	exp := &LocalEvent{
 		Service:   ViewChangeService,
 		EventType: ViewChangeQuorumEvent,
@@ -247,7 +248,7 @@ func TestVC_recvSendRequestBatch_AfterViewChanged(t *testing.T) {
 	rbfts[2].vcMgr.newViewStore[nv.View] = nv
 
 	// start the test for recv nil sending request batch
-	ret1 := rbfts[2].recvSendRequestBatch(nil)
+	ret1 := rbfts[2].recvSendRequestBatch(context.Background(), nil)
 	assert.Nil(t, ret1)
 
 	// construct a sending request batch message
@@ -267,14 +268,14 @@ func TestVC_recvSendRequestBatch_AfterViewChanged(t *testing.T) {
 
 	// the request batch is not the one we want
 	rbfts[2].storeMgr.missingReqBatches["lost-batch-another"] = true
-	rbfts[2].recvSendRequestBatch(sr)
+	rbfts[2].recvSendRequestBatch(context.Background(), sr)
 	assert.Equal(t, true, rbfts[2].storeMgr.missingReqBatches["lost-batch-another"])
 	delete(rbfts[2].storeMgr.missingReqBatches, "lost-batch-another")
 
 	// recv the request batch we want
 	rbfts[2].storeMgr.missingReqBatches["lost-batch"] = true
 	rbfts[2].atomicOn(InViewChange)
-	ret3 := rbfts[2].recvSendRequestBatch(sr)
+	ret3 := rbfts[2].recvSendRequestBatch(context.Background(), sr)
 	exp3 := &LocalEvent{
 		Service:   ViewChangeService,
 		EventType: ViewChangedEvent,
@@ -311,7 +312,7 @@ func TestVC_processNewView_AfterViewChanged_PrimaryNormal(t *testing.T) {
 		SeqNo:           uint64(3),
 	}
 	rbfts[0].storeMgr.batchStore[batch[0].BatchHash] = batch3
-	rbfts[0].processNewView(msgList)
+	rbfts[0].processNewView(context.Background(), msgList)
 	assert.Equal(t, uint64(3), rbfts[0].batchMgr.seqNo)
 	assert.Nil(t, nodes[0].broadcastMessageCache)
 }
@@ -346,7 +347,7 @@ func TestVC_processNewView_AfterViewChanged_ReplicaNormal(t *testing.T) {
 	rbfts[0].storeMgr.batchStore[batch[0].BatchHash] = batch3
 	rbfts[0].setView(uint64(1))
 	rbfts[0].exec.setLastExec(uint64(3))
-	rbfts[0].processNewView(msgList)
+	rbfts[0].processNewView(context.Background(), msgList)
 	assert.Equal(t, uint64(3), rbfts[0].batchMgr.seqNo)
 	assert.Equal(t, pb.Type_COMMIT, nodes[0].broadcastMessageCache.Type)
 }
@@ -398,7 +399,7 @@ func TestVC_processNewView_AfterViewChanged_LargerConfig(t *testing.T) {
 
 	rbfts[0].setView(uint64(1))
 	rbfts[0].exec.setLastExec(uint64(5))
-	rbfts[0].processNewView(msgList)
+	rbfts[0].processNewView(context.Background(), msgList)
 	assert.Equal(t, uint64(5), rbfts[0].batchMgr.seqNo)
 	assert.Equal(t, pb.Type_COMMIT, nodes[0].broadcastMessageCache.Type)
 }
@@ -450,7 +451,7 @@ func TestVC_processNewView_AfterViewChanged_LowerConfig(t *testing.T) {
 
 	rbfts[0].setView(uint64(2))
 	rbfts[0].exec.setLastExec(uint64(3))
-	rbfts[0].processNewView(msgList)
+	rbfts[0].processNewView(context.Background(), msgList)
 	assert.Equal(t, uint64(4), rbfts[0].batchMgr.seqNo)
 	assert.Equal(t, pb.Type_PREPARE, nodes[0].broadcastMessageCache.Type)
 }
@@ -508,7 +509,7 @@ func TestVC_processNewView_AfterViewChanged_EqualConfig(t *testing.T) {
 			Digest: "digest-4",
 		},
 	})
-	rbfts[0].processNewView(msgList)
+	rbfts[0].processNewView(context.Background(), msgList)
 	assert.Equal(t, uint64(4), rbfts[0].batchMgr.seqNo)
 	assert.Equal(t, pb.Type_COMMIT, nodes[0].broadcastMessageCache.Type)
 }

@@ -5,6 +5,7 @@
 package mocknode
 
 import (
+	context "context"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
@@ -156,15 +157,15 @@ func (mr *MockNodeMockRecorder) Status() *gomock.Call {
 }
 
 // Step mocks base method.
-func (m *MockNode) Step(msg *rbftpb.ConsensusMessage) {
+func (m *MockNode) Step(ctx context.Context, msg *rbftpb.ConsensusMessage) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Step", msg)
+	m.ctrl.Call(m, "Step", ctx, msg)
 }
 
 // Step indicates an expected call of Step.
-func (mr *MockNodeMockRecorder) Step(msg interface{}) *gomock.Call {
+func (mr *MockNodeMockRecorder) Step(ctx, msg interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Step", reflect.TypeOf((*MockNode)(nil).Step), msg)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Step", reflect.TypeOf((*MockNode)(nil).Step), ctx, msg)
 }
 
 // Stop mocks base method.

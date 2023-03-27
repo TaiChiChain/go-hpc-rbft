@@ -15,6 +15,7 @@
 package rbft
 
 import (
+	"context"
 	"sync"
 
 	"github.com/hyperchain/go-hpc-common/types/protos"
@@ -35,7 +36,7 @@ type Node interface {
 	// Application needs to call ApplyConfChange when applying EntryConfChange type entry.
 	ProposeConfChange(cc *types.ConfChange) error
 	// Step advances the state machine using the given message.
-	Step(msg *pb.ConsensusMessage)
+	Step(ctx context.Context, msg *pb.ConsensusMessage)
 	// ApplyConfChange applies config change to the local node.
 	ApplyConfChange(cc *types.ConfState)
 	// Status returns the current node status of the RBFT state machine.
@@ -47,9 +48,10 @@ type Node interface {
 }
 
 // ServiceInbound receives and records modifications from application service which includes two events:
-// 1. ReportExecuted is invoked after application service has actually height a batch.
-// 2. ReportStateUpdated is invoked after application service finished stateUpdate which must be
-//    triggered by RBFT core before.
+//  1. ReportExecuted is invoked after application service has actually height a batch.
+//  2. ReportStateUpdated is invoked after application service finished stateUpdate which must be
+//     triggered by RBFT core before.
+//
 // ServiceInbound is corresponding to External.ServiceOutbound.
 type ServiceInbound interface {
 	// ReportExecuted reports to RBFT core that application service has finished height one batch with
@@ -165,8 +167,8 @@ func (n *node) ProposeConfChange(cc *types.ConfChange) error {
 }
 
 // Step advances the state machine using the given message.
-func (n *node) Step(msg *pb.ConsensusMessage) {
-	n.rbft.step(msg)
+func (n *node) Step(ctx context.Context, msg *pb.ConsensusMessage) {
+	n.rbft.step(ctx, msg)
 }
 
 // ApplyConfChange applies config change to the local node.

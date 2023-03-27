@@ -15,6 +15,7 @@
 package rbft
 
 import (
+	"context"
 	"fmt"
 
 	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
@@ -95,16 +96,16 @@ func initMsgEventMap() {
 }
 
 // dispatchLocalEvent dispatches local Event to corresponding handles using its service type
-func (rbft *rbftImpl) dispatchLocalEvent(e *LocalEvent) consensusEvent {
+func (rbft *rbftImpl) dispatchLocalEvent(ctx context.Context, e *LocalEvent) consensusEvent {
 	switch e.Service {
 	case CoreRbftService:
-		return rbft.handleCoreRbftEvent(e)
+		return rbft.handleCoreRbftEvent(ctx, e)
 	case ViewChangeService:
-		return rbft.handleViewChangeEvent(e)
+		return rbft.handleViewChangeEvent(ctx, e)
 	case RecoveryService:
-		return rbft.handleRecoveryEvent(e)
+		return rbft.handleRecoveryEvent(ctx, e)
 	case EpochMgrService:
-		return rbft.handleEpochMgrEvent(e)
+		return rbft.handleEpochMgrEvent(ctx, e)
 	default:
 		rbft.logger.Errorf("Not Supported event: %v", e)
 		return nil
@@ -112,7 +113,7 @@ func (rbft *rbftImpl) dispatchLocalEvent(e *LocalEvent) consensusEvent {
 }
 
 // handleCoreRbftEvent handles core RBFT service events
-func (rbft *rbftImpl) handleCoreRbftEvent(e *LocalEvent) consensusEvent {
+func (rbft *rbftImpl) handleCoreRbftEvent(ctx context.Context, e *LocalEvent) consensusEvent {
 	switch e.EventType {
 	case CoreBatchTimerEvent:
 		if !rbft.isNormal() {
@@ -135,14 +136,14 @@ func (rbft *rbftImpl) handleCoreRbftEvent(e *LocalEvent) consensusEvent {
 
 		if len(rbft.batchMgr.cacheBatch) > 0 {
 			rbft.restartBatchTimer()
-			rbft.maybeSendPrePrepare(nil, true)
+			rbft.maybeSendPrePrepare(ctx, nil, true)
 			return nil
 		}
 		rbft.stopBatchTimer()
 
 		// call requestPool module to generate a tx batch
 		batches := rbft.batchMgr.requestPool.GenerateRequestBatch()
-		rbft.postBatches(batches)
+		rbft.postBatches(ctx, batches)
 
 		return nil
 
@@ -167,7 +168,7 @@ func (rbft *rbftImpl) handleCoreRbftEvent(e *LocalEvent) consensusEvent {
 		return nil
 
 	case CoreStateUpdatedEvent:
-		return rbft.recvStateUpdatedEvent(e.Event.(*types.ServiceState))
+		return rbft.recvStateUpdatedEvent(ctx, e.Event.(*types.ServiceState))
 
 	case CoreResendMissingTxsEvent:
 		ev, ok := e.Event.(*pb.FetchMissingRequests)
@@ -175,7 +176,7 @@ func (rbft *rbftImpl) handleCoreRbftEvent(e *LocalEvent) consensusEvent {
 			rbft.logger.Error("FetchMissingRequests parsing error")
 			return nil
 		}
-		_ = rbft.recvFetchMissingTxs(ev)
+		_ = rbft.recvFetchMissingTxs(ctx, ev)
 		return nil
 
 	case CoreHighWatermarkEvent:
@@ -207,7 +208,7 @@ func (rbft *rbftImpl) handleCoreRbftEvent(e *LocalEvent) consensusEvent {
 }
 
 // handleRecoveryEvent handles recovery services related events.
-func (rbft *rbftImpl) handleRecoveryEvent(e *LocalEvent) consensusEvent {
+func (rbft *rbftImpl) handleRecoveryEvent(ctx context.Context, e *LocalEvent) consensusEvent {
 	switch e.EventType {
 	case RecoveryInitEvent:
 		preView, ok := e.Event.(uint64)
@@ -279,7 +280,7 @@ func (rbft *rbftImpl) handleRecoveryEvent(e *LocalEvent) consensusEvent {
 		// commit or other consensus messages during add/delete node
 		rbft.fetchRecoveryPQC()
 
-		rbft.primaryResubmitTransactions()
+		rbft.primaryResubmitTransactions(context.TODO())
 
 		return nil
 
@@ -312,7 +313,7 @@ func (rbft *rbftImpl) handleRecoveryEvent(e *LocalEvent) consensusEvent {
 			// primary construct and send new view message
 			return rbft.sendNewView(true)
 		}
-		return rbft.replicaCheckNewView()
+		return rbft.replicaCheckNewView(context.TODO())
 	default:
 		rbft.logger.Errorf("Invalid recovery service events : %v", e)
 		return nil
@@ -320,7 +321,7 @@ func (rbft *rbftImpl) handleRecoveryEvent(e *LocalEvent) consensusEvent {
 }
 
 // handleViewChangeEvent handles view change service related events.
-func (rbft *rbftImpl) handleViewChangeEvent(e *LocalEvent) consensusEvent {
+func (rbft *rbftImpl) handleViewChangeEvent(ctx context.Context, e *LocalEvent) consensusEvent {
 	switch e.EventType {
 	case ViewChangeTimerEvent:
 		demand, ok := e.Event.(nextDemandNewView)
@@ -388,7 +389,7 @@ func (rbft *rbftImpl) handleViewChangeEvent(e *LocalEvent) consensusEvent {
 			return rbft.initRecovery()
 		}
 
-		rbft.primaryResubmitTransactions()
+		rbft.primaryResubmitTransactions(ctx)
 
 		if !rbft.isPrimary(rbft.peerPool.ID) {
 			rbft.fetchRecoveryPQC()
@@ -426,7 +427,7 @@ func (rbft *rbftImpl) handleViewChangeEvent(e *LocalEvent) consensusEvent {
 			// primary construct and send new view message
 			return rbft.sendNewView(false)
 		}
-		return rbft.replicaCheckNewView()
+		return rbft.replicaCheckNewView(ctx)
 
 	default:
 		rbft.logger.Errorf("Invalid viewChange event: %v", e)
@@ -436,7 +437,7 @@ func (rbft *rbftImpl) handleViewChangeEvent(e *LocalEvent) consensusEvent {
 }
 
 // handleViewChangeEvent handles epoch service related events.
-func (rbft *rbftImpl) handleEpochMgrEvent(e *LocalEvent) consensusEvent {
+func (rbft *rbftImpl) handleEpochMgrEvent(ctx context.Context, e *LocalEvent) consensusEvent {
 	switch e.EventType {
 	case FetchCheckpointEvent:
 		rbft.logger.Debugf("Replica %d fetch checkpoint timer expired", rbft.peerPool.ID)
@@ -451,17 +452,17 @@ func (rbft *rbftImpl) handleEpochMgrEvent(e *LocalEvent) consensusEvent {
 }
 
 // dispatchConsensusMsg dispatches consensus messages to corresponding handlers using its service type
-func (rbft *rbftImpl) dispatchConsensusMsg(e consensusEvent) consensusEvent {
+func (rbft *rbftImpl) dispatchConsensusMsg(ctx context.Context, e consensusEvent) consensusEvent {
 	service := rbft.dispatchMsgToService(e)
 	switch service {
 	case CoreRbftService:
-		return rbft.dispatchCoreRbftMsg(e)
+		return rbft.dispatchCoreRbftMsg(ctx, e)
 	case ViewChangeService:
-		return rbft.dispatchViewChangeMsg(e)
+		return rbft.dispatchViewChangeMsg(ctx, e)
 	case RecoveryService:
-		return rbft.dispatchRecoveryMsg(e)
+		return rbft.dispatchRecoveryMsg(ctx, e)
 	case EpochMgrService:
-		return rbft.dispatchEpochMsg(e)
+		return rbft.dispatchEpochMsg(ctx, e)
 	default:
 		rbft.logger.Errorf("Not Supported event: %v", e)
 	}

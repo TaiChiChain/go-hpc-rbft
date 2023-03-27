@@ -28,7 +28,7 @@ func newTestTimerMgr(ctrl *gomock.Controller) *timerManager {
 		MetricsProv:   &disabled.Provider{},
 		DelFlag:       make(chan bool),
 	}
-	eventC := make(chan interface{})
+	eventC := make(chan consensusEventWrapper)
 
 	return newTimerMgr(eventC, conf)
 }

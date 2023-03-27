@@ -1,6 +1,7 @@
 package rbft
 
 import (
+	"context"
 	"errors"
 	"os"
 	"reflect"
@@ -16,9 +17,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-//******************************************************************************************************************
+// ******************************************************************************************************************
 // some tools for unit tests
-//******************************************************************************************************************
+// ******************************************************************************************************************
 func unlockCluster(rbfts []*rbftImpl) {
 	for index := range rbfts {
 		rbfts[index].atomicOff(Pending)
@@ -80,7 +81,7 @@ func executeExceptN(t *testing.T, rbfts []*rbftImpl, nodes []*testNode, tx *prot
 		Service:   CoreRbftService,
 		EventType: CoreBatchTimerEvent,
 	}
-	rbfts[0].processEvent(batchTimerEvent)
+	rbfts[0].processEvent(context.Background(), batchTimerEvent)
 
 	preprepMsg := nodes[0].broadcastMessageCache
 	assert.Equal(t, pb.Type_PRE_PREPARE, preprepMsg.Type)
@@ -94,7 +95,7 @@ func executeExceptN(t *testing.T, rbfts []*rbftImpl, nodes []*testNode, tx *prot
 		if index == 0 || index == notExec {
 			continue
 		}
-		rbfts[index].processEvent(preprepMsg)
+		rbfts[index].processEvent(context.Background(), preprepMsg)
 		prepMsg[index] = nodes[index].broadcastMessageCache
 		assert.Equal(t, pb.Type_PREPARE, prepMsg[index].Type)
 	}
@@ -111,7 +112,7 @@ func executeExceptN(t *testing.T, rbfts []*rbftImpl, nodes []*testNode, tx *prot
 			if j == 0 || j == notExec {
 				continue
 			}
-			rbfts[index].processEvent(prepMsg[j])
+			rbfts[index].processEvent(context.Background(), prepMsg[j])
 		}
 		commitMsg[index] = nodes[index].broadcastMessageCache
 		assert.Equal(t, pb.Type_COMMIT, commitMsg[index].Type)
@@ -126,7 +127,7 @@ func executeExceptN(t *testing.T, rbfts []*rbftImpl, nodes []*testNode, tx *prot
 			if j == notExec {
 				continue
 			}
-			rbfts[index].processEvent(commitMsg[j])
+			rbfts[index].processEvent(context.Background(), commitMsg[j])
 		}
 		if checkpoint {
 			checkpointMsg[index] = nodes[index].broadcastMessageCache
@@ -145,7 +146,7 @@ func executeExceptN(t *testing.T, rbfts []*rbftImpl, nodes []*testNode, tx *prot
 					if j == notExec {
 						continue
 					}
-					rbfts[index].processEvent(checkpointMsg[j])
+					rbfts[index].processEvent(context.Background(), checkpointMsg[j])
 				}
 			}
 		} else {
@@ -157,7 +158,7 @@ func executeExceptN(t *testing.T, rbfts []*rbftImpl, nodes []*testNode, tx *prot
 					if j == notExec {
 						continue
 					}
-					rbfts[index].processEvent(checkpointMsg[j])
+					rbfts[index].processEvent(context.Background(), checkpointMsg[j])
 				}
 			}
 		}

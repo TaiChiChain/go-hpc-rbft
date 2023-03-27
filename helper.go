@@ -15,6 +15,7 @@
 package rbft
 
 import (
+	"context"
 	"crypto/md5"
 	"encoding/binary"
 	"encoding/hex"
@@ -184,7 +185,7 @@ func (rbft *rbftImpl) broadcastReqSet(set *pb.RequestSet) {
 		Epoch:   rbft.epoch,
 		Payload: payload,
 	}
-	rbft.peerPool.broadcast(consensusMsg)
+	rbft.peerPool.broadcast(context.Background(), consensusMsg)
 }
 
 // =============================================================================
@@ -576,7 +577,7 @@ func (rbft *rbftImpl) compareWholeStates(states wholeStates) consensusEvent {
 				return nil
 			}
 
-			return rbft.resetStateForRecovery()
+			return rbft.resetStateForRecovery(context.TODO())
 		}
 	}
 
@@ -905,13 +906,13 @@ func calculateMD5Hash(list []string, timestamp int64) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-func drainChannel(ch chan interface{}) protos.Transactions {
+func drainChannel(ch chan consensusEventWrapper) protos.Transactions {
 	remainTxs := make(protos.Transactions, 0)
 
 	for len(ch) > 0 {
 		select {
-		case ee := <-ch:
-			switch e := ee.(type) {
+		case w := <-ch:
+			switch e := w.event.(type) {
 			case *pb.RequestSet:
 				remainTxs = append(remainTxs, e.Requests...)
 			default:

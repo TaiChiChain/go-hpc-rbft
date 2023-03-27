@@ -1,6 +1,7 @@
 package rbft
 
 import (
+	"context"
 	"sync"
 
 	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
@@ -57,10 +58,10 @@ func newEpochManager(c Config) *epochManager {
 }
 
 // dispatchRecoveryMsg dispatches recovery service messages using service type
-func (rbft *rbftImpl) dispatchEpochMsg(e consensusEvent) consensusEvent {
+func (rbft *rbftImpl) dispatchEpochMsg(ctx context.Context, e consensusEvent) consensusEvent {
 	switch et := e.(type) {
 	case *pb.FetchCheckpoint:
-		return rbft.recvFetchCheckpoint(et)
+		return rbft.recvFetchCheckpoint(ctx, et)
 	}
 	return nil
 }
@@ -90,7 +91,8 @@ func (rbft *rbftImpl) fetchCheckpoint() consensusEvent {
 	}
 
 	rbft.logger.Debugf("Replica %d is fetching checkpoint %d", rbft.peerPool.ID, fetch.SequenceNumber)
-	rbft.peerPool.broadcast(consensusMsg)
+
+	rbft.peerPool.broadcast(context.Background(), consensusMsg)
 	return nil
 }
 
@@ -107,7 +109,7 @@ func (rbft *rbftImpl) stopFetchCheckpointTimer() {
 	rbft.timerMgr.stopTimer(fetchCheckpointTimer)
 }
 
-func (rbft *rbftImpl) recvFetchCheckpoint(fetch *pb.FetchCheckpoint) consensusEvent {
+func (rbft *rbftImpl) recvFetchCheckpoint(ctx context.Context, fetch *pb.FetchCheckpoint) consensusEvent {
 	if !rbft.inRouters(fetch.GetReplicaHost()) {
 		return nil
 	}
@@ -136,7 +138,7 @@ func (rbft *rbftImpl) recvFetchCheckpoint(fetch *pb.FetchCheckpoint) consensusEv
 		Epoch:   rbft.epoch,
 		Payload: payload,
 	}
-	rbft.peerPool.unicastByHostname(consensusMsg, fetch.GetReplicaHost())
+	rbft.peerPool.unicastByHostname(ctx, consensusMsg, fetch.GetReplicaHost())
 
 	return nil
 }
