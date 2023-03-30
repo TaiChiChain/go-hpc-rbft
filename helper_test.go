@@ -426,6 +426,7 @@ func TestHelper_CheckIfNeedStateUpdate(t *testing.T) {
 	defer ctrl.Finish()
 
 	_, rbfts := newBasicClusterInstance()
+	unlockCluster(rbfts)
 	rbfts[0].storeMgr.localCheckpoints = make(map[uint64]*pb.SignedCheckpoint)
 
 	selfCheckpoint10 := &pb.SignedCheckpoint{
