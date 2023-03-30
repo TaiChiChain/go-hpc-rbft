@@ -58,9 +58,7 @@ func TestRBFT_newRBFT(t *testing.T) {
 		EpochInit:    uint64(0),
 		LatestConfig: nil,
 	}
-	cpChan := make(chan *types.ServiceState)
-	confC := make(chan uint64)
-	rbft, _ := newRBFT(cpChan, confC, conf)
+	rbft, _ := newRBFT(conf)
 
 	// Normal case
 	structName, nilElems, err := checkNilElems(rbft)
@@ -71,13 +69,13 @@ func TestRBFT_newRBFT(t *testing.T) {
 
 	// Nil Peers
 	conf.Peers = nil
-	_, err = newRBFT(cpChan, confC, conf)
+	_, err = newRBFT(conf)
 	assert.Equal(t, errors.New("nil peers"), err)
 
 	// Is a New Node
 	conf.Peers = peerSet
 	conf.ID = 4
-	rbft, _ = newRBFT(cpChan, confC, conf)
+	rbft, _ = newRBFT(conf)
 	assert.Equal(t, 4, rbft.N)
 }
 
