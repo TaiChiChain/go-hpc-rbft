@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.1.1](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v1.1.0...v1.1.1) (2023-03-30)
+
+
+### Bug Fixes
+
+* catch panic for send on closed channel ([6d7d494](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/6d7d494836d2f2ad2d8dc2a653b2f90b2d0567e4))
+
 ## [1.1.0](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v1.0.10...v1.1.0) (2023-02-22)
 
 
