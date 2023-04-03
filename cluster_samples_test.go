@@ -67,7 +67,7 @@ func TestCluster_SyncEpochThenSyncBlockWithCheckpoint(t *testing.T) {
 	ctx := newCTX(defaultValidatorSet)
 	retMessagesCtx := executeExceptN(t, rbfts, nodes, ctx, true, 2)
 
-	var retMessageSet []map[pb.Type][]*pb.ConsensusMessage
+	var retMessageSet []map[pb.Type][]*consensusMessageWrapper
 	for i := 0; i < 6; i++ {
 		tx := newTx()
 		seqValue := uint64(10 * (i + 1))
@@ -96,7 +96,7 @@ func TestCluster_SyncEpochThenSyncBlockWithCheckpoint(t *testing.T) {
 	epochRequestMsg := nodes[2].unicastMessageCache
 	assert.Equal(t, pb.Type_EPOCH_CHANGE_REQUEST, epochRequestMsg.Type)
 
-	var rspList []*pb.ConsensusMessage
+	var rspList []*consensusMessageWrapper
 	for index := range rbfts {
 		if index == 2 {
 			continue
@@ -125,7 +125,7 @@ func TestCluster_SyncEpochThenSyncBlockWithCheckpoint(t *testing.T) {
 	rvc := nodes[2].broadcastMessageCache
 	// try recovery view change after epoch change.
 	assert.Equal(t, pb.Type_VIEW_CHANGE, rvc.Type)
-	var newViewRspList []*pb.ConsensusMessage
+	var newViewRspList []*consensusMessageWrapper
 	for index := range rbfts {
 		if index == 2 {
 			continue
@@ -161,7 +161,7 @@ func TestCluster_SyncBlockThenSyncEpochWithCheckpoint(t *testing.T) {
 	unlockCluster(rbfts)
 
 	// normal nodes execute normal txs to height 50.
-	var retMessageSet []map[pb.Type][]*pb.ConsensusMessage
+	var retMessageSet []map[pb.Type][]*consensusMessageWrapper
 	for i := 0; i < 5; i++ {
 		tx := newTx()
 		seqValue := uint64(10 * (i + 1))
@@ -206,7 +206,7 @@ func TestCluster_SyncBlockThenSyncEpochWithCheckpoint(t *testing.T) {
 	epochRequestMsg := nodes[2].unicastMessageCache
 	assert.Equal(t, pb.Type_EPOCH_CHANGE_REQUEST, epochRequestMsg.Type)
 
-	var rspList []*pb.ConsensusMessage
+	var rspList []*consensusMessageWrapper
 	for index := range rbfts {
 		if index == 2 {
 			continue
@@ -220,7 +220,7 @@ func TestCluster_SyncBlockThenSyncEpochWithCheckpoint(t *testing.T) {
 
 	// process epoch change proof and enter sync chain.
 	for _, rsp := range rspList {
-		ev := rbfts[2].processEvent(rsp)
+		ev = rbfts[2].processEvent(rsp)
 		if ev != nil {
 			assert.Equal(t, EpochSyncEvent, ev.(*LocalEvent).EventType)
 			rbfts[2].processEvent(ev)
@@ -244,7 +244,7 @@ func TestCluster_SyncBlockThenSyncEpochWithCheckpoint(t *testing.T) {
 		rbfts[index].processEvent(rvc)
 		rspMsg := nodes[index].unicastMessageCache
 		assert.Equal(t, pb.Type_RECOVERY_RESPONSE, rspMsg.Type)
-		newViewRspList = append(newViewRspList, rspMsg)
+		newViewRspList = append(newViewRspList, rspMsg.ConsensusMessage)
 	}
 
 	// process fetch view response and enter sync chain.

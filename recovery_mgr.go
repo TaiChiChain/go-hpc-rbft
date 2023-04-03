@@ -15,6 +15,7 @@
 package rbft
 
 import (
+	"context"
 	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
 
 	"github.com/gogo/protobuf/proto"
@@ -74,7 +75,7 @@ func (rbft *rbftImpl) fetchRecoveryPQC() consensusEvent {
 		Payload: payload,
 	}
 
-	rbft.peerPool.broadcast(conMsg)
+	rbft.peerPool.broadcast(context.TODO(), conMsg)
 
 	return nil
 }
@@ -143,7 +144,7 @@ func (rbft *rbftImpl) recvFetchPQCRequest(fetch *pb.FetchPQCRequest) consensusEv
 		Type:    pb.Type_FETCH_PQC_RESPONSE,
 		Payload: payload,
 	}
-	rbft.peerPool.unicast(consensusMsg, fetch.ReplicaId)
+	rbft.peerPool.unicast(context.TODO(), consensusMsg, fetch.ReplicaId)
 
 	rbft.logger.Debugf("Replica %d send PQC response to %d, detailed: %+v", rbft.peerPool.ID,
 		fetch.ReplicaId, pqcResponse)
@@ -159,14 +160,14 @@ func (rbft *rbftImpl) recvFetchPQCResponse(PQCInfo *pb.FetchPQCResponse) consens
 	// post all the PQC
 	if !rbft.isPrimary(rbft.peerPool.ID) {
 		for _, preprep := range PQCInfo.GetPrepreSet() {
-			_ = rbft.recvPrePrepare(preprep)
+			_ = rbft.recvPrePrepare(context.TODO(), preprep)
 		}
 	}
 	for _, prep := range PQCInfo.GetPreSet() {
-		_ = rbft.recvPrepare(prep)
+		_ = rbft.recvPrepare(context.TODO(), prep)
 	}
 	for _, cmt := range PQCInfo.GetCmtSet() {
-		_ = rbft.recvCommit(cmt)
+		_ = rbft.recvCommit(context.TODO(), cmt)
 	}
 
 	return nil
@@ -233,7 +234,7 @@ func (rbft *rbftImpl) initSyncState() consensusEvent {
 		Type:    pb.Type_SYNC_STATE,
 		Payload: payload,
 	}
-	rbft.peerPool.broadcast(msg)
+	rbft.peerPool.broadcast(context.TODO(), msg)
 
 	// post the sync state response message event to myself
 	state := rbft.node.getCurrentState()
@@ -283,6 +284,7 @@ func (rbft *rbftImpl) recvSyncState(sync *pb.SyncState) consensusEvent {
 		View:             rbft.view,
 		SignedCheckpoint: signedCheckpoint,
 	}
+	
 	payload, err := proto.Marshal(syncStateRsp)
 	if err != nil {
 		rbft.logger.Errorf("Marshal SyncStateResponse Error!")
@@ -292,7 +294,7 @@ func (rbft *rbftImpl) recvSyncState(sync *pb.SyncState) consensusEvent {
 		Type:    pb.Type_SYNC_STATE_RESPONSE,
 		Payload: payload,
 	}
-	rbft.peerPool.unicast(consensusMsg, sync.ReplicaId)
+	rbft.peerPool.unicast(context.TODO(), consensusMsg, sync.ReplicaId)
 	rbft.logger.Debugf("Replica %d send sync state response to replica %d: view=%d, checkpoint=%+v",
 		rbft.peerPool.ID, sync.ReplicaId, rbft.view, signedCheckpoint.GetCheckpoint())
 	return nil

@@ -1,6 +1,7 @@
 package rbft
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"math/rand"
@@ -15,6 +16,8 @@ import (
 	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
 	"github.com/hyperchain/go-hpc-rbft/v2/types"
 	txpool "github.com/hyperchain/go-hpc-txpool"
+
+	"go.opentelemetry.io/otel/trace"
 )
 
 var (
@@ -111,16 +114,16 @@ type testNode struct {
 	close chan bool
 
 	// Channel to receive messages in cluster.
-	recvChan chan *pb.ConsensusMessage
+	recvChan chan *consensusMessageWrapper
 
 	// Storage of consensus logs.
 	stateStore map[string][]byte
 
 	// consensus message cache for broadcast
-	broadcastMessageCache *pb.ConsensusMessage
+	broadcastMessageCache *consensusMessageWrapper
 
 	// consensus message cache for unicast
-	unicastMessageCache *pb.ConsensusMessage
+	unicastMessageCache *consensusMessageWrapper
 }
 
 // testExternal is the instance of External interface.
@@ -165,9 +168,9 @@ func (lookup *defaultTxpoolSupportSmokeTest) IsRequestsExist(txs []*protos.Trans
 func (lookup *defaultTxpoolSupportSmokeTest) CheckSigns(txs []*protos.Transaction) {
 }
 
-//=============================================================================
+// =============================================================================
 // init process
-//=============================================================================
+// =============================================================================
 // newTestFramework init the testFramework instance
 func newTestFramework(account int, loggerFile bool) *testFramework {
 	// Init PeerSet
@@ -269,6 +272,7 @@ func (tf *testFramework) newNodeConfig(
 		External:    ext,
 		RequestPool: pool,
 		MetricsProv: &disabled.Provider{},
+		Tracer:      trace.NewNoopTracerProvider().Tracer("hyperchain"),
 		DelFlag:     make(chan bool),
 	}
 }
@@ -322,7 +326,7 @@ func (tf *testFramework) newTestNode(id uint64, hostname string, cc chan *channe
 		normal:     true,
 		online:     true,
 		close:      make(chan bool),
-		recvChan:   make(chan *pb.ConsensusMessage),
+		recvChan:   make(chan *consensusMessageWrapper),
 		stateStore: make(map[string][]byte),
 		blocks:     make(map[uint64]string),
 	}
@@ -352,7 +356,10 @@ func (tf *testFramework) clusterListen() {
 			for i := range tf.TestNode {
 				if obj.to == "" || obj.to == tf.TestNode[i].Hash {
 					if tf.TestNode[i].online && obj.msg.From != tf.TestNode[i].ID {
-						tf.TestNode[i].recvChan <- obj.msg
+						tf.TestNode[i].recvChan <- &consensusMessageWrapper{
+							ctx:              context.TODO(),
+							ConsensusMessage: obj.msg,
+						}
 					}
 				}
 			}
@@ -370,9 +377,9 @@ func (tn *testNode) nodeListen() {
 		select {
 		case <-tn.close:
 			return
-		case msg := <-tn.recvChan:
+		case w := <-tn.recvChan:
 			if tn.normal {
-				tn.N.Step(msg)
+				tn.N.Step(w.ctx, w.ConsensusMessage)
 			}
 		}
 	}
@@ -582,7 +589,7 @@ func (tf *testFramework) frameworkAddNode(hostname string, loggerFile bool, vSet
 		normal:   true,
 		online:   true,
 		close:    make(chan bool),
-		recvChan: make(chan *pb.ConsensusMessage),
+		recvChan: make(chan *consensusMessageWrapper),
 		blocks:   make(map[uint64]string),
 	}
 	tf.TestNode = append(tf.TestNode, tn)
@@ -678,9 +685,9 @@ func (tf *testFramework) sendInitCtx() {
 	_ = tf.TestNode[senderID3-1].N.Propose(txSet)
 }
 
-//=============================================================================
+// =============================================================================
 // External Interface Implement
-//=============================================================================
+// =============================================================================
 // Storage
 func (ext *testExternal) StoreState(key string, value []byte) error {
 	ext.testNode.stateStore[key] = value
@@ -726,8 +733,7 @@ func (ext *testExternal) Destroy(key string) error {
 func (ext *testExternal) postMsg(msg *channelMsg) {
 	ext.clusterChan <- msg
 }
-
-func (ext *testExternal) Broadcast(msg *pb.ConsensusMessage) error {
+func (ext *testExternal) Broadcast(ctx context.Context, msg *pb.ConsensusMessage) error {
 	if !ext.testNode.online {
 		return errors.New("node offline")
 	}
@@ -737,13 +743,15 @@ func (ext *testExternal) Broadcast(msg *pb.ConsensusMessage) error {
 		to:  "",
 	}
 	ext.tf.log.Debugf("%s broadcast msg %v", ext.testNode.Hostname, msg.Type)
-	ext.testNode.broadcastMessageCache = msg
+	ext.testNode.broadcastMessageCache = &consensusMessageWrapper{
+		ctx:              ctx,
+		ConsensusMessage: msg,
+	}
 
 	go ext.postMsg(cm)
 	return nil
 }
-
-func (ext *testExternal) Unicast(msg *pb.ConsensusMessage, to uint64) error {
+func (ext *testExternal) Unicast(ctx context.Context, msg *pb.ConsensusMessage, to uint64) error {
 	if !ext.testNode.online {
 		return errors.New("node offline")
 	}
@@ -758,13 +766,15 @@ func (ext *testExternal) Unicast(msg *pb.ConsensusMessage, to uint64) error {
 			break
 		}
 	}
-	ext.testNode.unicastMessageCache = msg
+	ext.testNode.unicastMessageCache = &consensusMessageWrapper{
+		ctx:              ctx,
+		ConsensusMessage: msg,
+	}
 
 	go ext.postMsg(cm)
 	return nil
 }
-
-func (ext *testExternal) UnicastByHostname(msg *pb.ConsensusMessage, to string) error {
+func (ext *testExternal) UnicastByHostname(ctx context.Context, msg *pb.ConsensusMessage, to string) error {
 	if !ext.testNode.online {
 		return errors.New("node offline")
 	}
@@ -773,7 +783,10 @@ func (ext *testExternal) UnicastByHostname(msg *pb.ConsensusMessage, to string) 
 		msg: msg,
 		to:  to,
 	}
-	ext.testNode.unicastMessageCache = msg
+	ext.testNode.unicastMessageCache = &consensusMessageWrapper{
+		ctx:              ctx,
+		ConsensusMessage: msg,
+	}
 
 	go ext.postMsg(cm)
 	return nil

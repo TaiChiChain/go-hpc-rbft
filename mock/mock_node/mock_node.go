@@ -5,12 +5,13 @@
 package mocknode
 
 import (
+	context "context"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
 	protos "github.com/hyperchain/go-hpc-common/types/protos"
 	rbft "github.com/hyperchain/go-hpc-rbft/v2"
-	rbftpb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
+	rbftpbV2 "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
 	types "github.com/hyperchain/go-hpc-rbft/v2/types"
 )
 
@@ -64,7 +65,7 @@ func (mr *MockNodeMockRecorder) GetUncommittedTransactions(maxsize interface{}) 
 }
 
 // Propose mocks base method.
-func (m *MockNode) Propose(requests *rbftpb.RequestSet) error {
+func (m *MockNode) Propose(requests *rbftpbV2.RequestSet) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Propose", requests)
 	ret0, _ := ret[0].(error)
@@ -142,15 +143,15 @@ func (mr *MockNodeMockRecorder) Status() *gomock.Call {
 }
 
 // Step mocks base method.
-func (m *MockNode) Step(msg *rbftpb.ConsensusMessage) {
+func (m *MockNode) Step(ctx context.Context, msg *rbftpbV2.ConsensusMessage) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Step", msg)
+	m.ctrl.Call(m, "Step", ctx, msg)
 }
 
 // Step indicates an expected call of Step.
-func (mr *MockNodeMockRecorder) Step(msg interface{}) *gomock.Call {
+func (mr *MockNodeMockRecorder) Step(ctx, msg interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Step", reflect.TypeOf((*MockNode)(nil).Step), msg)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Step", reflect.TypeOf((*MockNode)(nil).Step), ctx, msg)
 }
 
 // Stop mocks base method.

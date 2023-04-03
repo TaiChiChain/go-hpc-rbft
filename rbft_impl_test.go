@@ -1,6 +1,7 @@
 package rbft
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -92,7 +93,7 @@ func TestRBFT_consensusMessageFilter(t *testing.T) {
 	sync := nodes[2].broadcastMessageCache
 	assert.Equal(t, pb.Type_SYNC_STATE, sync.Type)
 	sync.Epoch = uint64(5)
-	rbfts[1].consensusMessageFilter(sync)
+	rbfts[1].consensusMessageFilter(context.TODO(), sync.ConsensusMessage)
 
 	tx := newTx()
 	rbfts[0].batchMgr.requestPool.AddNewRequests([]*protos.Transaction{tx}, false, true)
@@ -104,7 +105,7 @@ func TestRBFT_consensusMessageFilter(t *testing.T) {
 	preprepMsg := nodes[0].broadcastMessageCache
 	assert.Equal(t, pb.Type_PRE_PREPARE, preprepMsg.Type)
 	preprepMsg.Epoch = uint64(5)
-	rbfts[1].consensusMessageFilter(preprepMsg)
+	rbfts[1].consensusMessageFilter(context.TODO(), preprepMsg.ConsensusMessage)
 }
 
 //============================================
@@ -332,7 +333,7 @@ func TestRBFT_fetchMissingTxs(t *testing.T) {
 	missingTxHashes := map[uint64]string{
 		uint64(0): "transaction",
 	}
-	rbfts[0].fetchMissingTxs(prePrep, missingTxHashes)
+	rbfts[0].fetchMissingTxs(context.TODO(), prePrep, missingTxHashes)
 
 	fetch := &pb.FetchMissingRequest{
 		View:                 prePrep.View,
@@ -342,7 +343,7 @@ func TestRBFT_fetchMissingTxs(t *testing.T) {
 		ReplicaId:            uint64(1),
 	}
 	consensusMsg := rbfts[0].consensusMessagePacker(fetch)
-	assert.Equal(t, consensusMsg, nodes[0].unicastMessageCache)
+	assert.Equal(t, consensusMsg, nodes[0].unicastMessageCache.ConsensusMessage)
 }
 
 func TestRBFT_start_cache_message(t *testing.T) {
@@ -357,7 +358,7 @@ func TestRBFT_start_cache_message(t *testing.T) {
 		From:  10,
 		Type:  pb.Type_VIEW_CHANGE,
 	}
-	rbfts[0].step(errorMsg1)
+	rbfts[0].step(context.TODO(), errorMsg1)
 
 	// incorrect epoch
 	errorMsg2 := &pb.ConsensusMessage{
@@ -365,7 +366,7 @@ func TestRBFT_start_cache_message(t *testing.T) {
 		From:  2,
 		Type:  pb.Type_VIEW_CHANGE,
 	}
-	rbfts[0].step(errorMsg2)
+	rbfts[0].step(context.TODO(), errorMsg2)
 
 	err := rbfts[0].start()
 	assert.Nil(t, err)
@@ -377,7 +378,7 @@ func TestRBFT_start_cache_message(t *testing.T) {
 		Epoch: 1,
 		Type:  pb.Type_NULL_REQUEST,
 	}
-	rbfts[0].step(correctMsg)
+	rbfts[0].step(context.TODO(), correctMsg)
 
 	rs := &pb.RequestSet{}
 	rbfts[0].postRequests(rs)
@@ -464,7 +465,7 @@ func TestRBFT_sendNullRequest(t *testing.T) {
 		ReplicaId: rbfts[0].peerPool.ID,
 	}
 	consensusMsg := rbfts[0].consensusMessagePacker(nullRequest)
-	assert.Equal(t, consensusMsg, nodes[0].broadcastMessageCache)
+	assert.Equal(t, consensusMsg, nodes[0].broadcastMessageCache.ConsensusMessage)
 }
 
 func TestRBFT_recvPrePrepare_WrongDigest(t *testing.T) {
@@ -482,7 +483,7 @@ func TestRBFT_recvPrePrepare_WrongDigest(t *testing.T) {
 		HashBatch:      hashBatch,
 		ReplicaId:      rbfts[0].peerPool.ID,
 	}
-	err := rbfts[1].recvPrePrepare(preprep1)
+	err := rbfts[1].recvPrePrepare(context.TODO(), preprep1)
 	assert.Nil(t, err)
 	assert.Equal(t, pb.Type_VIEW_CHANGE, nodes[1].broadcastMessageCache.Type)
 }
@@ -502,7 +503,7 @@ func TestRBFT_recvPrePrepare_EmptyDigest(t *testing.T) {
 		HashBatch:      hashBatch,
 		ReplicaId:      rbfts[0].peerPool.ID,
 	}
-	err := rbfts[1].recvPrePrepare(preprep1)
+	err := rbfts[1].recvPrePrepare(context.TODO(), preprep1)
 	assert.Nil(t, err)
 	assert.Equal(t, pb.Type_VIEW_CHANGE, nodes[1].broadcastMessageCache.Type)
 }
@@ -527,11 +528,11 @@ func TestRBFT_recvPrePrepare_WrongSeqNo(t *testing.T) {
 	batchHash := calculateMD5Hash(preprep.HashBatch.RequestHashList, preprep.HashBatch.Timestamp)
 	preprep.BatchDigest = batchHash
 
-	err := rbfts[1].recvPrePrepare(preprep)
+	err := rbfts[1].recvPrePrepare(context.TODO(), preprep)
 	assert.Nil(t, err)
 	assert.Equal(t, pb.Type_FETCH_MISSING_REQUEST, nodes[1].unicastMessageCache.Type) // fetching missing tx for preprepare message
 
-	rbfts[1].recvFetchMissingResponse(&pb.FetchMissingResponse{
+	rbfts[1].recvFetchMissingResponse(context.TODO(), &pb.FetchMissingResponse{
 		ReplicaId:      rbfts[0].peerPool.ID,
 		View:           rbfts[0].view,
 		SequenceNumber: uint64(1),
@@ -556,7 +557,7 @@ func TestRBFT_recvPrePrepare_WrongSeqNo(t *testing.T) {
 		ReplicaId:      rbfts[0].peerPool.ID,
 	}
 	preprepDup.BatchDigest = calculateMD5Hash(preprepDup.HashBatch.RequestHashList, preprepDup.HashBatch.Timestamp)
-	err = rbfts[1].recvPrePrepare(preprepDup)
+	err = rbfts[1].recvPrePrepare(context.TODO(), preprepDup)
 
 	assert.Nil(t, err)
 	assert.Equal(t, pb.Type_VIEW_CHANGE, nodes[1].broadcastMessageCache.Type)
@@ -590,7 +591,7 @@ func TestRBFT_recvFetchMissingResponse(t *testing.T) {
 		ReplicaId:            rbfts[1].peerPool.ID,
 	}
 
-	err := rbfts[0].recvFetchMissingRequest(fetch)
+	err := rbfts[0].recvFetchMissingRequest(context.TODO(), fetch)
 	assert.Nil(t, err)
 	assert.Nil(t, nodes[0].unicastMessageCache)
 
@@ -600,7 +601,7 @@ func TestRBFT_recvFetchMissingResponse(t *testing.T) {
 		SeqNo:           uint64(1),
 		LocalList:       []bool{true},
 	}
-	err = rbfts[0].recvFetchMissingRequest(fetch)
+	err = rbfts[0].recvFetchMissingRequest(context.TODO(), fetch)
 	assert.Nil(t, err)
 	assert.Equal(t, pb.Type_FETCH_MISSING_RESPONSE, nodes[0].unicastMessageCache.Type)
 
@@ -615,7 +616,7 @@ func TestRBFT_recvFetchMissingResponse(t *testing.T) {
 
 	var ret consensusEvent
 	rbfts[1].exec.lastExec = uint64(10)
-	ret = rbfts[1].recvFetchMissingResponse(re)
+	ret = rbfts[1].recvFetchMissingResponse(context.TODO(), re)
 	assert.Nil(t, ret)
 
 	rbfts[1].storeMgr.missingBatchesInFetching[preprep.BatchDigest] = msgID{
@@ -624,44 +625,44 @@ func TestRBFT_recvFetchMissingResponse(t *testing.T) {
 		d: preprep.BatchDigest,
 	}
 	rbfts[1].exec.lastExec = uint64(10)
-	ret = rbfts[1].recvFetchMissingResponse(re)
+	ret = rbfts[1].recvFetchMissingResponse(context.TODO(), re)
 	assert.Nil(t, ret)
 
 	rbfts[1].exec.lastExec = uint64(0)
-	ret = rbfts[1].recvFetchMissingResponse(re)
+	ret = rbfts[1].recvFetchMissingResponse(context.TODO(), re)
 	assert.Nil(t, ret)
 
 	re.MissingRequestHashes = nil
-	ret = rbfts[1].recvFetchMissingResponse(re)
+	ret = rbfts[1].recvFetchMissingResponse(context.TODO(), re)
 	assert.Nil(t, ret)
 	re.MissingRequestHashes = fetch.MissingRequestHashes
 
 	re.View = 2
-	ret = rbfts[1].recvFetchMissingResponse(re)
+	ret = rbfts[1].recvFetchMissingResponse(context.TODO(), re)
 	assert.Nil(t, ret)
 	re.View = fetch.View
 
 	re.ReplicaId = 3
-	ret = rbfts[1].recvFetchMissingResponse(re)
+	ret = rbfts[1].recvFetchMissingResponse(context.TODO(), re)
 	assert.Nil(t, ret)
 	re.ReplicaId = 1
 
 	re.MissingRequests = map[uint64]*protos.Transaction{uint64(0): tx}
 	rbfts[1].exec.lastExec = uint64(0)
-	ret = rbfts[1].recvFetchMissingResponse(re)
+	ret = rbfts[1].recvFetchMissingResponse(context.TODO(), re)
 	assert.Nil(t, ret)
 
-	_ = rbfts[1].recvPrePrepare(preprep)
-	ret = rbfts[1].recvFetchMissingResponse(re)
+	_ = rbfts[1].recvPrePrepare(context.TODO(), preprep)
+	ret = rbfts[1].recvFetchMissingResponse(context.TODO(), re)
 	assert.Equal(t, pb.Type_PREPARE, nodes[1].broadcastMessageCache.Type)
 	assert.Nil(t, ret)
 
 	cert := rbfts[1].storeMgr.getCert(re.View, re.SequenceNumber, re.BatchDigest)
 	cert.sentCommit = true
-	ret = rbfts[1].recvFetchMissingResponse(re)
+	ret = rbfts[1].recvFetchMissingResponse(context.TODO(), re)
 	assert.Nil(t, ret)
 
 	rbfts[1].setView(uint64(2))
-	ret = rbfts[1].recvFetchMissingResponse(re)
+	ret = rbfts[1].recvFetchMissingResponse(context.TODO(), re)
 	assert.Nil(t, ret)
 }

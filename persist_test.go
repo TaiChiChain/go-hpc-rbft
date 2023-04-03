@@ -1,6 +1,7 @@
 package rbft
 
 import (
+	"context"
 	"encoding/binary"
 	"errors"
 	"testing"
@@ -300,7 +301,7 @@ func TestPersist_restoreCert(t *testing.T) {
 	ext.EXPECT().ReadStateSet("plist.").Return(map[string][]byte{"plist.": []byte("PList")}, nil).AnyTimes()
 
 	node.rbft.restoreCert()
-	exp := &msgCert{prePrepare: q, prepare: map[pb.Prepare]bool{*p: true}, commit: map[pb.Commit]bool{*c: true}}
+	exp := &msgCert{prePrepare: q, prePrepareCtx: context.TODO(), prepare: map[pb.Prepare]bool{*p: true}, commit: map[pb.Commit]bool{*c: true}}
 	assert.Equal(t, exp, node.rbft.storeMgr.certStore[msgID{1, 2, "msg"}])
 }
 

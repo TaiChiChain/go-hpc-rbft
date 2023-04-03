@@ -19,6 +19,7 @@ This file defines the structs used in RBFT
 */
 
 import (
+	"context"
 	"time"
 
 	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
@@ -64,7 +65,6 @@ const (
 	CoreNullRequestTimerEvent
 	CoreCheckPoolTimerEvent
 	CoreStateUpdatedEvent
-	CoreResendMissingTxsEvent
 	CoreHighWatermarkEvent
 
 	// 2.view change
@@ -99,8 +99,14 @@ type LocalEvent struct {
 	Event     interface{}
 }
 
-// Event is a type meant to clearly convey that the return type or parameter to a function will be supplied to/from an events.Manager
+// consensusEvent is a type meant to clearly convey that the return type or parameter to a function will be supplied to/from an events.Manager
 type consensusEvent interface{}
+
+// consensusMessageWrapper is used to wrap the *pb.ConsensusMessage type, providing an additional context field
+type consensusMessageWrapper struct {
+	ctx context.Context
+	*pb.ConsensusMessage
+}
 
 // -----------certStore related structs-----------------
 // Preprepare index
@@ -120,6 +126,7 @@ type msgID struct {
 type msgCert struct {
 	prePrepare      *pb.PrePrepare      // pre-prepare msg
 	prePreparedTime int64               // pre-prepared time
+	prePrepareCtx   context.Context     // prePrepareCtx can be used to continue tracing from prePrepare.
 	sentPrepare     bool                // track whether broadcast prepare for this batch before or not
 	prepare         map[pb.Prepare]bool // prepare msgs received from other nodes
 	preparedTime    int64               // prepared time

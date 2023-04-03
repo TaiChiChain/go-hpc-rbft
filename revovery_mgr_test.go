@@ -45,7 +45,7 @@ func TestRecovery_ReplicaSingleRecovery(t *testing.T) {
 	assert.Equal(t, uint64(1), rbfts[3].view)
 
 	// normal nodes response.
-	fetchViewRsp := make([]*pb.ConsensusMessage, 4)
+	fetchViewRsp := make([]*consensusMessageWrapper, 4)
 	for index := range rbfts {
 		if index == 3 {
 			continue
@@ -63,7 +63,7 @@ func TestRecovery_ReplicaSingleRecovery(t *testing.T) {
 	}
 
 	// node4 finish recovery.
-	var node4FetchPQC *pb.ConsensusMessage
+	var node4FetchPQC *consensusMessageWrapper
 	vcDoneEvent := &LocalEvent{
 		Service:   ViewChangeService,
 		EventType: ViewChangeDoneEvent,
@@ -72,7 +72,7 @@ func TestRecovery_ReplicaSingleRecovery(t *testing.T) {
 	node4FetchPQC = nodes[3].broadcastMessageCache
 	assert.Equal(t, pb.Type_FETCH_PQC_REQUEST, node4FetchPQC.Type)
 
-	fetchPQCRsp := make([]*pb.ConsensusMessage, 4)
+	fetchPQCRsp := make([]*consensusMessageWrapper, 4)
 	for index := range rbfts {
 		if index == 3 {
 			continue
@@ -200,7 +200,7 @@ func TestRecovery_PrimaryRecovery(t *testing.T) {
 	assert.Equal(t, pb.Type_VIEW_CHANGE, primaryVC.Type)
 
 	// all nodes trigger view change because of primary recovery.
-	vcRsp := make([]*pb.ConsensusMessage, 4)
+	vcRsp := make([]*consensusMessageWrapper, 4)
 	for index := range rbfts {
 		if index == primaryIndex {
 			continue
@@ -242,7 +242,7 @@ func TestRecovery_NormalCheckpointFailing_Recovery(t *testing.T) {
 	assert.Equal(t, uint64(2), rbfts[3].view)
 
 	// normal nodes response.
-	fetchViewRsp := make([]*pb.ConsensusMessage, 4)
+	fetchViewRsp := make([]*consensusMessageWrapper, 4)
 	for index := range rbfts {
 		if index == 3 {
 			continue
@@ -283,7 +283,7 @@ func TestRecovery_NormalCheckpointFailing_Recovery(t *testing.T) {
 	assert.Equal(t, pb.Type_FETCH_PQC_REQUEST, node4FetchPQC.Type)
 
 	// normal nodes response PQC.
-	returnRecoveryPQC := make([]*pb.ConsensusMessage, 4)
+	returnRecoveryPQC := make([]*consensusMessageWrapper, 4)
 	for index := range rbfts {
 		if index == 3 {
 			continue
@@ -328,7 +328,7 @@ func TestRecovery_SyncStateToStateUpdate(t *testing.T) {
 	node4SyncStateReq := nodes[3].broadcastMessageCache
 	assert.Equal(t, pb.Type_SYNC_STATE, node4SyncStateReq.Type)
 
-	syncStateResponse := make([]*pb.ConsensusMessage, 4)
+	syncStateResponse := make([]*consensusMessageWrapper, 4)
 	for index := range rbfts {
 		rbfts[index].processEvent(node4SyncStateReq)
 		syncStateResponse[index] = nodes[index].unicastMessageCache
@@ -368,7 +368,7 @@ func TestRecovery_ReplicaSyncStateToRecovery(t *testing.T) {
 	node4SyncStateReq := nodes[3].broadcastMessageCache
 	assert.Equal(t, pb.Type_SYNC_STATE, node4SyncStateReq.Type)
 
-	syncStateResponse := make([]*pb.ConsensusMessage, 4)
+	syncStateResponse := make([]*consensusMessageWrapper, 4)
 	for index := range rbfts {
 		rbfts[index].processEvent(node4SyncStateReq)
 		syncStateResponse[index] = nodes[index].unicastMessageCache
@@ -402,7 +402,7 @@ func TestRecovery_PrimarySyncStateToRecovery(t *testing.T) {
 	node4SyncStateReq := nodes[0].broadcastMessageCache
 	assert.Equal(t, pb.Type_SYNC_STATE, node4SyncStateReq.Type)
 
-	syncStateResponse := make([]*pb.ConsensusMessage, 4)
+	syncStateResponse := make([]*consensusMessageWrapper, 4)
 	for index := range rbfts {
 		rbfts[index].processEvent(node4SyncStateReq)
 		syncStateResponse[index] = nodes[index].unicastMessageCache

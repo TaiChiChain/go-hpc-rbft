@@ -1,6 +1,7 @@
 package rbft
 
 import (
+	"context"
 	"sync"
 	"testing"
 
@@ -64,7 +65,7 @@ func TestNode_Stop(t *testing.T) {
 	go func() {
 		for i := 1; i < 100; i++ {
 			con := &pb.ConsensusMessage{}
-			n.Step(con)
+			n.Step(context.TODO(), con)
 		}
 		wg.Done()
 	}()
@@ -109,7 +110,7 @@ func TestNode_Step(t *testing.T) {
 		Payload: payload,
 	}
 	go func() {
-		n.Step(msgTmp)
+		n.Step(context.TODO(), msgTmp)
 		obj := <-n.rbft.recvChan
 		assert.Equal(t, msgTmp, obj)
 	}()

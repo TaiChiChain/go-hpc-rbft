@@ -15,6 +15,7 @@
 package rbft
 
 import (
+	"context"
 	"fmt"
 
 	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
@@ -213,7 +214,7 @@ func (rbft *rbftImpl) maybeSendPrePrepare(batch *pb.RequestBatch, findCache bool
 
 // findNextPrepareBatch is used by the backup nodes to ensure that the batch corresponding to this cert exists.
 // If it exists, then prepare it.
-func (rbft *rbftImpl) findNextPrepareBatch(v uint64, n uint64, d string) error {
+func (rbft *rbftImpl) findNextPrepareBatch(ctx context.Context, v uint64, n uint64, d string) error {
 	rbft.logger.Debugf("Replica %d findNextPrepareBatch in cert with for view=%d/seqNo=%d/digest=%s", rbft.peerPool.ID, v, n, d)
 
 	if v != rbft.view {
@@ -235,14 +236,14 @@ func (rbft *rbftImpl) findNextPrepareBatch(v uint64, n uint64, d string) error {
 
 	if d == "" {
 		rbft.logger.Infof("Replica %d send prepare for no-op batch with view=%d/seqNo=%d", rbft.peerPool.ID, v, n)
-		return rbft.sendPrepare(v, n, d)
+		return rbft.sendPrepare(ctx, v, n, d)
 	}
 	// when system restart or finished vc, we need to resend prepare for cert
 	// with seqNo <= lastExec. However, those batches may have been deleted from requestPool,
 	// so we can get those batches from batchStore first.
 	if existBatch, ok := rbft.storeMgr.batchStore[d]; ok {
 		rbft.logger.Debugf("Replica %d prepare batch for view=%d/seqNo=%d, batch size: %d", rbft.peerPool.ID, v, n, len(existBatch.RequestHashList))
-		return rbft.sendPrepare(v, n, d)
+		return rbft.sendPrepare(ctx, v, n, d)
 	}
 	prePrep := cert.prePrepare
 
@@ -253,7 +254,7 @@ func (rbft *rbftImpl) findNextPrepareBatch(v uint64, n uint64, d string) error {
 		return nil
 	}
 	if missingTxs != nil {
-		rbft.fetchMissingTxs(prePrep, missingTxs)
+		rbft.fetchMissingTxs(ctx, prePrep, missingTxs)
 		return nil
 	}
 
@@ -281,7 +282,7 @@ func (rbft *rbftImpl) findNextPrepareBatch(v uint64, n uint64, d string) error {
 
 	rbft.logger.Debugf("Replica %d prepare batch for view=%d/seqNo=%d, batch size: %d", rbft.peerPool.ID, v, n, len(txList))
 
-	return rbft.sendPrepare(v, n, d)
+	return rbft.sendPrepare(ctx, v, n, d)
 }
 
 // primaryResubmitTransactions tries to submit transactions for primary after abnormal

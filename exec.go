@@ -15,6 +15,7 @@
 package rbft
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/hyperchain/go-hpc-common/types/protos"
@@ -165,15 +166,6 @@ func (rbft *rbftImpl) handleCoreRbftEvent(e *LocalEvent) consensusEvent {
 
 	case CoreStateUpdatedEvent:
 		return rbft.recvStateUpdatedEvent(e.Event.(*types.ServiceState))
-
-	case CoreResendMissingTxsEvent:
-		ev, ok := e.Event.(*pb.FetchMissingRequest)
-		if !ok {
-			rbft.logger.Error("FetchMissingRequest parsing error")
-			return nil
-		}
-		_ = rbft.recvFetchMissingRequest(ev)
-		return nil
 
 	case CoreHighWatermarkEvent:
 		if rbft.atomicIn(InViewChange) {
@@ -426,11 +418,11 @@ func (rbft *rbftImpl) handleEpochMgrEvent(e *LocalEvent) consensusEvent {
 }
 
 // dispatchConsensusMsg dispatches consensus messages to corresponding handlers using its service type
-func (rbft *rbftImpl) dispatchConsensusMsg(e consensusEvent) consensusEvent {
+func (rbft *rbftImpl) dispatchConsensusMsg(ctx context.Context, e consensusEvent) consensusEvent {
 	service := rbft.dispatchMsgToService(e)
 	switch service {
 	case CoreRbftService:
-		return rbft.dispatchCoreRbftMsg(e)
+		return rbft.dispatchCoreRbftMsg(ctx, e)
 	case ViewChangeService:
 		return rbft.dispatchViewChangeMsg(e)
 	case RecoveryService:

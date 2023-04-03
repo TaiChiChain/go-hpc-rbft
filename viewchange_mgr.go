@@ -16,6 +16,7 @@ package rbft
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"time"
 
@@ -167,7 +168,7 @@ func (rbft *rbftImpl) checkView(msg *pb.ConsensusMessage) {
 			Type:    pb.Type_FETCH_VIEW,
 			Payload: payload,
 		}
-		rbft.peerPool.unicast(consensusMsg, msg.From)
+		rbft.peerPool.unicast(context.TODO(), consensusMsg, msg.From)
 		return
 	}
 
@@ -184,12 +185,12 @@ func (rbft *rbftImpl) initRecovery() consensusEvent {
 // sendViewChange broadcasts view change message to all other replicas to request
 // all other replicas' current status, there will be two cases which need to trigger
 // view change:
-// 1. general view change: current node finds current primary behavior incorrectly.
-// 2. recovery view change: current node finds itself primary behavior incorrectly, such as
-//    2.1 restart node and trigger view change
-//    2.2 epoch changed and trigger view change
-//    2.3 view change resend timer out and trigger view change again
-//    2.4 find self inconsistent with quorum nodes in sync state.
+//  1. general view change: current node finds current primary behavior incorrectly.
+//  2. recovery view change: current node finds itself primary behavior incorrectly, such as
+//     2.1 restart node and trigger view change
+//     2.2 epoch changed and trigger view change
+//     2.3 view change resend timer out and trigger view change again
+//     2.4 find self inconsistent with quorum nodes in sync state.
 func (rbft *rbftImpl) sendViewChange(status ...bool) consensusEvent {
 	recovery := false
 	if len(status) != 0 {
@@ -247,7 +248,7 @@ func (rbft *rbftImpl) sendViewChange(status ...bool) consensusEvent {
 		Type:    pb.Type_VIEW_CHANGE,
 		Payload: payload,
 	}
-	rbft.peerPool.broadcast(consensusMsg)
+	rbft.peerPool.broadcast(context.TODO(), consensusMsg)
 
 	event := &LocalEvent{
 		Service:   ViewChangeService,
@@ -562,7 +563,7 @@ func (rbft *rbftImpl) sendNewView() consensusEvent {
 		Payload: payload,
 	}
 	// broadcast new view
-	rbft.peerPool.broadcast(consensusMsg)
+	rbft.peerPool.broadcast(context.TODO(), consensusMsg)
 	// set new view to newViewStore
 	rbft.vcMgr.newViewStore[rbft.view] = nv
 
@@ -722,7 +723,7 @@ func (rbft *rbftImpl) recvFetchView(fv *pb.FetchView) consensusEvent {
 			Type:    pb.Type_QUORUM_VIEW_CHANGE,
 			Payload: payload,
 		}
-		rbft.peerPool.unicast(consensusMsg, fv.ReplicaId)
+		rbft.peerPool.unicast(context.TODO(), consensusMsg, fv.ReplicaId)
 		return nil
 	}
 
@@ -739,7 +740,7 @@ func (rbft *rbftImpl) recvFetchView(fv *pb.FetchView) consensusEvent {
 		Type:    pb.Type_NEW_VIEW,
 		Payload: payload,
 	}
-	rbft.peerPool.unicast(consensusMsg, fv.ReplicaId)
+	rbft.peerPool.unicast(context.TODO(), consensusMsg, fv.ReplicaId)
 
 	return nil
 }
@@ -766,7 +767,7 @@ func (rbft *rbftImpl) sendRecoveryResponse(remoteReplicaID, remoteView uint64) e
 		Type:    pb.Type_RECOVERY_RESPONSE,
 		Payload: payload,
 	}
-	rbft.peerPool.unicast(consensusMsg, remoteReplicaID)
+	rbft.peerPool.unicast(context.TODO(), consensusMsg, remoteReplicaID)
 
 	return nil
 }
@@ -1019,7 +1020,7 @@ func (rbft *rbftImpl) fetchRequestBatches() {
 			Payload: payload,
 		}
 		rbft.metrics.fetchRequestBatchCounter.Add(float64(1))
-		rbft.peerPool.broadcast(consensusMsg)
+		rbft.peerPool.broadcast(context.TODO(), consensusMsg)
 	}
 }
 
@@ -1050,7 +1051,7 @@ func (rbft *rbftImpl) recvFetchRequestBatch(fr *pb.FetchBatchRequest) error {
 		Type:    pb.Type_FETCH_BATCH_RESPONSE,
 		Payload: payload,
 	}
-	rbft.peerPool.unicast(consensusMsg, fr.ReplicaId)
+	rbft.peerPool.unicast(context.TODO(), consensusMsg, fr.ReplicaId)
 
 	return nil
 }
@@ -1561,6 +1562,7 @@ func (rbft *rbftImpl) processNewView(msgList []*pb.Vc_PQ) {
 			}
 		}
 		cert.prePrepare = prePrep
+		cert.prePrepareCtx = context.Background()
 		rbft.persistQSet(prePrep)
 		if metrics.EnableExpensive() {
 			cert.prePreparedTime = time.Now().UnixNano()
@@ -1620,7 +1622,7 @@ func (rbft *rbftImpl) processNewView(msgList []*pb.Vc_PQ) {
 			if n > rbft.h {
 				cert := rbft.storeMgr.getCert(rbft.view, n, d)
 				cert.sentPrepare = true
-				_ = rbft.recvPrepare(prep)
+				_ = rbft.recvPrepare(context.TODO(), prep)
 			}
 			payload, err := proto.Marshal(prep)
 			if err != nil {
@@ -1632,7 +1634,7 @@ func (rbft *rbftImpl) processNewView(msgList []*pb.Vc_PQ) {
 				Type:    pb.Type_PREPARE,
 				Payload: payload,
 			}
-			rbft.peerPool.broadcast(consensusMsg)
+			rbft.peerPool.broadcast(context.TODO(), consensusMsg)
 		}
 
 		// directly construct commit message for committed batches even though we have not went through
@@ -1653,7 +1655,7 @@ func (rbft *rbftImpl) processNewView(msgList []*pb.Vc_PQ) {
 
 			cert := rbft.storeMgr.getCert(rbft.view, n, d)
 			cert.sentCommit = true
-			_ = rbft.recvCommit(cmt)
+			_ = rbft.recvCommit(context.TODO(), cmt)
 
 			payload, err := proto.Marshal(cmt)
 			if err != nil {
@@ -1665,7 +1667,7 @@ func (rbft *rbftImpl) processNewView(msgList []*pb.Vc_PQ) {
 				Type:    pb.Type_COMMIT,
 				Payload: payload,
 			}
-			rbft.peerPool.broadcast(consensusMsg)
+			rbft.peerPool.broadcast(context.TODO(), consensusMsg)
 		}
 	}
 }

@@ -1,6 +1,7 @@
 package rbft
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -101,7 +102,7 @@ func (rbft *rbftImpl) fetchCheckpoint() consensusEvent {
 	}
 
 	rbft.logger.Debugf("Replica %d is fetching checkpoint %d", rbft.peerPool.ID, fetch.SequenceNumber)
-	rbft.peerPool.broadcast(consensusMsg)
+	rbft.peerPool.broadcast(context.TODO(), consensusMsg)
 	return nil
 }
 
@@ -141,7 +142,7 @@ func (rbft *rbftImpl) recvFetchCheckpoint(fetch *pb.FetchCheckpoint) consensusEv
 		Type:    pb.Type_SIGNED_CHECKPOINT,
 		Payload: payload,
 	}
-	rbft.peerPool.unicast(consensusMsg, fetch.ReplicaId)
+	rbft.peerPool.unicast(context.TODO(), consensusMsg, fetch.ReplicaId)
 
 	return nil
 }
@@ -268,7 +269,7 @@ func (em *epochManager) retrieveEpochChange(start, target uint64, recipient stri
 		Type:    pb.Type_EPOCH_CHANGE_REQUEST,
 		Payload: payload,
 	}
-	em.peerPool.unicastByHostname(cum, recipient)
+	em.peerPool.unicastByHostname(context.TODO(), cum, recipient)
 	return nil
 }
 
@@ -291,7 +292,7 @@ func (em *epochManager) processEpochChangeRequest(request *pb.EpochChangeRequest
 			Type:    pb.Type_EPOCH_CHANGE_PROOF,
 			Payload: payload,
 		}
-		em.peerPool.unicastByHostname(cum, request.Author)
+		em.peerPool.unicastByHostname(context.TODO(), cum, request.Author)
 		return nil
 	}
 	return nil
