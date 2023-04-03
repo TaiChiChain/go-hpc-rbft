@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [2.1.0](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v2.0.0...v2.1.0) (2023-04-03)
+
+
+### Features
+
+* **consensus:** Tracing with OpenTelemetry ([f62c96f](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/f62c96f8d9f0dead61b7084cc3fa9f659244c6e9))
+
 ## [2.0.0](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v1.2.0...v2.0.0) (2023-04-03)
 
 
