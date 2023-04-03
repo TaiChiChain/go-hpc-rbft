@@ -54,7 +54,7 @@ func TestEpoch_recvFetchCheckpoint_SendBackNormal(t *testing.T) {
 	consensusMsg := rbfts[0].consensusMessagePacker(signedC)
 	ret := rbfts[0].recvFetchCheckpoint(fetch)
 	assert.Nil(t, ret)
-	assert.Equal(t, consensusMsg, nodes[0].unicastMessageCache)
+	assert.Equal(t, consensusMsg, nodes[0].unicastMessageCache.ConsensusMessage)
 }
 
 func TestEpoch_recvFetchCheckpoint_SendBackStableCheckpoint(t *testing.T) {
@@ -81,5 +81,5 @@ func TestEpoch_recvFetchCheckpoint_SendBackStableCheckpoint(t *testing.T) {
 	consensusMsg := rbfts[0].consensusMessagePacker(signedC)
 	ret := rbfts[0].recvFetchCheckpoint(fetch)
 	assert.Nil(t, ret)
-	assert.Equal(t, consensusMsg, nodes[0].unicastMessageCache)
+	assert.Equal(t, consensusMsg, nodes[0].unicastMessageCache.ConsensusMessage)
 }

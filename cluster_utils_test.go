@@ -16,9 +16,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-//******************************************************************************************************************
+// ******************************************************************************************************************
 // some tools for unit tests
-//******************************************************************************************************************
+// ******************************************************************************************************************
 func unlockCluster(rbfts []*rbftImpl) {
 	for index := range rbfts {
 		rbfts[index].atomicOff(Pending)
@@ -59,15 +59,15 @@ func setClusterExecExcept(rbfts []*rbftImpl, nodes []*testNode, seq uint64, noEx
 // 3) "executeExceptN", the node "N" will be abnormal and others will process transactions normally
 //******************************************************************************************************************
 
-func execute(t *testing.T, rbfts []*rbftImpl, nodes []*testNode, tx *protos.Transaction, checkpoint bool) map[pb.Type][]*pb.ConsensusMessage {
+func execute(t *testing.T, rbfts []*rbftImpl, nodes []*testNode, tx *protos.Transaction, checkpoint bool) map[pb.Type][]*consensusMessageWrapper {
 	return executeExceptN(t, rbfts, nodes, tx, checkpoint, len(rbfts))
 }
 
-func executeExceptPrimary(t *testing.T, rbfts []*rbftImpl, nodes []*testNode, tx *protos.Transaction, checkpoint bool) map[pb.Type][]*pb.ConsensusMessage {
+func executeExceptPrimary(t *testing.T, rbfts []*rbftImpl, nodes []*testNode, tx *protos.Transaction, checkpoint bool) map[pb.Type][]*consensusMessageWrapper {
 	return executeExceptN(t, rbfts, nodes, tx, checkpoint, 0)
 }
 
-func executeExceptN(t *testing.T, rbfts []*rbftImpl, nodes []*testNode, tx *protos.Transaction, checkpoint bool, notExec int) map[pb.Type][]*pb.ConsensusMessage {
+func executeExceptN(t *testing.T, rbfts []*rbftImpl, nodes []*testNode, tx *protos.Transaction, checkpoint bool, notExec int) map[pb.Type][]*consensusMessageWrapper {
 
 	var primaryIndex int
 	for index := range rbfts {
@@ -79,7 +79,7 @@ func executeExceptN(t *testing.T, rbfts []*rbftImpl, nodes []*testNode, tx *prot
 			break
 		}
 	}
-	retMessages := make(map[pb.Type][]*pb.ConsensusMessage)
+	retMessages := make(map[pb.Type][]*consensusMessageWrapper)
 
 	rbfts[0].batchMgr.requestPool.AddNewRequests([]*protos.Transaction{tx}, false, true)
 	rbfts[1].batchMgr.requestPool.AddNewRequests([]*protos.Transaction{tx}, false, true)
@@ -95,11 +95,11 @@ func executeExceptN(t *testing.T, rbfts []*rbftImpl, nodes []*testNode, tx *prot
 
 	preprepMsg := nodes[primaryIndex].broadcastMessageCache
 	assert.Equal(t, pb.Type_PRE_PREPARE, preprepMsg.Type)
-	retMessages[pb.Type_PRE_PREPARE] = []*pb.ConsensusMessage{preprepMsg}
+	retMessages[pb.Type_PRE_PREPARE] = []*consensusMessageWrapper{preprepMsg}
 
-	prepMsg := make([]*pb.ConsensusMessage, len(rbfts))
-	commitMsg := make([]*pb.ConsensusMessage, len(rbfts))
-	checkpointMsg := make([]*pb.ConsensusMessage, len(rbfts))
+	prepMsg := make([]*consensusMessageWrapper, len(rbfts))
+	commitMsg := make([]*consensusMessageWrapper, len(rbfts))
+	checkpointMsg := make([]*consensusMessageWrapper, len(rbfts))
 
 	for index := range rbfts {
 		if index == primaryIndex || index == notExec {
@@ -112,7 +112,7 @@ func executeExceptN(t *testing.T, rbfts []*rbftImpl, nodes []*testNode, tx *prot
 	}
 	// for pre-prepare message
 	// a primary won't process a pre-prepare, so that the prepMsg[primaryIndex] will always be empty
-	assert.Equal(t, (*pb.ConsensusMessage)(nil), prepMsg[primaryIndex])
+	assert.Nil(t, prepMsg[primaryIndex])
 	retMessages[pb.Type_PREPARE] = prepMsg
 
 	for index := range rbfts {
@@ -149,7 +149,7 @@ func executeExceptN(t *testing.T, rbfts []*rbftImpl, nodes []*testNode, tx *prot
 
 	if checkpoint {
 		if hpcCommonTypes.IsConfigTx(tx) {
-			vcMsg := make([]*pb.ConsensusMessage, len(rbfts))
+			vcMsg := make([]*consensusMessageWrapper, len(rbfts))
 			epochChanged := false
 			// process checkpoint, if epoch changed, trigger and process view change.
 			for index := range rbfts {
@@ -353,7 +353,7 @@ func clusterInitRecovery(t *testing.T, allNodes []*testNode, allRbfts []*rbftImp
 	}
 
 	// init recovery directly and broadcast recovery view change in view=1
-	recoveryVCs := make([]*pb.ConsensusMessage, 0, len(nodes))
+	recoveryVCs := make([]*consensusMessageWrapper, 0, len(nodes))
 	for idx := range rbfts {
 		rbfts[idx].processEvent(init)
 		recoveryVC := nodes[idx].broadcastMessageCache

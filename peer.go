@@ -15,6 +15,8 @@
 package rbft
 
 import (
+	"context"
+
 	"github.com/hyperchain/go-hpc-rbft/v2/external"
 	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
 	"github.com/hyperchain/go-hpc-rbft/v2/types"
@@ -81,36 +83,36 @@ func (pool *peerPool) initPeers(peers []*types.Peer) {
 	}
 }
 
-func (pool *peerPool) broadcast(msg *pb.ConsensusMessage) {
+func (pool *peerPool) broadcast(ctx context.Context, msg *pb.ConsensusMessage) {
 	msg.From = pool.ID
 	msg.Author = pool.hostname
 	msg.Epoch = pool.epoch
 	msg.View = pool.view
-	err := pool.network.Broadcast(msg)
+	err := pool.network.Broadcast(ctx, msg)
 	if err != nil {
 		pool.logger.Errorf("Broadcast failed: %v", err)
 		return
 	}
 }
 
-func (pool *peerPool) unicast(msg *pb.ConsensusMessage, to uint64) {
+func (pool *peerPool) unicast(ctx context.Context, msg *pb.ConsensusMessage, to uint64) {
 	msg.From = pool.ID
 	msg.Author = pool.hostname
 	msg.Epoch = pool.epoch
 	msg.View = pool.view
-	err := pool.network.Unicast(msg, to)
+	err := pool.network.Unicast(ctx, msg, to)
 	if err != nil {
 		pool.logger.Errorf("Unicast to %d failed: %v", to, err)
 		return
 	}
 }
 
-func (pool *peerPool) unicastByHostname(msg *pb.ConsensusMessage, to string) {
+func (pool *peerPool) unicastByHostname(ctx context.Context, msg *pb.ConsensusMessage, to string) {
 	msg.From = pool.ID
 	msg.Author = pool.hostname
 	msg.Epoch = pool.epoch
 	msg.View = pool.view
-	err := pool.network.UnicastByHostname(msg, to)
+	err := pool.network.UnicastByHostname(ctx, msg, to)
 	if err != nil {
 		pool.logger.Errorf("Unicast to %s failed: %v", to, err)
 		return

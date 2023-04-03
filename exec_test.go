@@ -135,58 +135,6 @@ func TestExec_handleCoreRbftEvent_StateUpdatedEvent(t *testing.T) {
 	assert.Equal(t, uint64(10), rbfts[1].exec.lastExec)
 }
 
-func TestExec_handleCoreRbftEvent_ResendMissingTxsEvent(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	nodes, rbfts := newBasicClusterInstance()
-
-	// create batch
-	tx := newTx()
-	rbfts[0].batchMgr.requestPool.AddNewRequests([]*protos.Transaction{tx}, false, true)
-	reqBatch := rbfts[0].batchMgr.requestPool.GenerateRequestBatch()
-	batch := &pb.RequestBatch{
-		RequestHashList: reqBatch[0].TxHashList,
-		RequestList:     reqBatch[0].TxList,
-		Timestamp:       reqBatch[0].Timestamp,
-		LocalList:       reqBatch[0].LocalList,
-		BatchHash:       reqBatch[0].BatchHash,
-	}
-	rbfts[0].storeMgr.batchStore[batch.BatchHash] = batch
-
-	// create pre-prepare
-	hashBatch := &pb.HashBatch{
-		RequestHashList: batch.RequestHashList,
-		Timestamp:       batch.Timestamp,
-	}
-	prePrep := &pb.PrePrepare{
-		ReplicaId:      rbfts[0].peerPool.ID,
-		View:           0,
-		SequenceNumber: 1,
-		BatchDigest:    batch.BatchHash,
-		HashBatch:      hashBatch,
-	}
-
-	// replica 2 reconstruct batch, find missing tx and create fetch missing request
-	_, _, missingTxHashes, _ := rbfts[1].batchMgr.requestPool.GetRequestsByHashList(prePrep.BatchDigest, prePrep.HashBatch.Timestamp, prePrep.HashBatch.RequestHashList, prePrep.HashBatch.DeDuplicateRequestHashList)
-	fetch := &pb.FetchMissingRequest{
-		View:                 prePrep.View,
-		SequenceNumber:       prePrep.SequenceNumber,
-		BatchDigest:          prePrep.BatchDigest,
-		MissingRequestHashes: missingTxHashes,
-		ReplicaId:            rbfts[1].peerPool.ID,
-	}
-
-	// time out in primary 1
-	ev := &LocalEvent{
-		Service:   CoreRbftService,
-		EventType: CoreResendMissingTxsEvent,
-		Event:     fetch,
-	}
-	rbfts[0].handleCoreRbftEvent(ev)
-	assert.Equal(t, pb.Type_FETCH_MISSING_RESPONSE, nodes[0].unicastMessageCache.Type)
-}
-
 func TestExec_handleRecoveryEvent_SyncStateRspTimerEvent(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()

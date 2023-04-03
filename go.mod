@@ -7,7 +7,9 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/hyperchain/go-hpc-common v0.3.29
 	github.com/hyperchain/go-hpc-txpool v1.1.0
-	github.com/stretchr/testify v1.8.0
+	github.com/stretchr/testify v1.8.2
+	go.opentelemetry.io/otel v1.14.0
+	go.opentelemetry.io/otel/trace v1.14.0
 	golang.org/x/crypto v0.0.0-20220622213112-05595931fe9d
 )
 
@@ -39,6 +41,6 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/hyperchain/go-hpc-common => git.hyperchain.cn/hyperchain/go-hpc-common.git v0.3.29
+replace github.com/hyperchain/go-hpc-common => git.hyperchain.cn/hyperchain/go-hpc-common.git v0.3.31
 
 replace github.com/hyperchain/go-hpc-txpool => git.hyperchain.cn/hyperchain/go-hpc-txpool.git v1.1.0

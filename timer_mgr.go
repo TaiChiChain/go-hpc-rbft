@@ -60,12 +60,12 @@ func (tt *titleTimer) clear() {
 // timerManager manages common used timers.
 type timerManager struct {
 	tTimers   map[string]*titleTimer
-	eventChan chan<- interface{}
+	eventChan chan<- consensusEvent
 	logger    Logger
 }
 
 // newTimerMgr news an instance of timerManager.
-func newTimerMgr(eventC chan interface{}, c Config) *timerManager {
+func newTimerMgr(eventC chan consensusEvent, c Config) *timerManager {
 	tm := &timerManager{
 		tTimers:   make(map[string]*titleTimer),
 		eventChan: eventC,

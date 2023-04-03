@@ -15,6 +15,7 @@
 package rbft
 
 import (
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -348,6 +349,7 @@ func (rbft *rbftImpl) restoreCert() {
 		}
 		cert := rbft.storeMgr.getCert(idx.v, idx.n, idx.d)
 		cert.prePrepare = q
+		cert.prePrepareCtx = context.TODO()
 	}
 
 	pset, _ := rbft.restorePSet()

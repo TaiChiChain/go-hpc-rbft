@@ -1,6 +1,7 @@
 package rbft
 
 import (
+	"context"
 	"testing"
 
 	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
@@ -15,7 +16,7 @@ func TestCluster_MissingCheckpoint(t *testing.T) {
 
 	nodes, rbfts := newBasicClusterInstance()
 	unlockCluster(rbfts)
-	var retMessageSet []map[pb.Type][]*pb.ConsensusMessage
+	var retMessageSet []map[pb.Type][]*consensusMessageWrapper
 	for i := 0; i < 40; i++ {
 		tx := newTx()
 		retMessages := execute(t, rbfts, nodes, tx, false)
@@ -23,7 +24,7 @@ func TestCluster_MissingCheckpoint(t *testing.T) {
 	}
 
 	newPrimaryIndex := 1
-	var vcMessages []*pb.ConsensusMessage
+	var vcMessages []*consensusMessageWrapper
 	vcDone := &LocalEvent{
 		Service:   ViewChangeService,
 		EventType: ViewChangeDoneEvent,
@@ -100,7 +101,7 @@ func TestCluster_CheckpointToViewChange(t *testing.T) {
 	nodes, rbfts := newBasicClusterInstance()
 	unlockCluster(rbfts)
 
-	var retMessageSet []map[pb.Type][]*pb.ConsensusMessage
+	var retMessageSet []map[pb.Type][]*consensusMessageWrapper
 	for i := 0; i < 40; i++ {
 		tx := newTx()
 		retMessages := execute(t, rbfts, nodes, tx, false)
@@ -128,7 +129,7 @@ func TestCluster_CheckpointToViewChange(t *testing.T) {
 		EventType: ViewChangeDoneEvent,
 	}
 
-	var vcMsgSet []*pb.ConsensusMessage
+	var vcMsgSet []*consensusMessageWrapper
 	for index := range rbfts {
 		rbfts[index].processEvent(vcEvent)
 		assert.False(t, rbfts[index].timerMgr.getTimer(highWatermarkTimer))
@@ -205,7 +206,7 @@ func TestCluster_ReceiveViewChangeBeforeStart(t *testing.T) {
 		if index == 0 {
 			continue
 		}
-		rbfts[index].node.Step(vcMsgNode1)
+		rbfts[index].node.Step(context.TODO(), vcMsgNode1.ConsensusMessage)
 	}
 
 	rbfts[1].atomicOff(Pending)
@@ -219,7 +220,7 @@ func TestCluster_ReceiveViewChangeBeforeStart(t *testing.T) {
 		if index == 0 || index == 1 {
 			continue
 		}
-		rbfts[index].node.Step(vcMsgNode2)
+		rbfts[index].node.Step(context.TODO(), vcMsgNode2.ConsensusMessage)
 	}
 	// started replicas receive message
 	rbfts[0].processEvent(vcMsgNode2)
@@ -236,7 +237,7 @@ func TestCluster_ReceiveViewChangeBeforeStart(t *testing.T) {
 		if index == 0 || index == 1 || index == 2 {
 			continue
 		}
-		rbfts[index].node.Step(vcMsgNode2)
+		rbfts[index].node.Step(context.TODO(), vcMsgNode2.ConsensusMessage)
 	}
 	// started replicas receive message
 	quorumNode1 := rbfts[0].processEvent(vcMsgNode3)
@@ -296,7 +297,7 @@ func TestCluster_ViewChange_StateUpdate_Timeout_StateUpdated_Replica(t *testing.
 	assert.Equal(t, uint64(30), rbfts[2].h)
 	assert.Equal(t, uint64(40), rbfts[3].h)
 
-	var vcMsgs []*pb.ConsensusMessage
+	var vcMsgs []*consensusMessageWrapper
 	for index := range rbfts {
 		rbfts[index].sendViewChange()
 		vcMsg := nodes[index].broadcastMessageCache
@@ -343,8 +344,8 @@ func TestCluster_ViewChange_StateUpdate_Timeout_StateUpdated_Replica(t *testing.
 			assert.Nil(t, vd)
 		}
 	}
-	msg := <-rbfts[2].recvChan
-	event := msg.(*LocalEvent)
+	ev := <-rbfts[2].recvChan
+	event := ev.(*LocalEvent)
 	vd := rbfts[2].processEvent(event)
 	assert.Equal(t, vcDone, vd)
 
@@ -378,7 +379,7 @@ func TestCluster_ViewChange_StateUpdate_Timeout_StateUpdated_Primary(t *testing.
 	assert.Equal(t, uint64(40), rbfts[2].h)
 	assert.Equal(t, uint64(40), rbfts[3].h)
 
-	var vcMsgs []*pb.ConsensusMessage
+	var vcMsgs []*consensusMessageWrapper
 	for index := range rbfts {
 		rbfts[index].sendViewChange()
 		vcMsg := nodes[index].broadcastMessageCache
@@ -491,7 +492,7 @@ func TestCluster_Checkpoint_in_StateUpdating(t *testing.T) {
 	nodes, rbfts := newBasicClusterInstance()
 	unlockCluster(rbfts)
 
-	var retMessageSet []map[pb.Type][]*pb.ConsensusMessage
+	var retMessageSet []map[pb.Type][]*consensusMessageWrapper
 	for i := 0; i < 50; i++ {
 		tx := newTx()
 		checkpoint := (i+1)%10 == 0
@@ -524,7 +525,7 @@ func TestCluster_Checkpoint_in_StateUpdating(t *testing.T) {
 		rbfts[1].processEvent(rsp)
 	}
 
-	var retMessageSet2 []map[pb.Type][]*pb.ConsensusMessage
+	var retMessageSet2 []map[pb.Type][]*consensusMessageWrapper
 	for i := 0; i < 10; i++ {
 		tx := newTx()
 		checkpoint := (i+1)%10 == 0
@@ -549,7 +550,7 @@ func TestCluster_Checkpoint_in_StateUpdating(t *testing.T) {
 
 	rbfts[1].processEvent(updatedEv1)
 
-	var retMessageSet3 []map[pb.Type][]*pb.ConsensusMessage
+	var retMessageSet3 []map[pb.Type][]*consensusMessageWrapper
 	for i := 0; i < 10; i++ {
 		tx := newTx()
 		checkpoint := (i+1)%10 == 0
@@ -595,7 +596,7 @@ func TestCluster_InitRecovery(t *testing.T) {
 	// replica 2&3 process init recovery directly and broadcast recovery view change in view=1
 	rbfts[1].processEvent(init)
 	rbfts[2].processEvent(init)
-	recoveryVCs := make([]*pb.ConsensusMessage, len(nodes))
+	recoveryVCs := make([]*consensusMessageWrapper, len(nodes))
 	recoveryVCs[1] = nodes[1].broadcastMessageCache
 	assert.Equal(t, pb.Type_VIEW_CHANGE, recoveryVCs[1].Type)
 	recoveryVCs[2] = nodes[2].broadcastMessageCache
