@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/hyperchain/go-hpc-common/metrics/disabled"
-	mockexternal "github.com/hyperchain/go-hpc-rbft/mock/mock_external"
-	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
+	mockexternal "github.com/hyperchain/go-hpc-rbft/v2/mock/mock_external"
+	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
 	txpoolmock "github.com/hyperchain/go-hpc-txpool/mock"
 
 	"github.com/golang/mock/gomock"
@@ -15,7 +15,7 @@ import (
 
 func newStorageTestNode(ctrl *gomock.Controller) (*storeManager, Config) {
 	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
-	log := FrameworkNewRawLogger()
+	log := newRawLogger()
 	external := mockexternal.NewMockMinimalExternal(ctrl)
 
 	conf := Config{
@@ -32,10 +32,8 @@ func newStorageTestNode(ctrl *gomock.Controller) (*storeManager, Config) {
 		VcResendTimeout:         10 * time.Second,
 		CleanVCTimeout:          60 * time.Second,
 		NewViewTimeout:          8 * time.Second,
-		FirstRequestTimeout:     30 * time.Second,
 		SyncStateTimeout:        1 * time.Second,
 		SyncStateRestartTimeout: 10 * time.Second,
-		RecoveryTimeout:         10 * time.Second,
 		FetchCheckpointTimeout:  5 * time.Second,
 		CheckPoolTimeout:        3 * time.Minute,
 

@@ -17,8 +17,9 @@ package rbft
 import (
 	"fmt"
 
-	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
-	"github.com/hyperchain/go-hpc-rbft/types"
+	"github.com/hyperchain/go-hpc-common/types/protos"
+	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
+	"github.com/hyperchain/go-hpc-rbft/v2/types"
 
 	"github.com/gogo/protobuf/proto"
 )
@@ -41,9 +42,9 @@ func (e *executor) setLastExec(l uint64) {
 
 // msgToEvent converts ConsensusMessage to the corresponding consensus event.
 func (rbft *rbftImpl) msgToEvent(msg *pb.ConsensusMessage) (interface{}, error) {
-	// reuse SendRequestBatch to avoid too many useless SendRequestBatch message caused by
+	// reuse FetchBatchResponse to avoid too many useless FetchBatchResponse message caused by
 	// broadcast fetch.
-	if msg.Type == pb.Type_SEND_REQUEST_BATCH {
+	if msg.Type == pb.Type_FETCH_BATCH_RESPONSE {
 		err := proto.Unmarshal(msg.Payload, rbft.reusableRequestBatch)
 		if err != nil {
 			rbft.logger.Errorf("Unmarshal error, can not unmarshal %v, error: %v", msg.Type, err)
@@ -52,7 +53,8 @@ func (rbft *rbftImpl) msgToEvent(msg *pb.ConsensusMessage) (interface{}, error) 
 		digest := rbft.reusableRequestBatch.BatchDigest
 		if _, ok := rbft.storeMgr.missingReqBatches[digest]; !ok {
 			// either the wrong digest, or we got it already from someone else
-			rbft.logger.Debugf("Replica %d received missing request: %s, but we don't miss this request, ignore it", rbft.peerPool.ID, digest)
+			rbft.logger.Debugf("Replica %d received missing request batch: %s, but we don't miss "+
+				"this request, ignore it", rbft.peerPool.ID, digest)
 			return nil, fmt.Errorf("useless request batch with %s", digest)
 		}
 	}
@@ -78,20 +80,23 @@ func initMsgEventMap() {
 	eventCreators[pb.Type_PRE_PREPARE] = func() interface{} { return &pb.PrePrepare{} }
 	eventCreators[pb.Type_PREPARE] = func() interface{} { return &pb.Prepare{} }
 	eventCreators[pb.Type_COMMIT] = func() interface{} { return &pb.Commit{} }
+	eventCreators[pb.Type_SIGNED_CHECKPOINT] = func() interface{} { return &pb.SignedCheckpoint{} }
 	eventCreators[pb.Type_FETCH_CHECKPOINT] = func() interface{} { return &pb.FetchCheckpoint{} }
 	eventCreators[pb.Type_VIEW_CHANGE] = func() interface{} { return &pb.ViewChange{} }
+	eventCreators[pb.Type_QUORUM_VIEW_CHANGE] = func() interface{} { return &pb.QuorumViewChange{} }
 	eventCreators[pb.Type_NEW_VIEW] = func() interface{} { return &pb.NewView{} }
-	eventCreators[pb.Type_FETCH_REQUEST_BATCH] = func() interface{} { return &pb.FetchRequestBatch{} }
-	eventCreators[pb.Type_SEND_REQUEST_BATCH] = func() interface{} { return &pb.SendRequestBatch{} }
-	eventCreators[pb.Type_RECOVERY_FETCH_QPC] = func() interface{} { return &pb.RecoveryFetchPQC{} }
-	eventCreators[pb.Type_RECOVERY_RETURN_QPC] = func() interface{} { return &pb.RecoveryReturnPQC{} }
-	eventCreators[pb.Type_FETCH_MISSING_REQUESTS] = func() interface{} { return &pb.FetchMissingRequests{} }
-	eventCreators[pb.Type_SEND_MISSING_REQUESTS] = func() interface{} { return &pb.SendMissingRequests{} }
+	eventCreators[pb.Type_FETCH_VIEW] = func() interface{} { return &pb.FetchView{} }
+	eventCreators[pb.Type_RECOVERY_RESPONSE] = func() interface{} { return &pb.RecoveryResponse{} }
+	eventCreators[pb.Type_FETCH_BATCH_REQUEST] = func() interface{} { return &pb.FetchBatchRequest{} }
+	eventCreators[pb.Type_FETCH_BATCH_RESPONSE] = func() interface{} { return &pb.FetchBatchResponse{} }
+	eventCreators[pb.Type_FETCH_PQC_REQUEST] = func() interface{} { return &pb.FetchPQCRequest{} }
+	eventCreators[pb.Type_FETCH_PQC_RESPONSE] = func() interface{} { return &pb.FetchPQCResponse{} }
+	eventCreators[pb.Type_FETCH_MISSING_REQUEST] = func() interface{} { return &pb.FetchMissingRequest{} }
+	eventCreators[pb.Type_FETCH_MISSING_RESPONSE] = func() interface{} { return &pb.FetchMissingResponse{} }
 	eventCreators[pb.Type_SYNC_STATE] = func() interface{} { return &pb.SyncState{} }
 	eventCreators[pb.Type_SYNC_STATE_RESPONSE] = func() interface{} { return &pb.SyncStateResponse{} }
-	eventCreators[pb.Type_NOTIFICATION] = func() interface{} { return &pb.Notification{} }
-	eventCreators[pb.Type_NOTIFICATION_RESPONSE] = func() interface{} { return &pb.NotificationResponse{} }
-	eventCreators[pb.Type_SIGNED_CHECKPOINT] = func() interface{} { return &pb.SignedCheckpoint{} }
+	eventCreators[pb.Type_EPOCH_CHANGE_REQUEST] = func() interface{} { return &pb.EpochChangeRequest{} }
+	eventCreators[pb.Type_EPOCH_CHANGE_PROOF] = func() interface{} { return &protos.EpochChangeProof{} }
 }
 
 // dispatchLocalEvent dispatches local Event to corresponding handles using its service type
@@ -150,14 +155,6 @@ func (rbft *rbftImpl) handleCoreRbftEvent(e *LocalEvent) consensusEvent {
 		rbft.handleNullRequestTimerEvent()
 		return nil
 
-	case CoreFirstRequestTimerEvent:
-		rbft.logger.Warningf("Replica %d first request timer expired", rbft.peerPool.ID)
-		if rbft.atomicInOne(InViewChange, InRecovery) {
-			rbft.logger.Debugf("Replica %d has already been in view-change or recovery, return directly", rbft.peerPool.ID)
-			return nil
-		}
-		return rbft.sendViewChange()
-
 	case CoreCheckPoolTimerEvent:
 		if !rbft.isNormal() {
 			return nil
@@ -170,17 +167,17 @@ func (rbft *rbftImpl) handleCoreRbftEvent(e *LocalEvent) consensusEvent {
 		return rbft.recvStateUpdatedEvent(e.Event.(*types.ServiceState))
 
 	case CoreResendMissingTxsEvent:
-		ev, ok := e.Event.(*pb.FetchMissingRequests)
+		ev, ok := e.Event.(*pb.FetchMissingRequest)
 		if !ok {
-			rbft.logger.Error("FetchMissingRequests parsing error")
+			rbft.logger.Error("FetchMissingRequest parsing error")
 			return nil
 		}
-		_ = rbft.recvFetchMissingTxs(ev)
+		_ = rbft.recvFetchMissingRequest(ev)
 		return nil
 
 	case CoreHighWatermarkEvent:
-		if rbft.atomicInOne(InViewChange, InRecovery) {
-			rbft.logger.Debugf("Replica %d is in viewChange/recovery, ignore the high-watermark event")
+		if rbft.atomicIn(InViewChange) {
+			rbft.logger.Debugf("Replica %d is in viewChange, ignore the high-watermark event")
 			return nil
 		}
 
@@ -197,8 +194,9 @@ func (rbft *rbftImpl) handleCoreRbftEvent(e *LocalEvent) consensusEvent {
 			return nil
 		}
 
-		rbft.logger.Infof("Replica %d high-watermark timer expired, init recovery: %s", rbft.peerPool.ID, rbft.recoveryMgr.highWatermarkTimerReason)
-		return rbft.initRecovery()
+		rbft.logger.Infof("Replica %d high-watermark timer expired, send view change: %s",
+			rbft.peerPool.ID, rbft.highWatermarkTimerReason)
+		return rbft.sendViewChange()
 
 	default:
 		rbft.logger.Errorf("Invalid core RBFT event: %v", e)
@@ -224,73 +222,12 @@ func (rbft *rbftImpl) handleRecoveryEvent(e *LocalEvent) consensusEvent {
 
 		rbft.logger.Debugf("Replica %d init recovery", rbft.peerPool.ID)
 		return rbft.initRecovery()
-	case RecoveryDoneEvent:
-		rbft.atomicOff(InRecovery)
-		rbft.metrics.statusGaugeInRecovery.Set(0)
-		rbft.recoveryMgr.notificationStore = make(map[ntfIdx]*pb.Notification)
-		rbft.recoveryMgr.outOfElection = make(map[ntfIdx]*pb.NotificationResponse)
-		rbft.recoveryMgr.differentEpoch = make(map[ntfIde]*pb.NotificationResponse)
-		rbft.vcMgr.viewChangeStore = make(map[vcIdx]*pb.ViewChange)
-		rbft.storeMgr.missingBatchesInFetching = make(map[string]msgID)
-		rbft.maybeSetNormal()
-		rbft.timerMgr.stopTimer(recoveryRestartTimer)
-		rbft.stopNewViewTimer()
-		rbft.logger.Noticef("======== Replica %d finished recovery, epoch=%d/view=%d/height=%d.", rbft.peerPool.ID, rbft.epoch, rbft.view, rbft.exec.lastExec)
-		rbft.logger.Notice(`
 
-  +==============================================+
-  |                                              |
-  |            RBFT Recovery Finished            |
-  |                                              |
-  +==============================================+
-
-`)
-		finishMsg := fmt.Sprintf("======== Replica %d finished recovery, primary=%d, epoch=%d/n=%d/f=%d/view=%d/h=%d/lastExec=%d", rbft.peerPool.ID, rbft.primaryID(rbft.view), rbft.epoch, rbft.N, rbft.f, rbft.view, rbft.h, rbft.exec.lastExec)
-		rbft.external.SendFilterEvent(types.InformTypeFilterFinishRecovery, finishMsg)
-
-		// check if epoch has been changed, if changed, trigger another round of recovery
-		// after epoch change to find correct view-number
-		epochChanged := rbft.syncEpoch()
-		if epochChanged {
-			// trigger another round of recovery after epoch change to find correct view-number
-			rbft.timerMgr.stopTimer(recoveryRestartTimer)
-			return rbft.initRecovery()
-		}
-
-		// after recovery, new primary need to send null request as a heartbeat, and non-primary will start a
-		// first request timer which must be longer than null request timer in which non-primary must receive a
-		// request from primary(null request or pre-prepare...), or this node will send viewChange.
-		// However, primary may have resend some batch during primaryResendBatch, so, for primary need
-		// only startTimerIfOutstandingRequests.
-		if rbft.isPrimary(rbft.peerPool.ID) {
-			rbft.startTimerIfOutstandingRequests()
-		} else {
-			event := &LocalEvent{
-				Service:   CoreRbftService,
-				EventType: CoreFirstRequestTimerEvent,
-			}
-
-			rbft.logger.Debugf("Replica %d start firstRequestTimer", rbft.peerPool.ID)
-			rbft.timerMgr.startTimer(firstRequestTimer, event)
-		}
-
-		// here, we always fetch PQC after finish recovery as we only recovery to the largest checkpoint which
-		// is lower or equal to the lastExec quorum of others, which, in this way, we avoid sending prepare and
-		// commit or other consensus messages during add/delete node
-		rbft.fetchRecoveryPQC()
-
-		rbft.primaryResubmitTransactions()
-
-		return nil
-
-	case RecoveryRestartTimerEvent:
-		rbft.logger.Infof("Replica %d recovery restart timer expired, restart recovery", rbft.peerPool.ID)
-		return rbft.restartRecovery()
 	case RecoverySyncStateRspTimerEvent:
 		rbft.logger.Noticef("Replica %d sync state response timer expired", rbft.peerPool.ID)
 		rbft.exitSyncState()
 		if !rbft.isNormal() {
-			rbft.logger.Noticef("Replica %d is in abnormal, not restart recovery", rbft.peerPool.ID)
+			rbft.logger.Noticef("Replica %d is in abnormal, not try view change", rbft.peerPool.ID)
 			return nil
 		}
 		return rbft.initRecovery()
@@ -302,17 +239,6 @@ func (rbft *rbftImpl) handleRecoveryEvent(e *LocalEvent) consensusEvent {
 			return nil
 		}
 		return rbft.restartSyncState()
-	case NotificationQuorumEvent:
-		rbft.logger.Infof("Replica %d received notification quorum, processing new view", rbft.peerPool.ID)
-		if rbft.isPrimary(rbft.peerPool.ID) {
-			if rbft.in(SkipInProgress) {
-				rbft.logger.Debugf("Replica %d is in catching up, don't send new view", rbft.peerPool.ID)
-				return nil
-			}
-			// primary construct and send new view message
-			return rbft.sendNewView(true)
-		}
-		return rbft.replicaCheckNewView()
 	default:
 		rbft.logger.Errorf("Invalid recovery service events : %v", e)
 		return nil
@@ -338,16 +264,11 @@ func (rbft *rbftImpl) handleViewChangeEvent(e *LocalEvent) consensusEvent {
 
 		rbft.logger.Infof("Replica %d viewChange timer expired, sending viewChange: %s", rbft.peerPool.ID, rbft.vcMgr.newViewTimerReason)
 
-		if rbft.atomicIn(InRecovery) {
-			rbft.logger.Debugf("Replica %d restart recovery after new view timer expired in recovery", rbft.peerPool.ID)
-			return rbft.initRecovery()
-		}
-
 		// Here, we directly send viewchange with a bigger target view (which is rbft.view+1) because it is the
 		// new view timer who triggered this ViewChangeTimerEvent so we send a new viewchange request
 		return rbft.sendViewChange()
 
-	case ViewChangedEvent:
+	case ViewChangeDoneEvent:
 		// set a viewChangeSeqNo if needed
 		rbft.updateViewChangeSeqNo(rbft.exec.lastExec, rbft.K)
 		delete(rbft.vcMgr.newViewStore, rbft.view)
@@ -360,53 +281,86 @@ func (rbft *rbftImpl) handleViewChangeEvent(e *LocalEvent) consensusEvent {
 		// set normal to 1 which indicates system comes into normal status after viewchange
 		rbft.atomicOff(InViewChange)
 		rbft.metrics.statusGaugeInViewChange.Set(0)
+		var finishMsg string
+		if rbft.atomicIn(InRecovery) {
+			rbft.atomicOff(InRecovery)
+			rbft.metrics.statusGaugeInRecovery.Set(0)
+			rbft.logger.Noticef("======== Replica %d finished recovery, primary=%d, "+
+				"epoch=%d/n=%d/f=%d/view=%d/h=%d/lastExec=%d", rbft.peerPool.ID, primaryID,
+				rbft.epoch, rbft.N, rbft.f, rbft.view, rbft.h, rbft.exec.lastExec)
+
+			rbft.logger.Notice(`
+
+  +==============================================+
+  |                                              |
+  |            RBFT Recovery Finished            |
+  |                                              |
+  +==============================================+
+
+`)
+			finishMsg = fmt.Sprintf("======== Replica %d finished recovery, primary=%d, "+
+				"epoch=%d/n=%d/f=%d/view=%d/h=%d/lastExec=%d", rbft.peerPool.ID, primaryID,
+				rbft.epoch, rbft.N, rbft.f, rbft.view, rbft.h, rbft.exec.lastExec)
+			rbft.external.SendFilterEvent(types.InformTypeFilterFinishRecovery, finishMsg)
+		} else {
+			rbft.logger.Noticef("======== Replica %d finished viewChange, primary=%d, "+
+				"epoch=%d/n=%d/f=%d/view=%d/h=%d/lastExec=%d", rbft.peerPool.ID, primaryID,
+				rbft.epoch, rbft.N, rbft.f, rbft.view, rbft.h, rbft.exec.lastExec)
+
+			finishMsg = fmt.Sprintf("======== Replica %d finished viewChange, primary=%d, "+
+				"epoch=%d/n=%d/f=%d/view=%d/h=%d/lastExec=%d", rbft.peerPool.ID, primaryID,
+				rbft.epoch, rbft.N, rbft.f, rbft.view, rbft.h, rbft.exec.lastExec)
+			rbft.external.SendFilterEvent(types.InformTypeFilterFinishViewChange, finishMsg)
+		}
 		rbft.maybeSetNormal()
-		rbft.logger.Noticef("======== Replica %d finished viewChange, primary=%d, view=%d/height=%d", rbft.peerPool.ID, primaryID, rbft.view, rbft.exec.lastExec)
-		finishMsg := fmt.Sprintf("Replica %d finished viewChange, primary=%d, view=%d/height=%d", rbft.peerPool.ID, primaryID, rbft.view, rbft.exec.lastExec)
 
 		// clear storage from lower view
-		for idx := range rbft.recoveryMgr.notificationStore {
-			if idx.v < rbft.view {
-				delete(rbft.recoveryMgr.notificationStore, idx)
-			}
-		}
 		for idx := range rbft.vcMgr.viewChangeStore {
-			if idx.v < rbft.view {
+			if idx.v <= rbft.view {
 				delete(rbft.vcMgr.viewChangeStore, idx)
 			}
 		}
 
-		// send viewchange result to web socket API
-		rbft.external.SendFilterEvent(types.InformTypeFilterFinishViewChange, finishMsg)
+		for view := range rbft.vcMgr.newViewStore {
+			if view < rbft.view {
+				delete(rbft.vcMgr.newViewStore, view)
+			}
+		}
 
-		// check if epoch has been changed, if changed, trigger another round of recovery
+		for idx := range rbft.vcMgr.newViewCache {
+			if idx.targetView <= rbft.view {
+				delete(rbft.vcMgr.newViewCache, idx)
+			}
+		}
+
+		// check if epoch has been changed, if changed, trigger another round of view change
 		// after epoch change to find correct view-number
 		epochChanged := rbft.syncEpoch()
 		if epochChanged {
-			// trigger another round of recovery after epoch change to find correct view-number
-			rbft.timerMgr.stopTimer(recoveryRestartTimer)
+			rbft.logger.Debugf("Replica %d sending view change again because of epoch change", rbft.peerPool.ID)
+			// trigger another round of view change after epoch change to find correct view-number
 			return rbft.initRecovery()
 		}
 
-		rbft.primaryResubmitTransactions()
-
-		if !rbft.isPrimary(rbft.peerPool.ID) {
+		if rbft.isPrimary(rbft.peerPool.ID) {
+			rbft.primaryResubmitTransactions()
+		} else {
+			// here, we always fetch PQC after finish recovery as we only recovery to the largest checkpoint which
+			// is lower or equal to the lastExec quorum of others.
 			rbft.fetchRecoveryPQC()
 		}
 
 	case ViewChangeResendTimerEvent:
 		if !rbft.atomicIn(InViewChange) {
-			rbft.logger.Warningf("Replica %d had its viewChange resend timer expired but it's not in viewChange,ignore it", rbft.peerPool.ID)
+			rbft.logger.Warningf("Replica %d had its viewChange resend timer expired but it's "+
+				"not in viewChange, ignore it", rbft.peerPool.ID)
 			return nil
 		}
-		rbft.logger.Infof("Replica %d viewChange resend timer expired before viewChange quorum was reached, try send notification", rbft.peerPool.ID)
-
-		rbft.timerMgr.stopTimer(newViewTimer)
-		rbft.atomicOff(InViewChange)
-		rbft.metrics.statusGaugeInViewChange.Set(0)
+		rbft.logger.Infof("Replica %d viewChange resend timer expired before viewChange quorum "+
+			"was reached, try recovery", rbft.peerPool.ID)
 
 		// if viewChange resend timer expired, directly enter recovery status,
-		// decrease view first as we may increase view when send notification.
+		// decrease view first as we may increase view when send view change.
 		newView := rbft.view - uint64(1)
 		rbft.setView(newView)
 
@@ -424,7 +378,7 @@ func (rbft *rbftImpl) handleViewChangeEvent(e *LocalEvent) consensusEvent {
 				return nil
 			}
 			// primary construct and send new view message
-			return rbft.sendNewView(false)
+			return rbft.sendNewView()
 		}
 		return rbft.replicaCheckNewView()
 
@@ -443,8 +397,29 @@ func (rbft *rbftImpl) handleEpochMgrEvent(e *LocalEvent) consensusEvent {
 		rbft.stopFetchCheckpointTimer()
 		rbft.fetchCheckpoint()
 
+	case EpochSyncEvent:
+		quorumCheckpoint := e.Event.(*protos.QuorumCheckpoint)
+		rbft.logger.Noticef("Replica %d try epoch sync to height %d, epoch %d", rbft.peerPool.ID,
+			quorumCheckpoint.Height(), quorumCheckpoint.NextEpoch())
+
+		// block consensus progress until sync to epoch change height.
+		rbft.atomicOn(inEpochSyncing)
+		target := &types.MetaState{
+			Height: quorumCheckpoint.Height(),
+			Digest: quorumCheckpoint.Digest(),
+		}
+		var checkpointSet []*pb.SignedCheckpoint
+		for _, sig := range quorumCheckpoint.Signatures {
+			checkpointSet = append(checkpointSet, &pb.SignedCheckpoint{
+				Checkpoint: quorumCheckpoint.Checkpoint,
+				Signature:  sig,
+			})
+		}
+		rbft.updateHighStateTarget(target, checkpointSet)
+		rbft.tryStateTransfer()
+
 	default:
-		rbft.logger.Errorf("Invalid viewChange event: %v", e)
+		rbft.logger.Errorf("Invalid viewChange quorumCheckpoint: %v", e)
 		return nil
 	}
 	return nil
@@ -484,9 +459,9 @@ func (rbft *rbftImpl) dispatchMsgToService(e consensusEvent) int {
 		return CoreRbftService
 	case *pb.Commit:
 		return CoreRbftService
-	case *pb.FetchMissingRequests:
+	case *pb.FetchMissingRequest:
 		return CoreRbftService
-	case *pb.SendMissingRequests:
+	case *pb.FetchMissingResponse:
 		return CoreRbftService
 	case *pb.SignedCheckpoint:
 		return CoreRbftService
@@ -496,23 +471,25 @@ func (rbft *rbftImpl) dispatchMsgToService(e consensusEvent) int {
 		return ViewChangeService
 	case *pb.NewView:
 		return ViewChangeService
-	case *pb.FetchRequestBatch:
+	case *pb.FetchBatchRequest:
 		return ViewChangeService
-	case *pb.SendRequestBatch:
+	case *pb.FetchBatchResponse:
+		return ViewChangeService
+	case *pb.FetchView:
+		return ViewChangeService
+	case *pb.RecoveryResponse:
+		return ViewChangeService
+	case *pb.QuorumViewChange:
 		return ViewChangeService
 
 		// recovery service
-	case *pb.RecoveryFetchPQC:
+	case *pb.FetchPQCRequest:
 		return RecoveryService
-	case *pb.RecoveryReturnPQC:
+	case *pb.FetchPQCResponse:
 		return RecoveryService
 	case *pb.SyncState:
 		return RecoveryService
 	case *pb.SyncStateResponse:
-		return RecoveryService
-	case *pb.Notification:
-		return RecoveryService
-	case *pb.NotificationResponse:
 		return RecoveryService
 
 	case *pb.FetchCheckpoint:

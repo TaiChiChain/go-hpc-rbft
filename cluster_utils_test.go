@@ -9,8 +9,8 @@ import (
 	"github.com/hyperchain/go-hpc-common/fancylogger"
 	hpcCommonTypes "github.com/hyperchain/go-hpc-common/types"
 	"github.com/hyperchain/go-hpc-common/types/protos"
-	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
-	"github.com/hyperchain/go-hpc-rbft/types"
+	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
+	"github.com/hyperchain/go-hpc-rbft/v2/types"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/stretchr/testify/assert"
@@ -47,7 +47,7 @@ func setClusterExecExcept(rbfts []*rbftImpl, nodes []*testNode, seq uint64, noEx
 		rbfts[index].exec.setLastExec(seq)
 		rbfts[index].batchMgr.setSeqNo(seq)
 		pos := seq / 10 * 10
-		rbfts[index].moveWatermarks(pos, false)
+		rbfts[index].moveWatermarks(pos)
 		nodes[index].Applied = seq
 	}
 }
@@ -69,6 +69,16 @@ func executeExceptPrimary(t *testing.T, rbfts []*rbftImpl, nodes []*testNode, tx
 
 func executeExceptN(t *testing.T, rbfts []*rbftImpl, nodes []*testNode, tx *protos.Transaction, checkpoint bool, notExec int) map[pb.Type][]*pb.ConsensusMessage {
 
+	var primaryIndex int
+	for index := range rbfts {
+		if index == notExec {
+			continue
+		}
+		if rbfts[index].isPrimary(rbfts[index].peerPool.ID) {
+			primaryIndex = index
+			break
+		}
+	}
 	retMessages := make(map[pb.Type][]*pb.ConsensusMessage)
 
 	rbfts[0].batchMgr.requestPool.AddNewRequests([]*protos.Transaction{tx}, false, true)
@@ -80,9 +90,10 @@ func executeExceptN(t *testing.T, rbfts []*rbftImpl, nodes []*testNode, tx *prot
 		Service:   CoreRbftService,
 		EventType: CoreBatchTimerEvent,
 	}
-	rbfts[0].processEvent(batchTimerEvent)
+	// primary start generate batch
+	rbfts[primaryIndex].processEvent(batchTimerEvent)
 
-	preprepMsg := nodes[0].broadcastMessageCache
+	preprepMsg := nodes[primaryIndex].broadcastMessageCache
 	assert.Equal(t, pb.Type_PRE_PREPARE, preprepMsg.Type)
 	retMessages[pb.Type_PRE_PREPARE] = []*pb.ConsensusMessage{preprepMsg}
 
@@ -91,16 +102,17 @@ func executeExceptN(t *testing.T, rbfts []*rbftImpl, nodes []*testNode, tx *prot
 	checkpointMsg := make([]*pb.ConsensusMessage, len(rbfts))
 
 	for index := range rbfts {
-		if index == 0 || index == notExec {
+		if index == primaryIndex || index == notExec {
 			continue
 		}
+		t.Logf("%s process pre-prepare", rbfts[index].peerPool.hostname)
 		rbfts[index].processEvent(preprepMsg)
 		prepMsg[index] = nodes[index].broadcastMessageCache
 		assert.Equal(t, pb.Type_PREPARE, prepMsg[index].Type)
 	}
 	// for pre-prepare message
-	// a primary won't process a pre-prepare, so that the prepMsg[0] will always be empty
-	assert.Equal(t, (*pb.ConsensusMessage)(nil), prepMsg[0])
+	// a primary won't process a pre-prepare, so that the prepMsg[primaryIndex] will always be empty
+	assert.Equal(t, (*pb.ConsensusMessage)(nil), prepMsg[primaryIndex])
 	retMessages[pb.Type_PREPARE] = prepMsg
 
 	for index := range rbfts {
@@ -108,7 +120,7 @@ func executeExceptN(t *testing.T, rbfts []*rbftImpl, nodes []*testNode, tx *prot
 			continue
 		}
 		for j := range prepMsg {
-			if j == 0 || j == notExec {
+			if j == primaryIndex || j == notExec {
 				continue
 			}
 			rbfts[index].processEvent(prepMsg[j])
@@ -137,7 +149,11 @@ func executeExceptN(t *testing.T, rbfts []*rbftImpl, nodes []*testNode, tx *prot
 
 	if checkpoint {
 		if hpcCommonTypes.IsConfigTx(tx) {
+			vcMsg := make([]*pb.ConsensusMessage, len(rbfts))
+			epochChanged := false
+			// process checkpoint, if epoch changed, trigger and process view change.
 			for index := range rbfts {
+				oldEpoch := rbfts[index].epoch
 				if index == notExec {
 					continue
 				}
@@ -147,7 +163,65 @@ func executeExceptN(t *testing.T, rbfts []*rbftImpl, nodes []*testNode, tx *prot
 					}
 					rbfts[index].processEvent(checkpointMsg[j])
 				}
+				newEpoch := rbfts[index].epoch
+				if oldEpoch != newEpoch {
+					epochChanged = true
+					t.Logf("%s epoch changed from %d to %d, should trigger vc",
+						rbfts[index].peerPool.hostname, oldEpoch, newEpoch)
+					vcMsg[index] = nodes[index].broadcastMessageCache
+				}
 			}
+			retMessages[pb.Type_VIEW_CHANGE] = vcMsg
+
+			// trigger view change after epoch change.
+			if epochChanged {
+				for index := range rbfts {
+					if index == notExec {
+						continue
+					}
+					for j := range vcMsg {
+						if j == notExec {
+							continue
+						}
+						rbfts[index].processEvent(vcMsg[j])
+					}
+				}
+				// view change quorum event
+				// new primary should be replica 2(view = 1)
+				primaryIndex = 1
+				quorumVC := &LocalEvent{Service: ViewChangeService, EventType: ViewChangeQuorumEvent}
+				for index := range rbfts {
+					if index == notExec {
+						continue
+					}
+					finished := rbfts[index].processEvent(quorumVC)
+					if index == primaryIndex {
+						assert.Equal(t, ViewChangeDoneEvent, finished.(*LocalEvent).EventType)
+					}
+				}
+				// new view message
+				newView := nodes[1].broadcastMessageCache
+				assert.Equal(t, pb.Type_NEW_VIEW, newView.Type)
+				for index := range rbfts {
+					if index == notExec || index == primaryIndex {
+						continue
+					}
+
+					finished := rbfts[index].processEvent(newView)
+					assert.Equal(t, ViewChangeDoneEvent, finished.(*LocalEvent).EventType)
+				}
+
+				// recovery done event
+				done := &LocalEvent{Service: ViewChangeService, EventType: ViewChangeDoneEvent}
+				for index := range rbfts {
+					if index == notExec {
+						continue
+					}
+
+					rbfts[index].processEvent(done)
+				}
+			}
+
 		} else {
 			for index := range rbfts {
 				if index == notExec {
@@ -170,8 +244,8 @@ func executeExceptN(t *testing.T, rbfts []*rbftImpl, nodes []*testNode, tx *prot
 // Tools for Cluster Check Stable State
 //=============================================================================
 
-// NewRawLoggerFile create log file for local cluster tests
-func FrameworkNewRawLoggerFile(hostname string) *fancylogger.Logger {
+// newRawLoggerWithHost create log file for local cluster tests
+func newRawLoggerWithHost(hostname string) *fancylogger.Logger {
 	rawLogger := fancylogger.NewLogger("test", fancylogger.DEBUG)
 
 	consoleFormatter := &fancylogger.StringFormatter{
@@ -192,8 +266,8 @@ func FrameworkNewRawLoggerFile(hostname string) *fancylogger.Logger {
 	return rawLogger
 }
 
-// NewRawLoggerFile create log file for local cluster tests
-func FrameworkNewRawLogger() *fancylogger.Logger {
+// newRawLogger create log file for local cluster tests
+func newRawLogger() *fancylogger.Logger {
 	rawLogger := fancylogger.NewLogger("test", fancylogger.DEBUG)
 
 	consoleFormatter := &fancylogger.StringFormatter{
@@ -258,6 +332,85 @@ func newBasicClusterInstance() ([]*testNode, []*rbftImpl) {
 	return nodes, rbfts
 }
 
+// clusterInitRecovery mocks cluster init recovery and change view to 1.
+// notExec indicates which node is offline and not execute recovery, use -1 to indicate no such nodes.
+// NOTE!!! assume replica 2 is online(the primary in view 1).
+func clusterInitRecovery(t *testing.T, allNodes []*testNode, allRbfts []*rbftImpl, notExec int) {
+	nodes := make([]*testNode, 0)
+	rbfts := make([]*rbftImpl, 0)
+	for idx := range allNodes {
+		if idx == notExec {
+			continue
+		}
+		nodes = append(nodes, allNodes[idx])
+		rbfts = append(rbfts, allRbfts[idx])
+	}
+
+	init := &LocalEvent{
+		Service:   RecoveryService,
+		EventType: RecoveryInitEvent,
+		Event:     uint64(0),
+	}
+
+	// init recovery directly and broadcast recovery view change in view=1
+	recoveryVCs := make([]*pb.ConsensusMessage, 0, len(nodes))
+	for idx := range rbfts {
+		rbfts[idx].processEvent(init)
+		recoveryVC := nodes[idx].broadcastMessageCache
+		assert.Equal(t, pb.Type_VIEW_CHANGE, recoveryVC.Type)
+		recoveryVCs = append(recoveryVCs, recoveryVC)
+	}
+
+	// process all recovery view changes and enter view change quorum status
+	for idx := range rbfts {
+		var quorum consensusEvent
+		for i := range recoveryVCs {
+			if i == idx {
+				continue
+			}
+			quorum = rbfts[idx].processEvent(recoveryVCs[i])
+		}
+		assert.Equal(t, ViewChangeQuorumEvent, quorum.(*LocalEvent).EventType)
+	}
+
+	// process view change quorum event
+	// NOTE!!! assume replica 2 is online.
+	quorumVC := &LocalEvent{Service: ViewChangeService, EventType: ViewChangeQuorumEvent}
+	for idx := range rbfts {
+		finished := rbfts[idx].processEvent(quorumVC)
+		// primary finish view change and broadcast new view.
+		if idx == 1 {
+			assert.Equal(t, ViewChangeDoneEvent, finished.(*LocalEvent).EventType)
+		}
+	}
+
+	// new view message
+	newView := nodes[1].broadcastMessageCache
+	assert.Equal(t, pb.Type_NEW_VIEW, newView.Type)
+
+	for index := range rbfts {
+		if index == 1 {
+			continue
+		}
+
+		// replicas process new view and finish view change.
+		finished := rbfts[index].processEvent(newView)
+		assert.Equal(t, ViewChangeDoneEvent, finished.(*LocalEvent).EventType)
+	}
+
+	// recovery done event
+	done := &LocalEvent{Service: ViewChangeService, EventType: ViewChangeDoneEvent}
+	for index := range rbfts {
+		rbfts[index].processEvent(done)
+	}
+
+	// check status
+	for index := range rbfts {
+		assert.Equal(t, uint64(1), rbfts[index].view)
+		assert.True(t, rbfts[index].isNormal())
+	}
+}
+
 func (rbft *rbftImpl) consensusMessagePacker(e consensusEvent) *pb.ConsensusMessage {
 	var (
 		eventType pb.Type
@@ -278,29 +431,47 @@ func (rbft *rbftImpl) consensusMessagePacker(e consensusEvent) *pb.ConsensusMess
 	case *pb.Commit:
 		eventType = pb.Type_COMMIT
 		payload, err = proto.Marshal(et)
+	case *pb.RequestSet:
+		eventType = pb.Type_REQUEST_SET
+		payload, err = proto.Marshal(et)
+	case *pb.SignedCheckpoint:
+		eventType = pb.Type_SIGNED_CHECKPOINT
+		payload, err = proto.Marshal(et)
 	case *pb.FetchCheckpoint:
 		eventType = pb.Type_FETCH_CHECKPOINT
+		payload, err = proto.Marshal(et)
+	case *pb.ViewChange:
+		eventType = pb.Type_VIEW_CHANGE
+		payload, err = proto.Marshal(et)
+	case *pb.QuorumViewChange:
+		eventType = pb.Type_QUORUM_VIEW_CHANGE
 		payload, err = proto.Marshal(et)
 	case *pb.NewView:
 		eventType = pb.Type_NEW_VIEW
 		payload, err = proto.Marshal(et)
-	case *pb.FetchRequestBatch:
-		eventType = pb.Type_FETCH_REQUEST_BATCH
+	case *pb.FetchView:
+		eventType = pb.Type_FETCH_VIEW
 		payload, err = proto.Marshal(et)
-	case *pb.SendRequestBatch:
-		eventType = pb.Type_SEND_REQUEST_BATCH
+	case *pb.RecoveryResponse:
+		eventType = pb.Type_RECOVERY_RESPONSE
 		payload, err = proto.Marshal(et)
-	case *pb.RecoveryFetchPQC:
-		eventType = pb.Type_RECOVERY_FETCH_QPC
+	case *pb.FetchBatchRequest:
+		eventType = pb.Type_FETCH_BATCH_REQUEST
 		payload, err = proto.Marshal(et)
-	case *pb.RecoveryReturnPQC:
-		eventType = pb.Type_RECOVERY_RETURN_QPC
+	case *pb.FetchBatchResponse:
+		eventType = pb.Type_FETCH_BATCH_RESPONSE
 		payload, err = proto.Marshal(et)
-	case *pb.FetchMissingRequests:
-		eventType = pb.Type_FETCH_MISSING_REQUESTS
+	case *pb.FetchPQCRequest:
+		eventType = pb.Type_FETCH_PQC_REQUEST
 		payload, err = proto.Marshal(et)
-	case *pb.SendMissingRequests:
-		eventType = pb.Type_SEND_MISSING_REQUESTS
+	case *pb.FetchPQCResponse:
+		eventType = pb.Type_FETCH_PQC_RESPONSE
+		payload, err = proto.Marshal(et)
+	case *pb.FetchMissingRequest:
+		eventType = pb.Type_FETCH_MISSING_REQUEST
+		payload, err = proto.Marshal(et)
+	case *pb.FetchMissingResponse:
+		eventType = pb.Type_FETCH_MISSING_RESPONSE
 		payload, err = proto.Marshal(et)
 	case *pb.SyncState:
 		eventType = pb.Type_SYNC_STATE
@@ -308,17 +479,11 @@ func (rbft *rbftImpl) consensusMessagePacker(e consensusEvent) *pb.ConsensusMess
 	case *pb.SyncStateResponse:
 		eventType = pb.Type_SYNC_STATE_RESPONSE
 		payload, err = proto.Marshal(et)
-	case *pb.Notification:
-		eventType = pb.Type_NOTIFICATION
+	case *pb.EpochChangeRequest:
+		eventType = pb.Type_EPOCH_CHANGE_REQUEST
 		payload, err = proto.Marshal(et)
-	case *pb.NotificationResponse:
-		eventType = pb.Type_NOTIFICATION_RESPONSE
-		payload, err = proto.Marshal(et)
-	case *pb.RequestSet:
-		eventType = pb.Type_REQUEST_SET
-		payload, err = proto.Marshal(et)
-	case *pb.SignedCheckpoint:
-		eventType = pb.Type_SIGNED_CHECKPOINT
+	case *protos.EpochChangeProof:
+		eventType = pb.Type_EPOCH_CHANGE_PROOF
 		payload, err = proto.Marshal(et)
 	default:
 		rbft.logger.Errorf("ConsensusMessage Unknown Type: %+v", e)
@@ -333,7 +498,9 @@ func (rbft *rbftImpl) consensusMessagePacker(e consensusEvent) *pb.ConsensusMess
 	consensusMsg := &pb.ConsensusMessage{
 		Type:    eventType,
 		From:    rbft.peerPool.ID,
+		Author:  rbft.peerPool.hostname,
 		Epoch:   rbft.epoch,
+		View:    rbft.view,
 		Payload: payload,
 	}
 

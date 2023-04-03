@@ -9,8 +9,8 @@ import (
 
 	gomock "github.com/golang/mock/gomock"
 	protos "github.com/hyperchain/go-hpc-common/types/protos"
-	rbftpb "github.com/hyperchain/go-hpc-rbft/rbftpb"
-	types "github.com/hyperchain/go-hpc-rbft/types"
+	rbftpb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
+	types "github.com/hyperchain/go-hpc-rbft/v2/types"
 )
 
 // MockStorage is a mock of Storage interface.
@@ -326,6 +326,21 @@ func (mr *MockEpochServiceMockRecorder) GetAlgorithmVersion() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAlgorithmVersion", reflect.TypeOf((*MockEpochService)(nil).GetAlgorithmVersion))
 }
 
+// GetCheckpointOfEpoch mocks base method.
+func (m *MockEpochService) GetCheckpointOfEpoch(epoch uint64) (*protos.QuorumCheckpoint, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCheckpointOfEpoch", epoch)
+	ret0, _ := ret[0].(*protos.QuorumCheckpoint)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetCheckpointOfEpoch indicates an expected call of GetCheckpointOfEpoch.
+func (mr *MockEpochServiceMockRecorder) GetCheckpointOfEpoch(epoch interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCheckpointOfEpoch", reflect.TypeOf((*MockEpochService)(nil).GetCheckpointOfEpoch), epoch)
+}
+
 // GetEpoch mocks base method.
 func (m *MockEpochService) GetEpoch() uint64 {
 	m.ctrl.T.Helper()
@@ -394,6 +409,20 @@ func (m *MockEpochService) Reconfiguration() uint64 {
 func (mr *MockEpochServiceMockRecorder) Reconfiguration() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Reconfiguration", reflect.TypeOf((*MockEpochService)(nil).Reconfiguration))
+}
+
+// VerifyEpochChangeProof mocks base method.
+func (m *MockEpochService) VerifyEpochChangeProof(proof *protos.EpochChangeProof, validators protos.Validators) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "VerifyEpochChangeProof", proof, validators)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// VerifyEpochChangeProof indicates an expected call of VerifyEpochChangeProof.
+func (mr *MockEpochServiceMockRecorder) VerifyEpochChangeProof(proof, validators interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyEpochChangeProof", reflect.TypeOf((*MockEpochService)(nil).VerifyEpochChangeProof), proof, validators)
 }
 
 // MockExternalStack is a mock of ExternalStack interface.
@@ -485,6 +514,21 @@ func (m *MockExternalStack) GetAlgorithmVersion() string {
 func (mr *MockExternalStackMockRecorder) GetAlgorithmVersion() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAlgorithmVersion", reflect.TypeOf((*MockExternalStack)(nil).GetAlgorithmVersion))
+}
+
+// GetCheckpointOfEpoch mocks base method.
+func (m *MockExternalStack) GetCheckpointOfEpoch(epoch uint64) (*protos.QuorumCheckpoint, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCheckpointOfEpoch", epoch)
+	ret0, _ := ret[0].(*protos.QuorumCheckpoint)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetCheckpointOfEpoch indicates an expected call of GetCheckpointOfEpoch.
+func (mr *MockExternalStackMockRecorder) GetCheckpointOfEpoch(epoch interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCheckpointOfEpoch", reflect.TypeOf((*MockExternalStack)(nil).GetCheckpointOfEpoch), epoch)
 }
 
 // GetEpoch mocks base method.
@@ -685,4 +729,18 @@ func (m *MockExternalStack) Verify(peerHash string, signature, msg []byte) error
 func (mr *MockExternalStackMockRecorder) Verify(peerHash, signature, msg interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Verify", reflect.TypeOf((*MockExternalStack)(nil).Verify), peerHash, signature, msg)
+}
+
+// VerifyEpochChangeProof mocks base method.
+func (m *MockExternalStack) VerifyEpochChangeProof(proof *protos.EpochChangeProof, validators protos.Validators) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "VerifyEpochChangeProof", proof, validators)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// VerifyEpochChangeProof indicates an expected call of VerifyEpochChangeProof.
+func (mr *MockExternalStackMockRecorder) VerifyEpochChangeProof(proof, validators interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyEpochChangeProof", reflect.TypeOf((*MockExternalStack)(nil).VerifyEpochChangeProof), proof, validators)
 }

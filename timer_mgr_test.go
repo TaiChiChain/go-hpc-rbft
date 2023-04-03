@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/hyperchain/go-hpc-common/metrics/disabled"
-	mockexternal "github.com/hyperchain/go-hpc-rbft/mock/mock_external"
+	mockexternal "github.com/hyperchain/go-hpc-rbft/v2/mock/mock_external"
 	txpoolmock "github.com/hyperchain/go-hpc-txpool/mock"
 
 	"github.com/golang/mock/gomock"
@@ -14,7 +14,7 @@ import (
 )
 
 func newTestTimerMgr(ctrl *gomock.Controller) *timerManager {
-	log := FrameworkNewRawLogger()
+	log := newRawLogger()
 	external := mockexternal.NewMockMinimalExternal(ctrl)
 	tx := txpoolmock.NewMockMinimalTxPool(ctrl)
 	conf := Config{
@@ -220,10 +220,8 @@ func TestTimerMgr_newTimer(t *testing.T) {
 	timeMgr.newTimer(vcResendTimer, 0)
 	timeMgr.newTimer(newViewTimer, 0)
 	timeMgr.newTimer(nullRequestTimer, 0)
-	timeMgr.newTimer(firstRequestTimer, 0)
 	timeMgr.newTimer(syncStateRspTimer, 0)
 	timeMgr.newTimer(syncStateRestartTimer, 0)
-	timeMgr.newTimer(recoveryRestartTimer, 0)
 	timeMgr.newTimer(cleanViewChangeTimer, 0)
 	timeMgr.newTimer(checkPoolTimer, 0)
 	timeMgr.newTimer(fetchCheckpointTimer, 0)
@@ -232,10 +230,8 @@ func TestTimerMgr_newTimer(t *testing.T) {
 	assert.Equal(t, DefaultVcResendTimeout, timeMgr.tTimers[vcResendTimer].timeout)
 	assert.Equal(t, DefaultNewViewTimeout, timeMgr.tTimers[newViewTimer].timeout)
 	assert.Equal(t, DefaultNullRequestTimeout, timeMgr.tTimers[nullRequestTimer].timeout)
-	assert.Equal(t, DefaultFirstRequestTimeout, timeMgr.tTimers[firstRequestTimer].timeout)
 	assert.Equal(t, DefaultSyncStateRspTimeout, timeMgr.tTimers[syncStateRspTimer].timeout)
 	assert.Equal(t, DefaultSyncStateRestartTimeout, timeMgr.tTimers[syncStateRestartTimer].timeout)
-	assert.Equal(t, DefaultRecoveryRestartTimeout, timeMgr.tTimers[recoveryRestartTimer].timeout)
 	assert.Equal(t, DefaultCleanViewChangeTimeout, timeMgr.tTimers[cleanViewChangeTimer].timeout)
 	assert.Equal(t, DefaultCheckPoolTimeout, timeMgr.tTimers[checkPoolTimer].timeout)
 	assert.Equal(t, DefaultFetchCheckpointTimeout, timeMgr.tTimers[fetchCheckpointTimer].timeout)

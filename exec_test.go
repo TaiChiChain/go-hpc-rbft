@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/hyperchain/go-hpc-common/types/protos"
-	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
-	"github.com/hyperchain/go-hpc-rbft/types"
+	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
+	"github.com/hyperchain/go-hpc-rbft/v2/types"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
@@ -72,27 +72,6 @@ func TestExec_handleCoreRbftEvent_NullRequestTimerEvent(t *testing.T) {
 	assert.Equal(t, pb.Type_VIEW_CHANGE, nodes[3].broadcastMessageCache.Type)
 }
 
-func TestExec_handleCoreRbftEvent_FirstRequestTimerEvent(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	nodes, rbfts := newBasicClusterInstance()
-
-	// every node will send view change
-	ev := &LocalEvent{
-		Service:   CoreRbftService,
-		EventType: CoreFirstRequestTimerEvent,
-	}
-	rbfts[0].handleCoreRbftEvent(ev)
-	rbfts[1].handleCoreRbftEvent(ev)
-	rbfts[2].handleCoreRbftEvent(ev)
-	rbfts[3].handleCoreRbftEvent(ev)
-	assert.Equal(t, pb.Type_VIEW_CHANGE, nodes[0].broadcastMessageCache.Type)
-	assert.Equal(t, pb.Type_VIEW_CHANGE, nodes[1].broadcastMessageCache.Type)
-	assert.Equal(t, pb.Type_VIEW_CHANGE, nodes[2].broadcastMessageCache.Type)
-	assert.Equal(t, pb.Type_VIEW_CHANGE, nodes[3].broadcastMessageCache.Type)
-}
-
 func TestExec_handleCoreRbftEvent_CheckPoolTimerEvent(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -147,9 +126,9 @@ func TestExec_handleCoreRbftEvent_StateUpdatedEvent(t *testing.T) {
 	rbfts[1].storeMgr.highStateTarget = &stateUpdateTarget{
 		metaState: metaS,
 		checkpointSet: []*pb.SignedCheckpoint{
-			{NodeInfo: &pb.NodeInfo{ReplicaId: 1, ReplicaHost: "test-hash-1"}, Checkpoint: checkpoint, Signature: []byte("sig-1")},
-			{NodeInfo: &pb.NodeInfo{ReplicaId: 2, ReplicaHost: "test-hash-2"}, Checkpoint: checkpoint, Signature: []byte("sig-2")},
-			{NodeInfo: &pb.NodeInfo{ReplicaId: 3, ReplicaHost: "test-hash-3"}, Checkpoint: checkpoint, Signature: []byte("sig-3")},
+			{Author: "node1", Checkpoint: checkpoint, Signature: []byte("sig-1")},
+			{Author: "node2", Checkpoint: checkpoint, Signature: []byte("sig-2")},
+			{Author: "node3", Checkpoint: checkpoint, Signature: []byte("sig-3")},
 		},
 	}
 	rbfts[1].handleCoreRbftEvent(ev)
@@ -190,7 +169,7 @@ func TestExec_handleCoreRbftEvent_ResendMissingTxsEvent(t *testing.T) {
 
 	// replica 2 reconstruct batch, find missing tx and create fetch missing request
 	_, _, missingTxHashes, _ := rbfts[1].batchMgr.requestPool.GetRequestsByHashList(prePrep.BatchDigest, prePrep.HashBatch.Timestamp, prePrep.HashBatch.RequestHashList, prePrep.HashBatch.DeDuplicateRequestHashList)
-	fetch := &pb.FetchMissingRequests{
+	fetch := &pb.FetchMissingRequest{
 		View:                 prePrep.View,
 		SequenceNumber:       prePrep.SequenceNumber,
 		BatchDigest:          prePrep.BatchDigest,
@@ -205,23 +184,7 @@ func TestExec_handleCoreRbftEvent_ResendMissingTxsEvent(t *testing.T) {
 		Event:     fetch,
 	}
 	rbfts[0].handleCoreRbftEvent(ev)
-	assert.Equal(t, pb.Type_SEND_MISSING_REQUESTS, nodes[0].unicastMessageCache.Type)
-}
-
-func TestExec_handleRecoveryEvent_RestartTimerEvent(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	_, rbfts := newBasicClusterInstance()
-
-	ev := &LocalEvent{
-		Service:   RecoveryService,
-		EventType: RecoveryRestartTimerEvent,
-	}
-	assert.False(t, rbfts[1].atomicIn(InRecovery))
-	rbfts[1].handleRecoveryEvent(ev)
-	assert.True(t, rbfts[1].atomicIn(InRecovery))
-	assert.Equal(t, uint64(0), rbfts[1].view)
+	assert.Equal(t, pb.Type_FETCH_MISSING_RESPONSE, nodes[0].unicastMessageCache.Type)
 }
 
 func TestExec_handleRecoveryEvent_SyncStateRspTimerEvent(t *testing.T) {
@@ -275,11 +238,11 @@ func TestExec_handleViewChangeEvent_ViewChangeTimerEvent(t *testing.T) {
 	}
 
 	preView := rbfts[1].view
-	rbfts[1].restartRecovery()
-	assert.Equal(t, pb.Type_NOTIFICATION, nodes[1].broadcastMessageCache.Type)
+	rbfts[1].sendViewChange()
+	assert.Equal(t, pb.Type_VIEW_CHANGE, nodes[1].broadcastMessageCache.Type)
 
 	rbfts[1].handleViewChangeEvent(ev)
-	assert.Equal(t, pb.Type_NOTIFICATION, nodes[1].broadcastMessageCache.Type)
+	assert.Equal(t, pb.Type_VIEW_CHANGE, nodes[1].broadcastMessageCache.Type)
 	assert.Equal(t, preView+1, rbfts[1].view)
 
 	rbfts[2].handleViewChangeEvent(ev)
@@ -299,7 +262,7 @@ func TestExec_handleViewChangeEvent_ViewChangeResendTimerEvent(t *testing.T) {
 
 	rbfts[1].atomicOn(InViewChange)
 	rbfts[1].handleViewChangeEvent(ev)
-	assert.Equal(t, pb.Type_NOTIFICATION, nodes[1].broadcastMessageCache.Type)
+	assert.Equal(t, pb.Type_VIEW_CHANGE, nodes[1].broadcastMessageCache.Type)
 }
 
 func TestExec_handleEpochMgrEvent_FetchCheckpointEvent(t *testing.T) {

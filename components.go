@@ -21,7 +21,7 @@ This file defines the structs used in RBFT
 import (
 	"time"
 
-	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
+	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
 )
 
 // constant timer names
@@ -31,10 +31,8 @@ const (
 	vcResendTimer         = "vcResendTimer"         // timer triggering resend of a view change
 	newViewTimer          = "newViewTimer"          // timer triggering view change by out of timeout of some requestBatch
 	nullRequestTimer      = "nullRequestTimer"      // timer triggering send null request, used for heartbeat
-	firstRequestTimer     = "firstRequestTimer"     // timer set for replicas in case of primary start and shut down immediately
 	syncStateRspTimer     = "syncStateRspTimer"     // timer track timeout for quorum sync-state responses
 	syncStateRestartTimer = "syncStateRestartTimer" // timer track timeout for restart sync-state
-	recoveryRestartTimer  = "recoveryRestartTimer"  // timer track how long a recovery is finished and fires if needed
 	cleanViewChangeTimer  = "cleanViewChangeTimer"  // timer track how long a viewchange msg will store in memory
 	checkPoolTimer        = "checkPoolTimer"        // timer track timeout for check pool interval
 	fetchCheckpointTimer  = "fetchCheckpointTimer"  // timer for nodes to trigger fetch checkpoint when we are processing config transaction
@@ -49,10 +47,8 @@ const (
 	DefaultVcResendTimeout         = 10 * time.Second
 	DefaultNewViewTimeout          = 8 * time.Second
 	DefaultNullRequestTimeout      = 9 * time.Second
-	DefaultFirstRequestTimeout     = 30 * time.Second
 	DefaultSyncStateRspTimeout     = 1 * time.Second
 	DefaultSyncStateRestartTimeout = 10 * time.Second
-	DefaultRecoveryRestartTimeout  = 10 * time.Second
 	DefaultCleanViewChangeTimeout  = 60 * time.Second
 	DefaultCheckPoolTimeout        = 3 * time.Minute
 	DefaultFetchCheckpointTimeout  = 5 * time.Second
@@ -66,7 +62,6 @@ const (
 	// 1.rbft core
 	CoreBatchTimerEvent = iota
 	CoreNullRequestTimerEvent
-	CoreFirstRequestTimerEvent
 	CoreCheckPoolTimerEvent
 	CoreStateUpdatedEvent
 	CoreResendMissingTxsEvent
@@ -76,18 +71,16 @@ const (
 	ViewChangeTimerEvent
 	ViewChangeResendTimerEvent
 	ViewChangeQuorumEvent
-	ViewChangedEvent
+	ViewChangeDoneEvent
 
 	// 3.recovery
 	RecoveryInitEvent
-	RecoveryRestartTimerEvent
-	RecoveryDoneEvent
 	RecoverySyncStateRspTimerEvent
 	RecoverySyncStateRestartTimerEvent
-	NotificationQuorumEvent
 
 	// 4.epoch mgr service
 	FetchCheckpointEvent
+	EpochSyncEvent
 )
 
 // service type
@@ -136,33 +129,16 @@ type msgCert struct {
 	sentExecute     bool                // track whether sent execute event to executor module before or not
 }
 
-// -----------recovery related structs-----------------
-type ntfIdx struct {
-	v      uint64
-	nodeID uint64
-}
-
-type ntfIde struct {
-	e      uint64
-	nodeID uint64
-}
-
 // ----------checkpoint related structs------------------
 type chkptID struct {
-	nodeHost string
+	author   string
 	sequence uint64
 }
 
-// -----------router struct-----------------
-type routerMap struct {
-	HostMap map[string]uint64
-}
-
-// nodeState records every node's consensus status(epoch, view) and
+// nodeState records every node's consensus status(view) and
 // ledger status(chain height, digest)
 type nodeState struct {
 	view   uint64
-	epoch  uint64
 	height uint64
 	digest string
 }
@@ -176,7 +152,5 @@ type vcIdx struct {
 	v  uint64 // view
 	id uint64 // replica id
 }
-
-type xset map[uint64]string
 
 type nextDemandNewView uint64

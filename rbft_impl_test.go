@@ -8,9 +8,9 @@ import (
 	"github.com/hyperchain/go-hpc-common/metrics/disabled"
 	commonTypes "github.com/hyperchain/go-hpc-common/types"
 	"github.com/hyperchain/go-hpc-common/types/protos"
-	mockexternal "github.com/hyperchain/go-hpc-rbft/mock/mock_external"
-	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
-	"github.com/hyperchain/go-hpc-rbft/types"
+	mockexternal "github.com/hyperchain/go-hpc-rbft/v2/mock/mock_external"
+	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
+	"github.com/hyperchain/go-hpc-rbft/v2/types"
 	txpoolmock "github.com/hyperchain/go-hpc-txpool/mock"
 
 	"github.com/golang/mock/gomock"
@@ -26,7 +26,7 @@ func TestRBFT_newRBFT(t *testing.T) {
 	defer ctrl.Finish()
 
 	pool := txpoolmock.NewMockTxPool(ctrl)
-	log := FrameworkNewRawLogger()
+	log := newRawLogger()
 	external := mockexternal.NewMockMinimalExternal(ctrl)
 
 	conf := Config{
@@ -43,10 +43,8 @@ func TestRBFT_newRBFT(t *testing.T) {
 		VcResendTimeout:         10 * time.Second,
 		CleanVCTimeout:          60 * time.Second,
 		NewViewTimeout:          8 * time.Second,
-		FirstRequestTimeout:     30 * time.Second,
 		SyncStateTimeout:        1 * time.Second,
 		SyncStateRestartTimeout: 10 * time.Second,
-		RecoveryTimeout:         10 * time.Second,
 		CheckPoolTimeout:        3 * time.Minute,
 
 		Logger:      log,
@@ -95,7 +93,6 @@ func TestRBFT_consensusMessageFilter(t *testing.T) {
 	assert.Equal(t, pb.Type_SYNC_STATE, sync.Type)
 	sync.Epoch = uint64(5)
 	rbfts[1].consensusMessageFilter(sync)
-	assert.Equal(t, 0, len(rbfts[1].epochMgr.checkOutOfEpoch))
 
 	tx := newTx()
 	rbfts[0].batchMgr.requestPool.AddNewRequests([]*protos.Transaction{tx}, false, true)
@@ -108,7 +105,6 @@ func TestRBFT_consensusMessageFilter(t *testing.T) {
 	assert.Equal(t, pb.Type_PRE_PREPARE, preprepMsg.Type)
 	preprepMsg.Epoch = uint64(5)
 	rbfts[1].consensusMessageFilter(preprepMsg)
-	assert.Equal(t, 1, len(rbfts[1].epochMgr.checkOutOfEpoch))
 }
 
 //============================================
@@ -190,6 +186,22 @@ func TestRBFT_reportStateUpdated(t *testing.T) {
 	assert.Equal(t, event, obj)
 }
 
+func TestRBFT_reportStableCheckpointFinished(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	_, rbfts := newBasicClusterInstance()
+	// in pending
+	rbfts[0].reportStableCheckpointFinished(20)
+	unlockCluster(rbfts)
+	// not in conf change
+	rbfts[0].reportStableCheckpointFinished(20)
+	rbfts[0].atomicOn(InConfChange)
+	rbfts[0].reportStableCheckpointFinished(20)
+	obj := <-rbfts[0].confChan
+	assert.EqualValues(t, 20, obj)
+}
+
 func TestRBFT_postMsg(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -245,6 +257,11 @@ func TestRBFT_getStatus(t *testing.T) {
 	assert.Equal(t, InConfChange, int(status.Status))
 	rbfts[0].atomicOff(InConfChange)
 
+	rbfts[0].atomicOn(inEpochSyncing)
+	status = rbfts[0].getStatus()
+	assert.Equal(t, InConfChange, int(status.Status))
+	rbfts[0].atomicOff(inEpochSyncing)
+
 	rbfts[0].on(Normal)
 	status = rbfts[0].getStatus()
 	assert.Equal(t, Normal, int(status.Status))
@@ -271,11 +288,6 @@ func TestRBFT_processNullRequset(t *testing.T) {
 	// If success process it, mode NeedSyncState will on
 	rbfts[0].on(Normal)
 
-	rbfts[0].atomicOn(InRecovery)
-	rbfts[0].processEvent(nullRequestMsg)
-	assert.Equal(t, false, rbfts[0].in(NeedSyncState))
-	rbfts[0].atomicOff(InRecovery)
-
 	rbfts[0].atomicOn(InViewChange)
 	rbfts[0].processEvent(nullRequestMsg)
 	assert.Equal(t, false, rbfts[0].in(NeedSyncState))
@@ -283,16 +295,6 @@ func TestRBFT_processNullRequset(t *testing.T) {
 
 	rbfts[0].processEvent(nullRequestMsg)
 	assert.Equal(t, true, rbfts[0].in(NeedSyncState))
-
-	// not primary
-	rbfts[1].on(NeedSyncState)
-	rbfts[0].processEvent(nullRequestMsg)
-	event := &LocalEvent{
-		Service:   CoreRbftService,
-		EventType: CoreFirstRequestTimerEvent,
-	}
-	rbfts[1].timerMgr.startTimer(firstRequestTimer, event)
-	assert.Equal(t, true, rbfts[1].timerMgr.getTimer(firstRequestTimer))
 }
 
 func TestRBFT_handleNullRequestTimerEvent(t *testing.T) {
@@ -300,12 +302,6 @@ func TestRBFT_handleNullRequestTimerEvent(t *testing.T) {
 	defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance()
-
-	rbfts[0].atomicOn(InRecovery)
-	rbfts[0].handleNullRequestTimerEvent()
-	assert.Equal(t, uint64(0), rbfts[0].view)
-	assert.Nil(t, nodes[0].broadcastMessageCache)
-	rbfts[0].atomicOff(InRecovery)
 
 	rbfts[0].atomicOn(InViewChange)
 	rbfts[0].handleNullRequestTimerEvent()
@@ -338,7 +334,7 @@ func TestRBFT_fetchMissingTxs(t *testing.T) {
 	}
 	rbfts[0].fetchMissingTxs(prePrep, missingTxHashes)
 
-	fetch := &pb.FetchMissingRequests{
+	fetch := &pb.FetchMissingRequest{
 		View:                 prePrep.View,
 		SequenceNumber:       prePrep.SequenceNumber,
 		BatchDigest:          prePrep.BatchDigest,
@@ -349,15 +345,42 @@ func TestRBFT_fetchMissingTxs(t *testing.T) {
 	assert.Equal(t, consensusMsg, nodes[0].unicastMessageCache)
 }
 
-func TestRBFT_start(t *testing.T) {
+func TestRBFT_start_cache_message(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	_, rbfts := newBasicClusterInstance()
+	assert.Equal(t, true, rbfts[0].atomicIn(Pending))
+	// unknown author.
+	errorMsg1 := &pb.ConsensusMessage{
+		Epoch: 1,
+		From:  10,
+		Type:  pb.Type_VIEW_CHANGE,
+	}
+	rbfts[0].step(errorMsg1)
+
+	// incorrect epoch
+	errorMsg2 := &pb.ConsensusMessage{
+		Epoch: 10,
+		From:  2,
+		Type:  pb.Type_VIEW_CHANGE,
+	}
+	rbfts[0].step(errorMsg2)
+
 	err := rbfts[0].start()
 	assert.Nil(t, err)
+	assert.Equal(t, false, rbfts[0].atomicIn(Pending))
 
-	assert.Equal(t, false, rbfts[0].in(Pending))
+	rbfts[0].atomicOn(inEpochSyncing)
+	correctMsg := &pb.ConsensusMessage{
+		From:  2,
+		Epoch: 1,
+		Type:  pb.Type_NULL_REQUEST,
+	}
+	rbfts[0].step(correctMsg)
+
+	rs := &pb.RequestSet{}
+	rbfts[0].postRequests(rs)
 }
 
 func TestRBFT_postConfState_NormalCase(t *testing.T) {
@@ -371,7 +394,7 @@ func TestRBFT_postConfState_NormalCase(t *testing.T) {
 		QuorumRouter: &r,
 	}
 	rbfts[0].postConfState(cc)
-	assert.Equal(t, 5, len(rbfts[0].peerPool.routerMap.HostMap))
+	assert.Equal(t, 5, len(rbfts[0].peerPool.router))
 }
 
 func TestRBFT_postConfState_NotExitInRouter(t *testing.T) {
@@ -506,9 +529,9 @@ func TestRBFT_recvPrePrepare_WrongSeqNo(t *testing.T) {
 
 	err := rbfts[1].recvPrePrepare(preprep)
 	assert.Nil(t, err)
-	assert.Equal(t, pb.Type_FETCH_MISSING_REQUESTS, nodes[1].unicastMessageCache.Type) // fetching missing tx for preprepare message
+	assert.Equal(t, pb.Type_FETCH_MISSING_REQUEST, nodes[1].unicastMessageCache.Type) // fetching missing tx for preprepare message
 
-	rbfts[1].recvSendMissingTxs(&pb.SendMissingRequests{
+	rbfts[1].recvFetchMissingResponse(&pb.FetchMissingResponse{
 		ReplicaId:      rbfts[0].peerPool.ID,
 		View:           rbfts[0].view,
 		SequenceNumber: uint64(1),
@@ -539,7 +562,7 @@ func TestRBFT_recvPrePrepare_WrongSeqNo(t *testing.T) {
 	assert.Equal(t, pb.Type_VIEW_CHANGE, nodes[1].broadcastMessageCache.Type)
 }
 
-func TestRBFT_recvFetchMissingTxs(t *testing.T) {
+func TestRBFT_recvFetchMissingResponse(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -559,7 +582,7 @@ func TestRBFT_recvFetchMissingTxs(t *testing.T) {
 	}
 	preprep.BatchDigest = calculateMD5Hash(preprep.HashBatch.RequestHashList, preprep.HashBatch.Timestamp)
 
-	fetch := &pb.FetchMissingRequests{
+	fetch := &pb.FetchMissingRequest{
 		View:                 preprep.View,
 		SequenceNumber:       preprep.SequenceNumber,
 		BatchDigest:          preprep.BatchDigest,
@@ -567,7 +590,7 @@ func TestRBFT_recvFetchMissingTxs(t *testing.T) {
 		ReplicaId:            rbfts[1].peerPool.ID,
 	}
 
-	err := rbfts[0].recvFetchMissingTxs(fetch)
+	err := rbfts[0].recvFetchMissingRequest(fetch)
 	assert.Nil(t, err)
 	assert.Nil(t, nodes[0].unicastMessageCache)
 
@@ -577,11 +600,11 @@ func TestRBFT_recvFetchMissingTxs(t *testing.T) {
 		SeqNo:           uint64(1),
 		LocalList:       []bool{true},
 	}
-	err = rbfts[0].recvFetchMissingTxs(fetch)
+	err = rbfts[0].recvFetchMissingRequest(fetch)
 	assert.Nil(t, err)
-	assert.Equal(t, pb.Type_SEND_MISSING_REQUESTS, nodes[0].unicastMessageCache.Type)
+	assert.Equal(t, pb.Type_FETCH_MISSING_RESPONSE, nodes[0].unicastMessageCache.Type)
 
-	re := &pb.SendMissingRequests{
+	re := &pb.FetchMissingResponse{
 		View:                 fetch.View,
 		SequenceNumber:       fetch.SequenceNumber,
 		BatchDigest:          fetch.BatchDigest,
@@ -592,7 +615,7 @@ func TestRBFT_recvFetchMissingTxs(t *testing.T) {
 
 	var ret consensusEvent
 	rbfts[1].exec.lastExec = uint64(10)
-	ret = rbfts[1].recvSendMissingTxs(re)
+	ret = rbfts[1].recvFetchMissingResponse(re)
 	assert.Nil(t, ret)
 
 	rbfts[1].storeMgr.missingBatchesInFetching[preprep.BatchDigest] = msgID{
@@ -601,29 +624,44 @@ func TestRBFT_recvFetchMissingTxs(t *testing.T) {
 		d: preprep.BatchDigest,
 	}
 	rbfts[1].exec.lastExec = uint64(10)
-	ret = rbfts[1].recvSendMissingTxs(re)
+	ret = rbfts[1].recvFetchMissingResponse(re)
 	assert.Nil(t, ret)
 
 	rbfts[1].exec.lastExec = uint64(0)
-	ret = rbfts[1].recvSendMissingTxs(re)
+	ret = rbfts[1].recvFetchMissingResponse(re)
 	assert.Nil(t, ret)
+
+	re.MissingRequestHashes = nil
+	ret = rbfts[1].recvFetchMissingResponse(re)
+	assert.Nil(t, ret)
+	re.MissingRequestHashes = fetch.MissingRequestHashes
+
+	re.View = 2
+	ret = rbfts[1].recvFetchMissingResponse(re)
+	assert.Nil(t, ret)
+	re.View = fetch.View
+
+	re.ReplicaId = 3
+	ret = rbfts[1].recvFetchMissingResponse(re)
+	assert.Nil(t, ret)
+	re.ReplicaId = 1
 
 	re.MissingRequests = map[uint64]*protos.Transaction{uint64(0): tx}
 	rbfts[1].exec.lastExec = uint64(0)
-	ret = rbfts[1].recvSendMissingTxs(re)
+	ret = rbfts[1].recvFetchMissingResponse(re)
 	assert.Nil(t, ret)
 
 	_ = rbfts[1].recvPrePrepare(preprep)
-	ret = rbfts[1].recvSendMissingTxs(re)
+	ret = rbfts[1].recvFetchMissingResponse(re)
 	assert.Equal(t, pb.Type_PREPARE, nodes[1].broadcastMessageCache.Type)
 	assert.Nil(t, ret)
 
 	cert := rbfts[1].storeMgr.getCert(re.View, re.SequenceNumber, re.BatchDigest)
 	cert.sentCommit = true
-	ret = rbfts[1].recvSendMissingTxs(re)
+	ret = rbfts[1].recvFetchMissingResponse(re)
 	assert.Nil(t, ret)
 
 	rbfts[1].setView(uint64(2))
-	ret = rbfts[1].recvSendMissingTxs(re)
+	ret = rbfts[1].recvFetchMissingResponse(re)
 	assert.Nil(t, ret)
 }

@@ -15,9 +15,9 @@
 package rbft
 
 import (
-	"github.com/hyperchain/go-hpc-rbft/external"
-	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
-	"github.com/hyperchain/go-hpc-rbft/types"
+	"github.com/hyperchain/go-hpc-rbft/v2/external"
+	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
+	"github.com/hyperchain/go-hpc-rbft/v2/types"
 )
 
 // peerPool maintains local peer ID which is the unique peer through the consensus network.
@@ -30,8 +30,14 @@ type peerPool struct {
 	// track local node's Host
 	hostname string
 
+	// track node's epoch number
+	epoch uint64
+
+	// track node's view number
+	view uint64
+
 	// track the vp router
-	routerMap routerMap
+	router map[uint64]string
 
 	// network helper to broadcast/unicast messages.
 	network external.Network
@@ -45,6 +51,7 @@ func newPeerPool(c Config) *peerPool {
 	pool := &peerPool{
 		ID:       c.ID,
 		hostname: c.Hostname,
+		epoch:    c.EpochInit,
 		network:  c.External,
 		logger:   c.Logger,
 	}
@@ -57,7 +64,7 @@ func (pool *peerPool) initPeers(peers []*types.Peer) {
 	pool.logger.Infof("Local ID: %d, update routerMap:", pool.ID)
 	length := len(peers)
 	preID := pool.ID
-	pool.routerMap.HostMap = make(map[string]uint64)
+	pool.router = make(map[uint64]string)
 	for _, p := range peers {
 		if p.ID > uint64(length) {
 			pool.logger.Errorf("Something wrong with peer[id=%d], peer id cannot be larger than peers' amount %d", p.ID, length)
@@ -67,7 +74,7 @@ func (pool *peerPool) initPeers(peers []*types.Peer) {
 			pool.ID = p.ID
 		}
 		pool.logger.Infof("ID: %d, Hostname: %s", p.ID, p.Hostname)
-		pool.routerMap.HostMap[p.Hostname] = p.ID
+		pool.router[p.ID] = p.Hostname
 	}
 	if preID != pool.ID {
 		pool.logger.Infof("Update Local ID: %d ===> %d", preID, pool.ID)
@@ -75,6 +82,10 @@ func (pool *peerPool) initPeers(peers []*types.Peer) {
 }
 
 func (pool *peerPool) broadcast(msg *pb.ConsensusMessage) {
+	msg.From = pool.ID
+	msg.Author = pool.hostname
+	msg.Epoch = pool.epoch
+	msg.View = pool.view
 	err := pool.network.Broadcast(msg)
 	if err != nil {
 		pool.logger.Errorf("Broadcast failed: %v", err)
@@ -83,6 +94,10 @@ func (pool *peerPool) broadcast(msg *pb.ConsensusMessage) {
 }
 
 func (pool *peerPool) unicast(msg *pb.ConsensusMessage, to uint64) {
+	msg.From = pool.ID
+	msg.Author = pool.hostname
+	msg.Epoch = pool.epoch
+	msg.View = pool.view
 	err := pool.network.Unicast(msg, to)
 	if err != nil {
 		pool.logger.Errorf("Unicast to %d failed: %v", to, err)
@@ -91,9 +106,13 @@ func (pool *peerPool) unicast(msg *pb.ConsensusMessage, to uint64) {
 }
 
 func (pool *peerPool) unicastByHostname(msg *pb.ConsensusMessage, to string) {
+	msg.From = pool.ID
+	msg.Author = pool.hostname
+	msg.Epoch = pool.epoch
+	msg.View = pool.view
 	err := pool.network.UnicastByHostname(msg, to)
 	if err != nil {
-		pool.logger.Errorf("Unicast to %d failed: %v", to, err)
+		pool.logger.Errorf("Unicast to %s failed: %v", to, err)
 		return
 	}
 }

@@ -36,6 +36,9 @@ func NewMockMinimalExternal(ctrl *gomock.Controller) *MockExternalStack {
 
 	mock.EXPECT().IsConfigBlock(gomock.Any()).Return(false).AnyTimes()
 	mock.EXPECT().GetLastCheckpoint().Return(nil).AnyTimes()
+	// TODO(DH): return meaningful value.
+	mock.EXPECT().GetCheckpointOfEpoch(gomock.Any()).Return(nil, nil).AnyTimes()
+	mock.EXPECT().VerifyEpochChangeProof(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
 	return mock
 }

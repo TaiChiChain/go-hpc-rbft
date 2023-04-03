@@ -17,7 +17,7 @@ package rbft
 import (
 	"fmt"
 
-	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
+	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
 	txpool "github.com/hyperchain/go-hpc-txpool"
 )
 
@@ -237,7 +237,7 @@ func (rbft *rbftImpl) findNextPrepareBatch(v uint64, n uint64, d string) error {
 		rbft.logger.Infof("Replica %d send prepare for no-op batch with view=%d/seqNo=%d", rbft.peerPool.ID, v, n)
 		return rbft.sendPrepare(v, n, d)
 	}
-	// when system restart or finished vc/recovery, we need to resend prepare for cert
+	// when system restart or finished vc, we need to resend prepare for cert
 	// with seqNo <= lastExec. However, those batches may have been deleted from requestPool,
 	// so we can get those batches from batchStore first.
 	if existBatch, ok := rbft.storeMgr.batchStore[d]; ok {
@@ -287,7 +287,7 @@ func (rbft *rbftImpl) findNextPrepareBatch(v uint64, n uint64, d string) error {
 // primaryResubmitTransactions tries to submit transactions for primary after abnormal
 // or stable checkpoint.
 func (rbft *rbftImpl) primaryResubmitTransactions() {
-	if rbft.isPrimary(rbft.peerPool.ID) && !rbft.atomicIn(InConfChange) {
+	if !rbft.atomicIn(InConfChange) {
 		// reset lastBatchTime for primary.
 		rbft.batchMgr.lastBatchTime = 0
 		rbft.logger.Debugf("======== Primary %d resubmit transactions", rbft.peerPool.ID)

@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/hyperchain/go-hpc-common/metrics/disabled"
-	mockexternal "github.com/hyperchain/go-hpc-rbft/mock/mock_external"
+	mockexternal "github.com/hyperchain/go-hpc-rbft/v2/mock/mock_external"
 	txpoolmock "github.com/hyperchain/go-hpc-txpool/mock"
 
 	"github.com/golang/mock/gomock"
@@ -12,7 +12,7 @@ import (
 )
 
 func newTestStatusNode(ctrl *gomock.Controller) *rbftImpl {
-	log := FrameworkNewRawLogger()
+	log := newRawLogger()
 	external := mockexternal.NewMockMinimalExternal(ctrl)
 	tx := txpoolmock.NewMockMinimalTxPool(ctrl)
 
@@ -31,7 +31,6 @@ func newTestStatusNode(ctrl *gomock.Controller) *rbftImpl {
 	}
 
 	rbft, _ := newRBFT(conf)
-
 	return rbft
 }
 
