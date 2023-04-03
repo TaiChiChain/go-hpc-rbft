@@ -89,14 +89,10 @@ func (tm *timerManager) newTimer(name string, d time.Duration) {
 			d = DefaultNewViewTimeout
 		case nullRequestTimer:
 			d = DefaultNullRequestTimeout
-		case firstRequestTimer:
-			d = DefaultFirstRequestTimeout
 		case syncStateRspTimer:
 			d = DefaultSyncStateRspTimeout
 		case syncStateRestartTimer:
 			d = DefaultSyncStateRestartTimeout
-		case recoveryRestartTimer:
-			d = DefaultRecoveryRestartTimeout
 		case cleanViewChangeTimer:
 			d = DefaultCleanViewChangeTimeout
 		case checkPoolTimer:
@@ -207,10 +203,8 @@ func (rbft *rbftImpl) initTimers() {
 	rbft.timerMgr.newTimer(vcResendTimer, rbft.config.VcResendTimeout)
 	rbft.timerMgr.newTimer(nullRequestTimer, rbft.config.NullRequestTimeout)
 	rbft.timerMgr.newTimer(newViewTimer, rbft.config.NewViewTimeout)
-	rbft.timerMgr.newTimer(firstRequestTimer, rbft.config.FirstRequestTimeout)
 	rbft.timerMgr.newTimer(syncStateRspTimer, rbft.config.SyncStateTimeout)
 	rbft.timerMgr.newTimer(syncStateRestartTimer, rbft.config.SyncStateRestartTimeout)
-	rbft.timerMgr.newTimer(recoveryRestartTimer, rbft.config.RecoveryTimeout)
 	rbft.timerMgr.newTimer(batchTimer, rbft.config.BatchTimeout)
 	rbft.timerMgr.newTimer(requestTimer, rbft.config.RequestTimeout)
 	rbft.timerMgr.newTimer(cleanViewChangeTimer, rbft.config.CleanVCTimeout)
@@ -324,7 +318,7 @@ func (rbft *rbftImpl) softStartHighWatermarkTimer(reason string) {
 	if hasStarted {
 		rbft.logger.Debugf("Replica %d has started new view timer before", rbft.peerPool.ID)
 	} else {
-		rbft.recoveryMgr.highWatermarkTimerReason = reason
+		rbft.highWatermarkTimerReason = reason
 	}
 }
 

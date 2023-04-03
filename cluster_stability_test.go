@@ -3,7 +3,7 @@ package rbft
 import (
 	"testing"
 
-	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
+	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
@@ -23,10 +23,10 @@ func TestCluster_MissingCheckpoint(t *testing.T) {
 	}
 
 	newPrimaryIndex := 1
-	var ntfMsgs []*pb.ConsensusMessage
-	recoveryDone := &LocalEvent{
-		Service:   RecoveryService,
-		EventType: RecoveryDoneEvent,
+	var vcMessages []*pb.ConsensusMessage
+	vcDone := &LocalEvent{
+		Service:   ViewChangeService,
+		EventType: ViewChangeDoneEvent,
 	}
 	for index := range rbfts {
 		event := &LocalEvent{
@@ -36,26 +36,27 @@ func TestCluster_MissingCheckpoint(t *testing.T) {
 		}
 		rbfts[index].processEvent(event)
 		ntf := nodes[index].broadcastMessageCache
-		assert.Equal(t, pb.Type_NOTIFICATION, ntf.Type)
-		ntfMsgs = append(ntfMsgs, ntf)
+		assert.Equal(t, pb.Type_VIEW_CHANGE, ntf.Type)
+		vcMessages = append(vcMessages, ntf)
 	}
 	for index := range rbfts {
-		for j := range ntfMsgs {
+		for j := range vcMessages {
 			if j == index {
 				continue
 			}
-			quorumRe := rbfts[index].processEvent(ntfMsgs[j])
-			if quorumRe != nil {
+			quorumVC := rbfts[index].processEvent(vcMessages[j])
+			if quorumVC != nil {
 				done := &LocalEvent{
-					Service:   RecoveryService,
-					EventType: NotificationQuorumEvent,
+					Service:   ViewChangeService,
+					EventType: ViewChangeQuorumEvent,
 				}
-				assert.Equal(t, done, quorumRe)
+				assert.Equal(t, done, quorumVC)
+
 				if index == newPrimaryIndex {
-					ev := rbfts[index].processEvent(quorumRe)
-					assert.Equal(t, recoveryDone, ev)
+					ev := rbfts[index].processEvent(quorumVC)
+					assert.Equal(t, vcDone, ev)
 				} else {
-					rbfts[index].processEvent(quorumRe)
+					rbfts[index].processEvent(quorumVC)
 				}
 				break
 			}
@@ -69,11 +70,11 @@ func TestCluster_MissingCheckpoint(t *testing.T) {
 			continue
 		}
 		ev := rbfts[index].processEvent(nv)
-		assert.Equal(t, recoveryDone, ev)
+		assert.Equal(t, vcDone, ev)
 	}
 
 	for index := range rbfts {
-		rbfts[index].processEvent(recoveryDone)
+		rbfts[index].processEvent(vcDone)
 	}
 
 	for index := range rbfts {
@@ -87,9 +88,9 @@ func TestCluster_CheckpointToViewChange(t *testing.T) {
 	// condition: 1) a cluster with 4 replicas, {node1, node2, node3, node4};
 	//            2) current view is 0, which means node1 is the primary;
 	//            2) every one finished the consensus on block n;
-	//            3) 3 of them, such as {node1, node3, node4}, have send the checkpoint;
-	//            4) last one, such as node2, hasn't send checkpoint yet
-	//            5) trigger view-change, and the node2, which hasn't send checkpoint, become the next leader
+	//            3) 3 of them, such as {node1, node3, node4}, have sent the checkpoint;
+	//            4) last one, such as node2 hasn't sent checkpoint yet
+	//            5) trigger view-change, and the node2, which hasn't sent checkpoint, become the next leader
 	// expected: for node2 should open the high-watermark timer
 	// ========================================================================================================
 
@@ -124,7 +125,7 @@ func TestCluster_CheckpointToViewChange(t *testing.T) {
 	}
 	vcDone := &LocalEvent{
 		Service:   ViewChangeService,
-		EventType: ViewChangedEvent,
+		EventType: ViewChangeDoneEvent,
 	}
 
 	var vcMsgSet []*pb.ConsensusMessage
@@ -171,7 +172,7 @@ func TestCluster_CheckpointToViewChange(t *testing.T) {
 	assert.True(t, rbfts[missingNodeIndex].timerMgr.getTimer(highWatermarkTimer))
 }
 
-func TestCluster_ReceiveNotificationBeforeStart(t *testing.T) {
+func TestCluster_ReceiveViewChangeBeforeStart(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -184,69 +185,66 @@ func TestCluster_ReceiveNotificationBeforeStart(t *testing.T) {
 	}
 
 	quorumEvent := &LocalEvent{
-		Service:   RecoveryService,
-		EventType: NotificationQuorumEvent,
+		Service:   ViewChangeService,
+		EventType: ViewChangeQuorumEvent,
 	}
 
 	doneEvent := &LocalEvent{
-		Service:   RecoveryService,
-		EventType: RecoveryDoneEvent,
+		Service:   ViewChangeService,
+		EventType: ViewChangeDoneEvent,
 	}
 
 	rbfts[0].atomicOff(Pending)
 	rbfts[0].processEvent(initRecoveryEvent)
 
-	ntfMsgNode1 := nodes[0].broadcastMessageCache
-	assert.Equal(t, pb.Type_NOTIFICATION, ntfMsgNode1.Type)
+	vcMsgNode1 := nodes[0].broadcastMessageCache
+	assert.Equal(t, pb.Type_VIEW_CHANGE, vcMsgNode1.Type)
 
 	// pending replicas receive message
 	for index := range rbfts {
 		if index == 0 {
 			continue
 		}
-		rbfts[index].node.Step(ntfMsgNode1)
+		rbfts[index].node.Step(vcMsgNode1)
 	}
 
 	rbfts[1].atomicOff(Pending)
-	rbfts[1].recoveryMgr.syncReceiver.Range(rbfts[1].readMap)
 	rbfts[1].processEvent(initRecoveryEvent)
 
-	ntfMsgNode2 := nodes[1].broadcastMessageCache
-	assert.Equal(t, pb.Type_NOTIFICATION, ntfMsgNode2.Type)
+	vcMsgNode2 := nodes[1].broadcastMessageCache
+	assert.Equal(t, pb.Type_VIEW_CHANGE, vcMsgNode2.Type)
 
 	// pending replicas receive message
 	for index := range rbfts {
 		if index == 0 || index == 1 {
 			continue
 		}
-		rbfts[index].node.Step(ntfMsgNode2)
+		rbfts[index].node.Step(vcMsgNode2)
 	}
 	// started replicas receive message
-	rbfts[0].processEvent(ntfMsgNode2)
+	rbfts[0].processEvent(vcMsgNode2)
 
 	rbfts[2].atomicOff(Pending)
-	rbfts[2].recoveryMgr.syncReceiver.Range(rbfts[2].readMap)
 	quorumNode3 := rbfts[2].processEvent(initRecoveryEvent)
 	assert.Equal(t, quorumEvent, quorumNode3)
 
-	ntfMsgNode3 := nodes[2].broadcastMessageCache
-	assert.Equal(t, pb.Type_NOTIFICATION, ntfMsgNode3.Type)
+	vcMsgNode3 := nodes[2].broadcastMessageCache
+	assert.Equal(t, pb.Type_VIEW_CHANGE, vcMsgNode3.Type)
 
 	// pending replicas receive message
 	for index := range rbfts {
 		if index == 0 || index == 1 || index == 2 {
 			continue
 		}
-		rbfts[index].node.Step(ntfMsgNode2)
+		rbfts[index].node.Step(vcMsgNode2)
 	}
 	// started replicas receive message
-	quorumNode1 := rbfts[0].processEvent(ntfMsgNode3)
+	quorumNode1 := rbfts[0].processEvent(vcMsgNode3)
 	assert.Equal(t, quorumEvent, quorumNode1)
-	quorumNode2 := rbfts[1].processEvent(ntfMsgNode3)
+	quorumNode2 := rbfts[1].processEvent(vcMsgNode3)
 	assert.Equal(t, quorumEvent, quorumNode2)
 
 	rbfts[3].atomicOff(Pending)
-	rbfts[3].recoveryMgr.syncReceiver.Range(rbfts[3].readMap)
 	quorumNode4 := rbfts[3].processEvent(initRecoveryEvent)
 	assert.Equal(t, quorumEvent, quorumNode4)
 
@@ -332,7 +330,7 @@ func TestCluster_ViewChange_StateUpdate_Timeout_StateUpdated_Replica(t *testing.
 
 	vcDone := &LocalEvent{
 		Service:   ViewChangeService,
-		EventType: ViewChangedEvent,
+		EventType: ViewChangeDoneEvent,
 	}
 	for index := range rbfts {
 		if index == 1 {
@@ -448,7 +446,7 @@ func TestCluster_ViewChange_StateUpdate_Timeout_StateUpdated_Primary(t *testing.
 
 	vcDone := &LocalEvent{
 		Service:   ViewChangeService,
-		EventType: ViewChangedEvent,
+		EventType: ViewChangeDoneEvent,
 	}
 	for index := range rbfts {
 		if index == 3 {
@@ -513,16 +511,16 @@ func TestCluster_Checkpoint_in_StateUpdating(t *testing.T) {
 		}
 	}
 
-	notificationMsg := nodes[1].broadcastMessageCache
-	assert.Equal(t, pb.Type_NOTIFICATION, notificationMsg.Type)
+	vcMsg := nodes[1].broadcastMessageCache
+	assert.Equal(t, pb.Type_VIEW_CHANGE, vcMsg.Type)
 
 	for index := range rbfts {
 		if index == 1 {
 			continue
 		}
-		rbfts[index].processEvent(notificationMsg)
+		rbfts[index].processEvent(vcMsg)
 		rsp := nodes[index].unicastMessageCache
-		assert.Equal(t, pb.Type_NOTIFICATION_RESPONSE, rsp.Type)
+		assert.Equal(t, pb.Type_RECOVERY_RESPONSE, rsp.Type)
 		rbfts[1].processEvent(rsp)
 	}
 
@@ -594,66 +592,66 @@ func TestCluster_InitRecovery(t *testing.T) {
 		Event:     uint64(0),
 	}
 
-	// replica 2&3 process init recovery directly and broadcast notification in view=1
+	// replica 2&3 process init recovery directly and broadcast recovery view change in view=1
 	rbfts[1].processEvent(init)
 	rbfts[2].processEvent(init)
-	notifications := make([]*pb.ConsensusMessage, len(nodes))
-	notifications[1] = nodes[1].broadcastMessageCache
-	assert.Equal(t, pb.Type_NOTIFICATION, notifications[1].Type)
-	notifications[2] = nodes[2].broadcastMessageCache
-	assert.Equal(t, pb.Type_NOTIFICATION, notifications[2].Type)
+	recoveryVCs := make([]*pb.ConsensusMessage, len(nodes))
+	recoveryVCs[1] = nodes[1].broadcastMessageCache
+	assert.Equal(t, pb.Type_VIEW_CHANGE, recoveryVCs[1].Type)
+	recoveryVCs[2] = nodes[2].broadcastMessageCache
+	assert.Equal(t, pb.Type_VIEW_CHANGE, recoveryVCs[2].Type)
 
-	// replica 1 received notifications from 2&3 and generate a notification in view=1
-	rbfts[0].processEvent(notifications[1])
-	quorum0 := rbfts[0].processEvent(notifications[2])
-	assert.Equal(t, NotificationQuorumEvent, quorum0.(*LocalEvent).EventType)
-	notifications[0] = nodes[0].broadcastMessageCache
-	assert.Equal(t, pb.Type_NOTIFICATION, notifications[0].Type)
+	// replica 1 received recoveryVCs from 2&3 and generate a recovery view change in view=1
+	rbfts[0].processEvent(recoveryVCs[1])
+	quorum0 := rbfts[0].processEvent(recoveryVCs[2])
+	assert.Equal(t, ViewChangeQuorumEvent, quorum0.(*LocalEvent).EventType)
+	recoveryVCs[0] = nodes[0].broadcastMessageCache
+	assert.Equal(t, pb.Type_VIEW_CHANGE, recoveryVCs[0].Type)
 
-	// delayed timeout for init recovery event on replica 1
-	// we should reject it
+	// delayed some time for init recovery event on replica 1
+	// replica 1 should reject init recovery event
 	assert.Equal(t, uint64(1), rbfts[0].view)
 	rbfts[0].processEvent(init)
 	assert.Equal(t, uint64(1), rbfts[0].view)
 
-	// replica 4 received notifications from 2&3 and generate a notification in view=1
-	rbfts[3].processEvent(notifications[1])
-	quorum3 := rbfts[3].processEvent(notifications[2])
-	assert.Equal(t, NotificationQuorumEvent, quorum3.(*LocalEvent).EventType)
-	notifications[3] = nodes[3].broadcastMessageCache
-	assert.Equal(t, pb.Type_NOTIFICATION, notifications[3].Type)
+	// replica 4 received recoveryVCs from 2&3 and generate a recovery view change in view=1
+	rbfts[3].processEvent(recoveryVCs[1])
+	quorum3 := rbfts[3].processEvent(recoveryVCs[2])
+	assert.Equal(t, ViewChangeQuorumEvent, quorum3.(*LocalEvent).EventType)
+	recoveryVCs[3] = nodes[3].broadcastMessageCache
+	assert.Equal(t, pb.Type_VIEW_CHANGE, recoveryVCs[3].Type)
 
-	// delayed timeout for init recovery event on replica 4
-	// we should reject it
+	// delayed some time for init recovery event on replica 4
+	// replica 4 should reject init recovery event
 	assert.Equal(t, uint64(1), rbfts[3].view)
 	rbfts[0].processEvent(init)
 	assert.Equal(t, uint64(1), rbfts[3].view)
 
-	// replica 1 receives notifications
-	rbfts[0].processEvent(notifications[3])
+	// replica 1 receives recoveryVCs
+	rbfts[0].processEvent(recoveryVCs[3])
 
-	// replica 2 receives notifications
-	rbfts[1].processEvent(notifications[0])
-	quorum1 := rbfts[1].processEvent(notifications[2])
-	assert.Equal(t, NotificationQuorumEvent, quorum1.(*LocalEvent).EventType)
-	rbfts[1].processEvent(notifications[3])
+	// replica 2 receives recoveryVCs
+	rbfts[1].processEvent(recoveryVCs[0])
+	quorum1 := rbfts[1].processEvent(recoveryVCs[2])
+	assert.Equal(t, ViewChangeQuorumEvent, quorum1.(*LocalEvent).EventType)
+	rbfts[1].processEvent(recoveryVCs[3])
 
-	// replica 3 receives notifications
-	rbfts[2].processEvent(notifications[0])
-	quorum2 := rbfts[2].processEvent(notifications[1])
-	assert.Equal(t, NotificationQuorumEvent, quorum2.(*LocalEvent).EventType)
-	rbfts[2].processEvent(notifications[3])
+	// replica 3 receives recoveryVCs
+	rbfts[2].processEvent(recoveryVCs[0])
+	quorum2 := rbfts[2].processEvent(recoveryVCs[1])
+	assert.Equal(t, ViewChangeQuorumEvent, quorum2.(*LocalEvent).EventType)
+	rbfts[2].processEvent(recoveryVCs[3])
 
-	// replica 4 receives notifications
-	rbfts[3].processEvent(notifications[0])
+	// replica 4 receives recoveryVCs
+	rbfts[3].processEvent(recoveryVCs[0])
 
-	// notification quorum event
-	quorumNotification := &LocalEvent{Service: RecoveryService, EventType: NotificationQuorumEvent}
+	// view change quorum event
+	quorumVC := &LocalEvent{Service: ViewChangeService, EventType: ViewChangeQuorumEvent}
 	for index := range rbfts {
-		finished := rbfts[index].processEvent(quorumNotification)
+		finished := rbfts[index].processEvent(quorumVC)
 
 		if index == 1 {
-			assert.Equal(t, RecoveryDoneEvent, finished.(*LocalEvent).EventType)
+			assert.Equal(t, ViewChangeDoneEvent, finished.(*LocalEvent).EventType)
 		}
 	}
 
@@ -667,11 +665,11 @@ func TestCluster_InitRecovery(t *testing.T) {
 		}
 
 		finished := rbfts[index].processEvent(newView)
-		assert.Equal(t, RecoveryDoneEvent, finished.(*LocalEvent).EventType)
+		assert.Equal(t, ViewChangeDoneEvent, finished.(*LocalEvent).EventType)
 	}
 
 	// recovery done event
-	done := &LocalEvent{Service: RecoveryService, EventType: RecoveryDoneEvent}
+	done := &LocalEvent{Service: ViewChangeService, EventType: ViewChangeDoneEvent}
 	for index := range rbfts {
 		rbfts[index].processEvent(done)
 	}

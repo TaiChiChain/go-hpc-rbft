@@ -16,8 +16,8 @@ package external
 
 import (
 	"github.com/hyperchain/go-hpc-common/types/protos"
-	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
-	"github.com/hyperchain/go-hpc-rbft/types"
+	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
+	"github.com/hyperchain/go-hpc-rbft/v2/types"
 )
 
 // Storage is an interface that should be implemented by the application using non-volatile
@@ -81,17 +81,23 @@ type EpochService interface {
 	// GetNodeInfos returns the full node info with public key.
 	GetNodeInfos() []*protos.NodeInfo
 
-	// GetAlgorithmVersion returns current algorithm version
+	// GetAlgorithmVersion returns current algorithm version.
 	GetAlgorithmVersion() string
 
 	// GetEpoch returns the current epoch.
 	GetEpoch() uint64
 
-	// IsConfigBlock returns if the block at height is config block .
+	// IsConfigBlock returns if the block at height is config block.
 	IsConfigBlock(height uint64) bool
 
-	// GetLastCheckpoint return the last QuorumCheckpoint in ledger
+	// GetLastCheckpoint return the last QuorumCheckpoint in ledger.
 	GetLastCheckpoint() *protos.QuorumCheckpoint
+
+	// GetCheckpointOfEpoch gets checkpoint of given epoch.
+	GetCheckpointOfEpoch(epoch uint64) (*protos.QuorumCheckpoint, error)
+
+	// VerifyEpochChangeProof verifies the proof is correctly chained with known validator verifier.
+	VerifyEpochChangeProof(proof *protos.EpochChangeProof, validators protos.Validators) error
 }
 
 // ExternalStack integrates all external interfaces which must be implemented by application users.

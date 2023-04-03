@@ -17,79 +17,41 @@ syntax = "proto3";
 import "github.com/hyperchain/go-hpc-common/types/protos/transaction.proto";
 import "github.com/hyperchain/go-hpc-common/types/protos/checkpoint.proto";
 
-package rbftpb;
+package rbftpbV2;
 
 enum Type {
     NULL_REQUEST = 0;
     PRE_PREPARE = 1;
     PREPARE = 2;
     COMMIT = 3;
-    SIGNED_CHECKPOINT = 4;
-    FETCH_CHECKPOINT = 5;
-    VIEW_CHANGE = 6;
-    NEW_VIEW = 7;
-    FETCH_REQUEST_BATCH = 8;
-    SEND_REQUEST_BATCH = 9;
-    RECOVERY_FETCH_QPC = 10;
-    RECOVERY_RETURN_QPC = 11;
-    FETCH_MISSING_REQUESTS = 12;
-    SEND_MISSING_REQUESTS = 13;
-    SYNC_STATE = 14;
-    SYNC_STATE_RESPONSE = 15;
-    NOTIFICATION = 16;
-    NOTIFICATION_RESPONSE = 17;
-    REQUEST_SET = 18;
+    REQUEST_SET = 4;
+    SIGNED_CHECKPOINT = 5;
+    FETCH_CHECKPOINT = 6;
+    VIEW_CHANGE = 7;
+    QUORUM_VIEW_CHANGE = 8;
+    NEW_VIEW = 9;
+    FETCH_VIEW = 10;
+    RECOVERY_RESPONSE = 11;
+    FETCH_BATCH_REQUEST = 12;
+    FETCH_BATCH_RESPONSE = 13;
+    FETCH_PQC_REQUEST = 14;
+    FETCH_PQC_RESPONSE = 15;
+    FETCH_MISSING_REQUEST = 16;
+    FETCH_MISSING_RESPONSE = 17;
+    SYNC_STATE = 18;
+    SYNC_STATE_RESPONSE = 19;
+    EPOCH_CHANGE_REQUEST = 20;
+    EPOCH_CHANGE_PROOF = 21;
 }
 
 message consensus_message {
     Type type = 1;
     uint64 from = 2;
-    uint64 to = 3;
-    uint64 epoch = 4;
-    bytes payload = 5;
-}
-
-message request_batch {
-    repeated string request_hash_list = 1;
-    repeated protos.Transaction request_list = 2;
-    int64 timestamp = 3;
-    uint64 seq_no = 4;
-    repeated bool local_list = 5;
-    string batch_hash = 6;
-}
-
-message hash_batch {
-    repeated string request_hash_list = 1;
-    repeated string de_duplicate_request_hash_list = 2;
-    int64 timestamp = 3;
-}
-
-message send_request_batch {
-    uint64 replica_id = 1;
-    request_batch batch = 2;
-    string batch_digest = 3;
-}
-
-message fetch_missing_requests {
-    uint64 replica_id = 1;
-    uint64 view = 2;
-    uint64 sequence_number = 3;
-    string batch_digest = 4;
-    map<uint64, string> missing_request_hashes = 5;
-}
-
-message send_missing_requests {
-    uint64 replica_id = 1;
-    uint64 view = 2;
-    uint64 sequence_number = 3;
-    string batch_digest = 4;
-    map<uint64, string> missing_request_hashes = 5;
-    map<uint64, protos.Transaction> missing_requests = 6;
-}
-
-message request_set {
-    repeated protos.Transaction requests = 1;
-    bool local = 2;
+    string author = 3;
+    uint64 to = 4;
+    uint64 epoch = 5;
+    uint64 view = 6;
+    bytes payload = 7;
 }
 
 message null_request {
@@ -118,20 +80,42 @@ message commit {
     string batch_digest = 4;
 }
 
+message request_set {
+    repeated protos.Transaction requests = 1;
+    bool local = 2;
+}
+
+message hash_batch {
+    repeated string request_hash_list = 1;
+    repeated string de_duplicate_request_hash_list = 2;
+    int64 timestamp = 3;
+}
+
 message signed_checkpoint {
-    node_info node_info = 1;
+    string author = 1;
     protos.Checkpoint checkpoint = 2;
     bytes signature = 3;
 }
 
 message fetch_checkpoint {
-    string replica_host = 1;
+    uint64 replica_id = 1;
     uint64 sequence_number = 2;
 }
 
-message vc_C {
-    uint64 sequence_number = 1;
-    string digest = 2;
+message view_change {
+    bytes basis = 1;
+    bytes    signature = 2;
+    int64    timestamp = 3;
+    bool recovery = 4;
+}
+
+message vc_basis {
+    uint64   replica_id = 1;
+    uint64   view = 2;
+    uint64   h = 3;
+    repeated vc_PQ pset = 4;
+    repeated vc_PQ qset = 5;
+    repeated signed_checkpoint cset = 6;
 }
 
 message vc_PQ {
@@ -140,44 +124,96 @@ message vc_PQ {
     uint64 view = 3;
 }
 
-message vc_basis {
+message quorum_view_change {
     uint64   replica_id = 1;
-    uint64   view = 2;
-    uint64   h = 3;
-    repeated vc_C cset = 4;
-    repeated vc_PQ pset = 5;
-    repeated vc_PQ qset = 6;
-    repeated signed_checkpoint signed_checkpoints = 7;
-}
-
-message view_change {
-    vc_basis basis = 1;
-    bytes    signature = 2;
-    int64    timestamp = 3;
+    repeated view_change view_changes = 2;
 }
 
 message new_view {
     uint64 replica_id = 1;
     uint64 view = 2;
-    map<uint64, string> xset = 3;
-    repeated vc_basis bset = 4;
+    repeated vc_PQ xset = 3;
+    quorum_view_change view_change_set = 4;
+    bytes    signature = 5;
 }
 
-message fetch_request_batch {
+message fetch_view {
+    uint64 replica_id = 1;
+    uint64 view = 2;
+}
+
+message recovery_response {
+    new_view new_view = 1;
+    signed_checkpoint initial_checkpoint = 2;
+}
+
+message fetch_batch_request {
     uint64 replica_id = 1;
     string batch_digest = 2;
 }
 
-message recovery_fetchPQC {
+message fetch_batch_response {
+    uint64 replica_id = 1;
+    request_batch batch = 2;
+    string batch_digest = 3;
+}
+
+message request_batch {
+    repeated string request_hash_list = 1;
+    repeated protos.Transaction request_list = 2;
+    int64 timestamp = 3;
+    uint64 seq_no = 4;
+    repeated bool local_list = 5;
+    string batch_hash = 6;
+}
+
+message fetch_missing_request {
+    uint64 replica_id = 1;
+    uint64 view = 2;
+    uint64 sequence_number = 3;
+    string batch_digest = 4;
+    map<uint64, string> missing_request_hashes = 5;
+}
+
+message fetch_missing_response {
+    uint64 replica_id = 1;
+    uint64 view = 2;
+    uint64 sequence_number = 3;
+    string batch_digest = 4;
+    map<uint64, string> missing_request_hashes = 5;
+    map<uint64, protos.Transaction> missing_requests = 6;
+}
+
+message fetchPQC_request {
     uint64 replica_id = 1;
     uint64 h = 2;
 }
 
-message recovery_returnPQC {
+message fetchPQC_response {
     uint64   replica_id = 1;
     repeated pre_prepare prepre_set = 2;
     repeated prepare pre_set = 3;
     repeated commit cmt_set = 4;
+}
+
+message sync_state {
+    uint64 replica_id = 1;
+}
+
+message sync_state_response {
+    uint64 replica_id = 1;
+    uint64 view = 2;
+    signed_checkpoint signed_checkpoint = 3;
+}
+
+// EpochChangeRequest is used to get a EpochChangeProof from start_epoch to target_epoch.
+message EpochChangeRequest {
+    // Author of the request.
+    string author = 1;
+    // The start epoch for the request.
+    uint64 start_epoch = 2;
+    // The target epoch for the request
+    uint64 target_epoch = 3;
 }
 
 message Pset {
@@ -186,33 +222,4 @@ message Pset {
 
 message Cset {
     repeated commit set = 1;
-}
-
-message node_info {
-    uint64 replica_id = 1;
-    string replica_host = 2;
-}
-
-message sync_state {
-    node_info node_info = 1;
-    uint64 epoch = 2;
-}
-
-message sync_state_response {
-    uint64 view = 1;
-    signed_checkpoint signed_checkpoint = 2;
-}
-
-message notification {
-    vc_basis  basis = 1;
-    uint64    epoch = 2;
-    bytes     signature = 3;
-    int64     timestamp = 4;
-    node_info node_info = 5;
-}
-
-message notification_response {
-    vc_basis  basis = 1;
-    uint64    epoch = 2;
-    node_info node_info = 3;
 }

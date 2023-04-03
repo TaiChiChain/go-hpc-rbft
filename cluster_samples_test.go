@@ -3,7 +3,7 @@ package rbft
 import (
 	"testing"
 
-	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
+	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
@@ -57,7 +57,7 @@ func TestCluster_SendTx_InitCtx(t *testing.T) {
 	assert.Equal(t, uint64(60), rbfts[3].exec.lastExec)
 }
 
-func TestCluster_SyncSmallEpochWithCheckpoint(t *testing.T) {
+func TestCluster_SyncEpochThenSyncBlockWithCheckpoint(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -92,40 +92,75 @@ func TestCluster_SyncSmallEpochWithCheckpoint(t *testing.T) {
 		}
 	}
 
-	ntfMsg := nodes[2].broadcastMessageCache
-	assert.Equal(t, pb.Type_NOTIFICATION, ntfMsg.Type)
+	// lagging node start retrieve epoch change proof.
+	epochRequestMsg := nodes[2].unicastMessageCache
+	assert.Equal(t, pb.Type_EPOCH_CHANGE_REQUEST, epochRequestMsg.Type)
 
 	var rspList []*pb.ConsensusMessage
 	for index := range rbfts {
 		if index == 2 {
 			continue
 		}
-		rbfts[index].processEvent(ntfMsg)
+		// response epoch change proof.
+		rbfts[index].processEvent(epochRequestMsg)
 		rspMsg := nodes[index].unicastMessageCache
-		assert.Equal(t, pb.Type_NOTIFICATION_RESPONSE, rspMsg.Type)
+		assert.Equal(t, pb.Type_EPOCH_CHANGE_PROOF, rspMsg.Type)
 		rspList = append(rspList, rspMsg)
 	}
 
+	// process epoch change proof and enter sync chain.
 	for _, rsp := range rspList {
-		rbfts[2].processEvent(rsp)
+		ev := rbfts[2].processEvent(rsp)
+		if ev != nil {
+			assert.Equal(t, EpochSyncEvent, ev.(*LocalEvent).EventType)
+			rbfts[2].processEvent(ev)
+			break
+		}
 	}
-	// first state update to 50( which is larger than initial high watermark 40)
+	// first state update to 1(last epoch change height), then trigger recovery view change.
 	ev := <-rbfts[2].recvChan
 	rbfts[2].processEvent(ev)
+	assert.Equal(t, uint64(2), rbfts[2].epoch)
+	assert.Equal(t, uint64(1), rbfts[2].h)
+	rvc := nodes[2].broadcastMessageCache
+	// try recovery view change after epoch change.
+	assert.Equal(t, pb.Type_VIEW_CHANGE, rvc.Type)
+	var newViewRspList []*pb.ConsensusMessage
+	for index := range rbfts {
+		if index == 2 {
+			continue
+		}
+		// response fetch view response.
+		rbfts[index].processEvent(rvc)
+		rspMsg := nodes[index].unicastMessageCache
+		assert.Equal(t, pb.Type_RECOVERY_RESPONSE, rspMsg.Type)
+		newViewRspList = append(newViewRspList, rspMsg)
+	}
+
+	// process fetch view response and enter sync chain.
+	for _, rsp := range newViewRspList {
+		ev = rbfts[2].processEvent(rsp)
+		if ev != nil {
+			assert.Equal(t, ViewChangeDoneEvent, ev.(*LocalEvent).EventType)
+			rbfts[2].processEvent(ev)
+			break
+		}
+	}
+
 	// then state update to 60
 	ev = <-rbfts[2].recvChan
 	rbfts[2].processEvent(ev)
-	assert.Equal(t, uint64(2), rbfts[2].epoch)
 	assert.Equal(t, uint64(60), rbfts[2].h)
 }
 
-func TestCluster_SyncLargeEpochWithCheckpoint(t *testing.T) {
+func TestCluster_SyncBlockThenSyncEpochWithCheckpoint(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance()
 	unlockCluster(rbfts)
 
+	// normal nodes execute normal txs to height 50.
 	var retMessageSet []map[pb.Type][]*pb.ConsensusMessage
 	for i := 0; i < 5; i++ {
 		tx := newTx()
@@ -135,9 +170,7 @@ func TestCluster_SyncLargeEpochWithCheckpoint(t *testing.T) {
 		retMessageSet = append(retMessageSet, retMessages)
 	}
 
-	ctx := newCTX(defaultValidatorSet)
-	retMessagesCtx := executeExceptN(t, rbfts, nodes, ctx, true, 2)
-
+	// node2 receives checkpoints of height 50 and trigger vc and sync chain.
 	for _, retMessages := range retMessageSet {
 		for index, chkpt := range retMessages[pb.Type_SIGNED_CHECKPOINT] {
 			if index == 2 {
@@ -147,36 +180,81 @@ func TestCluster_SyncLargeEpochWithCheckpoint(t *testing.T) {
 		}
 	}
 
-	for index, chkpt := range retMessagesCtx[pb.Type_SIGNED_CHECKPOINT] {
+	vcMsg := nodes[2].broadcastMessageCache
+	assert.Equal(t, pb.Type_VIEW_CHANGE, vcMsg.Type)
+
+	// first state update to 50(last checkpoint height).
+	ev := <-rbfts[2].recvChan
+	rbfts[2].processEvent(ev)
+	assert.Equal(t, uint64(1), rbfts[2].epoch)
+	assert.Equal(t, uint64(50), rbfts[2].h)
+
+	// normal nodes execute config txs to height 51 and broadcast recovery vc to view
+	// change.
+	ctx := newCTX(defaultValidatorSet)
+	retMessagesCtx := executeExceptN(t, rbfts, nodes, ctx, true, 2)
+
+	// node2 receives recovery view change and found self's epoch behind.
+	for index, recoveryVCS := range retMessagesCtx[pb.Type_VIEW_CHANGE] {
 		if index == 2 {
 			continue
 		}
-		rbfts[2].processEvent(chkpt)
+		rbfts[2].processEvent(recoveryVCS)
 	}
 
-	ntfMsg := nodes[2].broadcastMessageCache
-	assert.Equal(t, pb.Type_NOTIFICATION, ntfMsg.Type)
+	// lagging node start retrieve epoch change proof.
+	epochRequestMsg := nodes[2].unicastMessageCache
+	assert.Equal(t, pb.Type_EPOCH_CHANGE_REQUEST, epochRequestMsg.Type)
 
 	var rspList []*pb.ConsensusMessage
 	for index := range rbfts {
 		if index == 2 {
 			continue
 		}
-		rbfts[index].processEvent(ntfMsg)
+		// response epoch change proof.
+		rbfts[index].processEvent(epochRequestMsg)
 		rspMsg := nodes[index].unicastMessageCache
-		assert.Equal(t, pb.Type_NOTIFICATION_RESPONSE, rspMsg.Type)
+		assert.Equal(t, pb.Type_EPOCH_CHANGE_PROOF, rspMsg.Type)
 		rspList = append(rspList, rspMsg)
 	}
 
+	// process epoch change proof and enter sync chain.
 	for _, rsp := range rspList {
-		rbfts[2].processEvent(rsp)
+		ev := rbfts[2].processEvent(rsp)
+		if ev != nil {
+			assert.Equal(t, EpochSyncEvent, ev.(*LocalEvent).EventType)
+			rbfts[2].processEvent(ev)
+			break
+		}
 	}
-	// first state update to 50( which is larger than initial high watermark 40)
-	ev := <-rbfts[2].recvChan
-	rbfts[2].processEvent(ev)
-	// then state update to 51
+	// first state update to 1(last epoch change height), then trigger recovery view change.
 	ev = <-rbfts[2].recvChan
 	rbfts[2].processEvent(ev)
 	assert.Equal(t, uint64(2), rbfts[2].epoch)
-	assert.Equal(t, uint64(51), rbfts[2].exec.lastExec)
+	assert.Equal(t, uint64(51), rbfts[2].h)
+	rvc := nodes[2].broadcastMessageCache
+	// try recovery view change after epoch change.
+	assert.Equal(t, pb.Type_VIEW_CHANGE, rvc.Type)
+	var newViewRspList []*pb.ConsensusMessage
+	for index := range rbfts {
+		if index == 2 {
+			continue
+		}
+		// response fetch view response.
+		rbfts[index].processEvent(rvc)
+		rspMsg := nodes[index].unicastMessageCache
+		assert.Equal(t, pb.Type_RECOVERY_RESPONSE, rspMsg.Type)
+		newViewRspList = append(newViewRspList, rspMsg)
+	}
+
+	// process fetch view response and enter sync chain.
+	for _, rsp := range newViewRspList {
+		ev = rbfts[2].processEvent(rsp)
+		if ev != nil {
+			assert.Equal(t, ViewChangeDoneEvent, ev.(*LocalEvent).EventType)
+			rbfts[2].processEvent(ev)
+			break
+		}
+	}
+
 }

@@ -18,8 +18,8 @@ import (
 	"sync"
 
 	"github.com/hyperchain/go-hpc-common/types/protos"
-	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
-	"github.com/hyperchain/go-hpc-rbft/types"
+	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
+	"github.com/hyperchain/go-hpc-rbft/v2/types"
 )
 
 // Node represents a node in a RBFT cluster.
@@ -31,9 +31,6 @@ type Node interface {
 	// Propose proposes requests to RBFT core, requests are ensured to be eventually
 	// submitted to all non-fault nodes unless current node crash down.
 	Propose(requests *pb.RequestSet) error
-	// ProposeConfChange proposes config change.
-	// Application needs to call ApplyConfChange when applying EntryConfChange type entry.
-	ProposeConfChange(cc *types.ConfChange) error
 	// Step advances the state machine using the given message.
 	Step(msg *pb.ConsensusMessage)
 	// ApplyConfChange applies config change to the local node.
@@ -78,10 +75,6 @@ type node struct {
 	stateLock sync.RWMutex
 	// currentState maintains the current application service state.
 	currentState *types.ServiceState
-	// cpChan is used between node and RBFT service to deliver checkpoint state.
-	cpChan chan *types.ServiceState
-	// confChan is used to track if config checkpoint has been processed successfully.
-	confChan chan uint64
 
 	config Config
 	logger Logger
@@ -94,20 +87,15 @@ func NewNode(conf Config) (Node, error) {
 
 // newNode help to initialize a Node service.
 func newNode(conf Config) (*node, error) {
-	cpChan := make(chan *types.ServiceState)
-	confC := make(chan uint64)
-
-	rbft, err := newRBFT(cpChan, confC, conf)
+	rbft, err := newRBFT(conf)
 	if err != nil {
 		return nil, err
 	}
 
 	n := &node{
-		rbft:     rbft,
-		cpChan:   cpChan,
-		confChan: confC,
-		config:   conf,
-		logger:   conf.Logger,
+		rbft:   rbft,
+		config: conf,
+		logger: conf.Logger,
 	}
 
 	rbft.node = n
@@ -127,20 +115,7 @@ func (n *node) Start() error {
 
 // Stop stops a Node instance.
 func (n *node) Stop() []*protos.Transaction {
-	select {
-	case <-n.cpChan:
-	default:
-	}
-	n.logger.Notice("close channel: checkpoint")
-	close(n.cpChan)
-
-	select {
-	case <-n.confChan:
-	default:
-	}
-	n.logger.Notice("close channel: config")
-	close(n.confChan)
-
+	// stop RBFT core.
 	remainTxs := n.rbft.stop()
 
 	n.stateLock.Lock()
@@ -155,12 +130,6 @@ func (n *node) Stop() []*protos.Transaction {
 func (n *node) Propose(requests *pb.RequestSet) error {
 	n.rbft.postRequests(requests)
 
-	return nil
-}
-
-// ProposeConfChange proposes config change.
-// Application needs to call ApplyConfChange when applying EntryConfChange type entry.
-func (n *node) ProposeConfChange(cc *types.ConfChange) error {
 	return nil
 }
 
@@ -196,10 +165,7 @@ func (n *node) ReportExecuted(state *types.ServiceState) {
 	n.stateLock.Unlock()
 
 	// a config transaction executed or checkpoint, send state to checkpoint channel
-	if !n.rbft.atomicIn(Pending) && n.rbft.readConfigBatchToExecute() == state.MetaState.Height || state.MetaState.Height%n.config.K == 0 && n.cpChan != nil {
-		n.logger.Debugf("Report checkpoint: {%d, %s} to RBFT core", state.MetaState.Height, state.MetaState.Digest)
-		n.cpChan <- state
-	}
+	n.rbft.reportCheckpoint(state)
 }
 
 // ReportStateUpdated reports to RBFT core that application service has finished one desired StateUpdate
@@ -221,11 +187,7 @@ func (n *node) ReportStateUpdated(state *types.ServiceState) {
 // ReportStableCheckpointFinished reports stable checkpoint event has been processed successfully.
 func (n *node) ReportStableCheckpointFinished(height uint64) {
 	n.logger.Noticef("process stable checkpoint finished, height: %d", height)
-	if n.rbft.atomicIn(InConfChange) && n.confChan != nil {
-		n.confChan <- height
-	} else {
-		n.logger.Info("Current node isn't in config-change")
-	}
+	n.rbft.reportStableCheckpointFinished(height)
 }
 
 // Status returns the current node status of the RBFT state machine.

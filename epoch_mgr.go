@@ -1,19 +1,25 @@
 package rbft
 
 import (
+	"errors"
+	"fmt"
 	"sync"
 
-	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
-	"github.com/hyperchain/go-hpc-rbft/types"
+	"github.com/hyperchain/go-hpc-common/types/protos"
+	"github.com/hyperchain/go-hpc-rbft/v2/external"
+	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
+	"github.com/hyperchain/go-hpc-rbft/v2/types"
 
 	"github.com/gogo/protobuf/proto"
 )
 
+// MaxNumEpochEndingCheckpoint is max checkpoints allowed include in EpochChangeProof
+const MaxNumEpochEndingCheckpoint = 100
+
 // epochManager manages the epoch structure for RBFT.
 type epochManager struct {
-
-	// storage for node to check if it has been out of epoch
-	checkOutOfEpoch map[uint64]uint64
+	// current epoch
+	epoch uint64
 
 	// storage for the state of config batch which is waiting for stable-verification
 	// it might be assigned at the initiation of epoch-manager
@@ -27,17 +33,24 @@ type epochManager struct {
 	// mutex to set value of configBatchToExecute
 	configBatchToExecuteLock sync.RWMutex
 
+	// epoch related service
+	epochService external.EpochService
+
+	// peer pool
+	peerPool *peerPool
+
 	// logger
 	logger Logger
 }
 
-func newEpochManager(c Config) *epochManager {
+func newEpochManager(c Config, pp *peerPool) *epochManager {
 	em := &epochManager{
-		checkOutOfEpoch:      make(map[uint64]uint64),
+		epoch:                c.EpochInit,
 		configBatchToCheck:   nil,
 		configBatchToExecute: uint64(0),
-
-		logger: c.Logger,
+		epochService:         c.External,
+		peerPool:             pp,
+		logger:               c.Logger,
 	}
 
 	if c.LatestConfig == nil {
@@ -56,7 +69,7 @@ func newEpochManager(c Config) *epochManager {
 	return em
 }
 
-// dispatchRecoveryMsg dispatches recovery service messages using service type
+// dispatchEpochMsg dispatches epoch service messages using service type
 func (rbft *rbftImpl) dispatchEpochMsg(e consensusEvent) consensusEvent {
 	switch et := e.(type) {
 	case *pb.FetchCheckpoint:
@@ -72,7 +85,7 @@ func (rbft *rbftImpl) fetchCheckpoint() consensusEvent {
 	}
 
 	fetch := &pb.FetchCheckpoint{
-		ReplicaHost:    rbft.peerPool.hostname,
+		ReplicaId:      rbft.peerPool.ID,
 		SequenceNumber: rbft.epochMgr.configBatchToCheck.Height,
 	}
 	rbft.startFetchCheckpointTimer()
@@ -84,8 +97,6 @@ func (rbft *rbftImpl) fetchCheckpoint() consensusEvent {
 	}
 	consensusMsg := &pb.ConsensusMessage{
 		Type:    pb.Type_FETCH_CHECKPOINT,
-		From:    rbft.peerPool.ID,
-		Epoch:   rbft.epoch,
 		Payload: payload,
 	}
 
@@ -108,10 +119,6 @@ func (rbft *rbftImpl) stopFetchCheckpointTimer() {
 }
 
 func (rbft *rbftImpl) recvFetchCheckpoint(fetch *pb.FetchCheckpoint) consensusEvent {
-	if !rbft.inRouters(fetch.GetReplicaHost()) {
-		return nil
-	}
-
 	signedCheckpoint, ok := rbft.storeMgr.localCheckpoints[fetch.SequenceNumber]
 	// If we can find a checkpoint in corresponding height, just send it back.
 	if !ok {
@@ -132,37 +139,9 @@ func (rbft *rbftImpl) recvFetchCheckpoint(fetch *pb.FetchCheckpoint) consensusEv
 	}
 	consensusMsg := &pb.ConsensusMessage{
 		Type:    pb.Type_SIGNED_CHECKPOINT,
-		From:    rbft.peerPool.ID,
-		Epoch:   rbft.epoch,
 		Payload: payload,
 	}
-	rbft.peerPool.unicastByHostname(consensusMsg, fetch.GetReplicaHost())
-
-	return nil
-}
-
-// checkIfOutOfEpoch track all the messages from nodes in lager epoch than self
-func (rbft *rbftImpl) checkIfOutOfEpoch(msg *pb.ConsensusMessage) consensusEvent {
-	// as current node has already executed the block no less than epoch number and it is possible that
-	// current node will finish the epoch change later, so that we needn't to check epoch here
-	if rbft.epoch >= msg.Epoch {
-		return nil
-	}
-
-	// delete old record in checkOutOfEpoch which has a lower epoch than current epoch.
-	for from, epoch := range rbft.epochMgr.checkOutOfEpoch {
-		if epoch <= rbft.epoch {
-			delete(rbft.epochMgr.checkOutOfEpoch, from)
-		}
-	}
-
-	rbft.epochMgr.checkOutOfEpoch[msg.From] = msg.Epoch
-	rbft.logger.Debugf("Replica %d in epoch %d received message from %d in epoch %d, now %d messages "+
-		"with larger epoch", rbft.peerPool.ID, rbft.epoch, msg.From, msg.Epoch, len(rbft.epochMgr.checkOutOfEpoch))
-	if len(rbft.epochMgr.checkOutOfEpoch) >= rbft.oneCorrectQuorum() {
-		rbft.epochMgr.checkOutOfEpoch = make(map[uint64]uint64)
-		return rbft.initRecovery()
-	}
+	rbft.peerPool.unicast(consensusMsg, fetch.ReplicaId)
 
 	return nil
 }
@@ -171,28 +150,22 @@ func (rbft *rbftImpl) turnIntoEpoch() {
 	// validator set has been changed, start a new epoch and check new epoch
 	epoch := rbft.external.Reconfiguration()
 
+	// re-init vc manager and recovery manager as all caches related to view should
+	// be reset in new epoch.
+	// NOTE!!! all cert caches in storeManager will be clear in move watermark after
+	// turnIntoEpoch.
+	rbft.vcMgr = newVcManager(rbft.config)
+	rbft.recoveryMgr = newRecoveryMgr(rbft.config)
+
 	// set the latest epoch
 	rbft.setEpoch(epoch)
 
-	// clear notification storage from lower epoch
-	for key, value := range rbft.recoveryMgr.notificationStore {
-		if value.Epoch < rbft.epoch {
-			delete(rbft.recoveryMgr.notificationStore, key)
-		}
-	}
-
-	// clear checkOutOfEpoch record.
-	rbft.epochMgr.checkOutOfEpoch = make(map[uint64]uint64)
-
-	// initial the view, start from view=0
-	rbft.setView(uint64(0))
-	rbft.persistView(rbft.view)
-
-	// clear view change store
-	rbft.vcMgr.viewChangeStore = make(map[vcIdx]*pb.ViewChange)
+	// initial view 0 in new epoch.
+	rbft.persistNewView(initialNewView)
+	rbft.logger.Infof("Replica %d persist view=%d after epoch change", rbft.peerPool.ID, rbft.view)
 
 	// update N/f
-	rbft.N = len(rbft.peerPool.routerMap.HostMap)
+	rbft.N = len(rbft.peerPool.router)
 	rbft.f = (rbft.N - 1) / 3
 	rbft.persistN(rbft.N)
 
@@ -216,6 +189,8 @@ func (rbft *rbftImpl) turnIntoEpoch() {
 func (rbft *rbftImpl) setEpoch(epoch uint64) {
 	rbft.epochLock.Lock()
 	rbft.epoch = epoch
+	rbft.epochMgr.epoch = epoch
+	rbft.peerPool.epoch = epoch
 	rbft.epochLock.Unlock()
 	rbft.metrics.epochGauge.Set(float64(epoch))
 }
@@ -236,4 +211,190 @@ func (rbft *rbftImpl) readConfigBatchToExecute() uint64 {
 	rbft.epochMgr.configBatchToExecuteLock.RLock()
 	defer rbft.epochMgr.configBatchToExecuteLock.RUnlock()
 	return rbft.epochMgr.configBatchToExecute
+}
+
+// checkEpoch compares local epoch and remote epoch:
+// 1. remoteEpoch > currentEpoch, only accept EpochChangeProof, else retrieveEpochChange
+// 2. remoteEpoch < currentEpoch, only accept EpochChangeRequest, else ignore
+func (em *epochManager) checkEpoch(msg *pb.ConsensusMessage) consensusEvent {
+	currentEpoch := em.epoch
+	remoteEpoch := msg.Epoch
+	if remoteEpoch > currentEpoch {
+		em.logger.Debugf("Replica %d received message type %s from %s with larger epoch, "+
+			"current epoch %d, remote epoch %d", em.peerPool.ID, msg.Type, msg.Author, currentEpoch, remoteEpoch)
+		// first process epoch sync response with higher epoch.
+		if msg.Type == pb.Type_EPOCH_CHANGE_PROOF {
+			proof := &protos.EpochChangeProof{}
+			if uErr := proto.Unmarshal(msg.Payload, proof); uErr != nil {
+				em.logger.Warningf("Unmarshal EpochChangeProof failed: %s", uErr)
+				return uErr
+			}
+			return em.processEpochChangeProof(proof)
+		}
+		return em.retrieveEpochChange(currentEpoch, remoteEpoch, msg.Author)
+	}
+
+	if remoteEpoch < currentEpoch {
+		em.logger.Debugf("Replica %d received message type %s from %s with lower epoch, "+
+			"current epoch %d, remote epoch %d", em.peerPool.ID, msg.Type, msg.Author, currentEpoch, remoteEpoch)
+		// first process epoch sync request with lower epoch.
+		if msg.Type == pb.Type_EPOCH_CHANGE_REQUEST {
+			request := &pb.EpochChangeRequest{}
+			if uErr := proto.Unmarshal(msg.Payload, request); uErr != nil {
+				em.logger.Warningf("Unmarshal EpochChangeRequest failed: %s", uErr)
+				return uErr
+			}
+			return em.processEpochChangeRequest(request)
+		}
+		em.logger.Warningf("reject process message from %s with lower epoch %d, current epoch %d",
+			msg.Author, remoteEpoch, currentEpoch)
+	}
+	return nil
+}
+
+func (em *epochManager) retrieveEpochChange(start, target uint64, recipient string) error {
+	em.logger.Debugf("Replica %d request epoch changes %d to %d from %s", em.peerPool.ID, start, target, recipient)
+	req := &pb.EpochChangeRequest{
+		Author:      em.peerPool.hostname,
+		StartEpoch:  start,
+		TargetEpoch: target,
+	}
+	payload, mErr := proto.Marshal(req)
+	if mErr != nil {
+		em.logger.Warningf("Marshal EpochChangeRequest failed: %s", mErr)
+		return mErr
+	}
+	cum := &pb.ConsensusMessage{
+		Type:    pb.Type_EPOCH_CHANGE_REQUEST,
+		Payload: payload,
+	}
+	em.peerPool.unicastByHostname(cum, recipient)
+	return nil
+}
+
+func (em *epochManager) processEpochChangeRequest(request *pb.EpochChangeRequest) error {
+	em.logger.Debugf("Replica %d received epoch change request %s", em.peerPool.ID, request)
+
+	if err := em.verifyEpochChangeRequest(request); err != nil {
+		em.logger.Warningf("Verify epoch change request failed: %s", err)
+		return err
+	}
+
+	if proof := em.pagingGetEpochChangeProof(request.StartEpoch, request.TargetEpoch, MaxNumEpochEndingCheckpoint); proof != nil {
+		em.logger.Noticef("Replica %d send epoch change proof towards %s, info %s", em.peerPool.ID, request.GetAuthor(), proof)
+		payload, mErr := proto.Marshal(proof)
+		if mErr != nil {
+			em.logger.Warningf("Marshal EpochChangeProof failed: %s", mErr)
+			return mErr
+		}
+		cum := &pb.ConsensusMessage{
+			Type:    pb.Type_EPOCH_CHANGE_PROOF,
+			Payload: payload,
+		}
+		em.peerPool.unicastByHostname(cum, request.Author)
+		return nil
+	}
+	return nil
+}
+
+func (em *epochManager) processEpochChangeProof(proof *protos.EpochChangeProof) consensusEvent {
+	em.logger.Debugf("Replica %d received epoch change proof from %s", em.peerPool.ID, proof.Author)
+
+	if changeTo := proof.NextEpoch(); changeTo <= em.epoch {
+		// ignore proof old epoch which we have already started
+		em.logger.Debugf("reject lower epoch change to %d", changeTo)
+		return nil
+	}
+
+	// 1.Verify epoch-change-proof
+	err := em.verifyEpochChangeProof(proof)
+	if err != nil {
+		return fmt.Errorf("failed to verify epoch change proof: %s", err)
+	}
+
+	// 2.Sync to epoch change state
+	checkpoint := proof.Last()
+	localEvent := &LocalEvent{
+		Service:   EpochMgrService,
+		EventType: EpochSyncEvent,
+		Event:     checkpoint,
+	}
+	return localEvent
+}
+
+// verifyEpochChangeRequest verify the legality of epoch change request.
+func (em *epochManager) verifyEpochChangeRequest(request *pb.EpochChangeRequest) error {
+	if request == nil {
+		return errors.New("NIL epoch-change-request")
+	}
+	if request.StartEpoch >= request.TargetEpoch {
+		return fmt.Errorf("reject epoch change request for illegal change from %d to %d", request.StartEpoch, request.TargetEpoch)
+	}
+	if em.epoch < request.TargetEpoch {
+		return fmt.Errorf("reject epoch change request for higher target %d from %s", request.TargetEpoch, request.Author)
+	}
+	return nil
+}
+
+// pagingGetEpochChangeProof returns epoch change proof with given page limit.
+func (em *epochManager) pagingGetEpochChangeProof(startEpoch, endEpoch, pageLimit uint64) *protos.EpochChangeProof {
+	pagingEpoch := endEpoch
+	more := uint64(0)
+
+	if pagingEpoch-startEpoch > pageLimit {
+		more = pagingEpoch
+		pagingEpoch = startEpoch + pageLimit
+	}
+
+	checkpoints := make([]*protos.QuorumCheckpoint, 0)
+	for epoch := startEpoch; epoch < pagingEpoch; epoch++ {
+		cp, err := em.epochService.GetCheckpointOfEpoch(epoch)
+		if err != nil {
+			em.logger.Warningf("Cannot find epoch change for epoch %d", epoch)
+			return nil
+		}
+		checkpoints = append(checkpoints, cp)
+	}
+
+	return &protos.EpochChangeProof{
+		Author:      em.peerPool.hostname,
+		More:        more,
+		Checkpoints: checkpoints,
+	}
+}
+
+func (em *epochManager) verifyEpochChangeProof(proof *protos.EpochChangeProof) error {
+	// Skip any stale checkpoints in the proof prefix. Note that with
+	// the assertion above, we are guaranteed there is at least one
+	// non-stale checkpoints in the proof.
+	//
+	// It's useful to skip these stale checkpoints to better allow for
+	// concurrent node requests.
+	//
+	// For example, suppose the following:
+	//
+	// 1. My current trusted state is at epoch 5.
+	// 2. I make two concurrent requests to two validators A and B, who
+	//    live at epochs 9 and 11 respectively.
+	//
+	// If A's response returns first, I will ratchet my trusted state
+	// to epoch 9. When B's response returns, I will still be able to
+	// ratchet forward to 11 even though B's EpochChangeProof
+	// includes a bunch of stale checkpoints (for epochs 5, 6, 7, 8).
+	//
+	// Of course, if B's response returns first, we will reject A's
+	// response as it's completely stale.
+	var skip int
+	for _, cp := range proof.GetCheckpoints() {
+		if cp.Epoch() >= em.epoch {
+			break
+		}
+		skip++
+	}
+	proof.Checkpoints = proof.Checkpoints[skip:]
+
+	if proof.IsEmpty() {
+		return errors.New("empty epoch change proof")
+	}
+	return em.epochService.VerifyEpochChangeProof(proof, em.epochService.GetLastCheckpoint().ValidatorSet())
 }

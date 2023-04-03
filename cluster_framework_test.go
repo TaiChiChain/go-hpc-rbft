@@ -11,9 +11,9 @@ import (
 	"github.com/hyperchain/go-hpc-common/metrics/disabled"
 	hpcCommonTypes "github.com/hyperchain/go-hpc-common/types"
 	"github.com/hyperchain/go-hpc-common/types/protos"
-	"github.com/hyperchain/go-hpc-rbft/external"
-	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
-	"github.com/hyperchain/go-hpc-rbft/types"
+	"github.com/hyperchain/go-hpc-rbft/v2/external"
+	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
+	"github.com/hyperchain/go-hpc-rbft/v2/types"
 	txpool "github.com/hyperchain/go-hpc-txpool"
 )
 
@@ -135,6 +135,9 @@ type testExternal struct {
 
 	// mem chain for framework
 	lastConfigCheckpoint *protos.QuorumCheckpoint
+
+	// config checkpoint record
+	configCheckpointRecord map[uint64]*protos.QuorumCheckpoint
 }
 
 // channelMsg is the form of data in cluster network.
@@ -192,7 +195,7 @@ func newTestFramework(account int, loggerFile bool) *testFramework {
 
 		delFlag: delFlag,
 
-		log: FrameworkNewRawLogger(),
+		log: newRawLogger(),
 	}
 
 	tf.log.Debugf("routers:")
@@ -256,10 +259,8 @@ func (tf *testFramework) newNodeConfig(
 		VcResendTimeout:         10 * time.Second,
 		CleanVCTimeout:          60 * time.Second,
 		NewViewTimeout:          8 * time.Second,
-		FirstRequestTimeout:     30 * time.Second,
 		SyncStateTimeout:        1 * time.Second,
 		SyncStateRestartTimeout: 10 * time.Second,
-		RecoveryTimeout:         10 * time.Second,
 		FetchCheckpointTimeout:  5 * time.Second,
 		CheckPoolTimeout:        3 * time.Minute,
 		FlowControl:             false,
@@ -277,17 +278,18 @@ func (tf *testFramework) newTestNode(id uint64, hostname string, cc chan *channe
 	// Init logger
 	var log *fancylogger.Logger
 	if loggerFile {
-		log = FrameworkNewRawLoggerFile(hostname)
+		log = newRawLoggerWithHost(hostname)
 	} else {
-		log = FrameworkNewRawLogger()
+		log = newRawLogger()
 	}
 
 	// Simulation Function of External
 	var ext external.ExternalStack
 	testExt := &testExternal{
-		tf:          tf,
-		testNode:    nil,
-		clusterChan: cc,
+		tf:                     tf,
+		testNode:               nil,
+		clusterChan:            cc,
+		configCheckpointRecord: make(map[uint64]*protos.QuorumCheckpoint),
 	}
 	ext = testExt
 
@@ -306,10 +308,11 @@ func (tf *testFramework) newTestNode(id uint64, hostname string, cc chan *channe
 	pool := txpool.NewTxPool(namespace, dtps, confTxPool)
 	conf := tf.newNodeConfig(id, hostname, log, ext, pool, 1, defaultValidatorSet, nil)
 	n, _ := newNode(conf)
-	N := n
+	// init new view.
+	n.rbft.vcMgr.latestNewView = initialNewView
 	routers := vSetToRouters(defaultValidatorSet)
 	tn := &testNode{
-		N:          N,
+		N:          n,
 		n:          n,
 		Router:     routers,
 		Epoch:      0,
@@ -521,17 +524,18 @@ func (tf *testFramework) frameworkAddNode(hostname string, loggerFile bool, vSet
 	// Init logger
 	var log *fancylogger.Logger
 	if loggerFile {
-		log = FrameworkNewRawLoggerFile(hostname)
+		log = newRawLoggerWithHost(hostname)
 	} else {
-		log = FrameworkNewRawLogger()
+		log = newRawLogger()
 	}
 
 	// Simulation Function of External
 	var ext external.ExternalStack
 	testExt := &testExternal{
-		tf:          tf,
-		testNode:    nil,
-		clusterChan: tf.clusterChan,
+		tf:                     tf,
+		testNode:               nil,
+		clusterChan:            tf.clusterChan,
+		configCheckpointRecord: make(map[uint64]*protos.QuorumCheckpoint),
 	}
 	ext = testExt
 
@@ -682,6 +686,7 @@ func (ext *testExternal) StoreState(key string, value []byte) error {
 	ext.testNode.stateStore[key] = value
 	return nil
 }
+
 func (ext *testExternal) DelState(key string) error {
 	delete(ext.testNode.stateStore, key)
 	if ext.testNode.stateStore == nil {
@@ -689,6 +694,7 @@ func (ext *testExternal) DelState(key string) error {
 	}
 	return nil
 }
+
 func (ext *testExternal) ReadState(key string) ([]byte, error) {
 	value := ext.testNode.stateStore[key]
 
@@ -698,6 +704,7 @@ func (ext *testExternal) ReadState(key string) ([]byte, error) {
 
 	return nil, errors.New("empty")
 }
+
 func (ext *testExternal) ReadStateSet(key string) (map[string][]byte, error) {
 	value := ext.testNode.stateStore[key]
 
@@ -710,6 +717,7 @@ func (ext *testExternal) ReadStateSet(key string) (map[string][]byte, error) {
 
 	return nil, errors.New("empty")
 }
+
 func (ext *testExternal) Destroy(key string) error {
 	return nil
 }
@@ -718,6 +726,7 @@ func (ext *testExternal) Destroy(key string) error {
 func (ext *testExternal) postMsg(msg *channelMsg) {
 	ext.clusterChan <- msg
 }
+
 func (ext *testExternal) Broadcast(msg *pb.ConsensusMessage) error {
 	if !ext.testNode.online {
 		return errors.New("node offline")
@@ -727,11 +736,13 @@ func (ext *testExternal) Broadcast(msg *pb.ConsensusMessage) error {
 		msg: msg,
 		to:  "",
 	}
+	ext.tf.log.Debugf("%s broadcast msg %v", ext.testNode.Hostname, msg.Type)
 	ext.testNode.broadcastMessageCache = msg
 
 	go ext.postMsg(cm)
 	return nil
 }
+
 func (ext *testExternal) Unicast(msg *pb.ConsensusMessage, to uint64) error {
 	if !ext.testNode.online {
 		return errors.New("node offline")
@@ -752,6 +763,7 @@ func (ext *testExternal) Unicast(msg *pb.ConsensusMessage, to uint64) error {
 	go ext.postMsg(cm)
 	return nil
 }
+
 func (ext *testExternal) UnicastByHostname(msg *pb.ConsensusMessage, to string) error {
 	if !ext.testNode.online {
 		return errors.New("node offline")
@@ -771,6 +783,7 @@ func (ext *testExternal) UnicastByHostname(msg *pb.ConsensusMessage, to string) 
 func (ext *testExternal) Sign(msg []byte) ([]byte, error) {
 	return nil, nil
 }
+
 func (ext *testExternal) Verify(peerHash string, signature []byte, msg []byte) error {
 	return nil
 }
@@ -838,9 +851,10 @@ func (ext *testExternal) Execute(requests []*protos.Transaction, localList []boo
 		}
 	}
 }
+
 func (ext *testExternal) StateUpdate(seqNo uint64, digest string, signedCheckpoints []*pb.SignedCheckpoint) {
 	for key, val := range ext.tf.TestNode[0].blocks {
-		if key <= seqNo {
+		if key <= seqNo && key > ext.testNode.Applied {
 			ext.testNode.blocks[key] = val
 			ext.testNode.n.logger.Debugf("Block Number %d", key)
 			ext.testNode.n.logger.Debugf("Block Hash %s", val)
@@ -866,7 +880,7 @@ func (ext *testExternal) StateUpdate(seqNo uint64, digest string, signedCheckpoi
 				return
 			}
 		}
-		signatures[signedCheckpoint.NodeInfo.ReplicaHost] = signedCheckpoint.Signature
+		signatures[signedCheckpoint.Author] = signedCheckpoint.Signature
 	}
 
 	quorumCheckpoint := &protos.QuorumCheckpoint{
@@ -884,6 +898,7 @@ func (ext *testExternal) StateUpdate(seqNo uint64, digest string, signedCheckpoi
 	ext.tf.log.Infof("report state updated state: %+v", state)
 	ext.testNode.N.ReportStateUpdated(state)
 }
+
 func (ext *testExternal) SendFilterEvent(informType types.InformType, message ...interface{}) {
 	switch informType {
 	case types.InformTypeFilterStableCheckpoint:
@@ -903,14 +918,19 @@ func (ext *testExternal) SendFilterEvent(informType types.InformType, message ..
 					return
 				}
 			}
-			signatures[signedCheckpoint.NodeInfo.ReplicaHost] = signedCheckpoint.Signature
+			signatures[signedCheckpoint.Author] = signedCheckpoint.Signature
 		}
 
 		quorumCheckpoint := &protos.QuorumCheckpoint{
 			Checkpoint: checkpoint,
 			Signatures: signatures,
 		}
-		ext.lastConfigCheckpoint = quorumCheckpoint
+		if quorumCheckpoint.Reconfiguration() {
+			ext.lastConfigCheckpoint = quorumCheckpoint
+			ext.configCheckpointRecord[quorumCheckpoint.Epoch()] = quorumCheckpoint
+			ext.testNode.n.logger.Noticef("update latest checkpoint to epoch: %d, height: %d",
+				quorumCheckpoint.Epoch(), quorumCheckpoint.Height())
+		}
 		height := signedCheckpoints[0].Checkpoint.Height()
 		if ext.testNode.n.rbft.atomicIn(InConfChange) {
 			go ext.testNode.N.ReportStableCheckpointFinished(height)
@@ -969,4 +989,14 @@ func (ext *testExternal) GetLastCheckpoint() *protos.QuorumCheckpoint {
 		},
 		Signatures: nil,
 	}
+}
+
+// GetCheckpointOfEpoch gets checkpoint of given epoch.
+func (ext *testExternal) GetCheckpointOfEpoch(epoch uint64) (*protos.QuorumCheckpoint, error) {
+	return ext.configCheckpointRecord[epoch], nil
+}
+
+// VerifyEpochChangeProof verifies the proof is correctly chained with known validator verifier.
+func (ext *testExternal) VerifyEpochChangeProof(proof *protos.EpochChangeProof, validators protos.Validators) error {
+	return nil
 }

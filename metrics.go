@@ -75,8 +75,7 @@ type rbftMetrics struct {
 	// monitor the times of return fetch missing txs which is caused by backup node missing
 	// txs before commit.
 	returnFetchMissingTxsCounter metrics.Counter
-	// monitor the times of fetch request batch which is caused by missing batches after
-	// vc/recovery.
+	// monitor the times of fetch request batch which is caused by missing batches after vc.
 	fetchRequestBatchCounter metrics.Counter
 
 	// ========================== metrics related to txs/txSets info ==========================

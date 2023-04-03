@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/hyperchain/go-hpc-common/types/protos"
-	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
-	"github.com/hyperchain/go-hpc-rbft/types"
+	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
+	"github.com/hyperchain/go-hpc-rbft/v2/types"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
@@ -31,31 +31,17 @@ func TestEpoch_fetchCheckpoint_and_recv(t *testing.T) {
 	assert.Equal(t, pb.Type_SIGNED_CHECKPOINT, msg2.Type)
 }
 
-func TestEpoch_recvFetchCheckpoint_RouterNotExist(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	nodes, rbfts := newBasicClusterInstance()
-	fetch := &pb.FetchCheckpoint{
-		ReplicaHost:    "node5",
-		SequenceNumber: uint64(12),
-	}
-	ret := rbfts[0].recvFetchCheckpoint(fetch)
-	assert.Nil(t, ret)
-	assert.Nil(t, nodes[0].unicastMessageCache)
-}
-
 func TestEpoch_recvFetchCheckpoint_SendBackNormal(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance()
 	fetch := &pb.FetchCheckpoint{
-		ReplicaHost:    "node2",
+		ReplicaId:      2,
 		SequenceNumber: uint64(12),
 	}
 	signedC := &pb.SignedCheckpoint{
-		NodeInfo: rbfts[0].getNodeInfo(),
+		Author: rbfts[0].peerPool.hostname,
 		Checkpoint: &protos.Checkpoint{
 			Epoch: rbfts[0].epoch,
 			ExecuteState: &protos.Checkpoint_ExecuteState{
@@ -77,12 +63,12 @@ func TestEpoch_recvFetchCheckpoint_SendBackStableCheckpoint(t *testing.T) {
 
 	nodes, rbfts := newBasicClusterInstance()
 	fetch := &pb.FetchCheckpoint{
-		ReplicaHost:    "node2",
+		ReplicaId:      2,
 		SequenceNumber: uint64(12),
 	}
 	rbfts[0].h = uint64(50)
 	signedC := &pb.SignedCheckpoint{
-		NodeInfo: rbfts[0].getNodeInfo(),
+		Author: rbfts[0].peerPool.hostname,
 		Checkpoint: &protos.Checkpoint{
 			Epoch: rbfts[0].epoch,
 			ExecuteState: &protos.Checkpoint_ExecuteState{

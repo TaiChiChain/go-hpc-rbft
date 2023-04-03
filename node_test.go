@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/hyperchain/go-hpc-common/types/protos"
-	pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
-	"github.com/hyperchain/go-hpc-rbft/types"
+	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
+	"github.com/hyperchain/go-hpc-rbft/v2/types"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/golang/mock/gomock"
@@ -38,7 +38,6 @@ func TestNode_Stop(t *testing.T) {
 
 	_, rbfts := newBasicClusterInstance()
 	n := rbfts[0].node
-	r := rbfts[0]
 	n.currentState = &types.ServiceState{
 		MetaState: &types.MetaState{
 			Height: uint64(0),
@@ -69,19 +68,6 @@ func TestNode_Stop(t *testing.T) {
 		}
 		wg.Done()
 	}()
-	
-	wg.Add(1)
-	go func() {
-		<-r.cpChan
-		wg.Done()
-	}()
-
-	wg.Add(1)
-	go func() {
-		<-r.confChan
-		wg.Done()
-	}()
-
 	n.Stop()
 	wg.Wait()
 
@@ -139,7 +125,7 @@ func TestNode_ApplyConfChange(t *testing.T) {
 	r := &types.Router{Peers: peerSet}
 	cc := &types.ConfState{QuorumRouter: r}
 	n.ApplyConfChange(cc)
-	assert.Equal(t, len(peerSet), len(n.rbft.peerPool.routerMap.HostMap))
+	assert.Equal(t, len(peerSet), len(n.rbft.peerPool.router))
 }
 
 func TestNode_ReportExecuted(t *testing.T) {
@@ -186,7 +172,7 @@ func TestNode_ReportExecuted(t *testing.T) {
 	}
 	go func() {
 		n.ReportExecuted(state4)
-		obj := <-n.cpChan
+		obj := <-n.rbft.cpChan
 		assert.Equal(t, state4, obj)
 	}()
 }
