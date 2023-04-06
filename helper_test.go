@@ -442,7 +442,7 @@ func TestHelper_CheckIfNeedStateUpdate(t *testing.T) {
 	}
 	rbfts[0].storeMgr.localCheckpoints[10] = selfCheckpoint10
 	// mock move to stable checkpoint 10.
-	rbfts[0].moveWatermarks(10)
+	rbfts[0].moveWatermarks(10, false)
 	// mock execute to 15.
 	rbfts[0].exec.lastExec = 15
 

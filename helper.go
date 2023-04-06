@@ -647,7 +647,7 @@ func (rbft *rbftImpl) checkIfNeedStateUpdate(checkpointState *types.CheckpointSt
 			} else {
 				rbft.logger.Debugf("Replica %d finds normal checkpoint %d when checkIfNeedStateUpdate",
 					rbft.peerPool.ID, initialCheckpointHeight)
-				rbft.moveWatermarks(initialCheckpointHeight)
+				rbft.moveWatermarks(initialCheckpointHeight, false)
 			}
 			return false
 		}
@@ -844,7 +844,7 @@ func (rbft *rbftImpl) syncEpoch() bool {
 	if epochChanged {
 		rbft.logger.Infof("epoch changed from %d to %d", rbft.epoch, chainEpoch)
 		rbft.turnIntoEpoch()
-		rbft.moveWatermarks(lastEpochCheckpoint.Height())
+		rbft.moveWatermarks(lastEpochCheckpoint.Height(), true)
 	} else {
 		rbft.logger.Debugf("Replica %d don't change epoch as epoch %d has not been changed",
 			rbft.peerPool.ID, rbft.epoch)
