@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [2.1.1](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v2.1.0...v2.1.1) (2023-04-06)
+
+
+### Bug Fixes
+
+* re-sign checkpoint after epoch change to avoid invalid signature after cert replace ([14be9e4](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/14be9e42778f8d66c631d957b0938478a33ae139)), closes [#flato-5557](/git.hyperchain.cn/hyperchain/go-hpc-rbft/issues/flato-5557)
+
 ## [2.1.0](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v2.0.0...v2.1.0) (2023-04-03)
 
 
