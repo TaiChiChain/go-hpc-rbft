@@ -59,7 +59,7 @@ func TestBatchMgr_maybeSendPrePrepare(t *testing.T) {
 	// to find in catch
 	// Now, rbft.batchMgr.cacheBatch[0] has already store a value
 	// Set rbft.h 10, 10~50
-	rbfts[0].moveWatermarks(10)
+	rbfts[0].moveWatermarks(10, false)
 	rbfts[0].maybeSendPrePrepare(nil, true)
 	//assume that
 	assert.Equal(t, batchTmp41, rbfts[0].storeMgr.batchStore[batchTmp41.BatchHash])
