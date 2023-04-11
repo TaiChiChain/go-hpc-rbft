@@ -459,6 +459,11 @@ func TestRBFT_sendNullRequest(t *testing.T) {
 	defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance()
+
+	rbfts[0].atomicOn(InConfChange)
+	rbfts[0].sendNullRequest()
+	rbfts[0].atomicOff(InConfChange)
+
 	rbfts[0].sendNullRequest()
 
 	nullRequest := &pb.NullRequest{
@@ -466,6 +471,13 @@ func TestRBFT_sendNullRequest(t *testing.T) {
 	}
 	consensusMsg := rbfts[0].consensusMessagePacker(nullRequest)
 	assert.Equal(t, consensusMsg, nodes[0].broadcastMessageCache.ConsensusMessage)
+
+	nullRequest.ReplicaId = 2
+	rbfts[1].atomicOn(InConfChange)
+	rbfts[1].recvNullRequest(nullRequest)
+	rbfts[1].atomicOff(InConfChange)
+
+	rbfts[1].recvNullRequest(nullRequest)
 }
 
 func TestRBFT_recvPrePrepare_WrongDigest(t *testing.T) {

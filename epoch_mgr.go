@@ -27,9 +27,13 @@ type epochManager struct {
 	// it will be assigned after config-batch's execution to check a stable-state
 	configBatchToCheck *types.MetaState
 
-	// track the sequence number of the config transaction to execute
+	// track the sequence number of the config block to execute
 	// to notice Node transfer state related to config transactions into core
 	configBatchToExecute uint64
+
+	// only used by backup node to track the seqNo of config block in ordering, reject pre-prepare
+	// with seqNo higher than this config block seqNo.
+	configBatchInOrder uint64
 
 	// mutex to set value of configBatchToExecute
 	configBatchToExecuteLock sync.RWMutex

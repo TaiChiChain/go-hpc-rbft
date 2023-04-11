@@ -200,15 +200,12 @@ func (rbft *rbftImpl) startTimerIfOutstandingRequests() {
 	}
 
 	if len(rbft.storeMgr.outstandingReqBatches) > 0 {
-		getOutstandingDigests := func() []string {
-			var digests []string
-			for digest := range rbft.storeMgr.outstandingReqBatches {
-				digests = append(digests, digest)
-			}
-			return digests
-		}()
+		outStandingBatchIdxes := make([]msgID, 0)
+		for digest, batch := range rbft.storeMgr.outstandingReqBatches {
+			outStandingBatchIdxes = append(outStandingBatchIdxes, msgID{n: batch.SeqNo, d: digest})
+		}
 		rbft.softStartNewViewTimer(rbft.timerMgr.getTimeoutValue(requestTimer), fmt.Sprintf("outstanding request "+
-			"batches num=%v, batches: %v", len(getOutstandingDigests), getOutstandingDigests), false)
+			"batches num=%v, batches: %v", len(outStandingBatchIdxes), outStandingBatchIdxes), false)
 	} else if rbft.timerMgr.getTimeoutValue(nullRequestTimer) > 0 {
 		rbft.nullReqTimerReset()
 	}
@@ -636,6 +633,7 @@ func (rbft *rbftImpl) checkIfNeedStateUpdate(checkpointState *types.CheckpointSt
 				rbft.logger.Noticef("Replica %d finds config checkpoint %d when checkIfNeedStateUpdate",
 					rbft.peerPool.ID, initialCheckpointHeight)
 				rbft.atomicOn(InConfChange)
+				rbft.epochMgr.configBatchInOrder = initialCheckpointHeight
 				rbft.metrics.statusGaugeInConfChange.Set(InConfChange)
 				// sync config checkpoint with ledger.
 				success := rbft.syncConfigCheckpoint(initialCheckpointHeight, checkpointSet)
