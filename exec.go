@@ -486,6 +486,10 @@ func (rbft *rbftImpl) dispatchMsgToService(e consensusEvent) int {
 
 	case *pb.FetchCheckpoint:
 		return EpochMgrService
+	case *pb.EpochChangeRequest:
+		return EpochMgrService
+	case *protos.EpochChangeProof:
+		return EpochMgrService
 	default:
 		return NotSupportService
 
