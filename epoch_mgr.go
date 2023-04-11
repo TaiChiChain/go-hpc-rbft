@@ -75,6 +75,12 @@ func (rbft *rbftImpl) dispatchEpochMsg(e consensusEvent) consensusEvent {
 	switch et := e.(type) {
 	case *pb.FetchCheckpoint:
 		return rbft.recvFetchCheckpoint(et)
+	case *pb.EpochChangeRequest:
+		rbft.logger.Debugf("Replica %d don't process epoch change request from %s in same epoch",
+			rbft.peerPool.ID, et.GetAuthor())
+	case *protos.EpochChangeProof:
+		rbft.logger.Debugf("Replica %d don't process epoch change proof from %s in same epoch",
+			rbft.peerPool.ID, et.GetAuthor())
 	}
 	return nil
 }
