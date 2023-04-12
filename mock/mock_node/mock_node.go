@@ -10,8 +10,8 @@ import (
 
 	gomock "github.com/golang/mock/gomock"
 	protos "github.com/hyperchain/go-hpc-common/types/protos"
-	rbft "github.com/hyperchain/go-hpc-rbft/v2"
-	rbftpbV2 "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
+	v2 "github.com/hyperchain/go-hpc-rbft/v2"
+	rbftpb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
 	types "github.com/hyperchain/go-hpc-rbft/v2/types"
 )
 
@@ -65,7 +65,7 @@ func (mr *MockNodeMockRecorder) GetUncommittedTransactions(maxsize interface{}) 
 }
 
 // Propose mocks base method.
-func (m *MockNode) Propose(requests *rbftpbV2.RequestSet) error {
+func (m *MockNode) Propose(requests *rbftpb.RequestSet) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Propose", requests)
 	ret0, _ := ret[0].(error)
@@ -129,10 +129,10 @@ func (mr *MockNodeMockRecorder) Start() *gomock.Call {
 }
 
 // Status mocks base method.
-func (m *MockNode) Status() rbft.NodeStatus {
+func (m *MockNode) Status() v2.NodeStatus {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Status")
-	ret0, _ := ret[0].(rbft.NodeStatus)
+	ret0, _ := ret[0].(v2.NodeStatus)
 	return ret0
 }
 
@@ -143,7 +143,7 @@ func (mr *MockNodeMockRecorder) Status() *gomock.Call {
 }
 
 // Step mocks base method.
-func (m *MockNode) Step(ctx context.Context, msg *rbftpbV2.ConsensusMessage) {
+func (m *MockNode) Step(ctx context.Context, msg *rbftpb.ConsensusMessage) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "Step", ctx, msg)
 }

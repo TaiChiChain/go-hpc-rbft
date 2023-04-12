@@ -10,7 +10,7 @@ import (
 
 	gomock "github.com/golang/mock/gomock"
 	protos "github.com/hyperchain/go-hpc-common/types/protos"
-	rbftpbV2 "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
+	rbftpb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
 	types "github.com/hyperchain/go-hpc-rbft/v2/types"
 )
 
@@ -133,7 +133,7 @@ func (m *MockNetwork) EXPECT() *MockNetworkMockRecorder {
 }
 
 // Broadcast mocks base method.
-func (m *MockNetwork) Broadcast(ctx context.Context, msg *rbftpbV2.ConsensusMessage) error {
+func (m *MockNetwork) Broadcast(ctx context.Context, msg *rbftpb.ConsensusMessage) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Broadcast", ctx, msg)
 	ret0, _ := ret[0].(error)
@@ -147,7 +147,7 @@ func (mr *MockNetworkMockRecorder) Broadcast(ctx, msg interface{}) *gomock.Call 
 }
 
 // Unicast mocks base method.
-func (m *MockNetwork) Unicast(ctx context.Context, msg *rbftpbV2.ConsensusMessage, to uint64) error {
+func (m *MockNetwork) Unicast(ctx context.Context, msg *rbftpb.ConsensusMessage, to uint64) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Unicast", ctx, msg, to)
 	ret0, _ := ret[0].(error)
@@ -161,7 +161,7 @@ func (mr *MockNetworkMockRecorder) Unicast(ctx, msg, to interface{}) *gomock.Cal
 }
 
 // UnicastByHostname mocks base method.
-func (m *MockNetwork) UnicastByHostname(ctx context.Context, msg *rbftpbV2.ConsensusMessage, to string) error {
+func (m *MockNetwork) UnicastByHostname(ctx context.Context, msg *rbftpb.ConsensusMessage, to string) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UnicastByHostname", ctx, msg, to)
 	ret0, _ := ret[0].(error)
@@ -279,15 +279,20 @@ func (mr *MockServiceOutboundMockRecorder) SendFilterEvent(informType interface{
 }
 
 // StateUpdate mocks base method.
-func (m *MockServiceOutbound) StateUpdate(seqNo uint64, digest string, checkpoints []*rbftpbV2.SignedCheckpoint) {
+func (m *MockServiceOutbound) StateUpdate(seqNo uint64, digest string, checkpoints []*rbftpb.SignedCheckpoint, epochChanges ...*protos.QuorumCheckpoint) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "StateUpdate", seqNo, digest, checkpoints)
+	varargs := []interface{}{seqNo, digest, checkpoints}
+	for _, a := range epochChanges {
+		varargs = append(varargs, a)
+	}
+	m.ctrl.Call(m, "StateUpdate", varargs...)
 }
 
 // StateUpdate indicates an expected call of StateUpdate.
-func (mr *MockServiceOutboundMockRecorder) StateUpdate(seqNo, digest, checkpoints interface{}) *gomock.Call {
+func (mr *MockServiceOutboundMockRecorder) StateUpdate(seqNo, digest, checkpoints interface{}, epochChanges ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StateUpdate", reflect.TypeOf((*MockServiceOutbound)(nil).StateUpdate), seqNo, digest, checkpoints)
+	varargs := append([]interface{}{seqNo, digest, checkpoints}, epochChanges...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StateUpdate", reflect.TypeOf((*MockServiceOutbound)(nil).StateUpdate), varargs...)
 }
 
 // MockEpochService is a mock of EpochService interface.
@@ -450,7 +455,7 @@ func (m *MockExternalStack) EXPECT() *MockExternalStackMockRecorder {
 }
 
 // Broadcast mocks base method.
-func (m *MockExternalStack) Broadcast(ctx context.Context, msg *rbftpbV2.ConsensusMessage) error {
+func (m *MockExternalStack) Broadcast(ctx context.Context, msg *rbftpb.ConsensusMessage) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Broadcast", ctx, msg)
 	ret0, _ := ret[0].(error)
@@ -665,15 +670,20 @@ func (mr *MockExternalStackMockRecorder) Sign(msg interface{}) *gomock.Call {
 }
 
 // StateUpdate mocks base method.
-func (m *MockExternalStack) StateUpdate(seqNo uint64, digest string, checkpoints []*rbftpbV2.SignedCheckpoint) {
+func (m *MockExternalStack) StateUpdate(seqNo uint64, digest string, checkpoints []*rbftpb.SignedCheckpoint, epochChanges ...*protos.QuorumCheckpoint) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "StateUpdate", seqNo, digest, checkpoints)
+	varargs := []interface{}{seqNo, digest, checkpoints}
+	for _, a := range epochChanges {
+		varargs = append(varargs, a)
+	}
+	m.ctrl.Call(m, "StateUpdate", varargs...)
 }
 
 // StateUpdate indicates an expected call of StateUpdate.
-func (mr *MockExternalStackMockRecorder) StateUpdate(seqNo, digest, checkpoints interface{}) *gomock.Call {
+func (mr *MockExternalStackMockRecorder) StateUpdate(seqNo, digest, checkpoints interface{}, epochChanges ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StateUpdate", reflect.TypeOf((*MockExternalStack)(nil).StateUpdate), seqNo, digest, checkpoints)
+	varargs := append([]interface{}{seqNo, digest, checkpoints}, epochChanges...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StateUpdate", reflect.TypeOf((*MockExternalStack)(nil).StateUpdate), varargs...)
 }
 
 // StoreState mocks base method.
@@ -691,7 +701,7 @@ func (mr *MockExternalStackMockRecorder) StoreState(key, value interface{}) *gom
 }
 
 // Unicast mocks base method.
-func (m *MockExternalStack) Unicast(ctx context.Context, msg *rbftpbV2.ConsensusMessage, to uint64) error {
+func (m *MockExternalStack) Unicast(ctx context.Context, msg *rbftpb.ConsensusMessage, to uint64) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Unicast", ctx, msg, to)
 	ret0, _ := ret[0].(error)
@@ -705,7 +715,7 @@ func (mr *MockExternalStackMockRecorder) Unicast(ctx, msg, to interface{}) *gomo
 }
 
 // UnicastByHostname mocks base method.
-func (m *MockExternalStack) UnicastByHostname(ctx context.Context, msg *rbftpbV2.ConsensusMessage, to string) error {
+func (m *MockExternalStack) UnicastByHostname(ctx context.Context, msg *rbftpb.ConsensusMessage, to string) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UnicastByHostname", ctx, msg, to)
 	ret0, _ := ret[0].(error)

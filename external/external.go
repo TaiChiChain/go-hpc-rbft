@@ -16,7 +16,7 @@ package external
 
 import (
 	"context"
-	
+
 	"github.com/hyperchain/go-hpc-common/types/protos"
 	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
 	"github.com/hyperchain/go-hpc-rbft/v2/types"
@@ -69,7 +69,8 @@ type ServiceOutbound interface {
 	// Users can apply different batches asynchronously but ensure the order by seqNo.
 	Execute(txs []*protos.Transaction, localList []bool, seqNo uint64, timestamp int64)
 	// StateUpdate informs application layer to catch up to given seqNo with specified state digest.
-	StateUpdate(seqNo uint64, digest string, checkpoints []*pb.SignedCheckpoint)
+	// epochChanges should be provided when the sync request has a backwardness of epoch changes
+	StateUpdate(seqNo uint64, digest string, checkpoints []*pb.SignedCheckpoint, epochChanges ...*protos.QuorumCheckpoint)
 	// SendFilterEvent posts some impotent events to application layer.
 	// Users can decide to post filer event synchronously or asynchronously.
 	SendFilterEvent(informType types.InformType, message ...interface{})

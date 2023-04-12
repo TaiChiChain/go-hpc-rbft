@@ -320,11 +320,10 @@ func (em *epochManager) processEpochChangeProof(proof *protos.EpochChangeProof) 
 	}
 
 	// 2.Sync to epoch change state
-	checkpoint := proof.Last()
 	localEvent := &LocalEvent{
 		Service:   EpochMgrService,
 		EventType: EpochSyncEvent,
-		Event:     checkpoint,
+		Event:     proof,
 	}
 	return localEvent
 }
