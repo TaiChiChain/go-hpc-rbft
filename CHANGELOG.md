@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [2.1.3](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v2.1.2...v2.1.3) (2023-04-13)
+
+
+### Features
+
+* **state_update:** provide epoch change proof when the sync request has a backwardness of epoch change ([be4f90e](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/be4f90ee754ef15a1583e93b068b895a3ea37b3d))
+
 ### [2.1.2](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v2.1.1...v2.1.2) (2023-04-11)
 
 
