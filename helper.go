@@ -339,7 +339,7 @@ func (rbft *rbftImpl) compareCheckpointWithWeakSet(signedCheckpoint *pb.SignedCh
 			Height: checkpointHeight,
 			Digest: correctID,
 		}
-		rbft.updateHighStateTarget(target, correctCheckpoints)
+		rbft.updateHighStateTarget(target, correctCheckpoints) // for incorrect state
 		rbft.tryStateTransfer()
 		return false, nil
 	}
@@ -422,7 +422,7 @@ func (rbft *rbftImpl) compareWholeStates(states wholeStates) consensusEvent {
 				Height: quorumResp.height,
 				Digest: quorumResp.digest,
 			}
-			rbft.updateHighStateTarget(target, sameRespRecord[quorumResp])
+			rbft.updateHighStateTarget(target, sameRespRecord[quorumResp]) // for incorrect state
 			rbft.tryStateTransfer()
 			return nil
 		}
@@ -654,7 +654,7 @@ func (rbft *rbftImpl) checkIfNeedStateUpdate(checkpointState *types.CheckpointSt
 		rbft.logger.Warningf("Replica %d finds mismatch checkpoint %d when checkIfNeedStateUpdate, "+
 			"local digest: %s, quorum digest %s, try to sync chain", rbft.peerPool.ID, initialCheckpointHeight,
 			localDigest, initialCheckpointDigest)
-		rbft.updateHighStateTarget(&checkpointState.Meta, checkpointSet)
+		rbft.updateHighStateTarget(&checkpointState.Meta, checkpointSet) // for incorrect state
 		rbft.tryStateTransfer()
 		return true
 	}
@@ -664,7 +664,7 @@ func (rbft *rbftImpl) checkIfNeedStateUpdate(checkpointState *types.CheckpointSt
 	if lastExec < initialCheckpointHeight {
 		rbft.logger.Warningf("Replica %d missing base checkpoint %d (%s), our most recent execution %d",
 			rbft.peerPool.ID, initialCheckpointHeight, initialCheckpointDigest, lastExec)
-		rbft.updateHighStateTarget(&checkpointState.Meta, checkpointSet)
+		rbft.updateHighStateTarget(&checkpointState.Meta, checkpointSet) // for backwardness
 		rbft.tryStateTransfer()
 		return true
 	}

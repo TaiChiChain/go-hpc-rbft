@@ -17,7 +17,6 @@ package rbft
 import (
 	"context"
 	"fmt"
-
 	"strconv"
 	"sync"
 	"time"
@@ -1784,7 +1783,7 @@ func (rbft *rbftImpl) recvCheckpoint(signedCheckpoint *pb.SignedCheckpoint, loca
 		// update transferring target for state update, in order to trigger another state-update instance at the
 		// moment the previous one has finished.
 		target := &types.MetaState{Height: checkpointHeight, Digest: checkpointDigest}
-		rbft.updateHighStateTarget(target, matchingCheckpoints)
+		rbft.updateHighStateTarget(target, matchingCheckpoints) // for backwardness
 		return nil
 	}
 
@@ -1921,8 +1920,8 @@ func (rbft *rbftImpl) weakCheckpointSetOutOfRange(signedCheckpoint *pb.SignedChe
 				return false
 			}
 
-			// update state update target here for an efficient initiation for a new state-update instance.
-			rbft.updateHighStateTarget(&highestWeakCertMeta, highestWeakCert)
+			// update state-update target here for an efficient initiation for a new state-update instance.
+			rbft.updateHighStateTarget(&highestWeakCertMeta, highestWeakCert) // for backwardness
 
 			return true
 		}
@@ -2035,7 +2034,7 @@ func (rbft *rbftImpl) moveWatermarks(n uint64, newEpoch bool) {
 }
 
 // updateHighStateTarget updates high state target
-func (rbft *rbftImpl) updateHighStateTarget(target *types.MetaState, checkpointSet []*pb.SignedCheckpoint) {
+func (rbft *rbftImpl) updateHighStateTarget(target *types.MetaState, checkpointSet []*pb.SignedCheckpoint, epochChanges ...*protos.QuorumCheckpoint) {
 	if target == nil {
 		rbft.logger.Warningf("Replica %d received a nil target", rbft.peerPool.ID)
 		return
@@ -2058,6 +2057,7 @@ func (rbft *rbftImpl) updateHighStateTarget(target *types.MetaState, checkpointS
 	rbft.storeMgr.highStateTarget = &stateUpdateTarget{
 		metaState:     target,
 		checkpointSet: checkpointSet,
+		epochChanges:  epochChanges,
 	}
 }
 
@@ -2120,7 +2120,7 @@ func (rbft *rbftImpl) tryStateTransfer() {
 
 	// attempts to synchronize state to a particular target, implicitly calls rollback if needed
 	rbft.metrics.stateUpdateCounter.Add(float64(1))
-	rbft.external.StateUpdate(target.metaState.Height, target.metaState.Digest, target.checkpointSet)
+	rbft.external.StateUpdate(target.metaState.Height, target.metaState.Digest, target.checkpointSet, target.epochChanges...)
 }
 
 // recvStateUpdatedEvent processes StateUpdatedMessage.

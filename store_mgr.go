@@ -15,6 +15,7 @@
 package rbft
 
 import (
+	"github.com/hyperchain/go-hpc-common/types/protos"
 	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
 	"github.com/hyperchain/go-hpc-rbft/v2/types"
 )
@@ -75,6 +76,8 @@ type stateUpdateTarget struct {
 	metaState *types.MetaState
 	// signed checkpoints that prove the above target
 	checkpointSet []*pb.SignedCheckpoint
+	// path of epoch changes from epoch-change-proof
+	epochChanges []*protos.QuorumCheckpoint
 }
 
 // newStoreMgr news an instance of storeManager

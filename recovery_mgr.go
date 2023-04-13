@@ -16,6 +16,7 @@ package rbft
 
 import (
 	"context"
+
 	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
 
 	"github.com/gogo/protobuf/proto"
@@ -284,7 +285,7 @@ func (rbft *rbftImpl) recvSyncState(sync *pb.SyncState) consensusEvent {
 		View:             rbft.view,
 		SignedCheckpoint: signedCheckpoint,
 	}
-	
+
 	payload, err := proto.Marshal(syncStateRsp)
 	if err != nil {
 		rbft.logger.Errorf("Marshal SyncStateResponse Error!")

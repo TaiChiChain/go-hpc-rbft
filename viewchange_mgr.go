@@ -989,7 +989,7 @@ func (rbft *rbftImpl) resetStateForRecovery(targetView uint64, nvHash string, rc
 			rbft.logger.Noticef("Replica %d try to sync to initial checkpoint height %d, current h %d",
 				rbft.peerPool.ID, initialCheckpointHeight, rbft.h)
 			// update state update target here for an efficient initiation for a new state-update instance.
-			rbft.updateHighStateTarget(&initialCheckpointState, nc.initialCheckpoints)
+			rbft.updateHighStateTarget(&initialCheckpointState, nc.initialCheckpoints) // for backwardness
 			rbft.tryStateTransfer()
 		}
 		// close vcResendTimer

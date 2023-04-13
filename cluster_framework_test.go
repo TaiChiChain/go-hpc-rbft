@@ -865,7 +865,7 @@ func (ext *testExternal) Execute(requests []*protos.Transaction, localList []boo
 	}
 }
 
-func (ext *testExternal) StateUpdate(seqNo uint64, digest string, signedCheckpoints []*pb.SignedCheckpoint) {
+func (ext *testExternal) StateUpdate(seqNo uint64, digest string, signedCheckpoints []*pb.SignedCheckpoint, epochChanges ...*protos.QuorumCheckpoint) {
 	for key, val := range ext.tf.TestNode[0].blocks {
 		if key <= seqNo && key > ext.testNode.Applied {
 			ext.testNode.blocks[key] = val
@@ -896,6 +896,9 @@ func (ext *testExternal) StateUpdate(seqNo uint64, digest string, signedCheckpoi
 		signatures[signedCheckpoint.Author] = signedCheckpoint.Signature
 	}
 
+	for _, ec := range epochChanges {
+		ext.configCheckpointRecord[ec.Epoch()] = ec
+	}
 	quorumCheckpoint := &protos.QuorumCheckpoint{
 		Checkpoint: checkpoint,
 		Signatures: signatures,

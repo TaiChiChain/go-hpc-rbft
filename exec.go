@@ -390,7 +390,8 @@ func (rbft *rbftImpl) handleEpochMgrEvent(e *LocalEvent) consensusEvent {
 		rbft.fetchCheckpoint()
 
 	case EpochSyncEvent:
-		quorumCheckpoint := e.Event.(*protos.QuorumCheckpoint)
+		proof := e.Event.(*protos.EpochChangeProof)
+		quorumCheckpoint := proof.Last()
 		rbft.logger.Noticef("Replica %d try epoch sync to height %d, epoch %d", rbft.peerPool.ID,
 			quorumCheckpoint.Height(), quorumCheckpoint.NextEpoch())
 
@@ -407,7 +408,7 @@ func (rbft *rbftImpl) handleEpochMgrEvent(e *LocalEvent) consensusEvent {
 				Signature:  sig,
 			})
 		}
-		rbft.updateHighStateTarget(target, checkpointSet)
+		rbft.updateHighStateTarget(target, checkpointSet, proof.GetCheckpoints()...) // for new epoch
 		rbft.tryStateTransfer()
 
 	default:
