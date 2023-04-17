@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [2.1.4](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v2.1.3...v2.1.4) (2023-04-17)
+
+
+### Bug Fixes
+
+* enter conf change when find config batch in batchStore and reject null request in conf chang ([31edecd](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/31edecd809efe5190de07c1009d701592558fd4b)), closes [#flato-5570](/git.hyperchain.cn/hyperchain/go-hpc-rbft/issues/flato-5570)
+
 ### [2.1.3](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v2.1.2...v2.1.3) (2023-04-13)
 
 
