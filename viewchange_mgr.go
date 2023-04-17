@@ -1155,6 +1155,7 @@ func (rbft *rbftImpl) beforeSendVC() error {
 	// reach a correct state after view-change
 	rbft.epochMgr.configBatchToCheck = nil
 	rbft.atomicOff(InConfChange)
+	rbft.epochMgr.configBatchInOrder = 0
 	rbft.metrics.statusGaugeInConfChange.Set(0)
 
 	newView := rbft.view + uint64(1)
@@ -1578,6 +1579,8 @@ func (rbft *rbftImpl) processNewView(msgList []*pb.Vc_PQ) {
 			rbft.logger.Noticef("Replica %d is processing a config batch %d, skip the following", rbft.peerPool.ID, n)
 			if n == rbft.exec.lastExec {
 				rbft.atomicOn(InConfChange)
+				cert.isConfig = true
+				rbft.epochMgr.configBatchInOrder = n
 				rbft.metrics.statusGaugeInConfChange.Set(InConfChange)
 				// we have executed a config batch in old view, but we haven't reached stable checkpoint
 				// for that batch, so we need to fetch the missing config checkpoint.
@@ -1593,6 +1596,8 @@ func (rbft *rbftImpl) processNewView(msgList []*pb.Vc_PQ) {
 				// we have batched but not executed the config batch, turn into ConfChange status and
 				// execute this config batch later.
 				rbft.atomicOn(InConfChange)
+				cert.isConfig = true
+				rbft.epochMgr.configBatchInOrder = n
 				rbft.metrics.statusGaugeInConfChange.Set(InConfChange)
 				rbft.logger.Infof("Replica %d finds config batch in x-set", rbft.peerPool.ID)
 			} else {

@@ -134,6 +134,7 @@ type msgCert struct {
 	commit          map[pb.Commit]bool  // commit msgs received from other nodes
 	committedTime   int64               // committed time
 	sentExecute     bool                // track whether sent execute event to executor module before or not
+	isConfig        bool                // track whether current batch is a config batch
 }
 
 // ----------checkpoint related structs------------------
@@ -150,7 +151,7 @@ type nodeState struct {
 	digest string
 }
 
-// wholeStates maps node ID to nodeState
+// wholeStates maps checkpoint to nodeState
 type wholeStates map[*pb.SignedCheckpoint]nodeState
 
 // -----------viewchange related structs-----------------
