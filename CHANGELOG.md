@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [2.1.5](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v2.1.4...v2.1.5) (2023-04-19)
+
+
+### Bug Fixes
+
+* **epoch_mgr.go:** reject process epoch change proof with a higher start epoch than current epoch ([f959f1a](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/f959f1af8eb5aa45f7d61547e41e9b90d58cb480)), closes [#flato-5603](/git.hyperchain.cn/hyperchain/go-hpc-rbft/issues/flato-5603)
+
 ### [2.1.4](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v2.1.3...v2.1.4) (2023-04-17)
 
 
