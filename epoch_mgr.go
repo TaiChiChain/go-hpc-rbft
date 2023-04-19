@@ -394,12 +394,20 @@ func (em *epochManager) verifyEpochChangeProof(proof *protos.EpochChangeProof) e
 	//
 	// Of course, if B's response returns first, we will reject A's
 	// response as it's completely stale.
-	var skip int
+	var (
+		skip       int
+		startEpoch uint64
+	)
 	for _, cp := range proof.GetCheckpoints() {
 		if cp.Epoch() >= em.epoch {
+			startEpoch = cp.Epoch()
 			break
 		}
 		skip++
+	}
+	if startEpoch != em.epoch {
+		return fmt.Errorf("invalid epoch change proof with start epoch %d, "+
+			"current epoch %d", startEpoch, em.epoch)
 	}
 	proof.Checkpoints = proof.Checkpoints[skip:]
 
