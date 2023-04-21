@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [2.1.6](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v2.1.5...v2.1.6) (2023-04-21)
+
+
+### Bug Fixes
+
+* **viewchange:** periodically fetch view when in viewChange instead of fetch view once we found view ([128c2ed](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/128c2edd79c8813d02877ad3f2693d375d139f7e))
+
 ### [2.1.5](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v2.1.4...v2.1.5) (2023-04-19)
 
 
