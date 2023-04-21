@@ -145,14 +145,26 @@ func TestRecovery_Disconnect_ClusterRecovery(t *testing.T) {
 	assert.Equal(t, pb.Type_VIEW_CHANGE, vcNode1.Type)
 	assert.Equal(t, uint64(3), rbfts[0].view)
 
-	// node3 received vc from node1 with higher view, try fetch view.
+	// node3 received vc from node1 with higher view, try fetch view after fetch view timer expired.
 	rbfts[2].processEvent(vcNode1)
+	rbfts[2].checkView(vcNode1.ConsensusMessage)
+	event = &LocalEvent{
+		Service:   ViewChangeService,
+		EventType: FetchViewEvent,
+	}
+	rbfts[2].processEvent(event)
 	fetchViewNode3 := nodes[2].unicastMessageCache
 	assert.Equal(t, pb.Type_FETCH_VIEW, fetchViewNode3.Type)
 	assert.Equal(t, uint64(2), rbfts[2].view)
 
-	// node4 received vc from node1 with higher view, try fetch view.
+	// node4 received vc from node1 with higher view, try fetch view after fetch view timer expired.
 	rbfts[3].processEvent(vcNode1)
+	rbfts[3].checkView(vcNode1.ConsensusMessage)
+	event = &LocalEvent{
+		Service:   ViewChangeService,
+		EventType: FetchViewEvent,
+	}
+	rbfts[3].processEvent(event)
 	fetchViewNode4 := nodes[3].unicastMessageCache
 	assert.Equal(t, pb.Type_FETCH_VIEW, fetchViewNode4.Type)
 	assert.Equal(t, uint64(2), rbfts[3].view)

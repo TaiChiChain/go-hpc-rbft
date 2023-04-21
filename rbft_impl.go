@@ -109,6 +109,9 @@ type Config struct {
 	// FetchCheckpointTimeout
 	FetchCheckpointTimeout time.Duration
 
+	// FetchViewTimeout
+	FetchViewTimeout time.Duration
+
 	// CheckPoolTimeout is the time duration one check for out-of-date requests in request pool cyclically.
 	CheckPoolTimeout time.Duration
 
@@ -695,10 +698,6 @@ func (rbft *rbftImpl) consensusMessageFilter(ctx context.Context, msg *pb.Consen
 	// EpochChangeRequest and EpochChangeProof.
 	if msg.Epoch != rbft.epoch {
 		return rbft.epochMgr.checkEpoch(msg)
-	}
-
-	if msg.View != rbft.view {
-		rbft.checkView(msg)
 	}
 
 	next, err := rbft.msgToEvent(msg)

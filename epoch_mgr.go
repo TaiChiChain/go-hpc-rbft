@@ -116,19 +116,6 @@ func (rbft *rbftImpl) fetchCheckpoint() consensusEvent {
 	return nil
 }
 
-func (rbft *rbftImpl) startFetchCheckpointTimer() {
-	event := &LocalEvent{
-		Service:   EpochMgrService,
-		EventType: FetchCheckpointEvent,
-	}
-	// use fetchCheckpointTimer to fetch the missing checkpoint
-	rbft.timerMgr.startTimer(fetchCheckpointTimer, event)
-}
-
-func (rbft *rbftImpl) stopFetchCheckpointTimer() {
-	rbft.timerMgr.stopTimer(fetchCheckpointTimer)
-}
-
 func (rbft *rbftImpl) recvFetchCheckpoint(fetch *pb.FetchCheckpoint) consensusEvent {
 	signedCheckpoint, ok := rbft.storeMgr.localCheckpoints[fetch.SequenceNumber]
 	// If we can find a checkpoint in corresponding height, just send it back.
@@ -165,6 +152,8 @@ func (rbft *rbftImpl) turnIntoEpoch() {
 	// be reset in new epoch.
 	// NOTE!!! all cert caches in storeManager will be clear in move watermark after
 	// turnIntoEpoch.
+	rbft.stopNewViewTimer()
+	rbft.stopFetchViewTimer()
 	rbft.vcMgr = newVcManager(rbft.config)
 	rbft.recoveryMgr = newRecoveryMgr(rbft.config)
 
