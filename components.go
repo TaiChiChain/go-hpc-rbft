@@ -38,6 +38,7 @@ const (
 	checkPoolTimer        = "checkPoolTimer"        // timer track timeout for check pool interval
 	fetchCheckpointTimer  = "fetchCheckpointTimer"  // timer for nodes to trigger fetch checkpoint when we are processing config transaction
 	highWatermarkTimer    = "highWatermarkTimer"    // timer for nodes to find the problem of missing too much checkpoint
+	fetchViewTimer        = "fetchViewTimer"        // timer for nodes to fetch view periodically
 )
 
 // constant default
@@ -53,6 +54,7 @@ const (
 	DefaultCleanViewChangeTimeout  = 60 * time.Second
 	DefaultCheckPoolTimeout        = 3 * time.Minute
 	DefaultFetchCheckpointTimeout  = 5 * time.Second
+	DefaultFetchViewTimeout        = 1 * time.Second
 
 	// default k value
 	DefaultK = 10
@@ -72,6 +74,7 @@ const (
 	ViewChangeResendTimerEvent
 	ViewChangeQuorumEvent
 	ViewChangeDoneEvent
+	FetchViewEvent
 
 	// 3.recovery
 	RecoveryInitEvent

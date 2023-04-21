@@ -267,6 +267,7 @@ func (rbft *rbftImpl) handleViewChangeEvent(e *LocalEvent) consensusEvent {
 		rbft.storeMgr.missingBatchesInFetching = make(map[string]msgID)
 
 		rbft.stopNewViewTimer()
+		rbft.stopFetchViewTimer()
 		rbft.startTimerIfOutstandingRequests()
 		primaryID := rbft.primaryID(rbft.view)
 
@@ -373,6 +374,10 @@ func (rbft *rbftImpl) handleViewChangeEvent(e *LocalEvent) consensusEvent {
 			return rbft.sendNewView()
 		}
 		return rbft.replicaCheckNewView()
+
+	case FetchViewEvent:
+		rbft.logger.Debugf("Replica %d fetch view timer expired", rbft.peerPool.ID)
+		rbft.tryFetchView()
 
 	default:
 		rbft.logger.Errorf("Invalid viewChange event: %v", e)
