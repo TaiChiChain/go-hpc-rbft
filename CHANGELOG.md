@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [2.1.7](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v2.1.6...v2.1.7) (2023-04-26)
+
+
+### Bug Fixes
+
+* **view_change.go:** check if need state update rather than directly state update to initial checkpo ([f4ca4c8](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/f4ca4c8d7f566a2087764e27dd84b3e57fe94475))
+
 ### [2.1.6](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v2.1.5...v2.1.6) (2023-04-21)
 
 
