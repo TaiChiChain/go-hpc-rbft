@@ -212,7 +212,7 @@ func (rbft *rbftImpl) initTimers() {
 	rbft.timerMgr.newTimer(cleanViewChangeTimer, rbft.config.CleanVCTimeout)
 	rbft.timerMgr.newTimer(checkPoolTimer, rbft.config.CheckPoolTimeout)
 	rbft.timerMgr.newTimer(fetchCheckpointTimer, rbft.config.FetchCheckpointTimeout)
-	rbft.timerMgr.newTimer(fetchViewTimer, rbft.config.FetchCheckpointTimeout)
+	rbft.timerMgr.newTimer(fetchViewTimer, rbft.config.FetchViewTimeout)
 
 	rbft.timerMgr.makeNullRequestTimeoutLegal()
 	rbft.timerMgr.makeRequestTimeoutLegal()

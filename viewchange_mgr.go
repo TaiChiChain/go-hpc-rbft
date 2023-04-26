@@ -72,7 +72,7 @@ type quorumViewChangeCache struct {
 type newViewIdx struct {
 	targetView             uint64
 	newViewHash            string
-	initialCheckpointState types.MetaState
+	initialCheckpointState types.CheckpointState
 }
 
 // newViewCert is the certification for a new view.
@@ -794,7 +794,7 @@ func (rbft *rbftImpl) recvRecoveryResponse(rcr *pb.RecoveryResponse) consensusEv
 		return nil
 	}
 
-	rbft.logger.Debugf("Replica %d received fetch view response from %s", rbft.peerPool.ID,
+	rbft.logger.Debugf("Replica %d received recovery response from %s", rbft.peerPool.ID,
 		rcr.GetInitialCheckpoint().GetAuthor())
 
 	// current node is in recovery, which is caused by single node view change, cache this NewView
@@ -977,9 +977,13 @@ func (rbft *rbftImpl) resetStateForRecovery(targetView uint64, nvHash string, rc
 	}
 	initialCheckpointHeight := initialCheckpoint.GetCheckpoint().Height()
 	initialCheckpointDigest := initialCheckpoint.GetCheckpoint().Digest()
-	initialCheckpointState := types.MetaState{
-		Height: initialCheckpointHeight,
-		Digest: initialCheckpointDigest,
+	isConfig := initialCheckpoint.GetCheckpoint().Reconfiguration()
+	initialCheckpointState := types.CheckpointState{
+		Meta: types.MetaState{
+			Height: initialCheckpointHeight,
+			Digest: initialCheckpointDigest,
+		},
+		IsConfig: isConfig,
 	}
 	// cache and wait f+1 same NewView if we are in recovery status.
 	nvIdx := newViewIdx{
@@ -1000,12 +1004,12 @@ func (rbft *rbftImpl) resetStateForRecovery(targetView uint64, nvHash string, rc
 	rbft.logger.Infof("Replica %d cached %d new view %d, need %d", rbft.peerPool.ID, count,
 		targetView, rbft.oneCorrectQuorum())
 	if count >= rbft.oneCorrectQuorum() {
-		if initialCheckpointHeight > rbft.h {
+		// check if replica need state update before check new view as initialCheckpointState may be newer
+		// than state in new view.
+		needStateUpdate := rbft.checkIfNeedStateUpdate(&initialCheckpointState, nc.initialCheckpoints)
+		if needStateUpdate {
 			rbft.logger.Noticef("Replica %d try to sync to initial checkpoint height %d, current h %d",
 				rbft.peerPool.ID, initialCheckpointHeight, rbft.h)
-			// update state update target here for an efficient initiation for a new state-update instance.
-			rbft.updateHighStateTarget(&initialCheckpointState, nc.initialCheckpoints) // for backwardness
-			rbft.tryStateTransfer()
 		}
 		// close vcResendTimer
 		rbft.timerMgr.stopTimer(vcResendTimer)
