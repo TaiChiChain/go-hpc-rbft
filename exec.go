@@ -17,6 +17,7 @@ package rbft
 import (
 	"context"
 	"fmt"
+	commonTypes "github.com/hyperchain/go-hpc-common/types"
 
 	"github.com/hyperchain/go-hpc-common/types/protos"
 	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
@@ -306,6 +307,10 @@ func (rbft *rbftImpl) handleViewChangeEvent(e *LocalEvent) consensusEvent {
 			rbft.external.SendFilterEvent(types.InformTypeFilterFinishViewChange, finishMsg)
 		}
 		rbft.maybeSetNormal()
+		rbft.logger.Trace(commonTypes.TagNameViewChange, commonTypes.TagStageFinish, commonTypes.TagContentViewChange{
+			Node: rbft.peerPool.ID,
+			View: rbft.view,
+		})
 
 		// clear storage from lower view
 		for idx := range rbft.vcMgr.viewChangeStore {

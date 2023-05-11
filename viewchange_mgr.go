@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	commonTypes "github.com/hyperchain/go-hpc-common/types"
 	"time"
 
 	"github.com/hyperchain/go-hpc-common/metrics"
@@ -223,6 +224,11 @@ func (rbft *rbftImpl) sendViewChange(status ...bool) consensusEvent {
 	}
 	rbft.peerPool.broadcast(context.TODO(), consensusMsg)
 
+	rbft.logger.Trace(commonTypes.TagNameViewChange, commonTypes.TagStageStart, commonTypes.TagContentViewChange{
+		Node: rbft.peerPool.ID,
+		View: rbft.view,
+	})
+
 	event := &LocalEvent{
 		Service:   ViewChangeService,
 		EventType: ViewChangeResendTimerEvent,
@@ -290,6 +296,11 @@ func (rbft *rbftImpl) recvViewChange(vc *pb.ViewChange, vcBasis *pb.VcBasis, ver
 	vc.Timestamp = time.Now().UnixNano()
 	// store vc to viewChangeStore
 	rbft.vcMgr.viewChangeStore[vcIdx{v: targetView, id: remoteReplicaID}] = vc
+
+	rbft.logger.Trace(commonTypes.TagNameViewChange, commonTypes.TagStageReceive, commonTypes.TagContentViewChange{
+		Node: remoteReplicaID,
+		View: targetView,
+	})
 
 	// RBFT TOCS 4.5.1 Liveness: "if a replica receives a set of
 	// f+1 valid VIEW-CHANGE messages from other replicas for

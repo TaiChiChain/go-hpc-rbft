@@ -1732,6 +1732,12 @@ func (rbft *rbftImpl) checkpoint(state *types.ServiceState, isConfig bool) {
 		Payload: payload,
 	}
 	rbft.peerPool.broadcast(context.TODO(), consensusMsg)
+	rbft.logger.Trace(hpcCommonTypes.TagNameCheckpoint, hpcCommonTypes.TagStageStart, hpcCommonTypes.TagContentCheckpoint{
+		Node:   rbft.peerPool.hostname,
+		Height: seqNo,
+		Config: isConfig,
+	})
+
 	rbft.recvCheckpoint(signedCheckpoint, true)
 }
 
@@ -1757,6 +1763,12 @@ func (rbft *rbftImpl) recvCheckpoint(signedCheckpoint *pb.SignedCheckpoint, loca
 			return nil
 		}
 	}
+
+	rbft.logger.Trace(hpcCommonTypes.TagNameCheckpoint, hpcCommonTypes.TagStageReceive, hpcCommonTypes.TagContentCheckpoint{
+		Node:   signedCheckpoint.GetAuthor(),
+		Height: signedCheckpoint.GetCheckpoint().Height(),
+		Config: signedCheckpoint.GetCheckpoint().Reconfiguration(),
+	})
 
 	if rbft.weakCheckpointSetOutOfRange(signedCheckpoint) {
 		if rbft.atomicIn(StateTransferring) {
@@ -1841,6 +1853,11 @@ func (rbft *rbftImpl) finishConfigCheckpoint(checkpointHeight uint64, checkpoint
 		"primary=%d, epoch=%d/n=%d/f=%d/view=%d/h=%d/lastExec=%d",
 		rbft.peerPool.ID, rbft.primaryID(rbft.view), rbft.epoch, rbft.N, rbft.f, rbft.view, rbft.h, rbft.exec.lastExec)
 	rbft.external.SendFilterEvent(types.InformTypeFilterFinishConfigChange, finishMsg)
+	rbft.logger.Trace(hpcCommonTypes.TagNameCheckpoint, hpcCommonTypes.TagStageFinish, hpcCommonTypes.TagContentCheckpoint{
+		Node:   rbft.peerPool.hostname,
+		Height: checkpointHeight,
+		Config: true,
+	})
 
 	rbft.logger.Debugf("Replica %d sending view change again because of epoch change", rbft.peerPool.ID)
 	return rbft.initRecovery()
@@ -1858,6 +1875,11 @@ func (rbft *rbftImpl) finishNormalCheckpoint(checkpointHeight uint64, checkpoint
 	rbft.logger.Infof("Replica %d post stable checkpoint event for seqNo %d after "+
 		"executed to the height with the same digest", rbft.peerPool.ID, rbft.h)
 	rbft.external.SendFilterEvent(types.InformTypeFilterStableCheckpoint, matchingCheckpoints)
+	rbft.logger.Trace(hpcCommonTypes.TagNameCheckpoint, hpcCommonTypes.TagStageFinish, hpcCommonTypes.TagContentCheckpoint{
+		Node:   rbft.peerPool.hostname,
+		Height: checkpointHeight,
+		Config: false,
+	})
 
 	// make sure node is in normal status before try to batch, as we may reach stable
 	// checkpoint in vc.

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sync"
 
+	commonTypes "github.com/hyperchain/go-hpc-common/types"
 	"github.com/hyperchain/go-hpc-common/types/protos"
 	"github.com/hyperchain/go-hpc-rbft/v2/external"
 	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
@@ -145,6 +146,10 @@ func (rbft *rbftImpl) recvFetchCheckpoint(fetch *pb.FetchCheckpoint) consensusEv
 }
 
 func (rbft *rbftImpl) turnIntoEpoch() {
+	rbft.logger.Trace(commonTypes.TagNameEpochChange, commonTypes.TagStageFinish, commonTypes.TagContentEpochChange{
+		Epoch: rbft.epoch,
+	})
+
 	// validator set has been changed, start a new epoch and check new epoch
 	epoch := rbft.external.Reconfiguration()
 
@@ -183,6 +188,17 @@ func (rbft *rbftImpl) turnIntoEpoch() {
   +==============================================+
 
 `)
+	validators := rbft.external.GetLastCheckpoint().ValidatorSet()
+	vset := make([]string, 0, len(validators))
+	for _, info := range validators {
+		vset = append(vset, info.Hostname)
+	}
+	algoVersion := rbft.external.GetLastCheckpoint().Version()
+	rbft.logger.Trace(commonTypes.TagNameEpochChange, commonTypes.TagStageStart, commonTypes.TagContentEpochChange{
+		Epoch:        epoch,
+		ValidatorSet: vset,
+		AlgoVersion:  algoVersion,
+	})
 }
 
 // setEpoch sets the epoch with the epochLock.
@@ -309,7 +325,8 @@ func (em *epochManager) processEpochChangeProof(proof *protos.EpochChangeProof) 
 	// 1.Verify epoch-change-proof
 	err := em.verifyEpochChangeProof(proof)
 	if err != nil {
-		return fmt.Errorf("failed to verify epoch change proof: %s", err)
+		em.logger.Errorf("failed to verify epoch change proof: %s", err)
+		return err
 	}
 
 	// 2.Sync to epoch change state
