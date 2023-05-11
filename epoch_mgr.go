@@ -27,9 +27,13 @@ type epochManager struct {
 	// it will be assigned after config-batch's execution to check a stable-state
 	configBatchToCheck *types.MetaState
 
-	// track the sequence number of the config transaction to execute
+	// track the sequence number of the config block to execute
 	// to notice Node transfer state related to config transactions into core
 	configBatchToExecute uint64
+
+	// only used by backup node to track the seqNo of config block in ordering, reject pre-prepare
+	// with seqNo higher than this config block seqNo.
+	configBatchInOrder uint64
 
 	// mutex to set value of configBatchToExecute
 	configBatchToExecuteLock sync.RWMutex
@@ -75,6 +79,12 @@ func (rbft *rbftImpl) dispatchEpochMsg(e consensusEvent) consensusEvent {
 	switch et := e.(type) {
 	case *pb.FetchCheckpoint:
 		return rbft.recvFetchCheckpoint(et)
+	case *pb.EpochChangeRequest:
+		rbft.logger.Debugf("Replica %d don't process epoch change request from %s in same epoch",
+			rbft.peerPool.ID, et.GetAuthor())
+	case *protos.EpochChangeProof:
+		rbft.logger.Debugf("Replica %d don't process epoch change proof from %s in same epoch",
+			rbft.peerPool.ID, et.GetAuthor())
 	}
 	return nil
 }
@@ -104,19 +114,6 @@ func (rbft *rbftImpl) fetchCheckpoint() consensusEvent {
 	rbft.logger.Debugf("Replica %d is fetching checkpoint %d", rbft.peerPool.ID, fetch.SequenceNumber)
 	rbft.peerPool.broadcast(context.TODO(), consensusMsg)
 	return nil
-}
-
-func (rbft *rbftImpl) startFetchCheckpointTimer() {
-	event := &LocalEvent{
-		Service:   EpochMgrService,
-		EventType: FetchCheckpointEvent,
-	}
-	// use fetchCheckpointTimer to fetch the missing checkpoint
-	rbft.timerMgr.startTimer(fetchCheckpointTimer, event)
-}
-
-func (rbft *rbftImpl) stopFetchCheckpointTimer() {
-	rbft.timerMgr.stopTimer(fetchCheckpointTimer)
 }
 
 func (rbft *rbftImpl) recvFetchCheckpoint(fetch *pb.FetchCheckpoint) consensusEvent {
@@ -155,6 +152,8 @@ func (rbft *rbftImpl) turnIntoEpoch() {
 	// be reset in new epoch.
 	// NOTE!!! all cert caches in storeManager will be clear in move watermark after
 	// turnIntoEpoch.
+	rbft.stopNewViewTimer()
+	rbft.stopFetchViewTimer()
 	rbft.vcMgr = newVcManager(rbft.config)
 	rbft.recoveryMgr = newRecoveryMgr(rbft.config)
 
@@ -314,11 +313,10 @@ func (em *epochManager) processEpochChangeProof(proof *protos.EpochChangeProof) 
 	}
 
 	// 2.Sync to epoch change state
-	checkpoint := proof.Last()
 	localEvent := &LocalEvent{
 		Service:   EpochMgrService,
 		EventType: EpochSyncEvent,
-		Event:     checkpoint,
+		Event:     proof,
 	}
 	return localEvent
 }
@@ -385,12 +383,20 @@ func (em *epochManager) verifyEpochChangeProof(proof *protos.EpochChangeProof) e
 	//
 	// Of course, if B's response returns first, we will reject A's
 	// response as it's completely stale.
-	var skip int
+	var (
+		skip       int
+		startEpoch uint64
+	)
 	for _, cp := range proof.GetCheckpoints() {
 		if cp.Epoch() >= em.epoch {
+			startEpoch = cp.Epoch()
 			break
 		}
 		skip++
+	}
+	if startEpoch != em.epoch {
+		return fmt.Errorf("invalid epoch change proof with start epoch %d, "+
+			"current epoch %d", startEpoch, em.epoch)
 	}
 	proof.Checkpoints = proof.Checkpoints[skip:]
 

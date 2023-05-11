@@ -49,12 +49,14 @@ type vcManager struct {
 	newViewStore    map[uint64]*pb.NewView      // track last new-view we received or sent
 	newViewCache    map[newViewIdx]*newViewCert // cache all correct new-view we received
 	viewChangeStore map[vcIdx]*pb.ViewChange    // track view-change messages
-	logger          Logger
-
 	// track latest QuorumViewChange
 	latestQuorumViewChange *quorumViewChangeCache
 	// track latest NewView
 	latestNewView *pb.NewView
+	// track higher view from other nodes, map node id to view.
+	higherViewRecord map[uint64]uint64
+
+	logger Logger
 }
 
 // quorumViewChangeCache is the cache of a QuorumViewChange message.
@@ -70,7 +72,7 @@ type quorumViewChangeCache struct {
 type newViewIdx struct {
 	targetView             uint64
 	newViewHash            string
-	initialCheckpointState types.MetaState
+	initialCheckpointState types.CheckpointState
 }
 
 // newViewCert is the certification for a new view.
@@ -111,12 +113,13 @@ func (rbft *rbftImpl) dispatchViewChangeMsg(e consensusEvent) consensusEvent {
 // according to the configuration file.
 func newVcManager(c Config) *vcManager {
 	vcm := &vcManager{
-		qlist:           make(map[qidx]*pb.Vc_PQ),
-		plist:           make(map[uint64]*pb.Vc_PQ),
-		newViewStore:    make(map[uint64]*pb.NewView),
-		newViewCache:    make(map[newViewIdx]*newViewCert),
-		viewChangeStore: make(map[vcIdx]*pb.ViewChange),
-		logger:          c.Logger,
+		qlist:            make(map[qidx]*pb.Vc_PQ),
+		plist:            make(map[uint64]*pb.Vc_PQ),
+		newViewStore:     make(map[uint64]*pb.NewView),
+		newViewCache:     make(map[newViewIdx]*newViewCert),
+		viewChangeStore:  make(map[vcIdx]*pb.ViewChange),
+		higherViewRecord: make(map[uint64]uint64),
+		logger:           c.Logger,
 	}
 
 	vcm.viewChangePeriod = c.VCPeriod
@@ -141,40 +144,10 @@ func (rbft *rbftImpl) setView(view uint64) {
 	rbft.metrics.viewGauge.Set(float64(view))
 }
 
-// checkView compares local view and remote view:
-// 1. remoteView > currentView, fetch view
-// 2. remoteView <= currentView, ignore
 func (rbft *rbftImpl) checkView(msg *pb.ConsensusMessage) {
-	currentView := rbft.view
-	remoteView := msg.View
-	// fetch view when remote node has larger view and current node is in view change,
-	// ask remote node response new view info to help self advance view.
-	if remoteView > currentView && rbft.atomicIn(InViewChange) {
-		// create fetchView message
-		fv := &pb.FetchView{
-			ReplicaId: rbft.peerPool.ID,
-			View:      currentView,
-		}
-
-		rbft.logger.Infof("Replica %d sending fetch view to %d, current view: %d, "+
-			"remote view: %d", rbft.peerPool.ID, msg.From, currentView, remoteView)
-
-		payload, err := proto.Marshal(fv)
-		if err != nil {
-			rbft.logger.Errorf("ConsensusMessage_FETCH_VIEW Marshal Error: %s", err)
-			return
-		}
-		consensusMsg := &pb.ConsensusMessage{
-			Type:    pb.Type_FETCH_VIEW,
-			Payload: payload,
-		}
-		rbft.peerPool.unicast(context.TODO(), consensusMsg, msg.From)
-		return
-	}
-
-	if remoteView < currentView {
-		// TODO(DH): help remote in normal?
-		return
+	// record higher view to actively fetch view periodically.
+	if msg.View > rbft.view {
+		rbft.vcMgr.higherViewRecord[msg.From] = msg.View
 	}
 }
 
@@ -257,6 +230,8 @@ func (rbft *rbftImpl) sendViewChange(status ...bool) consensusEvent {
 	// start vcResendTimer. If peers can't viewChange successfully within the given time,
 	// enter recovery view change.
 	rbft.timerMgr.startTimer(vcResendTimer, event)
+	// start fetch view timer to actively fetch view periodically.
+	rbft.startFetchViewTimer()
 	return rbft.recvViewChange(vc, vcBasis, true)
 }
 
@@ -696,6 +671,46 @@ func (rbft *rbftImpl) checkNewView(nv *pb.NewView) (uint64, string, []*pb.VcBasi
 	return targetView, "", vcBasisSet, true
 }
 
+// tryFetchView tries fetch view in view change status, compares local view and remote view:
+// 1. remoteView > currentView, fetch view
+// 2. remoteView <= currentView, ignore
+func (rbft *rbftImpl) tryFetchView() {
+	if !rbft.atomicIn(InViewChange) {
+		rbft.logger.Debugf("Replica %d not try to fetch view in normal status", rbft.peerPool.ID)
+		return
+	}
+
+	// fetch view when remote node has larger view and current node is in view change,
+	// ask remote node response new view info to help self advance view.
+	for remoteID, remoteView := range rbft.vcMgr.higherViewRecord {
+		if remoteView > rbft.view {
+			// create fetchView message
+			fv := &pb.FetchView{
+				ReplicaId: rbft.peerPool.ID,
+				View:      rbft.view,
+			}
+
+			rbft.logger.Infof("Replica %d sending fetch view to %d, current view: %d, "+
+				"remote view: %d", rbft.peerPool.ID, remoteID, rbft.view, remoteView)
+
+			payload, err := proto.Marshal(fv)
+			if err != nil {
+				rbft.logger.Errorf("ConsensusMessage_FETCH_VIEW Marshal Error: %s", err)
+				return
+			}
+			consensusMsg := &pb.ConsensusMessage{
+				Type:    pb.Type_FETCH_VIEW,
+				Payload: payload,
+			}
+			rbft.peerPool.unicast(context.TODO(), consensusMsg, remoteID)
+			return
+		}
+		delete(rbft.vcMgr.higherViewRecord, remoteID)
+	}
+
+	rbft.startFetchViewTimer()
+}
+
 // recvFetchView helps remote node recover view and height using latestQuorumViewChange and latestNewView cache.
 func (rbft *rbftImpl) recvFetchView(fv *pb.FetchView) consensusEvent {
 	rbft.logger.Debugf("Replica %d received fetch view from %d, current view: %d, "+
@@ -730,7 +745,7 @@ func (rbft *rbftImpl) recvFetchView(fv *pb.FetchView) consensusEvent {
 	// 2. send back NewView as response to help remote node advance its view if we have no QuorumViewChange
 	// cache.
 	nv := rbft.vcMgr.latestNewView
-	rbft.logger.Infof("Replica %d send back newView, v:%d", rbft.peerPool.ID, nv.View)
+	rbft.logger.Infof("Replica %d sending back newView to %d, v:%d", rbft.peerPool.ID, fv.ReplicaId, nv.View)
 	payload, err := proto.Marshal(nv)
 	if err != nil {
 		rbft.logger.Errorf("ConsensusMessage_NEW_VIEW Marshal Error: %s", err)
@@ -779,7 +794,7 @@ func (rbft *rbftImpl) recvRecoveryResponse(rcr *pb.RecoveryResponse) consensusEv
 		return nil
 	}
 
-	rbft.logger.Debugf("Replica %d received fetch view response from %s", rbft.peerPool.ID,
+	rbft.logger.Debugf("Replica %d received recovery response from %s", rbft.peerPool.ID,
 		rcr.GetInitialCheckpoint().GetAuthor())
 
 	// current node is in recovery, which is caused by single node view change, cache this NewView
@@ -962,9 +977,13 @@ func (rbft *rbftImpl) resetStateForRecovery(targetView uint64, nvHash string, rc
 	}
 	initialCheckpointHeight := initialCheckpoint.GetCheckpoint().Height()
 	initialCheckpointDigest := initialCheckpoint.GetCheckpoint().Digest()
-	initialCheckpointState := types.MetaState{
-		Height: initialCheckpointHeight,
-		Digest: initialCheckpointDigest,
+	isConfig := initialCheckpoint.GetCheckpoint().Reconfiguration()
+	initialCheckpointState := types.CheckpointState{
+		Meta: types.MetaState{
+			Height: initialCheckpointHeight,
+			Digest: initialCheckpointDigest,
+		},
+		IsConfig: isConfig,
 	}
 	// cache and wait f+1 same NewView if we are in recovery status.
 	nvIdx := newViewIdx{
@@ -985,12 +1004,12 @@ func (rbft *rbftImpl) resetStateForRecovery(targetView uint64, nvHash string, rc
 	rbft.logger.Infof("Replica %d cached %d new view %d, need %d", rbft.peerPool.ID, count,
 		targetView, rbft.oneCorrectQuorum())
 	if count >= rbft.oneCorrectQuorum() {
-		if initialCheckpointHeight > rbft.h {
+		// check if replica need state update before check new view as initialCheckpointState may be newer
+		// than state in new view.
+		needStateUpdate := rbft.checkIfNeedStateUpdate(&initialCheckpointState, nc.initialCheckpoints)
+		if needStateUpdate {
 			rbft.logger.Noticef("Replica %d try to sync to initial checkpoint height %d, current h %d",
 				rbft.peerPool.ID, initialCheckpointHeight, rbft.h)
-			// update state update target here for an efficient initiation for a new state-update instance.
-			rbft.updateHighStateTarget(&initialCheckpointState, nc.initialCheckpoints)
-			rbft.tryStateTransfer()
 		}
 		// close vcResendTimer
 		rbft.timerMgr.stopTimer(vcResendTimer)
@@ -1155,6 +1174,7 @@ func (rbft *rbftImpl) beforeSendVC() error {
 	// reach a correct state after view-change
 	rbft.epochMgr.configBatchToCheck = nil
 	rbft.atomicOff(InConfChange)
+	rbft.epochMgr.configBatchInOrder = 0
 	rbft.metrics.statusGaugeInConfChange.Set(0)
 
 	newView := rbft.view + uint64(1)
@@ -1578,6 +1598,8 @@ func (rbft *rbftImpl) processNewView(msgList []*pb.Vc_PQ) {
 			rbft.logger.Noticef("Replica %d is processing a config batch %d, skip the following", rbft.peerPool.ID, n)
 			if n == rbft.exec.lastExec {
 				rbft.atomicOn(InConfChange)
+				cert.isConfig = true
+				rbft.epochMgr.configBatchInOrder = n
 				rbft.metrics.statusGaugeInConfChange.Set(InConfChange)
 				// we have executed a config batch in old view, but we haven't reached stable checkpoint
 				// for that batch, so we need to fetch the missing config checkpoint.
@@ -1593,6 +1615,8 @@ func (rbft *rbftImpl) processNewView(msgList []*pb.Vc_PQ) {
 				// we have batched but not executed the config batch, turn into ConfChange status and
 				// execute this config batch later.
 				rbft.atomicOn(InConfChange)
+				cert.isConfig = true
+				rbft.epochMgr.configBatchInOrder = n
 				rbft.metrics.statusGaugeInConfChange.Set(InConfChange)
 				rbft.logger.Infof("Replica %d finds config batch in x-set", rbft.peerPool.ID)
 			} else {

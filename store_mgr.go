@@ -15,6 +15,7 @@
 package rbft
 
 import (
+	"github.com/hyperchain/go-hpc-common/types/protos"
 	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
 	"github.com/hyperchain/go-hpc-rbft/v2/types"
 )
@@ -75,6 +76,8 @@ type stateUpdateTarget struct {
 	metaState *types.MetaState
 	// signed checkpoints that prove the above target
 	checkpointSet []*pb.SignedCheckpoint
+	// path of epoch changes from epoch-change-proof
+	epochChanges []*protos.QuorumCheckpoint
 }
 
 // newStoreMgr news an instance of storeManager
@@ -149,8 +152,11 @@ func (rbft *rbftImpl) isPrePrepareLegal(preprep *pb.PrePrepare) bool {
 		return false
 	}
 
-	if rbft.atomicIn(InConfChange) {
-		rbft.logger.Debugf("Replica %d try to receive prePrepare, but it's in confChange", rbft.peerPool.ID)
+	// backup node reject all pre-prepares with seqNo lower than current ordering config batch.
+	if rbft.atomicIn(InConfChange) && preprep.SequenceNumber <= rbft.epochMgr.configBatchInOrder {
+		rbft.logger.Debugf("Replica %d try to receive prePrepare for %d, but it's in confChange, "+
+			"current config batch in order is %d", rbft.peerPool.ID, preprep.SequenceNumber,
+			rbft.epochMgr.configBatchInOrder)
 		return false
 	}
 

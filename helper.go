@@ -200,15 +200,12 @@ func (rbft *rbftImpl) startTimerIfOutstandingRequests() {
 	}
 
 	if len(rbft.storeMgr.outstandingReqBatches) > 0 {
-		getOutstandingDigests := func() []string {
-			var digests []string
-			for digest := range rbft.storeMgr.outstandingReqBatches {
-				digests = append(digests, digest)
-			}
-			return digests
-		}()
+		outStandingBatchIdxes := make([]msgID, 0)
+		for digest, batch := range rbft.storeMgr.outstandingReqBatches {
+			outStandingBatchIdxes = append(outStandingBatchIdxes, msgID{n: batch.SeqNo, d: digest})
+		}
 		rbft.softStartNewViewTimer(rbft.timerMgr.getTimeoutValue(requestTimer), fmt.Sprintf("outstanding request "+
-			"batches num=%v, batches: %v", len(getOutstandingDigests), getOutstandingDigests), false)
+			"batches num=%v, batches: %v", len(outStandingBatchIdxes), outStandingBatchIdxes), false)
 	} else if rbft.timerMgr.getTimeoutValue(nullRequestTimer) > 0 {
 		rbft.nullReqTimerReset()
 	}
@@ -339,7 +336,7 @@ func (rbft *rbftImpl) compareCheckpointWithWeakSet(signedCheckpoint *pb.SignedCh
 			Height: checkpointHeight,
 			Digest: correctID,
 		}
-		rbft.updateHighStateTarget(target, correctCheckpoints)
+		rbft.updateHighStateTarget(target, correctCheckpoints) // for incorrect state
 		rbft.tryStateTransfer()
 		return false, nil
 	}
@@ -422,7 +419,7 @@ func (rbft *rbftImpl) compareWholeStates(states wholeStates) consensusEvent {
 				Height: quorumResp.height,
 				Digest: quorumResp.digest,
 			}
-			rbft.updateHighStateTarget(target, sameRespRecord[quorumResp])
+			rbft.updateHighStateTarget(target, sameRespRecord[quorumResp]) // for incorrect state
 			rbft.tryStateTransfer()
 			return nil
 		}
@@ -636,6 +633,7 @@ func (rbft *rbftImpl) checkIfNeedStateUpdate(checkpointState *types.CheckpointSt
 				rbft.logger.Noticef("Replica %d finds config checkpoint %d when checkIfNeedStateUpdate",
 					rbft.peerPool.ID, initialCheckpointHeight)
 				rbft.atomicOn(InConfChange)
+				rbft.epochMgr.configBatchInOrder = initialCheckpointHeight
 				rbft.metrics.statusGaugeInConfChange.Set(InConfChange)
 				// sync config checkpoint with ledger.
 				success := rbft.syncConfigCheckpoint(initialCheckpointHeight, checkpointSet)
@@ -647,14 +645,14 @@ func (rbft *rbftImpl) checkIfNeedStateUpdate(checkpointState *types.CheckpointSt
 			} else {
 				rbft.logger.Debugf("Replica %d finds normal checkpoint %d when checkIfNeedStateUpdate",
 					rbft.peerPool.ID, initialCheckpointHeight)
-				rbft.moveWatermarks(initialCheckpointHeight)
+				rbft.moveWatermarks(initialCheckpointHeight, false)
 			}
 			return false
 		}
 		rbft.logger.Warningf("Replica %d finds mismatch checkpoint %d when checkIfNeedStateUpdate, "+
 			"local digest: %s, quorum digest %s, try to sync chain", rbft.peerPool.ID, initialCheckpointHeight,
 			localDigest, initialCheckpointDigest)
-		rbft.updateHighStateTarget(&checkpointState.Meta, checkpointSet)
+		rbft.updateHighStateTarget(&checkpointState.Meta, checkpointSet) // for incorrect state
 		rbft.tryStateTransfer()
 		return true
 	}
@@ -664,7 +662,7 @@ func (rbft *rbftImpl) checkIfNeedStateUpdate(checkpointState *types.CheckpointSt
 	if lastExec < initialCheckpointHeight {
 		rbft.logger.Warningf("Replica %d missing base checkpoint %d (%s), our most recent execution %d",
 			rbft.peerPool.ID, initialCheckpointHeight, initialCheckpointDigest, lastExec)
-		rbft.updateHighStateTarget(&checkpointState.Meta, checkpointSet)
+		rbft.updateHighStateTarget(&checkpointState.Meta, checkpointSet) // for backwardness
 		rbft.tryStateTransfer()
 		return true
 	}
@@ -844,7 +842,7 @@ func (rbft *rbftImpl) syncEpoch() bool {
 	if epochChanged {
 		rbft.logger.Infof("epoch changed from %d to %d", rbft.epoch, chainEpoch)
 		rbft.turnIntoEpoch()
-		rbft.moveWatermarks(lastEpochCheckpoint.Height())
+		rbft.moveWatermarks(lastEpochCheckpoint.Height(), true)
 	} else {
 		rbft.logger.Debugf("Replica %d don't change epoch as epoch %d has not been changed",
 			rbft.peerPool.ID, rbft.epoch)

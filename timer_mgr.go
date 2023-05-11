@@ -99,6 +99,8 @@ func (tm *timerManager) newTimer(name string, d time.Duration) {
 			d = DefaultCheckPoolTimeout
 		case fetchCheckpointTimer:
 			d = DefaultFetchCheckpointTimeout
+		case fetchViewTimer:
+			d = DefaultFetchViewTimeout
 		}
 	}
 
@@ -210,6 +212,7 @@ func (rbft *rbftImpl) initTimers() {
 	rbft.timerMgr.newTimer(cleanViewChangeTimer, rbft.config.CleanVCTimeout)
 	rbft.timerMgr.newTimer(checkPoolTimer, rbft.config.CheckPoolTimeout)
 	rbft.timerMgr.newTimer(fetchCheckpointTimer, rbft.config.FetchCheckpointTimeout)
+	rbft.timerMgr.newTimer(fetchViewTimer, rbft.config.FetchViewTimeout)
 
 	rbft.timerMgr.makeNullRequestTimeoutLegal()
 	rbft.timerMgr.makeRequestTimeoutLegal()
@@ -326,4 +329,32 @@ func (rbft *rbftImpl) softStartHighWatermarkTimer(reason string) {
 func (rbft *rbftImpl) stopHighWatermarkTimer() {
 	rbft.logger.Debugf("Replica %d stop high-watermark timer", rbft.peerPool.ID)
 	rbft.timerMgr.stopTimer(highWatermarkTimer)
+}
+
+func (rbft *rbftImpl) startFetchCheckpointTimer() {
+	event := &LocalEvent{
+		Service:   EpochMgrService,
+		EventType: FetchCheckpointEvent,
+	}
+	// use fetchCheckpointTimer to fetch the missing checkpoint
+	rbft.timerMgr.startTimer(fetchCheckpointTimer, event)
+}
+
+func (rbft *rbftImpl) stopFetchCheckpointTimer() {
+	rbft.timerMgr.stopTimer(fetchCheckpointTimer)
+}
+
+func (rbft *rbftImpl) startFetchViewTimer() {
+	rbft.logger.Debugf("Replica %d start a fetchView timer", rbft.peerPool.ID)
+	event := &LocalEvent{
+		Service:   ViewChangeService,
+		EventType: FetchViewEvent,
+	}
+	// use fetchViewTimer to fetch the higher view
+	rbft.timerMgr.startTimer(fetchViewTimer, event)
+}
+
+func (rbft *rbftImpl) stopFetchViewTimer() {
+	rbft.logger.Debugf("Replica %d stop a running fetchView timer", rbft.peerPool.ID)
+	rbft.timerMgr.stopTimer(fetchViewTimer)
 }

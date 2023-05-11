@@ -59,7 +59,7 @@ func TestBatchMgr_maybeSendPrePrepare(t *testing.T) {
 	// to find in catch
 	// Now, rbft.batchMgr.cacheBatch[0] has already store a value
 	// Set rbft.h 10, 10~50
-	rbfts[0].moveWatermarks(10)
+	rbfts[0].moveWatermarks(10, false)
 	rbfts[0].maybeSendPrePrepare(nil, true)
 	//assume that
 	assert.Equal(t, batchTmp41, rbfts[0].storeMgr.batchStore[batchTmp41.BatchHash])
@@ -182,6 +182,35 @@ func TestBatchMgr_findNextPrepareBatch(t *testing.T) {
 		_ = rbfts[0].findNextPrepareBatch(context.TODO(), 0, 30, "")
 		assert.Equal(t, true, rbfts[0].storeMgr.certStore[msgIDTmpNil].sentPrepare)
 		assert.Equal(t, true, rbfts[0].storeMgr.certStore[msgIDTmpNil].sentPrepare)
+
+		prePrepareConfBatch := &pb.PrePrepare{
+			ReplicaId:      2,
+			View:           0,
+			SequenceNumber: 35,
+			BatchDigest:    "conf-batch-hash",
+			HashBatch:      &pb.HashBatch{Timestamp: 10086},
+		}
+		msgIDConfBatch := msgID{
+			v: 0,
+			n: 35,
+			d: "conf-batch-hash",
+		}
+		certConfBatch := &msgCert{
+			prePrepare:  prePrepareConfBatch,
+			sentPrepare: false,
+			prepare:     map[pb.Prepare]bool{prePareTmpNil: true},
+			sentCommit:  false,
+			commit:      map[pb.Commit]bool{commitTmpNil: true},
+			sentExecute: false,
+		}
+		rbfts[0].storeMgr.certStore[msgIDConfBatch] = certConfBatch
+		ctx := newCTX(defaultValidatorSet)
+		confBatch := &pb.RequestBatch{
+			BatchHash:   "conf-batch-hash",
+			RequestList: []*protos.Transaction{ctx},
+		}
+		rbfts[0].storeMgr.batchStore["conf-batch-hash"] = confBatch
+		_ = rbfts[0].findNextPrepareBatch(context.TODO(), 0, 35, "conf-batch-hash")
 	})
 
 }

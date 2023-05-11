@@ -267,6 +267,7 @@ func (rbft *rbftImpl) handleViewChangeEvent(e *LocalEvent) consensusEvent {
 		rbft.storeMgr.missingBatchesInFetching = make(map[string]msgID)
 
 		rbft.stopNewViewTimer()
+		rbft.stopFetchViewTimer()
 		rbft.startTimerIfOutstandingRequests()
 		primaryID := rbft.primaryID(rbft.view)
 
@@ -374,6 +375,10 @@ func (rbft *rbftImpl) handleViewChangeEvent(e *LocalEvent) consensusEvent {
 		}
 		return rbft.replicaCheckNewView()
 
+	case FetchViewEvent:
+		rbft.logger.Debugf("Replica %d fetch view timer expired", rbft.peerPool.ID)
+		rbft.tryFetchView()
+
 	default:
 		rbft.logger.Errorf("Invalid viewChange event: %v", e)
 		return nil
@@ -390,7 +395,8 @@ func (rbft *rbftImpl) handleEpochMgrEvent(e *LocalEvent) consensusEvent {
 		rbft.fetchCheckpoint()
 
 	case EpochSyncEvent:
-		quorumCheckpoint := e.Event.(*protos.QuorumCheckpoint)
+		proof := e.Event.(*protos.EpochChangeProof)
+		quorumCheckpoint := proof.Last()
 		rbft.logger.Noticef("Replica %d try epoch sync to height %d, epoch %d", rbft.peerPool.ID,
 			quorumCheckpoint.Height(), quorumCheckpoint.NextEpoch())
 
@@ -407,7 +413,7 @@ func (rbft *rbftImpl) handleEpochMgrEvent(e *LocalEvent) consensusEvent {
 				Signature:  sig,
 			})
 		}
-		rbft.updateHighStateTarget(target, checkpointSet)
+		rbft.updateHighStateTarget(target, checkpointSet, proof.GetCheckpoints()...) // for new epoch
 		rbft.tryStateTransfer()
 
 	default:
@@ -485,6 +491,10 @@ func (rbft *rbftImpl) dispatchMsgToService(e consensusEvent) int {
 		return RecoveryService
 
 	case *pb.FetchCheckpoint:
+		return EpochMgrService
+	case *pb.EpochChangeRequest:
+		return EpochMgrService
+	case *protos.EpochChangeProof:
 		return EpochMgrService
 	default:
 		return NotSupportService

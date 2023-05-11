@@ -350,6 +350,11 @@ func (rbft *rbftImpl) restoreCert() {
 		cert := rbft.storeMgr.getCert(idx.v, idx.n, idx.d)
 		cert.prePrepare = q
 		cert.prePrepareCtx = context.TODO()
+		batch, ok := rbft.storeMgr.batchStore[idx.d]
+		// set isConfig if found.
+		if ok {
+			cert.isConfig = isConfigBatch(batch)
+		}
 	}
 
 	pset, _ := rbft.restorePSet()
@@ -545,8 +550,8 @@ func (rbft *rbftImpl) restoreState() error {
 	rbft.restoreView()
 	rbft.restoreN()
 
-	rbft.restoreCert()
 	rbft.restoreBatchStore()
+	rbft.restoreCert()
 
 	chkpts, err := rbft.storage.ReadStateSet("chkpt.")
 	if err == nil {
@@ -581,7 +586,7 @@ func (rbft *rbftImpl) restoreState() error {
 			rbft.logger.Warningf("transfer rbft.h from string to uint64 failed with err: %s", err)
 			return err
 		}
-		rbft.moveWatermarks(h)
+		rbft.moveWatermarks(h, false)
 	}
 
 	rbft.logger.Infof("Replica %d restored state: epoch: %d, view: %d, seqNo: %d, "+

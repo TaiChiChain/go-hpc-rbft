@@ -242,6 +242,13 @@ func (rbft *rbftImpl) findNextPrepareBatch(ctx context.Context, v uint64, n uint
 	// with seqNo <= lastExec. However, those batches may have been deleted from requestPool,
 	// so we can get those batches from batchStore first.
 	if existBatch, ok := rbft.storeMgr.batchStore[d]; ok {
+		if isConfigBatch(existBatch) {
+			rbft.logger.Debugf("Replica %d generate a config batch", rbft.peerPool.ID)
+			rbft.atomicOn(InConfChange)
+			cert.isConfig = true
+			rbft.epochMgr.configBatchInOrder = n
+			rbft.metrics.statusGaugeInConfChange.Set(InConfChange)
+		}
 		rbft.logger.Debugf("Replica %d prepare batch for view=%d/seqNo=%d, batch size: %d", rbft.peerPool.ID, v, n, len(existBatch.RequestHashList))
 		return rbft.sendPrepare(ctx, v, n, d)
 	}
@@ -277,6 +284,8 @@ func (rbft *rbftImpl) findNextPrepareBatch(ctx context.Context, v uint64, n uint
 	if rbft.batchMgr.requestPool.IsConfigBatch(batch.BatchHash) {
 		rbft.logger.Debugf("Replica %d generate a config batch", rbft.peerPool.ID)
 		rbft.atomicOn(InConfChange)
+		cert.isConfig = true
+		rbft.epochMgr.configBatchInOrder = n
 		rbft.metrics.statusGaugeInConfChange.Set(InConfChange)
 	}
 
@@ -323,4 +332,11 @@ func (rbft *rbftImpl) primaryResubmitTransactions() {
 		}
 		rbft.logger.Debugf("======== Primary %d finished transactions resubmit", rbft.peerPool.ID)
 	}
+}
+
+func isConfigBatch(batch *pb.RequestBatch) bool {
+	if len(batch.RequestList) == 1 && batch.RequestList[0].IsConfigTx() {
+		return true
+	}
+	return false
 }

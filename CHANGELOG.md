@@ -2,6 +2,55 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [2.1.7](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v2.1.6...v2.1.7) (2023-04-26)
+
+
+### Bug Fixes
+
+* **view_change.go:** check if need state update rather than directly state update to initial checkpo ([f4ca4c8](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/f4ca4c8d7f566a2087764e27dd84b3e57fe94475))
+
+### [2.1.6](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v2.1.5...v2.1.6) (2023-04-21)
+
+
+### Bug Fixes
+
+* **viewchange:** periodically fetch view when in viewChange instead of fetch view once we found view ([128c2ed](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/128c2edd79c8813d02877ad3f2693d375d139f7e))
+
+### [2.1.5](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v2.1.4...v2.1.5) (2023-04-19)
+
+
+### Bug Fixes
+
+* **epoch_mgr.go:** reject process epoch change proof with a higher start epoch than current epoch ([f959f1a](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/f959f1af8eb5aa45f7d61547e41e9b90d58cb480)), closes [#flato-5603](/git.hyperchain.cn/hyperchain/go-hpc-rbft/issues/flato-5603)
+
+### [2.1.4](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v2.1.3...v2.1.4) (2023-04-17)
+
+
+### Bug Fixes
+
+* enter conf change when find config batch in batchStore and reject null request in conf chang ([31edecd](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/31edecd809efe5190de07c1009d701592558fd4b)), closes [#flato-5570](/git.hyperchain.cn/hyperchain/go-hpc-rbft/issues/flato-5570)
+
+### [2.1.3](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v2.1.2...v2.1.3) (2023-04-13)
+
+
+### Features
+
+* **state_update:** provide epoch change proof when the sync request has a backwardness of epoch change ([be4f90e](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/be4f90ee754ef15a1583e93b068b895a3ea37b3d))
+
+### [2.1.2](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v2.1.1...v2.1.2) (2023-04-11)
+
+
+### Bug Fixes
+
+* **exec.go:** reject process epoch change related messages in same epoch ([cd9ae7c](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/cd9ae7cb97c29f5d82f182c3b4bfc671d76dab04)), closes [#flato-5563](/git.hyperchain.cn/hyperchain/go-hpc-rbft/issues/flato-5563)
+
+### [2.1.1](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v2.1.0...v2.1.1) (2023-04-06)
+
+
+### Bug Fixes
+
+* re-sign checkpoint after epoch change to avoid invalid signature after cert replace ([14be9e4](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/14be9e42778f8d66c631d957b0938478a33ae139)), closes [#flato-5557](/git.hyperchain.cn/hyperchain/go-hpc-rbft/issues/flato-5557)
+
 ## [2.1.0](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v2.0.0...v2.1.0) (2023-04-03)
 
 

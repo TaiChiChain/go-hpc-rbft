@@ -38,6 +38,7 @@ const (
 	checkPoolTimer        = "checkPoolTimer"        // timer track timeout for check pool interval
 	fetchCheckpointTimer  = "fetchCheckpointTimer"  // timer for nodes to trigger fetch checkpoint when we are processing config transaction
 	highWatermarkTimer    = "highWatermarkTimer"    // timer for nodes to find the problem of missing too much checkpoint
+	fetchViewTimer        = "fetchViewTimer"        // timer for nodes to fetch view periodically
 )
 
 // constant default
@@ -53,6 +54,7 @@ const (
 	DefaultCleanViewChangeTimeout  = 60 * time.Second
 	DefaultCheckPoolTimeout        = 3 * time.Minute
 	DefaultFetchCheckpointTimeout  = 5 * time.Second
+	DefaultFetchViewTimeout        = 1 * time.Second
 
 	// default k value
 	DefaultK = 10
@@ -72,6 +74,7 @@ const (
 	ViewChangeResendTimerEvent
 	ViewChangeQuorumEvent
 	ViewChangeDoneEvent
+	FetchViewEvent
 
 	// 3.recovery
 	RecoveryInitEvent
@@ -134,6 +137,7 @@ type msgCert struct {
 	commit          map[pb.Commit]bool  // commit msgs received from other nodes
 	committedTime   int64               // committed time
 	sentExecute     bool                // track whether sent execute event to executor module before or not
+	isConfig        bool                // track whether current batch is a config batch
 }
 
 // ----------checkpoint related structs------------------
@@ -150,7 +154,7 @@ type nodeState struct {
 	digest string
 }
 
-// wholeStates maps node ID to nodeState
+// wholeStates maps checkpoint to nodeState
 type wholeStates map[*pb.SignedCheckpoint]nodeState
 
 // -----------viewchange related structs-----------------
