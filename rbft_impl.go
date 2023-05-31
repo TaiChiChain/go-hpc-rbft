@@ -51,7 +51,7 @@ type Config struct {
 
 	// peers contains the IDs and hashes of all nodes (including self) in the RBFT cluster. It
 	// should be set when starting/restarting a RBFT cluster or after application layer has
-	// finished add/delete node.
+	// finished config change.
 	// It's application's responsibility to ensure a consistent peer list among cluster.
 	Peers []*types.Peer
 
@@ -168,7 +168,7 @@ type rbftImpl struct {
 
 	recvChan chan interface{}         // channel to receive ordered consensus messages and local events
 	cpChan   chan *types.ServiceState // channel to wait for local checkpoint event
-	confChan chan uint64              // channel to track config checkpoint process
+	confChan chan uint64              // channel to track config checkpoint has been processed successfully.
 	delFlag  chan bool                // channel to stop namespace when there is a non-recoverable error
 	close    chan bool                // channel to close this event process
 
@@ -191,12 +191,14 @@ type rbftImpl struct {
 var once sync.Once
 
 // newRBFT init the RBFT instance
-func newRBFT(cpChan chan *types.ServiceState, confC chan uint64, c Config) (*rbftImpl, error) {
+func newRBFT(c Config) (*rbftImpl, error) {
 	var err error
 
 	// init message event converter
 	once.Do(initMsgEventMap)
 
+	cpChan := make(chan *types.ServiceState)
+	confC := make(chan uint64)
 	recvC := make(chan interface{}, 1)
 	rbft := &rbftImpl{
 		K:                    c.K,
@@ -364,9 +366,26 @@ func (rbft *rbftImpl) stop() []*protos.Transaction {
 	// reset status to pending.
 	rbft.initStatus()
 	rbft.atomicOn(Stopped)
+
+	// close checkpoint channel.
+	select {
+	case <-rbft.cpChan:
+	default:
+	}
+	rbft.logger.Notice("close channel: checkpoint")
+	close(rbft.cpChan)
+
+	// close config channel.
+	select {
+	case <-rbft.confChan:
+	default:
+	}
+	rbft.logger.Notice("close channel: config")
+	close(rbft.confChan)
+
 	remainTxs := drainChannel(rbft.recvChan)
 
-	rbft.logger.Debugf("get %d txs from recvChan", len(remainTxs))
+	rbft.logger.Debugf("get %d remaining txs from recvChan", len(remainTxs))
 
 	// stop listen consensus event
 	select {
@@ -393,7 +412,7 @@ func (rbft *rbftImpl) stop() []*protos.Transaction {
 
 	rbft.logger.Notice("Waiting...")
 	rbft.wg.Wait()
-	rbft.logger.Noticef("RBFT stopped!")
+	rbft.logger.Notice("RBFT stopped!")
 
 	return remainTxs
 }
@@ -430,25 +449,10 @@ func (rbft *rbftImpl) step(msg *pb.ConsensusMessage) {
 	rbft.postMsg(msg)
 }
 
-// reportStateUpdated informs RBFT stateUpdated event.
-func (rbft *rbftImpl) reportStateUpdated(state *types.ServiceState) {
-	if rbft.atomicIn(Pending) {
-		rbft.logger.Debugf("Replica %d is in pending status, reject consensus messages", rbft.peerPool.ID)
-		return
-	}
-	event := &LocalEvent{
-		Service:   CoreRbftService,
-		EventType: CoreStateUpdatedEvent,
-		Event:     state,
-	}
-
-	go rbft.postMsg(event)
-}
-
 // postRequests informs RBFT tx set event which is posted from application layer.
 func (rbft *rbftImpl) postRequests(requests *pb.RequestSet) {
 	if rbft.atomicIn(Pending) {
-		rbft.logger.Debugf("Replica %d is in pending status, reject consensus messages", rbft.peerPool.ID)
+		rbft.logger.Debugf("Replica %d is in pending status, reject propose request", rbft.peerPool.ID)
 		return
 	}
 	rbft.postMsg(requests)
@@ -482,6 +486,65 @@ func (rbft *rbftImpl) postConfState(cc *types.ConfState) {
 // postMsg posts messages to main loop.
 func (rbft *rbftImpl) postMsg(msg interface{}) {
 	rbft.recvChan <- msg
+}
+
+// reportStateUpdated informs RBFT stateUpdated event.
+func (rbft *rbftImpl) reportStateUpdated(state *types.ServiceState) {
+	if rbft.atomicIn(Pending) {
+		rbft.logger.Debugf("Replica %d is in pending status, reject report state updated", rbft.peerPool.ID)
+		return
+	}
+	event := &LocalEvent{
+		Service:   CoreRbftService,
+		EventType: CoreStateUpdatedEvent,
+		Event:     state,
+	}
+
+	go rbft.postMsg(event)
+}
+
+// reportCheckpoint informs RBFT checkpoint event.
+func (rbft *rbftImpl) reportCheckpoint(state *types.ServiceState) {
+	if rbft.atomicIn(Pending) {
+		rbft.logger.Debugf("Replica %d is in pending status, reject report checkpoint", rbft.peerPool.ID)
+		return
+	}
+
+	height := state.MetaState.Height
+	// report checkpoint of config block height or checkpoint block height.
+	if rbft.readConfigBatchToExecute() == height || height%rbft.K == 0 {
+		rbft.logger.Debugf("Report checkpoint: {%d, %s} to core", state.MetaState.Height, state.MetaState.Digest)
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					rbft.logger.Debugf("reject report checkpoint for recovered")
+				}
+			}()
+			rbft.cpChan <- state
+		}()
+	}
+}
+
+// reportStableCheckpointFinished informs RBFT stable checkpoint finish event.
+func (rbft *rbftImpl) reportStableCheckpointFinished(height uint64) {
+	if rbft.atomicIn(Pending) {
+		rbft.logger.Debugf("Replica %d is in pending status, reject report stable checkpoint finished", rbft.peerPool.ID)
+		return
+	}
+
+	if rbft.atomicIn(InConfChange) {
+		rbft.logger.Debugf("Report stable checkpoint %d finish to core", height)
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					rbft.logger.Debugf("reject report stable checkpoint for recovered")
+				}
+			}()
+			rbft.confChan <- height
+		}()
+	} else {
+		rbft.logger.Info("Current node isn't in config-change")
+	}
 }
 
 // getStatus returns the current consensus status.
