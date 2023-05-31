@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.0.11](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v1.0.10...v1.0.11) (2023-05-31)
+
+
+### Bug Fixes
+
+* **node.go:** catch panic for send on closed channel ([bcb0672](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/bcb0672fafc59c4b383fa8420d81c4a59a6f8901)), closes [#flato-5729](/git.hyperchain.cn/hyperchain/go-hpc-rbft/issues/flato-5729)
+
 ### [1.0.10](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v1.0.9...v1.0.10) (2023-02-14)
 
 
