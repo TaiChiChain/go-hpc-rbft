@@ -33,4 +33,6 @@ type Logger interface {
 
 	Critical(v ...interface{})
 	Criticalf(format string, v ...interface{})
+
+	Trace(name, stage string, content interface{})
 }

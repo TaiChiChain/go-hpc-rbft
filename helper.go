@@ -291,6 +291,21 @@ func (rbft *rbftImpl) compareCheckpointWithWeakSet(signedCheckpoint *pb.SignedCh
 		if len(diffValues) > rbft.oneCorrectQuorum() {
 			rbft.logger.Criticalf("Replica %d cannot find stable checkpoint with seqNo %d"+
 				"(%d different values observed already).", rbft.peerPool.ID, checkpointHeight, len(diffValues))
+			tc := hpcCommonTypes.TagContentInconsistentCheckpoint{
+				Height: checkpointHeight,
+			}
+			checkpointSet := make(map[hpcCommonTypes.CheckpointState][]string)
+			for _, value := range diffValues {
+				epoch := value[0].Checkpoint.NextEpoch()
+				digest := value[0].Checkpoint.Digest()
+				authors := make([]string, 0, len(value))
+				for _, sc := range value {
+					authors = append(authors, sc.GetAuthor())
+				}
+				checkpointSet[hpcCommonTypes.CheckpointState{Epoch: epoch, Hash: digest}] = authors
+			}
+			tc.CheckpointSet = checkpointSet
+			rbft.logger.Trace(hpcCommonTypes.TagNameCheckpoint, hpcCommonTypes.TagStageWarning, tc)
 			rbft.on(Inconsistent)
 			rbft.metrics.statusGaugeInconsistent.Set(Inconsistent)
 			rbft.setAbNormal()
