@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [2.3.0](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v2.2.0...v2.3.0) (2023-06-16)
+
+
+### Features
+
+* **logger:** support Trace logger ([e664a70](/git.hyperchain.cn/hyperchain/go-hpc-rbft/commit/e664a7019439bcba0b195a27f5547c59408478d4))
+
 ## [2.2.0](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v2.1.7...v2.2.0) (2023-05-11)
 
 ### [2.1.7](/git.hyperchain.cn/hyperchain/go-hpc-rbft/compare/v2.1.6...v2.1.7) (2023-04-26)
