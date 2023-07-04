@@ -168,3 +168,4 @@ target
 testLogger
 
 cluster_init_test.go
+.history

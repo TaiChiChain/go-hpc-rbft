@@ -1,10 +1,10 @@
 cloud.google.com/go v0.26.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMTw=
 cloud.google.com/go v0.34.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMTw=
-git.hyperchain.cn/hyperchain/go-hpc-common.git v0.3.44 h1:b1Hynzbe7IzOIzZHqjXhdxdZB9x7AnYYp/iIlRLGQuA=
-git.hyperchain.cn/hyperchain/go-hpc-common.git v0.3.44/go.mod h1:lztorrs1qclXl/F/dZ/ZRuCaz31tZh8OYCeLtl53liU=
-git.hyperchain.cn/hyperchain/go-hpc-txpool.git v1.1.0 h1:Oqp2tOy7GQBO8TlE68LF7CKKMmwARnYYEyiV/SrNRTM=
-git.hyperchain.cn/hyperchain/go-hpc-txpool.git v1.1.0/go.mod h1:Tb4sjtrBe0DDTTsc2aZDL62aIMQnRlJnWv6eyxWVvJA=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
+github.com/TaiChiChain/go-hpc-common v0.3.45-0.20230704020536-916b0d63a653 h1:VF6WdGzfibqJ9A/r/t+lVDRwvzOhjHvw6p6mnHW058U=
+github.com/TaiChiChain/go-hpc-common v0.3.45-0.20230704020536-916b0d63a653/go.mod h1:lztorrs1qclXl/F/dZ/ZRuCaz31tZh8OYCeLtl53liU=
+github.com/TaiChiChain/go-hpc-txpool v1.1.1-0.20230704020722-0e236dac9899 h1:r9zFX47O42XCCJifd7oil+oQ1GXanBEezsJXLIgoZSg=
+github.com/TaiChiChain/go-hpc-txpool v1.1.1-0.20230704020722-0e236dac9899/go.mod h1:Ta7AOVRhk4vnLYP+legtGxYeJjYNMCkhzSsEeWtAWJs=
 github.com/antihax/optional v1.0.0/go.mod h1:uupD/76wgC+ih3iEmQUL+0Ugr19nfwCT1kdvxnR2qWY=
 github.com/census-instrumentation/opencensus-proto v0.2.1/go.mod h1:f6KPmirojxKA12rnyqOA5BBL4O983OfeGPqjHWSTneU=
 github.com/cespare/xxhash/v2 v2.1.1/go.mod h1:VGX0DQ3Q6kWi7AoAeZDth3/j3BFtOZR5XLFGgcrjCOs=

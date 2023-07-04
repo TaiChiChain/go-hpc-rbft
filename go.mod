@@ -41,6 +41,6 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/hyperchain/go-hpc-common => git.hyperchain.cn/hyperchain/go-hpc-common.git v0.3.44
+replace github.com/hyperchain/go-hpc-common => github.com/TaiChiChain/go-hpc-common v0.3.45-0.20230704020536-916b0d63a653
 
-replace github.com/hyperchain/go-hpc-txpool => git.hyperchain.cn/hyperchain/go-hpc-txpool.git v1.1.0
+replace github.com/hyperchain/go-hpc-txpool => github.com/TaiChiChain/go-hpc-txpool v1.1.1-0.20230704020722-0e236dac9899
