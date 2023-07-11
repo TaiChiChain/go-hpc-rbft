@@ -3,20 +3,21 @@ package rbft
 import (
 	"testing"
 
-	"github.com/hyperchain/go-hpc-common/metrics/disabled"
+	consensus "github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
+	"github.com/hyperchain/go-hpc-rbft/v2/common/metrics/disabled"
 	mockexternal "github.com/hyperchain/go-hpc-rbft/v2/mock/mock_external"
-	txpoolmock "github.com/hyperchain/go-hpc-txpool/mock"
+	txpoolmock "github.com/hyperchain/go-hpc-rbft/v2/txpool/mock"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 )
 
-func newTestStatusNode(ctrl *gomock.Controller) *rbftImpl {
+func newTestStatusNode[T any, Constraint consensus.TXConstraint[T]](ctrl *gomock.Controller) *rbftImpl[T, Constraint] {
 	log := newRawLogger()
-	external := mockexternal.NewMockMinimalExternal(ctrl)
-	tx := txpoolmock.NewMockMinimalTxPool(ctrl)
+	external := mockexternal.NewMockMinimalExternal[T, Constraint](ctrl)
+	tx := txpoolmock.NewMockMinimalTxPool[T, Constraint](ctrl)
 
-	conf := Config{
+	conf := Config[T, Constraint]{
 		ID:          1,
 		Hash:        calHash("node1"),
 		Peers:       peerSet,
@@ -38,7 +39,7 @@ func TestStatusMgr_inOne(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	rbft := newTestStatusNode(ctrl)
+	rbft := newTestStatusNode[consensus.Transaction](ctrl)
 
 	rbft.atomicOn(InViewChange)
 	assert.Equal(t, true, rbft.atomicInOne(InViewChange, InRecovery))
@@ -48,7 +49,7 @@ func TestStatusMgr_setState(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	rbft := newTestStatusNode(ctrl)
+	rbft := newTestStatusNode[consensus.Transaction](ctrl)
 
 	rbft.setNormal()
 	assert.Equal(t, true, rbft.in(Normal))
@@ -61,7 +62,7 @@ func TestStatusMgr_maybeSetNormal(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	rbft := newTestStatusNode(ctrl)
+	rbft := newTestStatusNode[consensus.Transaction](ctrl)
 
 	rbft.atomicOff(InRecovery)
 	rbft.atomicOff(InConfChange)

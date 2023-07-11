@@ -17,8 +17,8 @@ package rbft
 import (
 	"context"
 
+	consensus "github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
 	"github.com/hyperchain/go-hpc-rbft/v2/external"
-	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
 	"github.com/hyperchain/go-hpc-rbft/v2/types"
 )
 
@@ -49,7 +49,7 @@ type peerPool struct {
 }
 
 // init peer pool in rbft core
-func newPeerPool(c Config) *peerPool {
+func newPeerPool[T any, Constraint consensus.TXConstraint[T]](c Config[T, Constraint]) *peerPool {
 	pool := &peerPool{
 		ID:       c.ID,
 		hostname: c.Hostname,
@@ -83,7 +83,7 @@ func (pool *peerPool) initPeers(peers []*types.Peer) {
 	}
 }
 
-func (pool *peerPool) broadcast(ctx context.Context, msg *pb.ConsensusMessage) {
+func (pool *peerPool) broadcast(ctx context.Context, msg *consensus.ConsensusMessage) {
 	msg.From = pool.ID
 	msg.Author = pool.hostname
 	msg.Epoch = pool.epoch
@@ -95,7 +95,7 @@ func (pool *peerPool) broadcast(ctx context.Context, msg *pb.ConsensusMessage) {
 	}
 }
 
-func (pool *peerPool) unicast(ctx context.Context, msg *pb.ConsensusMessage, to uint64) {
+func (pool *peerPool) unicast(ctx context.Context, msg *consensus.ConsensusMessage, to uint64) {
 	msg.From = pool.ID
 	msg.Author = pool.hostname
 	msg.Epoch = pool.epoch
@@ -107,7 +107,7 @@ func (pool *peerPool) unicast(ctx context.Context, msg *pb.ConsensusMessage, to 
 	}
 }
 
-func (pool *peerPool) unicastByHostname(ctx context.Context, msg *pb.ConsensusMessage, to string) {
+func (pool *peerPool) unicastByHostname(ctx context.Context, msg *consensus.ConsensusMessage, to string) {
 	msg.From = pool.ID
 	msg.Author = pool.hostname
 	msg.Epoch = pool.epoch

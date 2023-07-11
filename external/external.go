@@ -17,8 +17,7 @@ package external
 import (
 	"context"
 
-	"github.com/hyperchain/go-hpc-common/types/protos"
-	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
+	consensus "github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
 	"github.com/hyperchain/go-hpc-rbft/v2/types"
 )
 
@@ -40,11 +39,11 @@ type Storage interface {
 // Network is used to send p2p messages between nodes.
 type Network interface {
 	// Broadcast delivers messages to all other nodes.
-	Broadcast(ctx context.Context, msg *pb.ConsensusMessage) error
+	Broadcast(ctx context.Context, msg *consensus.ConsensusMessage) error
 	// Unicast delivers messages to given node with specified id.
-	Unicast(ctx context.Context, msg *pb.ConsensusMessage, to uint64) error
+	Unicast(ctx context.Context, msg *consensus.ConsensusMessage, to uint64) error
 	// UnicastByHostname delivers messages to given node with specified hostname.
-	UnicastByHostname(ctx context.Context, msg *pb.ConsensusMessage, to string) error
+	UnicastByHostname(ctx context.Context, msg *consensus.ConsensusMessage, to string) error
 }
 
 // Crypto is used to access the sign/verify methods from the crypto package
@@ -67,10 +66,10 @@ type Crypto interface {
 type ServiceOutbound interface {
 	// Execute informs application layer to apply one batch with given request list and batch seqNo.
 	// Users can apply different batches asynchronously but ensure the order by seqNo.
-	Execute(txs []*protos.Transaction, localList []bool, seqNo uint64, timestamp int64)
+	Execute(txs [][]byte, localList []bool, seqNo uint64, timestamp int64)
 	// StateUpdate informs application layer to catch up to given seqNo with specified state digest.
 	// epochChanges should be provided when the sync request has a backwardness of epoch changes
-	StateUpdate(seqNo uint64, digest string, checkpoints []*pb.SignedCheckpoint, epochChanges ...*protos.QuorumCheckpoint)
+	StateUpdate(seqNo uint64, digest string, checkpoints []*consensus.SignedCheckpoint, epochChanges ...*consensus.QuorumCheckpoint)
 	// SendFilterEvent posts some impotent events to application layer.
 	// Users can decide to post filer event synchronously or asynchronously.
 	SendFilterEvent(informType types.InformType, message ...interface{})
@@ -82,7 +81,7 @@ type EpochService interface {
 	Reconfiguration() uint64
 
 	// GetNodeInfos returns the full node info with public key.
-	GetNodeInfos() []*protos.NodeInfo
+	GetNodeInfos() []*consensus.NodeInfo
 
 	// GetAlgorithmVersion returns current algorithm version.
 	GetAlgorithmVersion() string
@@ -94,17 +93,17 @@ type EpochService interface {
 	IsConfigBlock(height uint64) bool
 
 	// GetLastCheckpoint return the last QuorumCheckpoint in ledger.
-	GetLastCheckpoint() *protos.QuorumCheckpoint
+	GetLastCheckpoint() *consensus.QuorumCheckpoint
 
 	// GetCheckpointOfEpoch gets checkpoint of given epoch.
-	GetCheckpointOfEpoch(epoch uint64) (*protos.QuorumCheckpoint, error)
+	GetCheckpointOfEpoch(epoch uint64) (*consensus.QuorumCheckpoint, error)
 
 	// VerifyEpochChangeProof verifies the proof is correctly chained with known validator verifier.
-	VerifyEpochChangeProof(proof *protos.EpochChangeProof, validators protos.Validators) error
+	VerifyEpochChangeProof(proof *consensus.EpochChangeProof, validators consensus.Validators) error
 }
 
 // ExternalStack integrates all external interfaces which must be implemented by application users.
-type ExternalStack interface {
+type ExternalStack[T any, Constraint consensus.TXConstraint[T]] interface {
 	Storage
 	Network
 	Crypto

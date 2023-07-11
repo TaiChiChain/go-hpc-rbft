@@ -3,8 +3,7 @@ package rbft
 import (
 	"testing"
 
-	"github.com/hyperchain/go-hpc-common/types/protos"
-	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
+	consensus "github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
 	"github.com/hyperchain/go-hpc-rbft/v2/types"
 
 	"github.com/golang/mock/gomock"
@@ -15,7 +14,7 @@ func TestExec_handleCoreRbftEvent_batchTimerEvent(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	nodes, rbfts := newBasicClusterInstance()
+	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 
 	// start state
 	ev := &LocalEvent{
@@ -36,9 +35,11 @@ func TestExec_handleCoreRbftEvent_batchTimerEvent(t *testing.T) {
 	rbfts[0].atomicOff(InConfChange)
 
 	tx := newTx()
-	rbfts[0].batchMgr.requestPool.AddNewRequests([]*protos.Transaction{tx}, false, true)
+	txBytes, err := tx.Marshal()
+	assert.Nil(t, err)
+	rbfts[0].batchMgr.requestPool.AddNewRequests([][]byte{txBytes}, false, true)
 	reqBatch := rbfts[0].batchMgr.requestPool.GenerateRequestBatch()
-	batch := &pb.RequestBatch{
+	batch := &consensus.RequestBatch{
 		RequestHashList: reqBatch[0].TxHashList,
 		RequestList:     reqBatch[0].TxList,
 		Timestamp:       reqBatch[0].Timestamp,
@@ -48,14 +49,14 @@ func TestExec_handleCoreRbftEvent_batchTimerEvent(t *testing.T) {
 	rbfts[0].batchMgr.cacheBatch = append(rbfts[0].batchMgr.cacheBatch, batch)
 	rbfts[0].setNormal()
 	rbfts[0].handleCoreRbftEvent(ev)
-	assert.Equal(t, pb.Type_PRE_PREPARE, nodes[0].broadcastMessageCache.Type)
+	assert.Equal(t, consensus.Type_PRE_PREPARE, nodes[0].broadcastMessageCache.Type)
 }
 
 func TestExec_handleCoreRbftEvent_NullRequestTimerEvent(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	nodes, rbfts := newBasicClusterInstance()
+	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 
 	// replica will send view change, primary will send null request
 	ev := &LocalEvent{
@@ -66,17 +67,17 @@ func TestExec_handleCoreRbftEvent_NullRequestTimerEvent(t *testing.T) {
 	rbfts[1].handleCoreRbftEvent(ev)
 	rbfts[2].handleCoreRbftEvent(ev)
 	rbfts[3].handleCoreRbftEvent(ev)
-	assert.Equal(t, pb.Type_NULL_REQUEST, nodes[0].broadcastMessageCache.Type)
-	assert.Equal(t, pb.Type_VIEW_CHANGE, nodes[1].broadcastMessageCache.Type)
-	assert.Equal(t, pb.Type_VIEW_CHANGE, nodes[2].broadcastMessageCache.Type)
-	assert.Equal(t, pb.Type_VIEW_CHANGE, nodes[3].broadcastMessageCache.Type)
+	assert.Equal(t, consensus.Type_NULL_REQUEST, nodes[0].broadcastMessageCache.Type)
+	assert.Equal(t, consensus.Type_VIEW_CHANGE, nodes[1].broadcastMessageCache.Type)
+	assert.Equal(t, consensus.Type_VIEW_CHANGE, nodes[2].broadcastMessageCache.Type)
+	assert.Equal(t, consensus.Type_VIEW_CHANGE, nodes[3].broadcastMessageCache.Type)
 }
 
 func TestExec_handleCoreRbftEvent_CheckPoolTimerEvent(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	_, rbfts := newBasicClusterInstance()
+	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 
 	// node will restart check pool timer
 	ev := &LocalEvent{
@@ -99,7 +100,7 @@ func TestExec_handleCoreRbftEvent_StateUpdatedEvent(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	_, rbfts := newBasicClusterInstance()
+	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 
 	metaS := &types.MetaState{
 		Height: uint64(10),
@@ -110,9 +111,9 @@ func TestExec_handleCoreRbftEvent_StateUpdatedEvent(t *testing.T) {
 		MetaState: metaS,
 		Epoch:     uint64(0),
 	}
-	checkpoint := &protos.Checkpoint{
+	checkpoint := &consensus.Checkpoint{
 		Epoch: uint64(0),
-		ExecuteState: &protos.Checkpoint_ExecuteState{
+		ExecuteState: &consensus.Checkpoint_ExecuteState{
 			Height: uint64(10),
 			Digest: "block-number-10",
 		},
@@ -125,7 +126,7 @@ func TestExec_handleCoreRbftEvent_StateUpdatedEvent(t *testing.T) {
 	assert.Equal(t, uint64(0), rbfts[1].exec.lastExec)
 	rbfts[1].storeMgr.highStateTarget = &stateUpdateTarget{
 		metaState: metaS,
-		checkpointSet: []*pb.SignedCheckpoint{
+		checkpointSet: []*consensus.SignedCheckpoint{
 			{Author: "node1", Checkpoint: checkpoint, Signature: []byte("sig-1")},
 			{Author: "node2", Checkpoint: checkpoint, Signature: []byte("sig-2")},
 			{Author: "node3", Checkpoint: checkpoint, Signature: []byte("sig-3")},
@@ -139,7 +140,7 @@ func TestExec_handleRecoveryEvent_SyncStateRspTimerEvent(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	_, rbfts := newBasicClusterInstance()
+	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 
 	ev := &LocalEvent{
 		Service:   RecoveryService,
@@ -162,7 +163,7 @@ func TestExec_handleRecoveryEvent_SyncStateRestartTimerEvent(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	_, rbfts := newBasicClusterInstance()
+	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 
 	ev := &LocalEvent{
 		Service:   RecoveryService,
@@ -178,7 +179,7 @@ func TestExec_handleViewChangeEvent_ViewChangeTimerEvent(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	nodes, rbfts := newBasicClusterInstance()
+	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 
 	ev := &LocalEvent{
 		Service:   ViewChangeService,
@@ -187,21 +188,21 @@ func TestExec_handleViewChangeEvent_ViewChangeTimerEvent(t *testing.T) {
 
 	preView := rbfts[1].view
 	rbfts[1].sendViewChange()
-	assert.Equal(t, pb.Type_VIEW_CHANGE, nodes[1].broadcastMessageCache.Type)
+	assert.Equal(t, consensus.Type_VIEW_CHANGE, nodes[1].broadcastMessageCache.Type)
 
 	rbfts[1].handleViewChangeEvent(ev)
-	assert.Equal(t, pb.Type_VIEW_CHANGE, nodes[1].broadcastMessageCache.Type)
+	assert.Equal(t, consensus.Type_VIEW_CHANGE, nodes[1].broadcastMessageCache.Type)
 	assert.Equal(t, preView+1, rbfts[1].view)
 
 	rbfts[2].handleViewChangeEvent(ev)
-	assert.Equal(t, pb.Type_VIEW_CHANGE, nodes[2].broadcastMessageCache.Type)
+	assert.Equal(t, consensus.Type_VIEW_CHANGE, nodes[2].broadcastMessageCache.Type)
 }
 
 func TestExec_handleViewChangeEvent_ViewChangeResendTimerEvent(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	nodes, rbfts := newBasicClusterInstance()
+	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 
 	ev := &LocalEvent{
 		Service:   ViewChangeService,
@@ -210,14 +211,14 @@ func TestExec_handleViewChangeEvent_ViewChangeResendTimerEvent(t *testing.T) {
 
 	rbfts[1].atomicOn(InViewChange)
 	rbfts[1].handleViewChangeEvent(ev)
-	assert.Equal(t, pb.Type_VIEW_CHANGE, nodes[1].broadcastMessageCache.Type)
+	assert.Equal(t, consensus.Type_VIEW_CHANGE, nodes[1].broadcastMessageCache.Type)
 }
 
 func TestExec_handleEpochMgrEvent_FetchCheckpointEvent(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	nodes, rbfts := newBasicClusterInstance()
+	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 
 	ev := &LocalEvent{
 		Service:   EpochMgrService,
@@ -231,5 +232,5 @@ func TestExec_handleEpochMgrEvent_FetchCheckpointEvent(t *testing.T) {
 		Digest: "block-hash-10",
 	}
 	rbfts[1].handleEpochMgrEvent(ev)
-	assert.Equal(t, pb.Type_FETCH_CHECKPOINT, nodes[1].broadcastMessageCache.Type)
+	assert.Equal(t, consensus.Type_FETCH_CHECKPOINT, nodes[1].broadcastMessageCache.Type)
 }

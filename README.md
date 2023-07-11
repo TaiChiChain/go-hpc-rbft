@@ -64,13 +64,13 @@ Stop Node Instance
 ```func (n *node) Stop()```
 
 Propose Requests
-```Propose(requests *pb.RequestSet) error```
+```Propose(requests *consensus.RequestSet) error```
 
 Propose Config Change
 ```ProposeConfChange(cc *types.ConfChange) error```
 
 Receive and Process Consensus Messages
-```Step(msg *pb.ConsensusMessage)```
+```Step(msg *consensus.ConsensusMessage)```
 
 RBFT Core Apply Config Change
 ```ApplyConfChange(cc *types.ConfState)```
@@ -100,7 +100,7 @@ How to use?
 - aux_files:接口文件不止一个文件时附加文件
 - build_flags: 传递给build工具的参数
 
-Eg.`mockgen -destination mock/mock_common.go -package common -source common.go`
+Eg.`mockgen -destination mock/mock_common.go -package common -source consensus.go`
 
 ## GitCZ
 

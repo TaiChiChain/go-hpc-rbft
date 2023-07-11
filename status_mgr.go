@@ -100,26 +100,26 @@ func (st *statusManager) atomicHasBit(position uint64) bool {
 }
 
 // atomic on sets the atomic status of specified positions.
-func (rbft *rbftImpl) atomicOn(statusPos ...uint64) {
+func (rbft *rbftImpl[T, Constraint]) atomicOn(statusPos ...uint64) {
 	for _, pos := range statusPos {
 		rbft.status.atomicSetBit(pos)
 	}
 }
 
 // atomic off resets the atomic status of specified positions.
-func (rbft *rbftImpl) atomicOff(statusPos ...uint64) {
+func (rbft *rbftImpl[T, Constraint]) atomicOff(statusPos ...uint64) {
 	for _, pos := range statusPos {
 		rbft.status.atomicClearBit(pos)
 	}
 }
 
 // atomic in returns the atomic status of specified position.
-func (rbft *rbftImpl) atomicIn(pos uint64) bool {
+func (rbft *rbftImpl[T, Constraint]) atomicIn(pos uint64) bool {
 	return rbft.status.atomicHasBit(pos)
 }
 
 // atomic inOne checks the result of several atomic status computed with each other using '||'
-func (rbft *rbftImpl) atomicInOne(poss ...uint64) bool {
+func (rbft *rbftImpl[T, Constraint]) atomicInOne(poss ...uint64) bool {
 	var rs = false
 	for _, pos := range poss {
 		rs = rs || rbft.atomicIn(pos)
@@ -147,26 +147,26 @@ func (st *statusManager) hasBit(position uint32) bool {
 }
 
 // on sets the status of specified positions.
-func (rbft *rbftImpl) on(statusPos ...uint32) {
+func (rbft *rbftImpl[T, Constraint]) on(statusPos ...uint32) {
 	for _, pos := range statusPos {
 		rbft.status.setBit(pos)
 	}
 }
 
 // off resets the status of specified positions.
-func (rbft *rbftImpl) off(statusPos ...uint32) {
+func (rbft *rbftImpl[T, Constraint]) off(statusPos ...uint32) {
 	for _, pos := range statusPos {
 		rbft.status.clearBit(pos)
 	}
 }
 
 // in returns the status of specified position.
-func (rbft *rbftImpl) in(pos uint32) bool {
+func (rbft *rbftImpl[T, Constraint]) in(pos uint32) bool {
 	return rbft.status.hasBit(pos)
 }
 
 // InOne checks the result of several status computed with each other using '||'
-func (rbft *rbftImpl) inOne(poss ...uint32) bool {
+func (rbft *rbftImpl[T, Constraint]) inOne(poss ...uint32) bool {
 	var rs = false
 	for _, pos := range poss {
 		rs = rs || rbft.in(pos)
@@ -178,13 +178,13 @@ func (rbft *rbftImpl) inOne(poss ...uint32) bool {
 // Status Tools
 // ==================================================
 // setNormal sets system to normal.
-func (rbft *rbftImpl) setNormal() {
+func (rbft *rbftImpl[T, Constraint]) setNormal() {
 	rbft.on(Normal)
 	rbft.metrics.statusGaugeInNormal.Set(Normal)
 }
 
 // maybeSetNormal checks if system is in normal or not, if in normal, set status to normal.
-func (rbft *rbftImpl) maybeSetNormal() {
+func (rbft *rbftImpl[T, Constraint]) maybeSetNormal() {
 	if !rbft.atomicInOne(InViewChange, Pending, SkipInProgress) {
 		rbft.setNormal()
 		rbft.startCheckPoolTimer()
@@ -195,7 +195,7 @@ func (rbft *rbftImpl) maybeSetNormal() {
 
 // setAbNormal sets system to abnormal which means system may be in viewChange, state update...
 // we can't do sync state when we are in abnormal.
-func (rbft *rbftImpl) setAbNormal() {
+func (rbft *rbftImpl[T, Constraint]) setAbNormal() {
 	rbft.exitSyncState()
 	rbft.stopCheckPoolTimer()
 	if rbft.isPrimary(rbft.peerPool.ID) {
@@ -207,29 +207,29 @@ func (rbft *rbftImpl) setAbNormal() {
 }
 
 // setFull means tx pool has reached the pool size.
-func (rbft *rbftImpl) setFull() {
+func (rbft *rbftImpl[T, Constraint]) setFull() {
 	rbft.atomicOn(PoolFull)
 	rbft.metrics.statusGaugePoolFull.Set(PoolFull)
 }
 
 // setNotFull means tx pool hasn't reached the pool size.
-func (rbft *rbftImpl) setNotFull() {
+func (rbft *rbftImpl[T, Constraint]) setNotFull() {
 	rbft.atomicOff(PoolFull)
 	rbft.metrics.statusGaugePoolFull.Set(0)
 }
 
 // isNormal checks setNormal and returns if system is normal or not.
-func (rbft *rbftImpl) isNormal() bool {
+func (rbft *rbftImpl[T, Constraint]) isNormal() bool {
 	return rbft.in(Normal)
 }
 
 // isPoolFull checks and returns if tx pool is full or not.
-func (rbft *rbftImpl) isPoolFull() bool {
+func (rbft *rbftImpl[T, Constraint]) isPoolFull() bool {
 	return rbft.atomicIn(PoolFull)
 }
 
 // initStatus init basic status when starts up
-func (rbft *rbftImpl) initStatus() {
+func (rbft *rbftImpl[T, Constraint]) initStatus() {
 	rbft.status.reset()
 	// set consensus status to pending to avoid process consensus messages
 	// until RBFT starts recovery

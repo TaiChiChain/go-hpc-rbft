@@ -4,21 +4,22 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hyperchain/go-hpc-common/metrics/disabled"
+	consensus "github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
+	"github.com/hyperchain/go-hpc-rbft/v2/common/metrics/disabled"
 	mockexternal "github.com/hyperchain/go-hpc-rbft/v2/mock/mock_external"
-	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
-	txpoolmock "github.com/hyperchain/go-hpc-txpool/mock"
+
+	txpoolmock "github.com/hyperchain/go-hpc-rbft/v2/txpool/mock"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 )
 
-func newStorageTestNode(ctrl *gomock.Controller) (*storeManager, Config) {
-	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
+func newStorageTestNode[T any, Constraint consensus.TXConstraint[T]](ctrl *gomock.Controller) (*storeManager, Config[T, Constraint]) {
+	pool := txpoolmock.NewMockMinimalTxPool[T, Constraint](ctrl)
 	log := newRawLogger()
-	external := mockexternal.NewMockMinimalExternal(ctrl)
+	external := mockexternal.NewMockMinimalExternal[T, Constraint](ctrl)
 
-	conf := Config{
+	conf := Config[T, Constraint]{
 		ID:                      2,
 		Hash:                    "hash-node2",
 		Peers:                   peerSet,
@@ -54,16 +55,16 @@ func TestStoreMgr_getCert(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	s, _ := newStorageTestNode(ctrl)
+	s, _ := newStorageTestNode[consensus.Transaction](ctrl)
 
 	var retCert *msgCert
 	// get default cert
 	certDefault := &msgCert{
 		prePrepare:  nil,
 		sentPrepare: false,
-		prepare:     make(map[pb.Prepare]bool),
+		prepare:     make(map[consensus.Prepare]bool),
 		sentCommit:  false,
-		commit:      make(map[pb.Commit]bool),
+		commit:      make(map[consensus.Commit]bool),
 		sentExecute: false,
 	}
 
@@ -78,9 +79,9 @@ func TestStoreMgr_getCert(t *testing.T) {
 	certTmp := &msgCert{
 		prePrepare:  nil,
 		sentPrepare: true,
-		prepare:     make(map[pb.Prepare]bool),
+		prepare:     make(map[consensus.Prepare]bool),
 		sentCommit:  true,
-		commit:      make(map[pb.Commit]bool),
+		commit:      make(map[consensus.Commit]bool),
 		sentExecute: true,
 	}
 	s.certStore[msgIDTmp] = certTmp
@@ -92,14 +93,14 @@ func TestStoreMgr_existedDigest(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	s, _ := newStorageTestNode(ctrl)
+	s, _ := newStorageTestNode[consensus.Transaction](ctrl)
 
 	msgIDTmp := msgID{
 		v: 1,
 		n: 20,
 		d: "tmp",
 	}
-	prePrepareTmp := &pb.PrePrepare{
+	prePrepareTmp := &consensus.PrePrepare{
 		ReplicaId:      2,
 		View:           0,
 		SequenceNumber: 20,
@@ -109,9 +110,9 @@ func TestStoreMgr_existedDigest(t *testing.T) {
 	certTmp := &msgCert{
 		prePrepare:  prePrepareTmp,
 		sentPrepare: true,
-		prepare:     make(map[pb.Prepare]bool),
+		prepare:     make(map[consensus.Prepare]bool),
 		sentCommit:  true,
-		commit:      make(map[pb.Commit]bool),
+		commit:      make(map[consensus.Commit]bool),
 		sentExecute: true,
 	}
 	s.certStore[msgIDTmp] = certTmp

@@ -15,8 +15,7 @@
 package rbft
 
 import (
-	"github.com/hyperchain/go-hpc-common/types/protos"
-	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
+	consensus "github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
 	"github.com/hyperchain/go-hpc-rbft/v2/types"
 )
 
@@ -24,7 +23,7 @@ import (
 This file provides a mechanism to manage the memory storage in RBFT
 */
 
-// storeManager manages common store data structures for RBFT.
+// storeManager manages consensus store data structures for RBFT.
 type storeManager struct {
 	logger Logger
 
@@ -35,10 +34,10 @@ type storeManager struct {
 	committedCert map[msgID]string
 
 	// track whether we are waiting for transaction batches to execute
-	outstandingReqBatches map[string]*pb.RequestBatch
+	outstandingReqBatches map[string]*consensus.RequestBatch
 
 	// track L cached transaction batches produced from requestPool
-	batchStore map[string]*pb.RequestBatch
+	batchStore map[string]*consensus.RequestBatch
 
 	// for all the assigned, non-checkpointed request batches we might miss
 	// some transactions in some batches, record batch no
@@ -60,37 +59,37 @@ type storeManager struct {
 	// checkpoints that we reached by ourselves after commit a block with a
 	// block number == integer multiple of K;
 	// map lastExec to signed checkpoint after executed certain block
-	localCheckpoints map[uint64]*pb.SignedCheckpoint
+	localCheckpoints map[uint64]*consensus.SignedCheckpoint
 
 	// checkpoint numbers received from others which are bigger than our
 	// H(=h+L); map author to the last checkpoint number received from
 	// that replica bigger than H
-	higherCheckpoints map[string]*pb.SignedCheckpoint
+	higherCheckpoints map[string]*consensus.SignedCheckpoint
 
 	// track all non-repeating checkpoints including self and others
-	checkpointStore map[chkptID]*pb.SignedCheckpoint
+	checkpointStore map[chkptID]*consensus.SignedCheckpoint
 }
 
 type stateUpdateTarget struct {
 	// target height and digest
 	metaState *types.MetaState
 	// signed checkpoints that prove the above target
-	checkpointSet []*pb.SignedCheckpoint
+	checkpointSet []*consensus.SignedCheckpoint
 	// path of epoch changes from epoch-change-proof
-	epochChanges []*protos.QuorumCheckpoint
+	epochChanges []*consensus.QuorumCheckpoint
 }
 
 // newStoreMgr news an instance of storeManager
-func newStoreMgr(c Config) *storeManager {
+func newStoreMgr[T any, Constraint consensus.TXConstraint[T]](c Config[T, Constraint]) *storeManager {
 	sm := &storeManager{
-		localCheckpoints:         make(map[uint64]*pb.SignedCheckpoint),
-		higherCheckpoints:        make(map[string]*pb.SignedCheckpoint),
-		checkpointStore:          make(map[chkptID]*pb.SignedCheckpoint),
+		localCheckpoints:         make(map[uint64]*consensus.SignedCheckpoint),
+		higherCheckpoints:        make(map[string]*consensus.SignedCheckpoint),
+		checkpointStore:          make(map[chkptID]*consensus.SignedCheckpoint),
 		certStore:                make(map[msgID]*msgCert),
 		committedCert:            make(map[msgID]string),
 		seqMap:                   make(map[uint64]string),
-		outstandingReqBatches:    make(map[string]*pb.RequestBatch),
-		batchStore:               make(map[string]*pb.RequestBatch),
+		outstandingReqBatches:    make(map[string]*consensus.RequestBatch),
+		batchStore:               make(map[string]*consensus.RequestBatch),
 		missingReqBatches:        make(map[string]bool),
 		missingBatchesInFetching: make(map[string]msgID),
 		logger:                   c.Logger,
@@ -99,7 +98,7 @@ func newStoreMgr(c Config) *storeManager {
 }
 
 // saveCheckpoint saves checkpoint information to localCheckpoints
-func (sm *storeManager) saveCheckpoint(height uint64, signedCheckpoint *pb.SignedCheckpoint) {
+func (sm *storeManager) saveCheckpoint(height uint64, signedCheckpoint *consensus.SignedCheckpoint) {
 	sm.localCheckpoints[height] = signedCheckpoint
 }
 
@@ -113,8 +112,8 @@ func (sm *storeManager) getCert(v uint64, n uint64, d string) *msgCert {
 		return cert
 	}
 
-	prepare := make(map[pb.Prepare]bool)
-	commit := make(map[pb.Commit]bool)
+	prepare := make(map[consensus.Prepare]bool)
+	commit := make(map[consensus.Commit]bool)
 	cert = &msgCert{
 		prepare: prepare,
 		commit:  commit,
@@ -145,7 +144,7 @@ func (sm *storeManager) existedDigest(v uint64, n uint64, d string) bool {
 // =============================================================================
 // isPrePrepareLegal firstly checks if current status can receive pre-prepare or not, then checks pre-prepare message
 // itself is legal or not
-func (rbft *rbftImpl) isPrePrepareLegal(preprep *pb.PrePrepare) bool {
+func (rbft *rbftImpl[T, Constraint]) isPrePrepareLegal(preprep *consensus.PrePrepare) bool {
 
 	if rbft.atomicIn(InViewChange) {
 		rbft.logger.Debugf("Replica %d try to receive prePrepare, but it's in viewChange", rbft.peerPool.ID)
@@ -200,7 +199,7 @@ func (rbft *rbftImpl) isPrePrepareLegal(preprep *pb.PrePrepare) bool {
 
 // isPrepareLegal firstly checks if current status can receive prepare or not, then checks prepare message itself is
 // legal or not
-func (rbft *rbftImpl) isPrepareLegal(prep *pb.Prepare) bool {
+func (rbft *rbftImpl[T, Constraint]) isPrepareLegal(prep *consensus.Prepare) bool {
 
 	// if we receive prepare from primary, which means primary behavior as a byzantine, we don't send view change here,
 	// because in this case, replicas will eventually find primary abnormal in other cases.
@@ -225,7 +224,7 @@ func (rbft *rbftImpl) isPrepareLegal(prep *pb.Prepare) bool {
 }
 
 // isCommitLegal checks commit message is legal or not
-func (rbft *rbftImpl) isCommitLegal(commit *pb.Commit) bool {
+func (rbft *rbftImpl[T, Constraint]) isCommitLegal(commit *consensus.Commit) bool {
 
 	if !rbft.inWV(commit.View, commit.SequenceNumber) {
 		if commit.SequenceNumber != rbft.h && !rbft.in(SkipInProgress) {

@@ -22,9 +22,7 @@ import (
 	"fmt"
 	"math"
 
-	hpcCommonTypes "github.com/hyperchain/go-hpc-common/types"
-	"github.com/hyperchain/go-hpc-common/types/protos"
-	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
+	"github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
 	"github.com/hyperchain/go-hpc-rbft/v2/types"
 
 	"github.com/gogo/protobuf/proto"
@@ -51,65 +49,65 @@ func (a sortableUint64List) Less(i, j int) bool {
 // =============================================================================
 
 // primaryID returns the expected primary id with the given view v
-func (rbft *rbftImpl) primaryID(v uint64) uint64 {
+func (rbft *rbftImpl[T, Constraint]) primaryID(v uint64) uint64 {
 	// calculate primary id by view
 	primaryID := v%uint64(rbft.N) + 1
 	return primaryID
 }
 
 // isPrimary returns if current node is primary or not
-func (rbft *rbftImpl) isPrimary(id uint64) bool {
+func (rbft *rbftImpl[T, Constraint]) isPrimary(id uint64) bool {
 	return rbft.primaryID(rbft.view) == id
 }
 
 // InW returns if the given seqNo is higher than h or not
-func (rbft *rbftImpl) inW(n uint64) bool {
+func (rbft *rbftImpl[T, Constraint]) inW(n uint64) bool {
 	return n > rbft.h
 }
 
 // InV returns if the given view equals the current view or not
-func (rbft *rbftImpl) inV(v uint64) bool {
+func (rbft *rbftImpl[T, Constraint]) inV(v uint64) bool {
 	return rbft.view == v
 }
 
 // InWV firstly checks if the given view is inV then checks if the given seqNo n is inW
-func (rbft *rbftImpl) inWV(v uint64, n uint64) bool {
+func (rbft *rbftImpl[T, Constraint]) inWV(v uint64, n uint64) bool {
 	return rbft.inV(v) && rbft.inW(n)
 }
 
 // sendInW used in maybeSendPrePrepare checks the given seqNo is between low
 // watermark and high watermark or not.
-func (rbft *rbftImpl) sendInW(n uint64) bool {
+func (rbft *rbftImpl[T, Constraint]) sendInW(n uint64) bool {
 	return n > rbft.h && n <= rbft.h+rbft.L
 }
 
 // beyondRange is used to check the given seqNo is out of high-watermark or not
-func (rbft *rbftImpl) beyondRange(n uint64) bool {
+func (rbft *rbftImpl[T, Constraint]) beyondRange(n uint64) bool {
 	return n > rbft.h+rbft.L
 }
 
 // cleanAllBatchAndCert cleans all outstandingReqBatches and committedCert
-func (rbft *rbftImpl) cleanOutstandingAndCert() {
-	rbft.storeMgr.outstandingReqBatches = make(map[string]*pb.RequestBatch)
+func (rbft *rbftImpl[T, Constraint]) cleanOutstandingAndCert() {
+	rbft.storeMgr.outstandingReqBatches = make(map[string]*consensus.RequestBatch)
 	rbft.storeMgr.committedCert = make(map[msgID]string)
 
 	rbft.metrics.outstandingBatchesGauge.Set(float64(0))
 }
 
 // When N=3F+1, this should be 2F+1 (N-F)
-// More generally, we need every two common case quorum of size X to intersect in at least F+1
+// More generally, we need every two consensus case quorum of size X to intersect in at least F+1
 // hence 2X>=N+F+1
-func (rbft *rbftImpl) commonCaseQuorum() int {
+func (rbft *rbftImpl[T, Constraint]) commonCaseQuorum() int {
 	return int(math.Ceil(float64(rbft.N+rbft.f+1) / float64(2)))
 }
 
 // oneCorrectQuorum returns the number of replicas in which correct numbers must be bigger than incorrect number
-func (rbft *rbftImpl) allCorrectReplicasQuorum() int {
+func (rbft *rbftImpl[T, Constraint]) allCorrectReplicasQuorum() int {
 	return rbft.N - rbft.f
 }
 
 // oneCorrectQuorum returns the number of replicas in which there must exist at least one correct replica
-func (rbft *rbftImpl) oneCorrectQuorum() int {
+func (rbft *rbftImpl[T, Constraint]) oneCorrectQuorum() int {
 	return rbft.f + 1
 }
 
@@ -118,7 +116,7 @@ func (rbft *rbftImpl) oneCorrectQuorum() int {
 // =============================================================================
 
 // prePrepared returns if there existed a pre-prepare message in certStore with the given view,seqNo,digest
-func (rbft *rbftImpl) prePrepared(v uint64, n uint64, d string) bool {
+func (rbft *rbftImpl[T, Constraint]) prePrepared(v uint64, n uint64, d string) bool {
 	cert := rbft.storeMgr.certStore[msgID{v, n, d}]
 
 	if cert != nil {
@@ -135,7 +133,7 @@ func (rbft *rbftImpl) prePrepared(v uint64, n uint64, d string) bool {
 
 // prepared firstly checks if the cert with the given msgID has been prePrepared,
 // then checks if this node has collected enough prepare messages for the cert with given msgID
-func (rbft *rbftImpl) prepared(v uint64, n uint64, d string) bool {
+func (rbft *rbftImpl[T, Constraint]) prepared(v uint64, n uint64, d string) bool {
 
 	if !rbft.prePrepared(v, n, d) {
 		return false
@@ -153,7 +151,7 @@ func (rbft *rbftImpl) prepared(v uint64, n uint64, d string) bool {
 
 // committed firstly checks if the cert with the given msgID has been prepared,
 // then checks if this node has collected enough commit messages for the cert with given msgID
-func (rbft *rbftImpl) committed(v uint64, n uint64, d string) bool {
+func (rbft *rbftImpl[T, Constraint]) committed(v uint64, n uint64, d string) bool {
 
 	if !rbft.prepared(v, n, d) {
 		return false
@@ -174,14 +172,14 @@ func (rbft *rbftImpl) committed(v uint64, n uint64, d string) bool {
 // =============================================================================
 
 // broadcastReqSet helps broadcast requestSet to others.
-func (rbft *rbftImpl) broadcastReqSet(set *pb.RequestSet) {
+func (rbft *rbftImpl[T, Constraint]) broadcastReqSet(set *consensus.RequestSet) {
 	payload, err := proto.Marshal(set)
 	if err != nil {
 		rbft.logger.Errorf("ConsensusMessage_TRANSACTION_SET Marshal Error: %s", err)
 		return
 	}
-	consensusMsg := &pb.ConsensusMessage{
-		Type:    pb.Type_REQUEST_SET,
+	consensusMsg := &consensus.ConsensusMessage{
+		Type:    consensus.Type_REQUEST_SET,
 		Payload: payload,
 	}
 	rbft.peerPool.broadcast(context.TODO(), consensusMsg)
@@ -193,7 +191,7 @@ func (rbft *rbftImpl) broadcastReqSet(set *pb.RequestSet) {
 
 // startTimerIfOutstandingRequests soft starts a new view timer if there exists some outstanding request batches,
 // else reset the null request timer
-func (rbft *rbftImpl) startTimerIfOutstandingRequests() {
+func (rbft *rbftImpl[T, Constraint]) startTimerIfOutstandingRequests() {
 	if rbft.in(SkipInProgress) {
 		// Do not start the view change timer if we are executing or state transferring, these take arbitrarily long amounts of time
 		return
@@ -215,7 +213,7 @@ func (rbft *rbftImpl) startTimerIfOutstandingRequests() {
 // different:
 // 1. for primary, null request timeout is the timeout written in the config
 // 2. for non-primary, null request timeout =3*(timeout written in the config)+request timeout
-func (rbft *rbftImpl) nullReqTimerReset() {
+func (rbft *rbftImpl[T, Constraint]) nullReqTimerReset() {
 	timeout := rbft.timerMgr.getTimeoutValue(nullRequestTimer)
 	if !rbft.isPrimary(rbft.peerPool.ID) {
 		// we're waiting for the primary to deliver a null request - give it a bit more time
@@ -236,7 +234,7 @@ func (rbft *rbftImpl) nullReqTimerReset() {
 // and ID, if there exists more than one weak sets, we'll never find a stable cert for this
 // seqNo, else checks if self's generated checkpoint has the same ID with the given one,
 // if not, directly start state update to recover to a correct state.
-func (rbft *rbftImpl) compareCheckpointWithWeakSet(signedCheckpoint *pb.SignedCheckpoint) (bool, []*pb.SignedCheckpoint) {
+func (rbft *rbftImpl[T, Constraint]) compareCheckpointWithWeakSet(signedCheckpoint *consensus.SignedCheckpoint) (bool, []*consensus.SignedCheckpoint) {
 	// if checkpoint height is lower than current low watermark, ignore it as we have reached a higher h,
 	// else, continue to find f+1 checkpoint messages with the same seqNo and ID
 	checkpointHeight := signedCheckpoint.Checkpoint.Height()
@@ -264,7 +262,7 @@ func (rbft *rbftImpl) compareCheckpointWithWeakSet(signedCheckpoint *pb.SignedCh
 	rbft.storeMgr.checkpointStore[cID] = signedCheckpoint
 
 	// track how much different checkpoint values we have for the seqNo.
-	diffValues := make(map[string][]*pb.SignedCheckpoint)
+	diffValues := make(map[string][]*consensus.SignedCheckpoint)
 	// track how many "correct"(more than f + 1) checkpoint values we have for the seqNo.
 	var correctHashes []string
 
@@ -281,7 +279,7 @@ func (rbft *rbftImpl) compareCheckpointWithWeakSet(signedCheckpoint *pb.SignedCh
 		}
 
 		if _, exist := diffValues[hash]; !exist {
-			diffValues[hash] = []*pb.SignedCheckpoint{signedChkpt}
+			diffValues[hash] = []*consensus.SignedCheckpoint{signedChkpt}
 		} else {
 			diffValues[hash] = append(diffValues[hash], signedChkpt)
 		}
@@ -291,10 +289,10 @@ func (rbft *rbftImpl) compareCheckpointWithWeakSet(signedCheckpoint *pb.SignedCh
 		if len(diffValues) > rbft.oneCorrectQuorum() {
 			rbft.logger.Criticalf("Replica %d cannot find stable checkpoint with seqNo %d"+
 				"(%d different values observed already).", rbft.peerPool.ID, checkpointHeight, len(diffValues))
-			tc := hpcCommonTypes.TagContentInconsistentCheckpoint{
+			tc := consensus.TagContentInconsistentCheckpoint{
 				Height: checkpointHeight,
 			}
-			checkpointSet := make(map[hpcCommonTypes.CheckpointState][]string)
+			checkpointSet := make(map[consensus.CommonCheckpointState][]string)
 			for _, value := range diffValues {
 				epoch := value[0].Checkpoint.NextEpoch()
 				digest := value[0].Checkpoint.Digest()
@@ -302,10 +300,10 @@ func (rbft *rbftImpl) compareCheckpointWithWeakSet(signedCheckpoint *pb.SignedCh
 				for _, sc := range value {
 					authors = append(authors, sc.GetAuthor())
 				}
-				checkpointSet[hpcCommonTypes.CheckpointState{Epoch: epoch, Hash: digest}] = authors
+				checkpointSet[consensus.CommonCheckpointState{Epoch: epoch, Hash: digest}] = authors
 			}
 			tc.CheckpointSet = checkpointSet
-			rbft.logger.Trace(hpcCommonTypes.TagNameCheckpoint, hpcCommonTypes.TagStageWarning, tc)
+			rbft.logger.Trace(consensus.TagNameCheckpoint, consensus.TagStageWarning, tc)
 			rbft.on(Inconsistent)
 			rbft.metrics.statusGaugeInconsistent.Set(Inconsistent)
 			rbft.setAbNormal()
@@ -364,9 +362,9 @@ func (rbft *rbftImpl) compareCheckpointWithWeakSet(signedCheckpoint *pb.SignedCh
 // 1. view: current view of bft network
 // 2. height: current latest blockChain height
 // 3. digest: current latest blockChain hash
-func (rbft *rbftImpl) compareWholeStates(states wholeStates) consensusEvent {
+func (rbft *rbftImpl[T, Constraint]) compareWholeStates(states wholeStates) consensusEvent {
 	// track all replica with same state used to find quorum consistent state
-	sameRespRecord := make(map[nodeState][]*pb.SignedCheckpoint)
+	sameRespRecord := make(map[nodeState][]*consensus.SignedCheckpoint)
 
 	// check if we can find quorum nodeState who have the same view, height and digest, if we can
 	// find, which means quorum nodes agree to same state, save to quorumRsp, set canFind to true
@@ -450,9 +448,9 @@ func (rbft *rbftImpl) compareWholeStates(states wholeStates) consensusEvent {
 // calcQSet selects Pre-prepares which satisfy the following conditions
 // 1. Pre-prepares in previous qlist
 // 2. Pre-prepares from certStore which is preprepared and its view <= its idx.v or not in qlist
-func (rbft *rbftImpl) calcQSet() map[qidx]*pb.Vc_PQ {
+func (rbft *rbftImpl[T, Constraint]) calcQSet() map[qidx]*consensus.Vc_PQ {
 
-	qset := make(map[qidx]*pb.Vc_PQ)
+	qset := make(map[qidx]*consensus.Vc_PQ)
 
 	for n, q := range rbft.vcMgr.qlist {
 		qset[n] = q
@@ -469,7 +467,7 @@ func (rbft *rbftImpl) calcQSet() map[qidx]*pb.Vc_PQ {
 			continue
 		}
 
-		qset[qi] = &pb.Vc_PQ{
+		qset[qi] = &consensus.Vc_PQ{
 			SequenceNumber: idx.n,
 			BatchDigest:    idx.d,
 			View:           idx.v,
@@ -482,9 +480,9 @@ func (rbft *rbftImpl) calcQSet() map[qidx]*pb.Vc_PQ {
 // calcPSet selects prepares which satisfy the following conditions:
 // 1. prepares in previous qlist
 // 2. prepares from certStore which is prepared and (its view <= its idx.v or not in plist)
-func (rbft *rbftImpl) calcPSet() map[uint64]*pb.Vc_PQ {
+func (rbft *rbftImpl[T, Constraint]) calcPSet() map[uint64]*consensus.Vc_PQ {
 
-	pset := make(map[uint64]*pb.Vc_PQ)
+	pset := make(map[uint64]*consensus.Vc_PQ)
 
 	for n, p := range rbft.vcMgr.plist {
 		pset[n] = p
@@ -500,7 +498,7 @@ func (rbft *rbftImpl) calcPSet() map[uint64]*pb.Vc_PQ {
 			continue
 		}
 
-		pset[idx.n] = &pb.Vc_PQ{
+		pset[idx.n] = &consensus.Vc_PQ{
 			SequenceNumber: idx.n,
 			BatchDigest:    idx.d,
 			View:           idx.v,
@@ -512,8 +510,8 @@ func (rbft *rbftImpl) calcPSet() map[uint64]*pb.Vc_PQ {
 
 // getVcBasis helps re-calculate the plist and qlist then construct a vcBasis
 // at teh same time, useless cert with lower .
-func (rbft *rbftImpl) getVcBasis() *pb.VcBasis {
-	basis := &pb.VcBasis{
+func (rbft *rbftImpl[T, Constraint]) getVcBasis() *consensus.VcBasis {
+	basis := &consensus.VcBasis{
 		View:      rbft.view,
 		H:         rbft.h,
 		ReplicaId: rbft.peerPool.ID,
@@ -553,7 +551,7 @@ func (rbft *rbftImpl) getVcBasis() *pb.VcBasis {
 }
 
 // gatherPQC just gather all checkpoints, p entries and q entries.
-func (rbft *rbftImpl) gatherPQC() (pset []*pb.Vc_PQ, qset []*pb.Vc_PQ, signedCheckpoints []*pb.SignedCheckpoint) {
+func (rbft *rbftImpl[T, Constraint]) gatherPQC() (pset []*consensus.Vc_PQ, qset []*consensus.Vc_PQ, signedCheckpoints []*consensus.SignedCheckpoint) {
 	// Gather all the checkpoints
 	rbft.logger.Debugf("Replica %d gather CSet:", rbft.peerPool.ID)
 	for n, signedCheckpoint := range rbft.storeMgr.localCheckpoints {
@@ -586,7 +584,7 @@ func (rbft *rbftImpl) gatherPQC() (pset []*pb.Vc_PQ, qset []*pb.Vc_PQ, signedChe
 }
 
 // putBackRequestBatches reset all txs into 'non-batched' state in requestPool to prepare re-arrange by order.
-func (rbft *rbftImpl) putBackRequestBatches(xset []*pb.Vc_PQ) {
+func (rbft *rbftImpl[T, Constraint]) putBackRequestBatches(xset []*consensus.Vc_PQ) {
 
 	// remove all the batches that smaller than initial checkpoint.
 	// those batches are the dependency of duplicator,
@@ -630,7 +628,7 @@ func (rbft *rbftImpl) putBackRequestBatches(xset []*pb.Vc_PQ) {
 }
 
 // checkIfNeedStateUpdate checks if a replica needs to do state update
-func (rbft *rbftImpl) checkIfNeedStateUpdate(checkpointState *types.CheckpointState, checkpointSet []*pb.SignedCheckpoint) bool {
+func (rbft *rbftImpl[T, Constraint]) checkIfNeedStateUpdate(checkpointState *types.CheckpointState, checkpointSet []*consensus.SignedCheckpoint) bool {
 	// initial checkpoint height and digest.
 	initialCheckpointHeight := checkpointState.Meta.Height
 	initialCheckpointDigest := checkpointState.Meta.Digest
@@ -684,7 +682,7 @@ func (rbft *rbftImpl) checkIfNeedStateUpdate(checkpointState *types.CheckpointSt
 	return false
 }
 
-func (rbft *rbftImpl) equalMetaState(s1 *types.MetaState, s2 *types.MetaState) bool {
+func (rbft *rbftImpl[T, Constraint]) equalMetaState(s1 *types.MetaState, s2 *types.MetaState) bool {
 	rbft.logger.Debugf("Replica %d check if meta states are equal: 1)%+v, 2)%+v", rbft.peerPool.ID, s1, s2)
 
 	// nil pointer cannot be checked
@@ -703,7 +701,7 @@ func (rbft *rbftImpl) equalMetaState(s1 *types.MetaState, s2 *types.MetaState) b
 	return true
 }
 
-func (rbft *rbftImpl) stopNamespace() {
+func (rbft *rbftImpl[T, Constraint]) stopNamespace() {
 	defer func() {
 		// delFlag channel might be closed by other modules at the same time
 		// consensus requests to stop namespace
@@ -716,8 +714,12 @@ func (rbft *rbftImpl) stopNamespace() {
 	rbft.delFlag <- true
 }
 
-func requestHash(tx *protos.Transaction) string {
-	return hpcCommonTypes.GetHash(tx).String()
+func requestHash[T any, Constraint consensus.TXConstraint[T]](data []byte) string {
+	tx, err := consensus.DecodeTx[T, Constraint](data)
+	if err != nil {
+		panic("decodeTx err in requestHash")
+	}
+	return Constraint(tx).RbftGetTxHash()
 }
 
 // calculateMD5Hash calculate hash by MD5
@@ -734,32 +736,34 @@ func calculateMD5Hash(list []string, timestamp int64) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-func drainChannel(ch chan consensusEvent) protos.Transactions {
-	remainTxs := make(protos.Transactions, 0)
+func drainChannel(ch chan consensusEvent) ([][]byte, error) {
+	remainTxs := make([][]byte, 0)
 
 	for len(ch) > 0 {
 		select {
 		case ee := <-ch:
 			switch e := ee.(type) {
-			case *pb.RequestSet:
-				remainTxs = append(remainTxs, e.Requests...)
+			case *consensus.RequestSet:
+				for _, tx := range e.Requests {
+					remainTxs = append(remainTxs, tx)
+				}
 			default:
 			}
 		default:
 		}
 	}
-	return remainTxs
+	return remainTxs, nil
 }
 
 // generateSignedCheckpoint generates a signed checkpoint using given service state.
-func (rbft *rbftImpl) generateSignedCheckpoint(state *types.ServiceState, isConfig bool) (*pb.SignedCheckpoint, error) {
-	signedCheckpoint := &pb.SignedCheckpoint{
+func (rbft *rbftImpl[T, Constraint]) generateSignedCheckpoint(state *types.ServiceState, isConfig bool) (*consensus.SignedCheckpoint, error) {
+	signedCheckpoint := &consensus.SignedCheckpoint{
 		Author: rbft.peerPool.hostname,
 	}
 
-	checkpoint := &protos.Checkpoint{
+	checkpoint := &consensus.Checkpoint{
 		Epoch: rbft.epoch,
-		ExecuteState: &protos.Checkpoint_ExecuteState{
+		ExecuteState: &consensus.Checkpoint_ExecuteState{
 			Height: state.MetaState.Height,
 			Digest: state.MetaState.Digest,
 		},
@@ -802,7 +806,7 @@ func (rbft *rbftImpl) generateSignedCheckpoint(state *types.ServiceState, isConf
 }
 
 // signCheckpoint generates a signature of certain checkpoint message.
-func (rbft *rbftImpl) signCheckpoint(checkpoint *protos.Checkpoint) ([]byte, error) {
+func (rbft *rbftImpl[T, Constraint]) signCheckpoint(checkpoint *consensus.Checkpoint) ([]byte, error) {
 	msg := checkpoint.Hash()
 	sig, sErr := rbft.external.Sign(msg)
 	if sErr != nil {
@@ -812,13 +816,13 @@ func (rbft *rbftImpl) signCheckpoint(checkpoint *protos.Checkpoint) ([]byte, err
 }
 
 // verifySignedCheckpoint returns whether given signedCheckpoint contains a valid signature.
-func (rbft *rbftImpl) verifySignedCheckpoint(signedCheckpoint *pb.SignedCheckpoint) error {
+func (rbft *rbftImpl[T, Constraint]) verifySignedCheckpoint(signedCheckpoint *consensus.SignedCheckpoint) error {
 	msg := signedCheckpoint.Checkpoint.Hash()
 	return rbft.external.Verify(signedCheckpoint.GetAuthor(), signedCheckpoint.Signature, msg)
 }
 
 // syncConfigCheckpoint posts config checkpoint out and wait for its completion synchronously.
-func (rbft *rbftImpl) syncConfigCheckpoint(checkpointHeight uint64, quorumCheckpoints []*pb.SignedCheckpoint) bool {
+func (rbft *rbftImpl[T, Constraint]) syncConfigCheckpoint(checkpointHeight uint64, quorumCheckpoints []*consensus.SignedCheckpoint) bool {
 	// waiting for stable checkpoint finish
 	rbft.logger.Infof("Replica %d post stable checkpoint event for seqNo %d after "+
 		"executed to the height with the same digest", rbft.peerPool.ID, checkpointHeight)
@@ -850,7 +854,7 @@ func (rbft *rbftImpl) syncConfigCheckpoint(checkpointHeight uint64, quorumCheckp
 // syncEpoch tries to sync rbft.Epoch with current latest epoch on ledger and returns
 // if epoch has been changed.
 // turn into new epoch when epoch has been changed.
-func (rbft *rbftImpl) syncEpoch() bool {
+func (rbft *rbftImpl[T, Constraint]) syncEpoch() bool {
 	lastEpochCheckpoint := rbft.external.GetLastCheckpoint()
 	chainEpoch := lastEpochCheckpoint.NextEpoch()
 	epochChanged := chainEpoch != rbft.epoch
@@ -867,7 +871,7 @@ func (rbft *rbftImpl) syncEpoch() bool {
 }
 
 // signViewChange generates a signature of certain ViewChange message.
-func (rbft *rbftImpl) signViewChange(vc *pb.ViewChange) ([]byte, error) {
+func (rbft *rbftImpl[T, Constraint]) signViewChange(vc *consensus.ViewChange) ([]byte, error) {
 	hash, hErr := rbft.calculateViewChangeHash(vc)
 	if hErr != nil {
 		return nil, hErr
@@ -882,7 +886,7 @@ func (rbft *rbftImpl) signViewChange(vc *pb.ViewChange) ([]byte, error) {
 }
 
 // verifySignedViewChange returns whether given ViewChange contains a valid signature.
-func (rbft *rbftImpl) verifySignedViewChange(vc *pb.ViewChange, replicaID uint64) error {
+func (rbft *rbftImpl[T, Constraint]) verifySignedViewChange(vc *consensus.ViewChange, replicaID uint64) error {
 	hash, hErr := rbft.calculateViewChangeHash(vc)
 	if hErr != nil {
 		return hErr
@@ -894,7 +898,7 @@ func (rbft *rbftImpl) verifySignedViewChange(vc *pb.ViewChange, replicaID uint64
 	return rbft.external.Verify(host, vc.Signature, hash)
 }
 
-func (rbft *rbftImpl) calculateViewChangeHash(vc *pb.ViewChange) ([]byte, error) {
+func (rbft *rbftImpl[T, Constraint]) calculateViewChangeHash(vc *consensus.ViewChange) ([]byte, error) {
 	hasher := sha3.NewLegacyKeccak256()
 	//nolint
 	hasher.Write(vc.GetBasis())
@@ -903,7 +907,7 @@ func (rbft *rbftImpl) calculateViewChangeHash(vc *pb.ViewChange) ([]byte, error)
 }
 
 // signNewView generates a signature of certain NewView message.
-func (rbft *rbftImpl) signNewView(nv *pb.NewView) ([]byte, error) {
+func (rbft *rbftImpl[T, Constraint]) signNewView(nv *consensus.NewView) ([]byte, error) {
 	hash, hErr := rbft.calculateNewViewHash(nv)
 	if hErr != nil {
 		return nil, hErr
@@ -918,7 +922,7 @@ func (rbft *rbftImpl) signNewView(nv *pb.NewView) ([]byte, error) {
 }
 
 // verifySignedNewView returns whether given NewView contains a valid signature.
-func (rbft *rbftImpl) verifySignedNewView(nv *pb.NewView) ([]byte, error) {
+func (rbft *rbftImpl[T, Constraint]) verifySignedNewView(nv *consensus.NewView) ([]byte, error) {
 	hash, hErr := rbft.calculateNewViewHash(nv)
 	if hErr != nil {
 		return nil, hErr
@@ -930,8 +934,8 @@ func (rbft *rbftImpl) verifySignedNewView(nv *pb.NewView) ([]byte, error) {
 	return hash, rbft.external.Verify(host, nv.Signature, hash)
 }
 
-func (rbft *rbftImpl) calculateNewViewHash(nv *pb.NewView) ([]byte, error) {
-	signValue := &pb.NewView{
+func (rbft *rbftImpl[T, Constraint]) calculateNewViewHash(nv *consensus.NewView) ([]byte, error) {
+	signValue := &consensus.NewView{
 		ReplicaId: nv.ReplicaId,
 		View:      nv.View,
 		Xset:      nv.Xset,

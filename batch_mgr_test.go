@@ -5,10 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hyperchain/go-hpc-common/types/protos"
-	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
-
 	"github.com/golang/mock/gomock"
+	consensus "github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -16,7 +14,7 @@ func TestBatchMgr_startBatchTimer(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	_, rbfts := newBasicClusterInstance()
+	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	assert.False(t, rbfts[0].timerMgr.getTimer(batchTimer))
 	assert.False(t, rbfts[0].batchMgr.isBatchTimerActive())
 	rbfts[0].startBatchTimer()
@@ -29,19 +27,23 @@ func TestBatchMgr_maybeSendPrePrepare(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	_, rbfts := newBasicClusterInstance()
+	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 
 	// Set a Batch
-	batchTmp41 := &pb.RequestBatch{
+	txBytes41, err := newTx().Marshal()
+	assert.NoError(t, err)
+	batchTmp41 := &consensus.RequestBatch{
 		RequestHashList: []string{"tx-hash-41"},
-		RequestList:     []*protos.Transaction{newTx()},
+		RequestList:     [][]byte{txBytes41},
 		Timestamp:       time.Now().UnixNano(),
 		LocalList:       []bool{true},
 		BatchHash:       "test digest 41",
 	}
-	batchTmp42 := &pb.RequestBatch{
+	txBytes42, err := newTx().Marshal()
+	assert.NoError(t, err)
+	batchTmp42 := &consensus.RequestBatch{
 		RequestHashList: []string{"tx-hash-42"},
-		RequestList:     []*protos.Transaction{newTx()},
+		RequestList:     [][]byte{txBytes42},
 		Timestamp:       time.Now().UnixNano(),
 		LocalList:       []bool{true},
 		BatchHash:       "test digest 42",
@@ -70,23 +72,23 @@ func TestBatchMgr_findNextPrepareBatch(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	_, rbfts := newBasicClusterInstance()
+	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 
 	// Struct of certTmp which stored in rbft.storeMgr.certStore
-	prePrepareTmp := &pb.PrePrepare{
+	prePrepareTmp := &consensus.PrePrepare{
 		ReplicaId:      2,
 		View:           0,
 		SequenceNumber: 20,
 		BatchDigest:    "msg",
-		HashBatch:      &pb.HashBatch{Timestamp: 10086},
+		HashBatch:      &consensus.HashBatch{Timestamp: 10086},
 	}
-	prePareTmp := pb.Prepare{
+	prePareTmp := consensus.Prepare{
 		ReplicaId:      3,
 		View:           0,
 		SequenceNumber: 20,
 		BatchDigest:    "msg",
 	}
-	commitTmp := pb.Commit{
+	commitTmp := consensus.Commit{
 		ReplicaId:      4,
 		View:           0,
 		SequenceNumber: 20,
@@ -102,9 +104,9 @@ func TestBatchMgr_findNextPrepareBatch(t *testing.T) {
 	certTmp := &msgCert{
 		prePrepare:  nil,
 		sentPrepare: false,
-		prepare:     nil, //map[pb.Prepare]bool{prePareTmp: true},
+		prepare:     nil, //map[consensus.Prepare]bool{prePareTmp: true},
 		sentCommit:  false,
-		commit:      nil, //map[pb.Commit]bool{commitTmp: true},
+		commit:      nil, //map[consensus.Commit]bool{commitTmp: true},
 		sentExecute: false,
 	}
 	rbfts[0].storeMgr.certStore[msgIDTmp] = certTmp
@@ -129,8 +131,8 @@ func TestBatchMgr_findNextPrepareBatch(t *testing.T) {
 	t.Run("Normal case, there are no batches in storeMgr", func(t *testing.T) {
 
 		// store the HashBatch which was input by certTmp
-		certTmp.prepare = map[pb.Prepare]bool{prePareTmp: true}
-		certTmp.commit = map[pb.Commit]bool{commitTmp: true}
+		certTmp.prepare = map[consensus.Prepare]bool{prePareTmp: true}
+		certTmp.commit = map[consensus.Commit]bool{commitTmp: true}
 
 		assert.Nil(t, rbfts[0].findNextPrepareBatch(context.TODO(), 0, 20, "msg"))
 
@@ -144,20 +146,20 @@ func TestBatchMgr_findNextPrepareBatch(t *testing.T) {
 		assert.Nil(t, rbfts[0].findNextPrepareBatch(context.TODO(), 0, 20, "msg"))
 		assert.Equal(t, true, rbfts[0].storeMgr.certStore[msgIDTmp].sentPrepare)
 		// Digest == ""
-		prePrepareTmpNil := &pb.PrePrepare{
+		prePrepareTmpNil := &consensus.PrePrepare{
 			ReplicaId:      2,
 			View:           0,
 			SequenceNumber: 30,
 			BatchDigest:    "",
-			HashBatch:      &pb.HashBatch{Timestamp: 10086},
+			HashBatch:      &consensus.HashBatch{Timestamp: 10086},
 		}
-		prePareTmpNil := pb.Prepare{
+		prePareTmpNil := consensus.Prepare{
 			ReplicaId:      3,
 			View:           0,
 			SequenceNumber: 30,
 			BatchDigest:    "",
 		}
-		commitTmpNil := pb.Commit{
+		commitTmpNil := consensus.Commit{
 			ReplicaId:      4,
 			View:           0,
 			SequenceNumber: 30,
@@ -171,9 +173,9 @@ func TestBatchMgr_findNextPrepareBatch(t *testing.T) {
 		certTmpNil := &msgCert{
 			prePrepare:  prePrepareTmpNil,
 			sentPrepare: false,
-			prepare:     map[pb.Prepare]bool{prePareTmpNil: true},
+			prepare:     map[consensus.Prepare]bool{prePareTmpNil: true},
 			sentCommit:  false,
-			commit:      map[pb.Commit]bool{commitTmpNil: true},
+			commit:      map[consensus.Commit]bool{commitTmpNil: true},
 			sentExecute: false,
 		}
 		rbfts[0].setView(0)
@@ -183,12 +185,12 @@ func TestBatchMgr_findNextPrepareBatch(t *testing.T) {
 		assert.Equal(t, true, rbfts[0].storeMgr.certStore[msgIDTmpNil].sentPrepare)
 		assert.Equal(t, true, rbfts[0].storeMgr.certStore[msgIDTmpNil].sentPrepare)
 
-		prePrepareConfBatch := &pb.PrePrepare{
+		prePrepareConfBatch := &consensus.PrePrepare{
 			ReplicaId:      2,
 			View:           0,
 			SequenceNumber: 35,
 			BatchDigest:    "conf-batch-hash",
-			HashBatch:      &pb.HashBatch{Timestamp: 10086},
+			HashBatch:      &consensus.HashBatch{Timestamp: 10086},
 		}
 		msgIDConfBatch := msgID{
 			v: 0,
@@ -198,16 +200,18 @@ func TestBatchMgr_findNextPrepareBatch(t *testing.T) {
 		certConfBatch := &msgCert{
 			prePrepare:  prePrepareConfBatch,
 			sentPrepare: false,
-			prepare:     map[pb.Prepare]bool{prePareTmpNil: true},
+			prepare:     map[consensus.Prepare]bool{prePareTmpNil: true},
 			sentCommit:  false,
-			commit:      map[pb.Commit]bool{commitTmpNil: true},
+			commit:      map[consensus.Commit]bool{commitTmpNil: true},
 			sentExecute: false,
 		}
 		rbfts[0].storeMgr.certStore[msgIDConfBatch] = certConfBatch
 		ctx := newCTX(defaultValidatorSet)
-		confBatch := &pb.RequestBatch{
+		txBytes, err := ctx.Marshal()
+		assert.Nil(t, err)
+		confBatch := &consensus.RequestBatch{
 			BatchHash:   "conf-batch-hash",
-			RequestList: []*protos.Transaction{ctx},
+			RequestList: [][]byte{txBytes},
 		}
 		rbfts[0].storeMgr.batchStore["conf-batch-hash"] = confBatch
 		_ = rbfts[0].findNextPrepareBatch(context.TODO(), 0, 35, "conf-batch-hash")

@@ -18,28 +18,27 @@ import (
 	"context"
 	"sync"
 
-	"github.com/hyperchain/go-hpc-common/types/protos"
-	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
+	consensus "github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
 	"github.com/hyperchain/go-hpc-rbft/v2/types"
 )
 
 // Node represents a node in a RBFT cluster.
-type Node interface {
+type Node[T any, Constraint consensus.TXConstraint[T]] interface {
 	// Start starts a RBFT node instance.
 	Start() error
 	// Stop performs any necessary termination of the Node.
-	Stop() []*protos.Transaction
+	Stop() [][]byte
 	// Propose proposes requests to RBFT core, requests are ensured to be eventually
 	// submitted to all non-fault nodes unless current node crash down.
-	Propose(requests *pb.RequestSet) error
+	Propose(requests *consensus.RequestSet) error
 	// Step advances the state machine using the given message.
-	Step(ctx context.Context, msg *pb.ConsensusMessage)
+	Step(ctx context.Context, msg *consensus.ConsensusMessage)
 	// ApplyConfChange applies config change to the local node.
 	ApplyConfChange(cc *types.ConfState)
 	// Status returns the current node status of the RBFT state machine.
 	Status() NodeStatus
 	// GetUncommittedTransactions returns uncommitted txs
-	GetUncommittedTransactions(maxsize uint64) []*protos.Transaction
+	GetUncommittedTransactions(maxsize uint64) [][]byte
 	// ServiceInbound receives and records modifications from application service.
 	ServiceInbound
 }
@@ -69,32 +68,32 @@ type ServiceInbound interface {
 
 // node implements the Node interface and track application service synchronously to help RBFT core
 // retrieve service state.
-type node struct {
+type node[T any, Constraint consensus.TXConstraint[T]] struct {
 	// rbft is the actually RBFT service.
-	rbft *rbftImpl
+	rbft *rbftImpl[T, Constraint]
 
 	// stateLock is used to ensure mutually exclusive access of currentState.
 	stateLock sync.RWMutex
 	// currentState maintains the current application service state.
 	currentState *types.ServiceState
 
-	config Config
+	config Config[T, Constraint]
 	logger Logger
 }
 
 // NewNode initializes a Node service.
-func NewNode(conf Config) (Node, error) {
-	return newNode(conf)
+func NewNode[T any, Constraint consensus.TXConstraint[T]](conf Config[T, Constraint]) (Node[T, Constraint], error) {
+	return newNode[T, Constraint](conf)
 }
 
 // newNode help to initialize a Node service.
-func newNode(conf Config) (*node, error) {
-	rbft, err := newRBFT(conf)
+func newNode[T any, Constraint consensus.TXConstraint[T]](conf Config[T, Constraint]) (*node[T, Constraint], error) {
+	rbft, err := newRBFT[T, Constraint](conf)
 	if err != nil {
 		return nil, err
 	}
 
-	n := &node{
+	n := &node[T, Constraint]{
 		rbft:   rbft,
 		config: conf,
 		logger: conf.Logger,
@@ -106,7 +105,7 @@ func newNode(conf Config) (*node, error) {
 }
 
 // Start starts a Node instance.
-func (n *node) Start() error {
+func (n *node[T, Constraint]) Start() error {
 	err := n.rbft.start()
 	if err != nil {
 		return err
@@ -116,7 +115,7 @@ func (n *node) Start() error {
 }
 
 // Stop stops a Node instance.
-func (n *node) Stop() []*protos.Transaction {
+func (n *node[T, Constraint]) Stop() [][]byte {
 	// stop RBFT core.
 	remainTxs := n.rbft.stop()
 
@@ -129,26 +128,26 @@ func (n *node) Stop() []*protos.Transaction {
 
 // Propose proposes requests to RBFT core, requests are ensured to be eventually
 // submitted to all non-fault nodes unless current node crash down.
-func (n *node) Propose(requests *pb.RequestSet) error {
+func (n *node[T, Constraint]) Propose(requests *consensus.RequestSet) error {
 	n.rbft.postRequests(requests)
 
 	return nil
 }
 
 // Step advances the state machine using the given message.
-func (n *node) Step(ctx context.Context, msg *pb.ConsensusMessage) {
+func (n *node[T, Constraint]) Step(ctx context.Context, msg *consensus.ConsensusMessage) {
 	n.rbft.step(ctx, msg)
 }
 
 // ApplyConfChange applies config change to the local node.
-func (n *node) ApplyConfChange(cc *types.ConfState) {
+func (n *node[T, Constraint]) ApplyConfChange(cc *types.ConfState) {
 	n.rbft.postConfState(cc)
 }
 
 // ReportExecuted reports to RBFT core that application service has finished height one batch with
 // current height batch seqNo and state digest.
 // Users can report any necessary extra field optionally.
-func (n *node) ReportExecuted(state *types.ServiceState) {
+func (n *node[T, Constraint]) ReportExecuted(state *types.ServiceState) {
 	n.stateLock.Lock()
 	if n.currentState == nil {
 		n.logger.Noticef("Init service state with: %s", state)
@@ -174,7 +173,7 @@ func (n *node) ReportExecuted(state *types.ServiceState) {
 // request which was triggered by RBFT core before.
 // Users must ReportStateUpdated after RBFT core invoked StateUpdate request no matter this request was
 // finished successfully or not, otherwise, RBFT core will enter abnormal status infinitely.
-func (n *node) ReportStateUpdated(state *types.ServiceState) {
+func (n *node[T, Constraint]) ReportStateUpdated(state *types.ServiceState) {
 	n.stateLock.Lock()
 	if state.MetaState.Height != 0 && state.MetaState.Height <= n.currentState.MetaState.Height {
 		n.logger.Infof("Receive a service state with height ID which is not "+
@@ -187,17 +186,17 @@ func (n *node) ReportStateUpdated(state *types.ServiceState) {
 }
 
 // ReportStableCheckpointFinished reports stable checkpoint event has been processed successfully.
-func (n *node) ReportStableCheckpointFinished(height uint64) {
+func (n *node[T, Constraint]) ReportStableCheckpointFinished(height uint64) {
 	n.logger.Noticef("process stable checkpoint finished, height: %d", height)
 	n.rbft.reportStableCheckpointFinished(height)
 }
 
 // Status returns the current node status of the RBFT state machine.
-func (n *node) Status() NodeStatus {
+func (n *node[T, Constraint]) Status() NodeStatus {
 	return n.rbft.getStatus()
 }
 
-func (n *node) GetUncommittedTransactions(maxsize uint64) []*protos.Transaction {
+func (n *node[T, Constraint]) GetUncommittedTransactions(maxsize uint64) [][]byte {
 	// get hash of transactions that had committed
 	var digestList []string
 	committedHeight := n.rbft.h
@@ -213,7 +212,7 @@ func (n *node) GetUncommittedTransactions(maxsize uint64) []*protos.Transaction 
 }
 
 // getCurrentState retrieves the current application state.
-func (n *node) getCurrentState() *types.ServiceState {
+func (n *node[T, Constraint]) getCurrentState() *types.ServiceState {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
 	return n.currentState

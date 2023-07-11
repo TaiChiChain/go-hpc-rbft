@@ -5,19 +5,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hyperchain/go-hpc-common/metrics/disabled"
+	"github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
+	"github.com/hyperchain/go-hpc-rbft/v2/common/metrics/disabled"
 	mockexternal "github.com/hyperchain/go-hpc-rbft/v2/mock/mock_external"
-	txpoolmock "github.com/hyperchain/go-hpc-txpool/mock"
+	txpoolmock "github.com/hyperchain/go-hpc-rbft/v2/txpool/mock"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 )
 
-func newTestTimerMgr(ctrl *gomock.Controller) *timerManager {
+func newTestTimerMgr[T any, Constraint consensus.TXConstraint[T]](ctrl *gomock.Controller) *timerManager {
 	log := newRawLogger()
-	external := mockexternal.NewMockMinimalExternal(ctrl)
-	tx := txpoolmock.NewMockMinimalTxPool(ctrl)
-	conf := Config{
+	external := mockexternal.NewMockMinimalExternal[T, Constraint](ctrl)
+	tx := txpoolmock.NewMockMinimalTxPool[T, Constraint](ctrl)
+	conf := Config[T, Constraint]{
 		ID:            1,
 		Peers:         peerSet,
 		Logger:        log,
@@ -30,7 +31,7 @@ func newTestTimerMgr(ctrl *gomock.Controller) *timerManager {
 	}
 	eventC := make(chan consensusEvent)
 
-	return newTimerMgr(eventC, conf)
+	return newTimerMgr[T, Constraint](eventC, conf)
 }
 
 func TestTimerMgr_store(t *testing.T) {
@@ -70,7 +71,7 @@ func TestTimerMgr_stopTimer(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	timeMgr := newTestTimerMgr(ctrl)
+	timeMgr := newTestTimerMgr[consensus.Transaction](ctrl)
 
 	tt := titleTimer{
 		timerName: "test timer",
@@ -91,7 +92,7 @@ func TestTimerMgr_stopOneTimer(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	timeMgr := newTestTimerMgr(ctrl)
+	timeMgr := newTestTimerMgr[consensus.Transaction](ctrl)
 
 	tt := titleTimer{
 		timerName: "test timer",
@@ -113,7 +114,7 @@ func TestTimerMgr_getTimeoutValue(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	timeMgr := newTestTimerMgr(ctrl)
+	timeMgr := newTestTimerMgr[consensus.Transaction](ctrl)
 
 	tt := titleTimer{
 		timerName: "test timer",
@@ -132,7 +133,7 @@ func TestTimerMgr_setTimeoutValue(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	timeMgr := newTestTimerMgr(ctrl)
+	timeMgr := newTestTimerMgr[consensus.Transaction](ctrl)
 
 	tt := titleTimer{
 		timerName: "test timer",
@@ -153,7 +154,7 @@ func TestTimerMgr_makeNullRequestTimeoutLegal(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	timeMgr := newTestTimerMgr(ctrl)
+	timeMgr := newTestTimerMgr[consensus.Transaction](ctrl)
 
 	tt := titleTimer{
 		timerName: "test timer",
@@ -173,7 +174,7 @@ func TestTimerMgr_makeCleanVcTimeoutLegal(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	timeMgr := newTestTimerMgr(ctrl)
+	timeMgr := newTestTimerMgr[consensus.Transaction](ctrl)
 
 	tt := titleTimer{
 		timerName: "test timer",
@@ -193,7 +194,7 @@ func TestTimerMgr_makeSyncStateTimeoutLegal(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	timeMgr := newTestTimerMgr(ctrl)
+	timeMgr := newTestTimerMgr[consensus.Transaction](ctrl)
 
 	tt := titleTimer{
 		timerName: "test timer",
@@ -213,7 +214,7 @@ func TestTimerMgr_newTimer(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	timeMgr := newTestTimerMgr(ctrl)
+	timeMgr := newTestTimerMgr[consensus.Transaction](ctrl)
 
 	timeMgr.newTimer(requestTimer, 0)
 	timeMgr.newTimer(batchTimer, 0)

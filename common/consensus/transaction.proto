@@ -1,0 +1,128 @@
+syntax = "proto3";
+package consensus;
+
+//option go_package = "github.com/hyperchain/go-hpc-rbft/v2/common/consensus/protos";
+//option java_package = "cn.hyperchain.sdk.transaction.proto";
+//option java_outer_classname = "TransactionValueProto";
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+message Transaction {
+  option (gogoproto.goproto_getters) = false;
+  bytes version = 1;
+	bytes from = 2;
+	bytes to = 3;
+	bytes value = 4;
+	int64 timestamp = 5;
+	bytes signature = 6;
+	uint64 id = 7;
+	bytes transactionHash = 8;
+	int64  nonce = 9;
+	NonHash other = 10;
+	enum TxType {
+                NTX = 0;
+                CTX = 1; // config tx
+                CROSSCHAINTX = 2; // cross chain tx
+                ANCHORTX = 3; // anchor tx
+                CROSSCHAINTXAUTO = 4;
+                ANCHORTXAUTO = 5;
+                TIMEOUTTX = 6;
+        }
+  TxType txType = 11;
+  bytes cName = 12;
+  int64 expiration_timestamp = 13;
+  Participant participant = 14;
+}
+
+message Participant {
+  bytes initiator = 1;
+  repeated bytes withholding = 2;
+}
+
+message InvalidTransactionRecord {
+    Transaction tx = 1;
+    ErrType errType = 2;
+    enum ErrType {
+        OUTOFBALANCE = 0;
+        SIGFAILED = 1;
+        INVOKE_CONTRACT_FAILED=2;
+        DEPLOY_CONTRACT_FAILED=3;
+        INVALID_PERMISSION = 4;
+        DID_INVOCATION_FAILED = 5;
+        EXEC_KVSQL_FAILED = 6;
+        OUTOFGAS = 7;
+    }
+    bytes errMsg = 3;
+    uint64 index = 4;
+}
+message InvalidTransactionRecords {
+    repeated InvalidTransactionRecord records = 1;
+}
+
+message TransactionMeta {
+    uint64  BlockIndex = 1;
+    int64   Index = 2;
+    uint64  version = 3;
+    bool    Invalid = 4;
+}
+
+message TransactionWrapper {
+    bytes transactionVersion = 1;
+    bytes transaction = 2;
+}
+
+message TransactionValue {
+	int64 price = 1;
+	int64 gasLimit = 2;
+	int64 amount = 3;
+	bytes payload = 4;
+	bytes encryptedAmount = 5;
+	bytes homomorphicAmount = 6;
+	bytes homomorphicBalance = 7;
+	enum Opcode {
+            NORMAL = 0;
+            UPDATE = 1;
+            FREEZE = 2;
+            UNFREEZE = 3;
+            SKIPVM = 4;
+            DESTROY = 5;
+            ARCHIVE = 100;
+            DID_REGISTER = 200;
+            DID_FREEZE = 201;
+            DID_UNFREEZE = 202;
+            DID_ABANDON = 203;
+            DID_UPDATEPUBLICKEY = 204;
+            DID_UPDATEADMINS = 205;
+            DIDCREDENTIAL_UPLOAD = 206;
+            DIDCREDENTIAL_DOWNLOAD = 207;
+            DIDCREDENTIAL_ABANDON = 208;
+            DID_SETEXTRA = 209;
+            DID_GETEXTRA = 210;
+    }
+	Opcode op = 8;
+    enum VmType {
+            EVM = 0;
+            JVM = 1;
+            HVM = 2;
+            BVM = 3;
+            TRANSFER = 4;
+            KVSQL = 5;
+            FVM = 6;
+    }
+    bytes extra = 9;
+    bytes extraId = 10;
+    VmType vmType = 11;
+}
+
+message InvokeArgs {
+    bytes  code         = 1;
+    string methodName   = 2;
+    repeated bytes args = 3;
+}
+
+message NonHash {
+    bytes  nodeHash = 1;
+    bytes  privateTxHash = 2;
+    repeated string collection = 3;
+    uint64 nonce = 4;
+}

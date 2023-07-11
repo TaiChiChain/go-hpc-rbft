@@ -4,9 +4,8 @@ import (
 	"context"
 	"testing"
 
-	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
-
 	"github.com/golang/mock/gomock"
+	consensus "github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -14,9 +13,9 @@ func TestCluster_MissingCheckpoint(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	nodes, rbfts := newBasicClusterInstance()
+	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	unlockCluster(rbfts)
-	var retMessageSet []map[pb.Type][]*consensusMessageWrapper
+	var retMessageSet []map[consensus.Type][]*consensusMessageWrapper
 	for i := 0; i < 40; i++ {
 		tx := newTx()
 		retMessages := execute(t, rbfts, nodes, tx, false)
@@ -37,7 +36,7 @@ func TestCluster_MissingCheckpoint(t *testing.T) {
 		}
 		rbfts[index].processEvent(event)
 		ntf := nodes[index].broadcastMessageCache
-		assert.Equal(t, pb.Type_VIEW_CHANGE, ntf.Type)
+		assert.Equal(t, consensus.Type_VIEW_CHANGE, ntf.Type)
 		vcMessages = append(vcMessages, ntf)
 	}
 	for index := range rbfts {
@@ -65,7 +64,7 @@ func TestCluster_MissingCheckpoint(t *testing.T) {
 	}
 
 	nv := nodes[newPrimaryIndex].broadcastMessageCache
-	assert.Equal(t, pb.Type_NEW_VIEW, nv.Type)
+	assert.Equal(t, consensus.Type_NEW_VIEW, nv.Type)
 	for index := range rbfts {
 		if index == newPrimaryIndex {
 			continue
@@ -98,10 +97,10 @@ func TestCluster_CheckpointToViewChange(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	nodes, rbfts := newBasicClusterInstance()
+	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	unlockCluster(rbfts)
 
-	var retMessageSet []map[pb.Type][]*consensusMessageWrapper
+	var retMessageSet []map[consensus.Type][]*consensusMessageWrapper
 	for i := 0; i < 40; i++ {
 		tx := newTx()
 		retMessages := execute(t, rbfts, nodes, tx, false)
@@ -135,7 +134,7 @@ func TestCluster_CheckpointToViewChange(t *testing.T) {
 		assert.False(t, rbfts[index].timerMgr.getTimer(highWatermarkTimer))
 
 		vcMsg := nodes[index].broadcastMessageCache
-		assert.Equal(t, pb.Type_VIEW_CHANGE, vcMsg.Type)
+		assert.Equal(t, consensus.Type_VIEW_CHANGE, vcMsg.Type)
 		vcMsgSet = append(vcMsgSet, vcMsg)
 	}
 
@@ -177,7 +176,7 @@ func TestCluster_ReceiveViewChangeBeforeStart(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	nodes, rbfts := newBasicClusterInstance()
+	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 
 	initRecoveryEvent := &LocalEvent{
 		Service:   RecoveryService,
@@ -199,7 +198,7 @@ func TestCluster_ReceiveViewChangeBeforeStart(t *testing.T) {
 	rbfts[0].processEvent(initRecoveryEvent)
 
 	vcMsgNode1 := nodes[0].broadcastMessageCache
-	assert.Equal(t, pb.Type_VIEW_CHANGE, vcMsgNode1.Type)
+	assert.Equal(t, consensus.Type_VIEW_CHANGE, vcMsgNode1.Type)
 
 	// pending replicas receive message
 	for index := range rbfts {
@@ -213,7 +212,7 @@ func TestCluster_ReceiveViewChangeBeforeStart(t *testing.T) {
 	rbfts[1].processEvent(initRecoveryEvent)
 
 	vcMsgNode2 := nodes[1].broadcastMessageCache
-	assert.Equal(t, pb.Type_VIEW_CHANGE, vcMsgNode2.Type)
+	assert.Equal(t, consensus.Type_VIEW_CHANGE, vcMsgNode2.Type)
 
 	// pending replicas receive message
 	for index := range rbfts {
@@ -230,7 +229,7 @@ func TestCluster_ReceiveViewChangeBeforeStart(t *testing.T) {
 	assert.Equal(t, quorumEvent, quorumNode3)
 
 	vcMsgNode3 := nodes[2].broadcastMessageCache
-	assert.Equal(t, pb.Type_VIEW_CHANGE, vcMsgNode3.Type)
+	assert.Equal(t, consensus.Type_VIEW_CHANGE, vcMsgNode3.Type)
 
 	// pending replicas receive message
 	for index := range rbfts {
@@ -252,7 +251,7 @@ func TestCluster_ReceiveViewChangeBeforeStart(t *testing.T) {
 	doneNode1 := rbfts[1].processEvent(quorumEvent)
 	assert.Equal(t, doneEvent, doneNode1)
 	nvMsg := nodes[1].broadcastMessageCache
-	assert.Equal(t, pb.Type_NEW_VIEW, nvMsg.Type)
+	assert.Equal(t, consensus.Type_NEW_VIEW, nvMsg.Type)
 
 	for index := range rbfts {
 		rbfts[index].processEvent(quorumEvent)
@@ -280,7 +279,7 @@ func TestCluster_ViewChange_StateUpdate_Timeout_StateUpdated_Replica(t *testing.
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	nodes, rbfts := newBasicClusterInstance()
+	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	unlockCluster(rbfts)
 
 	for i := 0; i < 40; i++ {
@@ -301,7 +300,7 @@ func TestCluster_ViewChange_StateUpdate_Timeout_StateUpdated_Replica(t *testing.
 	for index := range rbfts {
 		rbfts[index].sendViewChange()
 		vcMsg := nodes[index].broadcastMessageCache
-		assert.Equal(t, pb.Type_VIEW_CHANGE, vcMsg.Type)
+		assert.Equal(t, consensus.Type_VIEW_CHANGE, vcMsg.Type)
 		vcMsgs = append(vcMsgs, vcMsg)
 	}
 
@@ -327,7 +326,7 @@ func TestCluster_ViewChange_StateUpdate_Timeout_StateUpdated_Replica(t *testing.
 		rbfts[index].processEvent(vcQuorum)
 	}
 	nvMsg := nodes[1].broadcastMessageCache
-	assert.Equal(t, pb.Type_NEW_VIEW, nvMsg.Type)
+	assert.Equal(t, consensus.Type_NEW_VIEW, nvMsg.Type)
 
 	vcDone := &LocalEvent{
 		Service:   ViewChangeService,
@@ -362,7 +361,7 @@ func TestCluster_ViewChange_StateUpdate_Timeout_StateUpdated_Primary(t *testing.
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	nodes, rbfts := newBasicClusterInstance()
+	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	unlockCluster(rbfts)
 
 	for i := 0; i < 40; i++ {
@@ -383,7 +382,7 @@ func TestCluster_ViewChange_StateUpdate_Timeout_StateUpdated_Primary(t *testing.
 	for index := range rbfts {
 		rbfts[index].sendViewChange()
 		vcMsg := nodes[index].broadcastMessageCache
-		assert.Equal(t, pb.Type_VIEW_CHANGE, vcMsg.Type)
+		assert.Equal(t, consensus.Type_VIEW_CHANGE, vcMsg.Type)
 		vcMsgs = append(vcMsgs, vcMsg)
 	}
 
@@ -419,11 +418,11 @@ func TestCluster_ViewChange_StateUpdate_Timeout_StateUpdated_Primary(t *testing.
 	// node 3 crash
 	rbfts[0].processEvent(nvTimeoutEvent)
 	newVCNode1 := nodes[0].broadcastMessageCache
-	assert.Equal(t, pb.Type_VIEW_CHANGE, newVCNode1.Type)
+	assert.Equal(t, consensus.Type_VIEW_CHANGE, newVCNode1.Type)
 
 	rbfts[2].processEvent(nvTimeoutEvent)
 	newVCNode3 := nodes[2].broadcastMessageCache
-	assert.Equal(t, pb.Type_VIEW_CHANGE, newVCNode3.Type)
+	assert.Equal(t, consensus.Type_VIEW_CHANGE, newVCNode3.Type)
 
 	rbfts[0].processEvent(newVCNode3)
 	rbfts[2].processEvent(newVCNode1)
@@ -438,7 +437,7 @@ func TestCluster_ViewChange_StateUpdate_Timeout_StateUpdated_Primary(t *testing.
 	retNode2 := rbfts[1].processEvent(event)
 	assert.Equal(t, vcQuorum, retNode2)
 	newVCNode2 := nodes[1].broadcastMessageCache
-	assert.Equal(t, pb.Type_VIEW_CHANGE, newVCNode2.Type)
+	assert.Equal(t, consensus.Type_VIEW_CHANGE, newVCNode2.Type)
 
 	retNode1 := rbfts[0].processEvent(newVCNode2)
 	assert.Equal(t, vcQuorum, retNode1)
@@ -460,7 +459,7 @@ func TestCluster_ViewChange_StateUpdate_Timeout_StateUpdated_Primary(t *testing.
 		}
 	}
 	newNVMsg := nodes[2].broadcastMessageCache
-	assert.Equal(t, pb.Type_NEW_VIEW, newNVMsg.Type)
+	assert.Equal(t, consensus.Type_NEW_VIEW, newNVMsg.Type)
 
 	for index := range rbfts {
 		if index == 2 || index == 3 {
@@ -489,10 +488,10 @@ func TestCluster_Checkpoint_in_StateUpdating(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	nodes, rbfts := newBasicClusterInstance()
+	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	unlockCluster(rbfts)
 
-	var retMessageSet []map[pb.Type][]*consensusMessageWrapper
+	var retMessageSet []map[consensus.Type][]*consensusMessageWrapper
 	for i := 0; i < 50; i++ {
 		tx := newTx()
 		checkpoint := (i+1)%10 == 0
@@ -501,7 +500,7 @@ func TestCluster_Checkpoint_in_StateUpdating(t *testing.T) {
 	}
 
 	for _, retMessages := range retMessageSet {
-		for index, chkpt := range retMessages[pb.Type_SIGNED_CHECKPOINT] {
+		for index, chkpt := range retMessages[consensus.Type_SIGNED_CHECKPOINT] {
 			if chkpt == nil {
 				continue
 			}
@@ -513,7 +512,7 @@ func TestCluster_Checkpoint_in_StateUpdating(t *testing.T) {
 	}
 
 	vcMsg := nodes[1].broadcastMessageCache
-	assert.Equal(t, pb.Type_VIEW_CHANGE, vcMsg.Type)
+	assert.Equal(t, consensus.Type_VIEW_CHANGE, vcMsg.Type)
 
 	for index := range rbfts {
 		if index == 1 {
@@ -521,11 +520,11 @@ func TestCluster_Checkpoint_in_StateUpdating(t *testing.T) {
 		}
 		rbfts[index].processEvent(vcMsg)
 		rsp := nodes[index].unicastMessageCache
-		assert.Equal(t, pb.Type_RECOVERY_RESPONSE, rsp.Type)
+		assert.Equal(t, consensus.Type_RECOVERY_RESPONSE, rsp.Type)
 		rbfts[1].processEvent(rsp)
 	}
 
-	var retMessageSet2 []map[pb.Type][]*consensusMessageWrapper
+	var retMessageSet2 []map[consensus.Type][]*consensusMessageWrapper
 	for i := 0; i < 10; i++ {
 		tx := newTx()
 		checkpoint := (i+1)%10 == 0
@@ -534,7 +533,7 @@ func TestCluster_Checkpoint_in_StateUpdating(t *testing.T) {
 	}
 
 	for _, retMessages := range retMessageSet2 {
-		for index, chkpt := range retMessages[pb.Type_SIGNED_CHECKPOINT] {
+		for index, chkpt := range retMessages[consensus.Type_SIGNED_CHECKPOINT] {
 			if chkpt == nil {
 				continue
 			}
@@ -550,7 +549,7 @@ func TestCluster_Checkpoint_in_StateUpdating(t *testing.T) {
 
 	rbfts[1].processEvent(updatedEv1)
 
-	var retMessageSet3 []map[pb.Type][]*consensusMessageWrapper
+	var retMessageSet3 []map[consensus.Type][]*consensusMessageWrapper
 	for i := 0; i < 10; i++ {
 		tx := newTx()
 		checkpoint := (i+1)%10 == 0
@@ -559,7 +558,7 @@ func TestCluster_Checkpoint_in_StateUpdating(t *testing.T) {
 	}
 
 	for _, retMessages := range retMessageSet3 {
-		for index, chkpt := range retMessages[pb.Type_SIGNED_CHECKPOINT] {
+		for index, chkpt := range retMessages[consensus.Type_SIGNED_CHECKPOINT] {
 			if chkpt == nil {
 				continue
 			}
@@ -584,7 +583,7 @@ func TestCluster_InitRecovery(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	nodes, rbfts := newBasicClusterInstance()
+	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	unlockCluster(rbfts)
 
 	init := &LocalEvent{
@@ -598,16 +597,16 @@ func TestCluster_InitRecovery(t *testing.T) {
 	rbfts[2].processEvent(init)
 	recoveryVCs := make([]*consensusMessageWrapper, len(nodes))
 	recoveryVCs[1] = nodes[1].broadcastMessageCache
-	assert.Equal(t, pb.Type_VIEW_CHANGE, recoveryVCs[1].Type)
+	assert.Equal(t, consensus.Type_VIEW_CHANGE, recoveryVCs[1].Type)
 	recoveryVCs[2] = nodes[2].broadcastMessageCache
-	assert.Equal(t, pb.Type_VIEW_CHANGE, recoveryVCs[2].Type)
+	assert.Equal(t, consensus.Type_VIEW_CHANGE, recoveryVCs[2].Type)
 
 	// replica 1 received recoveryVCs from 2&3 and generate a recovery view change in view=1
 	rbfts[0].processEvent(recoveryVCs[1])
 	quorum0 := rbfts[0].processEvent(recoveryVCs[2])
 	assert.Equal(t, ViewChangeQuorumEvent, quorum0.(*LocalEvent).EventType)
 	recoveryVCs[0] = nodes[0].broadcastMessageCache
-	assert.Equal(t, pb.Type_VIEW_CHANGE, recoveryVCs[0].Type)
+	assert.Equal(t, consensus.Type_VIEW_CHANGE, recoveryVCs[0].Type)
 
 	// delayed some time for init recovery event on replica 1
 	// replica 1 should reject init recovery event
@@ -620,7 +619,7 @@ func TestCluster_InitRecovery(t *testing.T) {
 	quorum3 := rbfts[3].processEvent(recoveryVCs[2])
 	assert.Equal(t, ViewChangeQuorumEvent, quorum3.(*LocalEvent).EventType)
 	recoveryVCs[3] = nodes[3].broadcastMessageCache
-	assert.Equal(t, pb.Type_VIEW_CHANGE, recoveryVCs[3].Type)
+	assert.Equal(t, consensus.Type_VIEW_CHANGE, recoveryVCs[3].Type)
 
 	// delayed some time for init recovery event on replica 4
 	// replica 4 should reject init recovery event
@@ -658,7 +657,7 @@ func TestCluster_InitRecovery(t *testing.T) {
 
 	// new view message
 	newView := nodes[1].broadcastMessageCache
-	assert.Equal(t, pb.Type_NEW_VIEW, newView.Type)
+	assert.Equal(t, consensus.Type_NEW_VIEW, newView.Type)
 
 	for index := range rbfts {
 		if index == 1 {

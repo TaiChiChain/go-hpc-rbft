@@ -9,9 +9,8 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	protos "github.com/hyperchain/go-hpc-common/types/protos"
-	v2 "github.com/hyperchain/go-hpc-rbft/v2"
-	rbftpb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
+	rbft "github.com/hyperchain/go-hpc-rbft/v2"
+	consensus "github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
 	types "github.com/hyperchain/go-hpc-rbft/v2/types"
 )
 
@@ -51,10 +50,10 @@ func (mr *MockNodeMockRecorder) ApplyConfChange(cc interface{}) *gomock.Call {
 }
 
 // GetUncommittedTransactions mocks base method.
-func (m *MockNode) GetUncommittedTransactions(maxsize uint64) []*protos.Transaction {
+func (m *MockNode) GetUncommittedTransactions(maxsize uint64) [][]byte {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetUncommittedTransactions", maxsize)
-	ret0, _ := ret[0].([]*protos.Transaction)
+	ret0, _ := ret[0].([][]byte)
 	return ret0
 }
 
@@ -65,7 +64,7 @@ func (mr *MockNodeMockRecorder) GetUncommittedTransactions(maxsize interface{}) 
 }
 
 // Propose mocks base method.
-func (m *MockNode) Propose(requests *rbftpb.RequestSet) error {
+func (m *MockNode) Propose(requests *consensus.RequestSet) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Propose", requests)
 	ret0, _ := ret[0].(error)
@@ -129,10 +128,10 @@ func (mr *MockNodeMockRecorder) Start() *gomock.Call {
 }
 
 // Status mocks base method.
-func (m *MockNode) Status() v2.NodeStatus {
+func (m *MockNode) Status() rbft.NodeStatus {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Status")
-	ret0, _ := ret[0].(v2.NodeStatus)
+	ret0, _ := ret[0].(rbft.NodeStatus)
 	return ret0
 }
 
@@ -143,7 +142,7 @@ func (mr *MockNodeMockRecorder) Status() *gomock.Call {
 }
 
 // Step mocks base method.
-func (m *MockNode) Step(ctx context.Context, msg *rbftpb.ConsensusMessage) {
+func (m *MockNode) Step(ctx context.Context, msg *consensus.ConsensusMessage) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "Step", ctx, msg)
 }
@@ -155,10 +154,10 @@ func (mr *MockNodeMockRecorder) Step(ctx, msg interface{}) *gomock.Call {
 }
 
 // Stop mocks base method.
-func (m *MockNode) Stop() []*protos.Transaction {
+func (m *MockNode) Stop() [][]byte {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Stop")
-	ret0, _ := ret[0].([]*protos.Transaction)
+	ret0, _ := ret[0].([][]byte)
 	return ret0
 }
 

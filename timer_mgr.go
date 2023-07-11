@@ -18,6 +18,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
 )
 
 // titleTimer manages timer with the same timer name, which, we allow different timer with the same timer name, such as:
@@ -57,7 +59,7 @@ func (tt *titleTimer) clear() {
 	})
 }
 
-// timerManager manages common used timers.
+// timerManager manages consensus used timers.
 type timerManager struct {
 	tTimers   map[string]*titleTimer
 	eventChan chan<- consensusEvent
@@ -65,7 +67,7 @@ type timerManager struct {
 }
 
 // newTimerMgr news an instance of timerManager.
-func newTimerMgr(eventC chan consensusEvent, c Config) *timerManager {
+func newTimerMgr[T any, Constraint consensus.TXConstraint[T]](eventC chan consensusEvent, c Config[T, Constraint]) *timerManager {
 	tm := &timerManager{
 		tTimers:   make(map[string]*titleTimer),
 		eventChan: eventC,
@@ -201,7 +203,7 @@ func (tm *timerManager) setTimeoutValue(timerName string, timeout time.Duration)
 }
 
 // initTimers creates timers when start up
-func (rbft *rbftImpl) initTimers() {
+func (rbft *rbftImpl[T, Constraint]) initTimers() {
 	rbft.timerMgr.newTimer(vcResendTimer, rbft.config.VcResendTimeout)
 	rbft.timerMgr.newTimer(nullRequestTimer, rbft.config.NullRequestTimeout)
 	rbft.timerMgr.newTimer(newViewTimer, rbft.config.NewViewTimeout)
@@ -307,7 +309,7 @@ func (tm *timerManager) makeSyncStateTimeoutLegal() {
 // 2) replica received pre-prepare out of range
 // 3) replica is trying to send checkpoint equal to high-watermark
 // 4) replica received f+1 checkpoints out of range, but it has already executed blocks larger than these checkpoints
-func (rbft *rbftImpl) softStartHighWatermarkTimer(reason string) {
+func (rbft *rbftImpl[T, Constraint]) softStartHighWatermarkTimer(reason string) {
 
 	rbft.logger.Debugf("Replica %d soft start high-watermark timer, current low-watermark is %d, reason: %s", rbft.peerPool.ID, rbft.h, reason)
 
@@ -326,12 +328,12 @@ func (rbft *rbftImpl) softStartHighWatermarkTimer(reason string) {
 }
 
 // stopHighWatermarkTimer stops a high-watermark timer
-func (rbft *rbftImpl) stopHighWatermarkTimer() {
+func (rbft *rbftImpl[T, Constraint]) stopHighWatermarkTimer() {
 	rbft.logger.Debugf("Replica %d stop high-watermark timer", rbft.peerPool.ID)
 	rbft.timerMgr.stopTimer(highWatermarkTimer)
 }
 
-func (rbft *rbftImpl) startFetchCheckpointTimer() {
+func (rbft *rbftImpl[T, Constraint]) startFetchCheckpointTimer() {
 	event := &LocalEvent{
 		Service:   EpochMgrService,
 		EventType: FetchCheckpointEvent,
@@ -340,11 +342,11 @@ func (rbft *rbftImpl) startFetchCheckpointTimer() {
 	rbft.timerMgr.startTimer(fetchCheckpointTimer, event)
 }
 
-func (rbft *rbftImpl) stopFetchCheckpointTimer() {
+func (rbft *rbftImpl[T, Constraint]) stopFetchCheckpointTimer() {
 	rbft.timerMgr.stopTimer(fetchCheckpointTimer)
 }
 
-func (rbft *rbftImpl) startFetchViewTimer() {
+func (rbft *rbftImpl[T, Constraint]) startFetchViewTimer() {
 	rbft.logger.Debugf("Replica %d start a fetchView timer", rbft.peerPool.ID)
 	event := &LocalEvent{
 		Service:   ViewChangeService,
@@ -354,7 +356,7 @@ func (rbft *rbftImpl) startFetchViewTimer() {
 	rbft.timerMgr.startTimer(fetchViewTimer, event)
 }
 
-func (rbft *rbftImpl) stopFetchViewTimer() {
+func (rbft *rbftImpl[T, Constraint]) stopFetchViewTimer() {
 	rbft.logger.Debugf("Replica %d stop a running fetchView timer", rbft.peerPool.ID)
 	rbft.timerMgr.stopTimer(fetchViewTimer)
 }

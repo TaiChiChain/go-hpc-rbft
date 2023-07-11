@@ -5,8 +5,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/hyperchain/go-hpc-common/types/protos"
-	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
+	consensus "github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
 	"github.com/hyperchain/go-hpc-rbft/v2/types"
 
 	"github.com/gogo/protobuf/proto"
@@ -18,7 +17,7 @@ func TestNode_Start(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	_, rbfts := newBasicClusterInstance()
+	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	n := rbfts[0].node
 	n.rbft.atomicOn(Pending)
 
@@ -37,7 +36,7 @@ func TestNode_Stop(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	_, rbfts := newBasicClusterInstance()
+	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	n := rbfts[0].node
 	n.currentState = &types.ServiceState{
 		MetaState: &types.MetaState{
@@ -52,8 +51,14 @@ func TestNode_Stop(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		for i := 1; i < 100; i++ {
-			txs := &pb.RequestSet{
-				Requests: []*protos.Transaction{newTx(), newTx()},
+			tx1 := newTx()
+			txBytes1, err := tx1.Marshal()
+			assert.Nil(t, err)
+			tx2 := newTx()
+			txBytes2, err := tx2.Marshal()
+			assert.Nil(t, err)
+			txs := &consensus.RequestSet{
+				Requests: [][]byte{txBytes1, txBytes2},
 				Local:    true,
 			}
 			_ = n.Propose(txs)
@@ -64,7 +69,7 @@ func TestNode_Stop(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		for i := 1; i < 100; i++ {
-			con := &pb.ConsensusMessage{}
+			con := &consensus.ConsensusMessage{}
 			n.Step(context.TODO(), con)
 		}
 		wg.Done()
@@ -79,12 +84,15 @@ func TestNode_Propose(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	_, rbfts := newBasicClusterInstance()
+	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	unlockCluster(rbfts)
 
 	n := rbfts[0].node
-	requestsTmp := &pb.RequestSet{
-		Requests: []*protos.Transaction{newTx()},
+	tx1 := newTx()
+	txBytes1, err := tx1.Marshal()
+	assert.Nil(t, err)
+	requestsTmp := &consensus.RequestSet{
+		Requests: [][]byte{txBytes1},
 		Local:    true,
 	}
 	_ = n.Propose(requestsTmp)
@@ -96,17 +104,17 @@ func TestNode_Step(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	_, rbfts := newBasicClusterInstance()
+	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	n := rbfts[0].node
 
 	// Post a Type_NULL_REQUEST Msg
 	// Type/Payload
-	nullRequest := &pb.NullRequest{
+	nullRequest := &consensus.NullRequest{
 		ReplicaId: n.rbft.peerPool.ID,
 	}
 	payload, _ := proto.Marshal(nullRequest)
-	msgTmp := &pb.ConsensusMessage{
-		Type:    pb.Type_NULL_REQUEST,
+	msgTmp := &consensus.ConsensusMessage{
+		Type:    consensus.Type_NULL_REQUEST,
 		Payload: payload,
 	}
 	go func() {
@@ -120,7 +128,7 @@ func TestNode_ApplyConfChange(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	_, rbfts := newBasicClusterInstance()
+	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	n := rbfts[0].node
 
 	r := &types.Router{Peers: peerSet}
@@ -133,7 +141,7 @@ func TestNode_ReportExecuted(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	_, rbfts := newBasicClusterInstance()
+	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	n := rbfts[0].node
 
 	state1 := &types.ServiceState{
@@ -182,7 +190,7 @@ func TestNode_ReportStateUpdated(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	_, rbfts := newBasicClusterInstance()
+	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	n := rbfts[0].node
 
 	state := &types.ServiceState{
@@ -217,7 +225,7 @@ func TestNode_getCurrentState(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	_, rbfts := newBasicClusterInstance()
+	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	n := rbfts[0].node
 
 	n.currentState = &types.ServiceState{

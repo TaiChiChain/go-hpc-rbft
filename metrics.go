@@ -1,6 +1,8 @@
 package rbft
 
-import "github.com/hyperchain/go-hpc-common/metrics"
+import (
+	"github.com/hyperchain/go-hpc-rbft/v2/common/metrics"
+)
 
 // rbftMetrics helps collect all metrics in rbft
 type rbftMetrics struct {

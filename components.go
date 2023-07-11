@@ -22,7 +22,7 @@ import (
 	"context"
 	"time"
 
-	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
+	consensus "github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
 )
 
 // constant timer names
@@ -105,10 +105,10 @@ type LocalEvent struct {
 // consensusEvent is a type meant to clearly convey that the return type or parameter to a function will be supplied to/from an events.Manager
 type consensusEvent interface{}
 
-// consensusMessageWrapper is used to wrap the *pb.ConsensusMessage type, providing an additional context field
+// consensusMessageWrapper is used to wrap the *consensus.ConsensusMessage type, providing an additional context field
 type consensusMessageWrapper struct {
 	ctx context.Context
-	*pb.ConsensusMessage
+	*consensus.ConsensusMessage
 }
 
 // -----------certStore related structs-----------------
@@ -127,17 +127,17 @@ type msgID struct {
 
 // cached consensus msgs related to batch
 type msgCert struct {
-	prePrepare      *pb.PrePrepare      // pre-prepare msg
-	prePreparedTime int64               // pre-prepared time
-	prePrepareCtx   context.Context     // prePrepareCtx can be used to continue tracing from prePrepare.
-	sentPrepare     bool                // track whether broadcast prepare for this batch before or not
-	prepare         map[pb.Prepare]bool // prepare msgs received from other nodes
-	preparedTime    int64               // prepared time
-	sentCommit      bool                // track whether broadcast commit for this batch before or not
-	commit          map[pb.Commit]bool  // commit msgs received from other nodes
-	committedTime   int64               // committed time
-	sentExecute     bool                // track whether sent execute event to executor module before or not
-	isConfig        bool                // track whether current batch is a config batch
+	prePrepare      *consensus.PrePrepare      // pre-prepare msg
+	prePreparedTime int64                      // pre-prepared time
+	prePrepareCtx   context.Context            // prePrepareCtx can be used to continue tracing from prePrepare.
+	sentPrepare     bool                       // track whether broadcast prepare for this batch before or not
+	prepare         map[consensus.Prepare]bool // prepare msgs received from other nodes
+	preparedTime    int64                      // prepared time
+	sentCommit      bool                       // track whether broadcast commit for this batch before or not
+	commit          map[consensus.Commit]bool  // commit msgs received from other nodes
+	committedTime   int64                      // committed time
+	sentExecute     bool                       // track whether sent execute event to executor module before or not
+	isConfig        bool                       // track whether current batch is a config batch
 }
 
 // ----------checkpoint related structs------------------
@@ -155,7 +155,7 @@ type nodeState struct {
 }
 
 // wholeStates maps checkpoint to nodeState
-type wholeStates map[*pb.SignedCheckpoint]nodeState
+type wholeStates map[*consensus.SignedCheckpoint]nodeState
 
 // -----------viewchange related structs-----------------
 // viewchange index

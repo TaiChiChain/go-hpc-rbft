@@ -33,7 +33,7 @@ type MetaState struct {
 	Digest string
 }
 
-// CheckpointState is the basic info for checkpoint.
+// CommonCheckpointState is the basic info for checkpoint.
 type CheckpointState struct {
 	Meta     MetaState
 	IsConfig bool
