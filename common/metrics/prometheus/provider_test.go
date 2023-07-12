@@ -99,10 +99,10 @@ func Test_Counter(t *testing.T) {
 	bytes, err := ioutil.ReadAll(resp.Body)
 	assert.Nil(t, err)
 
-	assert.Contains(t, string(bytes), `# HELP flato_common_test_tx test tx number`)
-	assert.Contains(t, string(bytes), `# TYPE flato_common_test_tx counter`)
-	assert.Contains(t, string(bytes), `flato_common_test_tx{ns="global",type="invalid"} 2`)
-	assert.Contains(t, string(bytes), `flato_common_test_tx{ns="global",type="valid"} 1`)
+	assert.Contains(t, string(bytes), `# HELP flato_consensus_test_tx test tx number`)
+	assert.Contains(t, string(bytes), `# TYPE flato_consensus_test_tx counter`)
+	assert.Contains(t, string(bytes), `flato_consensus_test_tx{ns="global",type="invalid"} 2`)
+	assert.Contains(t, string(bytes), `flato_consensus_test_tx{ns="global",type="valid"} 1`)
 }
 
 func Test_Gauge(t *testing.T) {
@@ -124,10 +124,10 @@ func Test_Gauge(t *testing.T) {
 	bytes, err := ioutil.ReadAll(resp.Body)
 	assert.Nil(t, err)
 
-	assert.Contains(t, string(bytes), `# HELP flato_common_test_tx test tx number`)
-	assert.Contains(t, string(bytes), `# TYPE flato_common_test_tx gauge`)
-	assert.Contains(t, string(bytes), `flato_common_test_tx{ns="global",type="invalid"} 2`)
-	assert.Contains(t, string(bytes), `flato_common_test_tx{ns="global",type="valid"} 1`)
+	assert.Contains(t, string(bytes), `# HELP flato_consensus_test_tx test tx number`)
+	assert.Contains(t, string(bytes), `# TYPE flato_consensus_test_tx gauge`)
+	assert.Contains(t, string(bytes), `flato_consensus_test_tx{ns="global",type="invalid"} 2`)
+	assert.Contains(t, string(bytes), `flato_consensus_test_tx{ns="global",type="valid"} 1`)
 }
 
 func Test_Histogram(t *testing.T) {
@@ -153,34 +153,34 @@ func Test_Histogram(t *testing.T) {
 	bytes, err := ioutil.ReadAll(resp.Body)
 	assert.Nil(t, err)
 
-	assert.Contains(t, string(bytes), `# HELP flato_common_test_tx test tx number`)
-	assert.Contains(t, string(bytes), `# TYPE flato_common_test_tx histogram`)
+	assert.Contains(t, string(bytes), `# HELP flato_consensus_test_tx test tx number`)
+	assert.Contains(t, string(bytes), `# TYPE flato_consensus_test_tx histogram`)
 
-	assert.Contains(t, string(bytes), `flato_common_test_tx_bucket{ns="global",type="invalid",le="0.005"} 2`)
-	assert.Contains(t, string(bytes), `flato_common_test_tx_bucket{ns="global",type="invalid",le="0.01"} 2`)
-	assert.Contains(t, string(bytes), `flato_common_test_tx_bucket{ns="global",type="invalid",le="0.025"} 4`)
-	assert.Contains(t, string(bytes), `flato_common_test_tx_bucket{ns="global",type="invalid",le="0.05"} 5`)
-	assert.Contains(t, string(bytes), `flato_common_test_tx_bucket{ns="global",type="invalid",le="0.1"} 5`)
-	assert.Contains(t, string(bytes), `flato_common_test_tx_bucket{ns="global",type="invalid",le="0.25"} 7`)
-	assert.Contains(t, string(bytes), `flato_common_test_tx_bucket{ns="global",type="invalid",le="0.5"} 8`)
-	assert.Contains(t, string(bytes), `flato_common_test_tx_bucket{ns="global",type="invalid",le="1"} 8`)
-	assert.Contains(t, string(bytes), `flato_common_test_tx_bucket{ns="global",type="invalid",le="2.5"} 10`)
-	assert.Contains(t, string(bytes), `flato_common_test_tx_bucket{ns="global",type="invalid",le="5"} 11`)
-	assert.Contains(t, string(bytes), `flato_common_test_tx_bucket{ns="global",type="invalid",le="10"} 11`)
-	assert.Contains(t, string(bytes), `flato_common_test_tx_count{ns="global",type="invalid"} 11`)
+	assert.Contains(t, string(bytes), `flato_consensus_test_tx_bucket{ns="global",type="invalid",le="0.005"} 2`)
+	assert.Contains(t, string(bytes), `flato_consensus_test_tx_bucket{ns="global",type="invalid",le="0.01"} 2`)
+	assert.Contains(t, string(bytes), `flato_consensus_test_tx_bucket{ns="global",type="invalid",le="0.025"} 4`)
+	assert.Contains(t, string(bytes), `flato_consensus_test_tx_bucket{ns="global",type="invalid",le="0.05"} 5`)
+	assert.Contains(t, string(bytes), `flato_consensus_test_tx_bucket{ns="global",type="invalid",le="0.1"} 5`)
+	assert.Contains(t, string(bytes), `flato_consensus_test_tx_bucket{ns="global",type="invalid",le="0.25"} 7`)
+	assert.Contains(t, string(bytes), `flato_consensus_test_tx_bucket{ns="global",type="invalid",le="0.5"} 8`)
+	assert.Contains(t, string(bytes), `flato_consensus_test_tx_bucket{ns="global",type="invalid",le="1"} 8`)
+	assert.Contains(t, string(bytes), `flato_consensus_test_tx_bucket{ns="global",type="invalid",le="2.5"} 10`)
+	assert.Contains(t, string(bytes), `flato_consensus_test_tx_bucket{ns="global",type="invalid",le="5"} 11`)
+	assert.Contains(t, string(bytes), `flato_consensus_test_tx_bucket{ns="global",type="invalid",le="10"} 11`)
+	assert.Contains(t, string(bytes), `flato_consensus_test_tx_count{ns="global",type="invalid"} 11`)
 
-	assert.Contains(t, string(bytes), `flato_common_test_tx_bucket{ns="global",type="valid",le="0.005"} 1`)
-	assert.Contains(t, string(bytes), `flato_common_test_tx_bucket{ns="global",type="valid",le="0.01"} 2`)
-	assert.Contains(t, string(bytes), `flato_common_test_tx_bucket{ns="global",type="valid",le="0.025"} 3`)
-	assert.Contains(t, string(bytes), `flato_common_test_tx_bucket{ns="global",type="valid",le="0.05"} 4`)
-	assert.Contains(t, string(bytes), `flato_common_test_tx_bucket{ns="global",type="valid",le="0.1"} 5`)
-	assert.Contains(t, string(bytes), `flato_common_test_tx_bucket{ns="global",type="valid",le="0.25"} 6`)
-	assert.Contains(t, string(bytes), `flato_common_test_tx_bucket{ns="global",type="valid",le="0.5"} 7`)
-	assert.Contains(t, string(bytes), `flato_common_test_tx_bucket{ns="global",type="valid",le="1"} 8`)
-	assert.Contains(t, string(bytes), `flato_common_test_tx_bucket{ns="global",type="valid",le="2.5"} 9`)
-	assert.Contains(t, string(bytes), `flato_common_test_tx_bucket{ns="global",type="valid",le="5"} 10`)
-	assert.Contains(t, string(bytes), `flato_common_test_tx_bucket{ns="global",type="valid",le="10"} 11`)
-	assert.Contains(t, string(bytes), `flato_common_test_tx_count{ns="global",type="valid"} 11`)
+	assert.Contains(t, string(bytes), `flato_consensus_test_tx_bucket{ns="global",type="valid",le="0.005"} 1`)
+	assert.Contains(t, string(bytes), `flato_consensus_test_tx_bucket{ns="global",type="valid",le="0.01"} 2`)
+	assert.Contains(t, string(bytes), `flato_consensus_test_tx_bucket{ns="global",type="valid",le="0.025"} 3`)
+	assert.Contains(t, string(bytes), `flato_consensus_test_tx_bucket{ns="global",type="valid",le="0.05"} 4`)
+	assert.Contains(t, string(bytes), `flato_consensus_test_tx_bucket{ns="global",type="valid",le="0.1"} 5`)
+	assert.Contains(t, string(bytes), `flato_consensus_test_tx_bucket{ns="global",type="valid",le="0.25"} 6`)
+	assert.Contains(t, string(bytes), `flato_consensus_test_tx_bucket{ns="global",type="valid",le="0.5"} 7`)
+	assert.Contains(t, string(bytes), `flato_consensus_test_tx_bucket{ns="global",type="valid",le="1"} 8`)
+	assert.Contains(t, string(bytes), `flato_consensus_test_tx_bucket{ns="global",type="valid",le="2.5"} 9`)
+	assert.Contains(t, string(bytes), `flato_consensus_test_tx_bucket{ns="global",type="valid",le="5"} 10`)
+	assert.Contains(t, string(bytes), `flato_consensus_test_tx_bucket{ns="global",type="valid",le="10"} 11`)
+	assert.Contains(t, string(bytes), `flato_consensus_test_tx_count{ns="global",type="valid"} 11`)
 }
 
 func Test_Summary(t *testing.T) {
@@ -206,20 +206,20 @@ func Test_Summary(t *testing.T) {
 	bytes, err := ioutil.ReadAll(resp.Body)
 	assert.Nil(t, err)
 
-	assert.Contains(t, string(bytes), `# HELP flato_common_test_tx test tx number`)
-	assert.Contains(t, string(bytes), `# TYPE flato_common_test_tx summary`)
+	assert.Contains(t, string(bytes), `# HELP flato_consensus_test_tx test tx number`)
+	assert.Contains(t, string(bytes), `# TYPE flato_consensus_test_tx summary`)
 
-	assert.Contains(t, string(bytes), `flato_common_test_tx{ns="global",type="valid",quantile="0.5"} 1`)
-	assert.Contains(t, string(bytes), `flato_common_test_tx{ns="global",type="valid",quantile="0.9"} 3`)
-	assert.Contains(t, string(bytes), `flato_common_test_tx{ns="global",type="valid",quantile="0.99"} 3`)
-	assert.Contains(t, string(bytes), `flato_common_test_tx_sum{ns="global",type="valid"} 4`)
-	assert.Contains(t, string(bytes), `flato_common_test_tx_count{ns="global",type="valid"} 2`)
+	assert.Contains(t, string(bytes), `flato_consensus_test_tx{ns="global",type="valid",quantile="0.5"} 1`)
+	assert.Contains(t, string(bytes), `flato_consensus_test_tx{ns="global",type="valid",quantile="0.9"} 3`)
+	assert.Contains(t, string(bytes), `flato_consensus_test_tx{ns="global",type="valid",quantile="0.99"} 3`)
+	assert.Contains(t, string(bytes), `flato_consensus_test_tx_sum{ns="global",type="valid"} 4`)
+	assert.Contains(t, string(bytes), `flato_consensus_test_tx_count{ns="global",type="valid"} 2`)
 
-	assert.Contains(t, string(bytes), `flato_common_test_tx{ns="global",type="invalid",quantile="0.5"} 2`)
-	assert.Contains(t, string(bytes), `flato_common_test_tx{ns="global",type="invalid",quantile="0.9"} 4`)
-	assert.Contains(t, string(bytes), `flato_common_test_tx{ns="global",type="invalid",quantile="0.99"} 4`)
-	assert.Contains(t, string(bytes), `flato_common_test_tx_sum{ns="global",type="invalid"} 6`)
-	assert.Contains(t, string(bytes), `flato_common_test_tx_count{ns="global",type="invalid"} 2`)
+	assert.Contains(t, string(bytes), `flato_consensus_test_tx{ns="global",type="invalid",quantile="0.5"} 2`)
+	assert.Contains(t, string(bytes), `flato_consensus_test_tx{ns="global",type="invalid",quantile="0.9"} 4`)
+	assert.Contains(t, string(bytes), `flato_consensus_test_tx{ns="global",type="invalid",quantile="0.99"} 4`)
+	assert.Contains(t, string(bytes), `flato_consensus_test_tx_sum{ns="global",type="invalid"} 6`)
+	assert.Contains(t, string(bytes), `flato_consensus_test_tx_count{ns="global",type="invalid"} 2`)
 }
 
 // Note: These tests can't be run in parallel because prometheus uses

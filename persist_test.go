@@ -22,6 +22,7 @@ func newPersistTestReplica[T any, Constraint consensus.TXConstraint[T]](ctrl *go
 	pool := txpoolmock.NewMockMinimalTxPool[T, Constraint](ctrl)
 	log := newRawLogger()
 	ext := mockexternal.NewMockExternalStack[T, Constraint](ctrl)
+	ext.EXPECT().Sign(gomock.Any()).Return([]byte("sig"), nil).AnyTimes()
 
 	conf := Config[T, Constraint]{
 		ID:                      2,
@@ -58,10 +59,9 @@ func newPersistTestReplica[T any, Constraint consensus.TXConstraint[T]](ctrl *go
 
 func TestPersist_restoreView(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	//defer ctrl.Finish()
 
 	node, ext := newPersistTestReplica[consensus.Transaction](ctrl)
-	ext.EXPECT().Sign(gomock.Any()).Return([]byte("sig"), nil).AnyTimes()
 	ext.EXPECT().ReadState("new-view").Return(nil, errors.New("err"))
 	node.rbft.restoreView()
 	assert.Equal(t, uint64(0), node.rbft.view)
@@ -78,9 +78,8 @@ func TestPersist_restoreView(t *testing.T) {
 
 func TestPersist_restoreQList(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	//defer ctrl.Finish()
 	node, ext := newPersistTestReplica[consensus.Transaction](ctrl)
-	ext.EXPECT().Sign(gomock.Any()).Return([]byte("sig"), nil).AnyTimes()
 
 	var ret map[string][]byte
 	var err error
@@ -113,9 +112,8 @@ func TestPersist_restoreQList(t *testing.T) {
 
 func TestPersist_restorePList(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	//defer ctrl.Finish()
 	node, ext := newPersistTestReplica[consensus.Transaction](ctrl)
-	ext.EXPECT().Sign(gomock.Any()).Return([]byte("sig"), nil).AnyTimes()
 
 	var ret map[string][]byte
 	var err error
@@ -143,10 +141,9 @@ func TestPersist_restorePList(t *testing.T) {
 
 func TestPersist_restoreBatchStore(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	//defer ctrl.Finish()
 
 	node, ext := newPersistTestReplica[consensus.Transaction](ctrl)
-	ext.EXPECT().Sign(gomock.Any()).Return([]byte("sig"), nil).AnyTimes()
 
 	var ret map[string][]byte
 	ret = map[string][]byte{"batch.msg": {24, 10}}
@@ -158,10 +155,9 @@ func TestPersist_restoreBatchStore(t *testing.T) {
 
 func TestPersist_restoreQSet(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	//defer ctrl.Finish()
 
 	node, ext := newPersistTestReplica[consensus.Transaction](ctrl)
-	ext.EXPECT().Sign(gomock.Any()).Return([]byte("sig"), nil).AnyTimes()
 
 	q := &consensus.PrePrepare{
 		ReplicaId:      1,
@@ -184,10 +180,9 @@ func TestPersist_restoreQSet(t *testing.T) {
 
 func TestPersist_restorePSet(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	//defer ctrl.Finish()
 
 	node, ext := newPersistTestReplica[consensus.Transaction](ctrl)
-	ext.EXPECT().Sign(gomock.Any()).Return([]byte("sig"), nil).AnyTimes()
 
 	p := &consensus.Prepare{
 		ReplicaId:      1,
@@ -210,10 +205,9 @@ func TestPersist_restorePSet(t *testing.T) {
 
 func TestPersist_restoreCSet(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	//defer ctrl.Finish()
 
 	node, ext := newPersistTestReplica[consensus.Transaction](ctrl)
-	ext.EXPECT().Sign(gomock.Any()).Return([]byte("sig"), nil).AnyTimes()
 
 	c := &consensus.Commit{
 		ReplicaId:      1,
@@ -236,9 +230,8 @@ func TestPersist_restoreCSet(t *testing.T) {
 
 func TestPersist_restoreCert(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	//defer ctrl.Finish()
 	node, ext := newPersistTestReplica[consensus.Transaction](ctrl)
-	ext.EXPECT().Sign(gomock.Any()).Return([]byte("sig"), nil).AnyTimes()
 
 	q := &consensus.PrePrepare{
 		ReplicaId:      1,
@@ -290,10 +283,9 @@ func TestPersist_restoreCert(t *testing.T) {
 
 func TestPersist_restoreState(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	//defer ctrl.Finish()
 
 	node, ext := newPersistTestReplica[consensus.Transaction](ctrl)
-	ext.EXPECT().Sign(gomock.Any()).Return([]byte("sig"), nil).AnyTimes()
 
 	var ret map[string][]byte
 	ret = map[string][]byte{
@@ -335,8 +327,8 @@ func TestPersist_restoreState(t *testing.T) {
 }
 
 func TestPersist_parseQPCKey(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	//ctrl := gomock.NewController(t)
+	//defer ctrl.Finish()
 
 	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	var u1, u2 uint64

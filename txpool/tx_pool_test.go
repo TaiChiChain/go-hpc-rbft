@@ -182,8 +182,8 @@ func testAddNewRequest[T any, Constraint consensus.TXConstraint[T]](t *testing.T
 	txBytes, err = tx.Marshal()
 	assert.Nil(t, err)
 	batch, _ := pool.AddNewRequests([][]byte{txBytes}, true, false)
-	assert.Equal(t, false, batch[0].IsConfBatch())
-	assert.Equal(t, 1, pool.nonBatchedTxs.Len())
+	assert.Equal(t, true, batch[0].IsConfBatch())
+	assert.Equal(t, 2, pool.nonBatchedTxs.Len())
 }
 
 func Test_GenerateRequestBatch(t *testing.T) {
@@ -396,7 +396,7 @@ func Test_GetRequestsByHashList_WithoutMissing(t *testing.T) {
 
 func testGetRequestsByHashListWithoutMissing[T any, Constraint consensus.TXConstraint[T]](t *testing.T) {
 	conf, rl := newDefaultConfig[T, Constraint](nil)
-	primaryPool := newTxPoolImpl[consensus.Transaction](DefaultNamespace, rl, conf)
+	primaryPool := newTxPoolImpl[T, Constraint](DefaultNamespace, rl, conf)
 	_ = primaryPool.Start()
 	replicaConf, replicaRl := newDefaultConfig[T, Constraint](nil)
 	replicaPool := newTxPoolImpl[T, Constraint](DefaultNamespace, replicaRl, replicaConf)
@@ -425,7 +425,7 @@ func testGetRequestsByHashListWithoutMissing[T any, Constraint consensus.TXConst
 
 	// get the same batch again, should return the same batch.
 	txs1, localList2, missing, err := replicaPool.GetRequestsByHashList(batch1.BatchHash, batch1.Timestamp, batch1.TxHashList, nil)
-	assert.Equal(t, []*consensus.Transaction{tx1, tx2}, txs1)
+	assert.Equal(t, [][]byte{txBytes1, txBytes2}, txs1)
 	assert.Equal(t, []bool{false, false}, localList2)
 	assert.Nil(t, missing)
 	assert.Nil(t, err)
@@ -503,9 +503,9 @@ func testGetRequestsByHashListWithMissing[T any, Constraint consensus.TXConstrai
 	_, err = primaryPool.SendMissingRequests(batch.BatchHash, wMissing)
 	assert.Equal(t, ErrMismatch, err)
 	// 3. return the right missing
-	expectTxs := make(map[uint64]*consensus.Transaction)
-	expectTxs[uint64(2)] = tx3
-	expectTxs[uint64(3)] = tx4
+	expectTxs := make(map[uint64][]byte)
+	expectTxs[uint64(2)] = txBytes3
+	expectTxs[uint64(3)] = txBytes4
 	txs, _ := primaryPool.SendMissingRequests(batch.BatchHash, missing)
 	assert.Equal(t, expectTxs, txs)
 
@@ -595,7 +595,7 @@ func testReConstructBatchByOrder[T any, Constraint consensus.TXConstraint[T]](t 
 	rtx := newRandomTx(10)
 	rtxBytes, err := rtx.Marshal()
 	assert.Nil(t, err)
-	wBatch := &RequestHashBatch{
+	wBatch := &RequestHashBatch[T, Constraint]{
 		BatchHash:  "BatchHash",
 		TxHashList: []string{"TxHashList"},
 		TxList:     [][]byte{rtxBytes},

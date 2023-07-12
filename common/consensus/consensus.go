@@ -21,6 +21,10 @@ func DecodeTx[T any, Constraint TXConstraint[T]](raw []byte) (*T, error) {
 // todo: not support temporary
 
 // IsConfigTx returns if this tx is corresponding with a config tx.
-func IsConfigTx(_ []byte) bool {
-	return false
+func IsConfigTx[T any, Constraint TXConstraint[T]](txData []byte) bool {
+	tx, err := DecodeTx[T, Constraint](txData)
+	if err != nil {
+		panic(err)
+	}
+	return Constraint(tx).RbftIsConfigTx()
 }

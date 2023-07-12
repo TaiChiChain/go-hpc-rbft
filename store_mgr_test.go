@@ -53,7 +53,7 @@ func newStorageTestNode[T any, Constraint consensus.TXConstraint[T]](ctrl *gomoc
 
 func TestStoreMgr_getCert(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	//defer ctrl.Finish()
 
 	s, _ := newStorageTestNode[consensus.Transaction](ctrl)
 
@@ -91,7 +91,7 @@ func TestStoreMgr_getCert(t *testing.T) {
 
 func TestStoreMgr_existedDigest(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	//defer ctrl.Finish()
 
 	s, _ := newStorageTestNode[consensus.Transaction](ctrl)
 

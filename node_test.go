@@ -9,13 +9,12 @@ import (
 	"github.com/hyperchain/go-hpc-rbft/v2/types"
 
 	"github.com/gogo/protobuf/proto"
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestNode_Start(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	//ctrl := gomock.NewController(t)
+	//defer ctrl.Finish()
 
 	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	n := rbfts[0].node
@@ -33,8 +32,8 @@ func TestNode_Start(t *testing.T) {
 }
 
 func TestNode_Stop(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	//ctrl := gomock.NewController(t)
+	//defer ctrl.Finish()
 
 	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	n := rbfts[0].node
@@ -81,8 +80,8 @@ func TestNode_Stop(t *testing.T) {
 }
 
 func TestNode_Propose(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	//ctrl := gomock.NewController(t)
+	//defer ctrl.Finish()
 
 	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	unlockCluster(rbfts)
@@ -101,8 +100,8 @@ func TestNode_Propose(t *testing.T) {
 }
 
 func TestNode_Step(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	//ctrl := gomock.NewController(t)
+	//defer ctrl.Finish()
 
 	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	n := rbfts[0].node
@@ -125,8 +124,8 @@ func TestNode_Step(t *testing.T) {
 }
 
 func TestNode_ApplyConfChange(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	//ctrl := gomock.NewController(t)
+	//defer ctrl.Finish()
 
 	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	n := rbfts[0].node
@@ -138,8 +137,8 @@ func TestNode_ApplyConfChange(t *testing.T) {
 }
 
 func TestNode_ReportExecuted(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	//ctrl := gomock.NewController(t)
+	//defer ctrl.Finish()
 
 	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	n := rbfts[0].node
@@ -187,8 +186,8 @@ func TestNode_ReportExecuted(t *testing.T) {
 }
 
 func TestNode_ReportStateUpdated(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	//ctrl := gomock.NewController(t)
+	//defer ctrl.Finish()
 
 	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	n := rbfts[0].node
@@ -222,8 +221,8 @@ func TestNode_ReportStateUpdated(t *testing.T) {
 }
 
 func TestNode_getCurrentState(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	//ctrl := gomock.NewController(t)
+	//defer ctrl.Finish()
 
 	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	n := rbfts[0].node

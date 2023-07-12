@@ -836,35 +836,39 @@ func (ext *testExternal[T, Constraint]) Execute(requests [][]byte, localList []b
 		ext.testNode.blocks[state.MetaState.Height] = state.MetaState.Digest
 		ext.testNode.n.logger.Debugf("Block Number %d", state.MetaState.Height)
 		ext.testNode.n.logger.Debugf("Block Hash %s", state.MetaState.Digest)
-		// not support config tx
 		//report latest validator set
-		//if len(requests) != 0 {
-		//	if consensus.IsConfigTx(requests[0]) {
-		//		var vSet []*consensus.NodeInfo
-		//		tmp := &vSet
-		//		_ = json.Unmarshal(requests[0].Value, tmp)
-		//		var peers []*types.Peer
-		//		for index, nodeInfo := range vSet {
-		//			peer := &types.Peer{
-		//				ID:       uint64(index + 1),
-		//				Hostname: nodeInfo.Hostname,
-		//			}
-		//			peers = append(peers, peer)
-		//		}
-		//		router := &types.Router{
-		//			Peers: peers,
-		//		}
-		//
-		//		ext.testNode.Epoch = state.MetaState.Height
-		//		ext.testNode.VSet = vSet
-		//
-		//		ext.testNode.n.logger.Debugf("Validator Set %+v", router)
-		//		ext.tf.log.Infof("router: %+v", router)
-		//	}
-		//}
+		if len(requests) != 0 {
+			if consensus.IsConfigTx[T, Constraint](requests[0]) {
+				var vSet []*consensus.NodeInfo
+				tmp := &vSet
+				tx, err := consensus.DecodeTx[T, Constraint](requests[0])
+				if err != nil {
+					ext.tf.log.Errorf("DecodeTx error: %v", err)
+				}
+				val := Constraint(tx).RbftGetData()
+				_ = json.Unmarshal(val, tmp)
+				var peers []*types.Peer
+				for index, nodeInfo := range vSet {
+					peer := &types.Peer{
+						ID:       uint64(index + 1),
+						Hostname: nodeInfo.Hostname,
+					}
+					peers = append(peers, peer)
+				}
+				router := &types.Router{
+					Peers: peers,
+				}
+
+				ext.testNode.Epoch = state.MetaState.Height
+				ext.testNode.VSet = vSet
+
+				ext.testNode.n.logger.Debugf("Validator Set %+v", router)
+				ext.tf.log.Infof("router: %+v", router)
+			}
+		}
 		go ext.testNode.N.ReportExecuted(state)
 
-		if !consensus.IsConfigTx(requests[0]) && state.MetaState.Height%10 != 0 {
+		if !consensus.IsConfigTx[T, Constraint](requests[0]) && state.MetaState.Height%10 != 0 {
 			success := make(chan bool)
 			go func() {
 				for {

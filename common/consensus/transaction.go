@@ -35,6 +35,10 @@ const (
 	HashLength  = 32
 )
 
+func (m *Transaction) RbftGetData() []byte {
+	return m.Value
+}
+
 // IsConfigTx returns if this tx is corresponding with a config tx.
 func (m *Transaction) IsConfigTx() bool {
 	return m.GetTxType() == Transaction_CTX || m.GetTxType() == Transaction_ANCHORTX ||
@@ -243,4 +247,12 @@ func (m *Transaction) RbftUnmarshal(raw []byte) error {
 
 func (m *Transaction) RbftMarshal() ([]byte, error) {
 	return m.Marshal()
+}
+
+func (m *Transaction) RbftIsConfigTx() bool {
+	return m.IsConfigTx()
+}
+
+func (m *Transaction) RbftGetSize() int {
+	return m.Size()
 }

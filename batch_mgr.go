@@ -242,7 +242,7 @@ func (rbft *rbftImpl[T, Constraint]) findNextPrepareBatch(ctx context.Context, v
 	// with seqNo <= lastExec. However, those batches may have been deleted from requestPool,
 	// so we can get those batches from batchStore first.
 	if existBatch, ok := rbft.storeMgr.batchStore[d]; ok {
-		if isConfigBatch(existBatch) {
+		if isConfigBatch[T, Constraint](existBatch) {
 			rbft.logger.Debugf("Replica %d generate a config batch", rbft.peerPool.ID)
 			rbft.atomicOn(InConfChange)
 			cert.isConfig = true
@@ -335,9 +335,9 @@ func (rbft *rbftImpl[T, Constraint]) primaryResubmitTransactions() {
 }
 
 // not support temporary
-func isConfigBatch(_ *consensus.RequestBatch) bool {
-	//if len(batch.RequestList) == 1 && batch.RequestList[0].IsConfigTx() {
-	//	return true
-	//}
+func isConfigBatch[T any, Constraint consensus.TXConstraint[T]](batch *consensus.RequestBatch) bool {
+	if len(batch.RequestList) == 1 {
+		return consensus.IsConfigTx[T, Constraint](batch.RequestList[0])
+	}
 	return false
 }

@@ -85,10 +85,10 @@ func (m *MockTxPool[T, Constraint]) EXPECT() *MockTxPoolMockRecorder[T, Constrai
 }
 
 // AddNewRequests mocks base method.
-func (m *MockTxPool[T, Constraint]) AddNewRequests(txs [][]byte, isPrimary, local bool) ([]*txpool.RequestHashBatch, []string) {
+func (m *MockTxPool[T, Constraint]) AddNewRequests(txs [][]byte, isPrimary, local bool) ([]*txpool.RequestHashBatch[T, Constraint], []string) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AddNewRequests", txs, isPrimary, local)
-	ret0, _ := ret[0].([]*txpool.RequestHashBatch)
+	ret0, _ := ret[0].([]*txpool.RequestHashBatch[T, Constraint])
 	ret1, _ := ret[1].([]string)
 	return ret0, ret1
 }
@@ -115,10 +115,10 @@ func (mr *MockTxPoolMockRecorder[T, Constraint]) FilterOutOfDateRequests() *gomo
 }
 
 // GenerateRequestBatch mocks base method.
-func (m *MockTxPool[T, Constraint]) GenerateRequestBatch() []*txpool.RequestHashBatch {
+func (m *MockTxPool[T, Constraint]) GenerateRequestBatch() []*txpool.RequestHashBatch[T, Constraint] {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GenerateRequestBatch")
-	ret0, _ := ret[0].([]*txpool.RequestHashBatch)
+	ret0, _ := ret[0].([]*txpool.RequestHashBatch[T, Constraint])
 	return ret0
 }
 
@@ -202,7 +202,7 @@ func (mr *MockTxPoolMockRecorder[T, Constraint]) IsPoolFull() *gomock.Call {
 }
 
 // ReConstructBatchByOrder mocks base method.
-func (m *MockTxPool[T, Constraint]) ReConstructBatchByOrder(oldBatch *txpool.RequestHashBatch) ([]string, error) {
+func (m *MockTxPool[T, Constraint]) ReConstructBatchByOrder(oldBatch *txpool.RequestHashBatch[T, Constraint]) ([]string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ReConstructBatchByOrder", oldBatch)
 	ret0, _ := ret[0].([]string)

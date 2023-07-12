@@ -40,8 +40,8 @@ github.com/Kubuxu/go-os-helper v0.0.1/go.mod h1:N8B+I7vPCT80IcP58r50u4+gEEcsZETF
 github.com/OneOfOne/xxhash v1.2.2/go.mod h1:HSdplMjZKSmBqAxg5vPj2TmRDmfkzw+cTzAElWljhcU=
 github.com/Shopify/sarama v1.19.0/go.mod h1:FVkBWblsNy7DGZRfXLU0O9RCGt5g3g3yEuWXgklEdEo=
 github.com/Shopify/toxiproxy v2.1.4+incompatible/go.mod h1:OXgGpZ6Cli1/URJOF1DMxUHB2q5Ap20/P/eIdh4G0pI=
-github.com/TaiChiChain/bitxhub-model v1.20.2-0.20230712015520-9b2175556cc3 h1:aEnvVSGd35E/oNC2n6FaHABS7bqKzGxVZzr1gllOrv8=
-github.com/TaiChiChain/bitxhub-model v1.20.2-0.20230712015520-9b2175556cc3/go.mod h1:H67D5gt1yJ/ybsaxywMFuRwm4XuJ5eopcDxOPXNdnb8=
+github.com/TaiChiChain/bitxhub-model v1.20.2-0.20230712080157-40a7dce120ba h1:YSXtuQG/wBW8mR25NJZD8ywJYk+N6Vdn4tUbiZHmaUU=
+github.com/TaiChiChain/bitxhub-model v1.20.2-0.20230712080157-40a7dce120ba/go.mod h1:Ns2yD6HQBOX/06U6Nj40sK0E4z87u+UA4R72JmSzXyM=
 github.com/VividCortex/gohistogram v1.0.0/go.mod h1:Pf5mBqqDxYaXu3hDrrU+w6nw50o/4+TcAqDqk/vUH7g=
 github.com/aead/siphash v1.0.1/go.mod h1:Nywa3cDsYNNK3gaciGTWPwHt0wlpNV15vwmswBAUSII=
 github.com/afex/hystrix-go v0.0.0-20180502004556-fa1af6a1f4f5/go.mod h1:SkGFH1ia65gfNATL8TAiHDNxPzPdmEL5uirI2Uyuz6c=

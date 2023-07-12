@@ -9,10 +9,14 @@ import (
 )
 
 func TestRequestHashBatch_IsConfBatch(t *testing.T) {
+	testRequestHashBatchIsConfBatch[consensus.Transaction](t)
+}
+
+func testRequestHashBatchIsConfBatch[T any, Constraint consensus.TXConstraint[T]](t *testing.T) {
 	tx1 := &consensus.Transaction{TxType: consensus.Transaction_CTX}
 	txBytes1, err := tx1.Marshal()
 	assert.Nil(t, err)
-	batch1 := &RequestHashBatch{
+	batch1 := &RequestHashBatch[T, Constraint]{
 		BatchHash:  "",
 		TxHashList: nil,
 		TxList:     [][]byte{txBytes1},
@@ -25,7 +29,7 @@ func TestRequestHashBatch_IsConfBatch(t *testing.T) {
 	tx2 := &consensus.Transaction{TxType: consensus.Transaction_NTX}
 	txBytes2, err := tx2.Marshal()
 	assert.Nil(t, err)
-	batch2 := &RequestHashBatch{
+	batch2 := &RequestHashBatch[T, Constraint]{
 		BatchHash:  "",
 		TxHashList: nil,
 		TxList:     [][]byte{txBytes2},
@@ -35,6 +39,6 @@ func TestRequestHashBatch_IsConfBatch(t *testing.T) {
 	}
 	flag2 := batch2.IsConfBatch()
 
-	assert.Equal(t, flag1, false)
+	assert.Equal(t, flag1, true)
 	assert.Equal(t, flag2, false)
 }

@@ -37,7 +37,7 @@ func newTestStatusNode[T any, Constraint consensus.TXConstraint[T]](ctrl *gomock
 
 func TestStatusMgr_inOne(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	//defer ctrl.Finish()
 
 	rbft := newTestStatusNode[consensus.Transaction](ctrl)
 
@@ -47,7 +47,7 @@ func TestStatusMgr_inOne(t *testing.T) {
 
 func TestStatusMgr_setState(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	//defer ctrl.Finish()
 
 	rbft := newTestStatusNode[consensus.Transaction](ctrl)
 
@@ -60,7 +60,7 @@ func TestStatusMgr_setState(t *testing.T) {
 
 func TestStatusMgr_maybeSetNormal(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	//defer ctrl.Finish()
 
 	rbft := newTestStatusNode[consensus.Transaction](ctrl)
 

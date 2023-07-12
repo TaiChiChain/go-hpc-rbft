@@ -353,7 +353,7 @@ func (rbft *rbftImpl[T, Constraint]) restoreCert() {
 		batch, ok := rbft.storeMgr.batchStore[idx.d]
 		// set isConfig if found.
 		if ok {
-			cert.isConfig = isConfigBatch(batch)
+			cert.isConfig = isConfigBatch[T, Constraint](batch)
 		}
 	}
 

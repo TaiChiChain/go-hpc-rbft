@@ -149,7 +149,7 @@ func executeExceptN[T any, Constraint consensus.TXConstraint[T]](t *testing.T, r
 	if checkpoint {
 		txBytes, err := tx.Marshal()
 		assert.Nil(t, err)
-		if consensus.IsConfigTx(txBytes) {
+		if consensus.IsConfigTx[T, Constraint](txBytes) {
 			vcMsg := make([]*consensusMessageWrapper, len(rbfts))
 			epochChanged := false
 			// process checkpoint, if epoch changed, trigger and process view change.

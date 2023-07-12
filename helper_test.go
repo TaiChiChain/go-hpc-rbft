@@ -8,7 +8,6 @@ import (
 	consensus "github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
 	"github.com/hyperchain/go-hpc-rbft/v2/types"
 
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -56,8 +55,8 @@ func TestHelper_Swap(t *testing.T) {
 // =============================================================================
 
 func TestHelper_RBFT(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	//ctrl := gomock.NewController(t)
+	//defer ctrl.Finish()
 
 	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 
@@ -101,8 +100,8 @@ func TestHelper_RBFT(t *testing.T) {
 // =============================================================================
 
 func TestHelper_Check(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	//ctrl := gomock.NewController(t)
+	//defer ctrl.Finish()
 
 	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 
@@ -193,8 +192,8 @@ func TestHelper_Check(t *testing.T) {
 // =============================================================================
 
 func TestHelper_isPrePrepareLegal(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	//ctrl := gomock.NewController(t)
+	//defer ctrl.Finish()
 
 	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 
@@ -239,8 +238,8 @@ func TestHelper_isPrePrepareLegal(t *testing.T) {
 }
 
 func TestHelper_isPrepareLegal(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	//ctrl := gomock.NewController(t)
+	//defer ctrl.Finish()
 
 	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 
@@ -260,8 +259,8 @@ func TestHelper_isPrepareLegal(t *testing.T) {
 }
 
 func TestHelper_isCommitLegal(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	//ctrl := gomock.NewController(t)
+	//defer ctrl.Finish()
 
 	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 
@@ -280,8 +279,8 @@ func TestHelper_isCommitLegal(t *testing.T) {
 }
 
 func TestRBFT_startTimerIfOutstandingRequests(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	//ctrl := gomock.NewController(t)
+	//defer ctrl.Finish()
 
 	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 
@@ -306,8 +305,8 @@ func TestRBFT_startTimerIfOutstandingRequests(t *testing.T) {
 }
 
 func TestHelper_stopNamespace(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	//ctrl := gomock.NewController(t)
+	//defer ctrl.Finish()
 
 	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 
@@ -316,8 +315,8 @@ func TestHelper_stopNamespace(t *testing.T) {
 }
 
 func TestHelper_compareCheckpointWithWeakSet(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	//ctrl := gomock.NewController(t)
+	//defer ctrl.Finish()
 
 	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 
@@ -430,8 +429,8 @@ func TestHelper_compareCheckpointWithWeakSet(t *testing.T) {
 }
 
 func TestHelper_CheckIfNeedStateUpdate(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	//ctrl := gomock.NewController(t)
+	//defer ctrl.Finish()
 
 	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	unlockCluster(rbfts)

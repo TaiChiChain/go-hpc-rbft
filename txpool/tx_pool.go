@@ -61,7 +61,7 @@ type chainSupport interface {
 type TxPool[T any, Constraint consensus.TXConstraint[T]] interface {
 	// GenerateRequestBatch generates a transaction batch and post it
 	// to outside if there are transactions in txPool.
-	GenerateRequestBatch() []*RequestHashBatch
+	GenerateRequestBatch() []*RequestHashBatch[T, Constraint]
 
 	// AddNewRequests adds transactions into txPool.
 	// When current node is primary, judge if we need to generate a batch by batch size.
@@ -72,7 +72,7 @@ type TxPool[T any, Constraint consensus.TXConstraint[T]] interface {
 	// with committed txs on ledger.
 	// Also, when we receive a tx locally, we need to check if these txs are out-of-date
 	// time by time.
-	AddNewRequests(txs [][]byte, isPrimary bool, local bool) ([]*RequestHashBatch, []string)
+	AddNewRequests(txs [][]byte, isPrimary bool, local bool) ([]*RequestHashBatch[T, Constraint], []string)
 
 	// RemoveBatches removes several batches by given digests of
 	// transaction batches from the pool(batchedTxs).
@@ -127,7 +127,7 @@ type TxPool[T any, Constraint consensus.TXConstraint[T]] interface {
 	RestorePool()
 
 	// ReConstructBatchByOrder reconstruct batch from empty txPool by order, must be called after RestorePool.
-	ReConstructBatchByOrder(oldBatch *RequestHashBatch) (deDuplicateTxHashes []string, err error)
+	ReConstructBatchByOrder(oldBatch *RequestHashBatch[T, Constraint]) (deDuplicateTxHashes []string, err error)
 
 	// Reset clears all cached txs in txPool and start with a pure empty environment,
 	// except batches in saveBatches and local non-batched-txs that not included in ledger.
@@ -144,7 +144,7 @@ type TxPool[T any, Constraint consensus.TXConstraint[T]] interface {
 }
 
 // RequestHashBatch contains transactions that batched by primary.
-type RequestHashBatch struct {
+type RequestHashBatch[T any, Constraint consensus.TXConstraint[T]] struct {
 	BatchHash  string   // hash of this batch calculated by MD5
 	TxHashList []string // list of all txs' hashes
 	TxList     [][]byte // list of all txs
@@ -198,7 +198,7 @@ type txPoolImpl[T any, Constraint consensus.TXConstraint[T]] struct {
 
 	// store all batches created by current primary in order, removed after
 	// they are sure have been included in ledger.
-	batchStore map[string]*RequestHashBatch
+	batchStore map[string]*RequestHashBatch[T, Constraint]
 
 	// store batched txs' hash corresponding to batchStore
 	batchedTxs map[string]bool
@@ -250,7 +250,7 @@ func NewTxPool[T any, Constraint consensus.TXConstraint[T]](namespace string, rl
 // with committed txs on ledger.
 // Also, when we receive a tx locally, we need to check if these txs are out-of-date
 // time by time.
-func (pool *txPoolImpl[T, Constraint]) AddNewRequests(txs [][]byte, isPrimary bool, local bool) ([]*RequestHashBatch, []string) {
+func (pool *txPoolImpl[T, Constraint]) AddNewRequests(txs [][]byte, isPrimary bool, local bool) ([]*RequestHashBatch[T, Constraint], []string) {
 	return pool.addNewRequests(txs, isPrimary, local)
 }
 
@@ -270,7 +270,7 @@ func (pool *txPoolImpl[T, Constraint]) HasPendingRequestInPool() bool {
 
 // GenerateRequestBatch generates a transaction batch and post it to outside
 // if there are transactions in txPool.
-func (pool *txPoolImpl[T, Constraint]) GenerateRequestBatch() []*RequestHashBatch {
+func (pool *txPoolImpl[T, Constraint]) GenerateRequestBatch() []*RequestHashBatch[T, Constraint] {
 	return pool.generateTxBatch()
 }
 
@@ -354,7 +354,7 @@ func (pool *txPoolImpl[T, Constraint]) GetRequestsByHashList(batchHash string, t
 		pool.missingTxsRecord[batchHash] = missingTxsHash
 		return
 	}
-	batch := &RequestHashBatch{
+	batch := &RequestHashBatch[T, Constraint]{
 		BatchHash:  batchHash,
 		TxHashList: hashList,
 		TxList:     txs,
@@ -607,7 +607,7 @@ func (pool *txPoolImpl[T, Constraint]) RestoreOneBatch(hash string) error {
 }
 
 // ReConstructBatchByOrder reconstruct batch from empty txPool by order, must be called after RestorePool.
-func (pool *txPoolImpl[T, Constraint]) ReConstructBatchByOrder(oldBatch *RequestHashBatch) (deDuplicateTxHashes []string, err error) {
+func (pool *txPoolImpl[T, Constraint]) ReConstructBatchByOrder(oldBatch *RequestHashBatch[T, Constraint]) (deDuplicateTxHashes []string, err error) {
 	// check if there exists duplicate batch hash.
 	if _, gErr := pool.getBatchByHash(oldBatch.BatchHash); gErr == nil {
 		pool.logger.Warningf("When re-construct batch, batch %s already exists", oldBatch.BatchHash)
@@ -639,7 +639,7 @@ func (pool *txPoolImpl[T, Constraint]) ReConstructBatchByOrder(oldBatch *Request
 		timeList = append(timeList, 0)
 	}
 
-	batch := &RequestHashBatch{
+	batch := &RequestHashBatch[T, Constraint]{
 		TxHashList: oldBatch.TxHashList,
 		TxList:     oldBatch.TxList,
 		LocalList:  localList,
@@ -648,7 +648,7 @@ func (pool *txPoolImpl[T, Constraint]) ReConstructBatchByOrder(oldBatch *Request
 	}
 
 	// The given batch hash should match with the calculated batch hash.
-	batch.BatchHash = GetBatchHash(batch)
+	batch.BatchHash = GetBatchHash[T, Constraint](batch)
 	if batch.BatchHash != oldBatch.BatchHash {
 		pool.logger.Warningf("The given batch hash %s does not match with the calculated batch hash %s.", oldBatch.BatchHash, batch.BatchHash)
 		err = ErrInvalidBatch
@@ -838,7 +838,7 @@ func newTxPoolImpl[T any, Constraint consensus.TXConstraint[T]](namespace string
 	}
 
 	txPool.nonBatchedTxs = NewTxList()
-	txPool.batchStore = make(map[string]*RequestHashBatch)
+	txPool.batchStore = make(map[string]*RequestHashBatch[T, Constraint])
 	txPool.batchedTxs = make(map[string]bool)
 	txPool.missingTxsRecord = make(map[string]map[uint64]string)
 
@@ -856,7 +856,7 @@ func newTxPoolImpl[T any, Constraint consensus.TXConstraint[T]](namespace string
 // for primary node, we need to check pending size and generate a batch once
 // pending size has exceeded the batch size.
 // for backup node, judge if we can eliminate some missing batches.
-func (pool *txPoolImpl[T, Constraint]) addNewRequests(txs [][]byte, isPrimary bool, local bool) ([]*RequestHashBatch, []string) {
+func (pool *txPoolImpl[T, Constraint]) addNewRequests(txs [][]byte, isPrimary bool, local bool) ([]*RequestHashBatch[T, Constraint], []string) {
 	pool.metrics.incomingTxsCounter.Add(float64(len(txs)))
 	// TODO(DH): move checkSign here
 	validTxs := make([][]byte, 0, len(txs))
@@ -898,7 +898,7 @@ func (pool *txPoolImpl[T, Constraint]) addNewRequests(txs [][]byte, isPrimary bo
 				req := pool.generateRequest(tx, local, time.Now().UnixNano())
 				pool.nonBatchedTxs.PushBack(validTxHashes[i], req)
 				pool.metrics.nonBatchedTxsNumber.Add(float64(1))
-				if consensus.IsConfigTx(tx) {
+				if consensus.IsConfigTx[T, Constraint](tx) {
 					hasConfigTx = true
 				}
 			}
@@ -945,7 +945,7 @@ func (pool *txPoolImpl[T, Constraint]) addNewRequests(txs [][]byte, isPrimary bo
 }
 
 // generateTxBatch generates a transaction batch by batch limit (timeout or size).
-func (pool *txPoolImpl[T, Constraint]) generateTxBatch() []*RequestHashBatch {
+func (pool *txPoolImpl[T, Constraint]) generateTxBatch() []*RequestHashBatch[T, Constraint] {
 
 	poolLen := pool.nonBatchedTxs.Len()
 	if poolLen == 0 {
@@ -966,7 +966,7 @@ func (pool *txPoolImpl[T, Constraint]) generateTxBatch() []*RequestHashBatch {
 //     generate a config batch and stuck txPool directly, so that only a config batch will be send out using
 //     batch set after this turn of generation.
 //  3. Memory Limit: Generate sub batches after txs picked out
-func (pool *txPoolImpl[T, Constraint]) newTxBatch() []*RequestHashBatch {
+func (pool *txPoolImpl[T, Constraint]) newTxBatch() []*RequestHashBatch[T, Constraint] {
 
 	var (
 		hashList  []string
@@ -984,7 +984,7 @@ func (pool *txPoolImpl[T, Constraint]) newTxBatch() []*RequestHashBatch {
 
 	i := 0
 	var n *list.Element
-	//memLen := 0
+	memLen := 0
 	for e := pool.nonBatchedTxs.Front(); i < batchSize; e = n {
 		req, ok := e.Value.(*request)
 		if !ok {
@@ -994,7 +994,7 @@ func (pool *txPoolImpl[T, Constraint]) newTxBatch() []*RequestHashBatch {
 
 		// Check the type of requests.
 		// If there is a config tx, break directly and generate a config batch.
-		if consensus.IsConfigTx(req.tx) {
+		if consensus.IsConfigTx[T, Constraint](req.tx) {
 			hash := requestHash[T, Constraint](req.tx)
 			pool.logger.Debugf("There is a config tx %s, generate a config batch directly, %d txs will be restored",
 				hash, len(txList))
@@ -1038,15 +1038,14 @@ func (pool *txPoolImpl[T, Constraint]) newTxBatch() []*RequestHashBatch {
 			break
 		}
 
-		// not support temporary
-		//if pool.batchMemLimit {
-		//	memLen += req.memory
-		//	if memLen > pool.batchMaxMem && len(txList) > 0 {
-		//		// the memory size of batch cannot be larger than batchMaxMem, except there is only one tx in batch
-		//		pool.logger.Debug("Reach the memory limit of batch, generate batch")
-		//		break
-		//	}
-		//}
+		if pool.batchMemLimit {
+			memLen += req.memory
+			if memLen > pool.batchMaxMem && len(txList) > 0 {
+				// the memory size of batch cannot be larger than batchMaxMem, except there is only one tx in batch
+				pool.logger.Debug("Reach the memory limit of batch, generate batch")
+				break
+			}
+		}
 
 		hash := requestHash[T, Constraint](req.tx)
 		txList = append(txList, req.tx)
@@ -1066,15 +1065,15 @@ func (pool *txPoolImpl[T, Constraint]) newTxBatch() []*RequestHashBatch {
 	}
 
 	// construct a hash batch
-	var batches []*RequestHashBatch
-	txBatch := &RequestHashBatch{
+	var batches []*RequestHashBatch[T, Constraint]
+	txBatch := &RequestHashBatch[T, Constraint]{
 		TxHashList: hashList,
 		TxList:     txList,
 		LocalList:  localList,
 		TimeList:   timeList,
 		Timestamp:  time.Now().UnixNano(),
 	}
-	batchHash := GetBatchHash(txBatch)
+	batchHash := GetBatchHash[T, Constraint](txBatch)
 	txBatch.BatchHash = batchHash
 	pool.batchStore[batchHash] = txBatch
 	pool.metrics.batchNumber.Add(float64(1))
@@ -1153,7 +1152,7 @@ func (pool *txPoolImpl[T, Constraint]) addMissingTxs(txs [][]byte) {
 
 // getBatchByHash find batch together with its index in batchStore, returns error
 // if not found batchHash in batchStore.
-func (pool *txPoolImpl[T, Constraint]) getBatchByHash(batchHash string) (*RequestHashBatch, error) {
+func (pool *txPoolImpl[T, Constraint]) getBatchByHash(batchHash string) (*RequestHashBatch[T, Constraint], error) {
 
 	batch, ok := pool.batchStore[batchHash]
 	if ok {
@@ -1164,7 +1163,7 @@ func (pool *txPoolImpl[T, Constraint]) getBatchByHash(batchHash string) (*Reques
 }
 
 // GetBatchHash calculate hash of a RequestHashBatch
-func GetBatchHash(batch *RequestHashBatch) string {
+func GetBatchHash[T any, Constraint consensus.TXConstraint[T]](batch *RequestHashBatch[T, Constraint]) string {
 	return CalculateMD5Hash(batch.TxHashList, batch.Timestamp)
 }
 
@@ -1224,10 +1223,16 @@ func (pool *txPoolImpl[T, Constraint]) generateRequest(tx []byte, local bool, ti
 			timestamp: timestamp,
 		}
 	}
+	t, err := consensus.DecodeTx[T, Constraint](tx)
+	if err != nil {
+		pool.logger.Errorf("decode tx err in generateRequest: %v", err)
+	}
+	mem := Constraint(t).RbftGetSize()
 	return &request{
 		tx:        tx,
 		local:     local,
 		timestamp: timestamp,
+		memory:    mem,
 	}
 }
 

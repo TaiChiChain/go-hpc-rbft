@@ -1574,7 +1574,7 @@ func (rbft *rbftImpl[T, Constraint]) processNewView(msgList []*consensus.Vc_PQ) 
 
 			// re-construct batches by order in xSet to de-duplicate txs during different batches in msgList which
 			// may be caused by different primary puts the same txs into different batches with different seqNo'
-			oldBatch := &txpool.RequestHashBatch{
+			oldBatch := &txpool.RequestHashBatch[T, Constraint]{
 				BatchHash:  batch.BatchHash,
 				TxHashList: batch.RequestHashList,
 				TxList:     batch.RequestList,
