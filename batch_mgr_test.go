@@ -5,13 +5,11 @@ import (
 	"testing"
 	"time"
 
-	consensus "github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
+	"github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestBatchMgr_startBatchTimer(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	assert.False(t, rbfts[0].timerMgr.getTimer(batchTimer))
@@ -23,8 +21,6 @@ func TestBatchMgr_startBatchTimer(t *testing.T) {
 
 // Test for only this function
 func TestBatchMgr_maybeSendPrePrepare(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 
@@ -68,8 +64,6 @@ func TestBatchMgr_maybeSendPrePrepare(t *testing.T) {
 }
 
 func TestBatchMgr_findNextPrepareBatch(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 

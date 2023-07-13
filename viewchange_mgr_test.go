@@ -3,7 +3,7 @@ package rbft
 import (
 	"testing"
 
-	consensus "github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
+	"github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
 	"github.com/hyperchain/go-hpc-rbft/v2/types"
 
 	"github.com/gogo/protobuf/proto"
@@ -11,8 +11,6 @@ import (
 )
 
 func TestVC_FullProcess(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	unlockCluster(rbfts)
@@ -71,8 +69,6 @@ func TestVC_FullProcess(t *testing.T) {
 }
 
 func TestVC_recvViewChange_FromPrimary(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	unlockCluster(rbfts)
@@ -95,8 +91,6 @@ func TestVC_recvViewChange_FromPrimary(t *testing.T) {
 }
 
 func TestVC_recvViewChange_Quorum(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	unlockCluster(rbfts)
@@ -125,8 +119,6 @@ func TestVC_recvViewChange_Quorum(t *testing.T) {
 }
 
 func TestVC_fetchRequestBatches(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	unlockCluster(rbfts)
@@ -139,8 +131,6 @@ func TestVC_fetchRequestBatches(t *testing.T) {
 }
 
 func TestVC_recvFetchRequestBatch(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	unlockCluster(rbfts)
@@ -163,8 +153,6 @@ func TestVC_recvFetchRequestBatch(t *testing.T) {
 }
 
 func TestVC_recvFetchBatchResponse_AfterViewChanged(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	unlockCluster(rbfts)
@@ -239,8 +227,6 @@ func TestVC_recvFetchBatchResponse_AfterViewChanged(t *testing.T) {
 }
 
 func TestVC_processNewView_AfterViewChanged_PrimaryNormal(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	unlockCluster(rbfts)
@@ -279,8 +265,6 @@ func TestVC_processNewView_AfterViewChanged_PrimaryNormal(t *testing.T) {
 }
 
 func TestVC_processNewView_AfterViewChanged_ReplicaNormal(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	unlockCluster(rbfts)
@@ -320,8 +304,6 @@ func TestVC_processNewView_AfterViewChanged_ReplicaNormal(t *testing.T) {
 }
 
 func TestVC_processNewView_AfterViewChanged_LargerConfig(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 
@@ -377,8 +359,6 @@ func TestVC_processNewView_AfterViewChanged_LargerConfig(t *testing.T) {
 }
 
 func TestVC_processNewView_AfterViewChanged_LowerConfig(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 
@@ -433,8 +413,6 @@ func TestVC_processNewView_AfterViewChanged_LowerConfig(t *testing.T) {
 }
 
 func TestVC_processNewView_AfterViewChanged_EqualConfig(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 
@@ -495,8 +473,6 @@ func TestVC_processNewView_AfterViewChanged_EqualConfig(t *testing.T) {
 }
 
 func TestVC_fetchMissingReqBatchIfNeeded(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 
@@ -534,8 +510,6 @@ func TestVC_fetchMissingReqBatchIfNeeded(t *testing.T) {
 }
 
 func TestVC_correctViewChange(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 
@@ -581,8 +555,6 @@ func TestVC_correctViewChange(t *testing.T) {
 }
 
 func TestVC_assignSequenceNumbers(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 

@@ -4,13 +4,11 @@ import (
 	"context"
 	"testing"
 
-	consensus "github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
+	"github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestCluster_MissingCheckpoint(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	unlockCluster(rbfts)
@@ -93,9 +91,6 @@ func TestCluster_CheckpointToViewChange(t *testing.T) {
 	// expected: for node2 should open the high-watermark timer
 	// ========================================================================================================
 
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
-
 	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	unlockCluster(rbfts)
 
@@ -172,8 +167,6 @@ func TestCluster_CheckpointToViewChange(t *testing.T) {
 }
 
 func TestCluster_ReceiveViewChangeBeforeStart(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 
@@ -275,8 +268,6 @@ func TestCluster_ReceiveViewChangeBeforeStart(t *testing.T) {
 }
 
 func TestCluster_ViewChange_StateUpdate_Timeout_StateUpdated_Replica(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	unlockCluster(rbfts)
@@ -357,8 +348,6 @@ func TestCluster_ViewChange_StateUpdate_Timeout_StateUpdated_Replica(t *testing.
 }
 
 func TestCluster_ViewChange_StateUpdate_Timeout_StateUpdated_Primary(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	unlockCluster(rbfts)
@@ -484,9 +473,6 @@ func TestCluster_ViewChange_StateUpdate_Timeout_StateUpdated_Primary(t *testing.
 func TestCluster_Checkpoint_in_StateUpdating(t *testing.T) {
 	// test for update high target while transferring for efficient state-update instance initiation.
 
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
-
 	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	unlockCluster(rbfts)
 
@@ -579,8 +565,6 @@ func TestCluster_Checkpoint_in_StateUpdating(t *testing.T) {
 }
 
 func TestCluster_InitRecovery(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	unlockCluster(rbfts)

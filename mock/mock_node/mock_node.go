@@ -10,7 +10,7 @@ import (
 
 	gomock "github.com/golang/mock/gomock"
 	rbft "github.com/hyperchain/go-hpc-rbft/v2"
-	consensus "github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
+	"github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
 	types "github.com/hyperchain/go-hpc-rbft/v2/types"
 )
 

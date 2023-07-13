@@ -6,8 +6,8 @@ import (
 	"reflect"
 	"testing"
 
-	consensus "github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
-	fancylogger2 "github.com/hyperchain/go-hpc-rbft/v2/common/fancylogger"
+	"github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
+	"github.com/hyperchain/go-hpc-rbft/v2/common/fancylogger"
 	"github.com/hyperchain/go-hpc-rbft/v2/types"
 
 	"github.com/gogo/protobuf/proto"
@@ -246,10 +246,10 @@ func executeExceptN[T any, Constraint consensus.TXConstraint[T]](t *testing.T, r
 //=============================================================================
 
 // newRawLoggerWithHost create log file for local cluster tests
-func newRawLoggerWithHost(hostname string) *fancylogger2.Logger {
-	rawLogger := fancylogger2.NewLogger("test", fancylogger2.DEBUG)
+func newRawLoggerWithHost(hostname string) *fancylogger.Logger {
+	rawLogger := fancylogger.NewLogger("test", fancylogger.DEBUG)
 
-	consoleFormatter := &fancylogger2.StringFormatter{
+	consoleFormatter := &fancylogger.StringFormatter{
 		EnableColors:    true,
 		TimestampFormat: "2006-01-02T15:04:05.000",
 		IsTerminal:      true,
@@ -259,7 +259,7 @@ func newRawLoggerWithHost(hostname string) *fancylogger2.Logger {
 	_ = os.Mkdir("testLogger", os.ModePerm)
 	fileName := "testLogger/" + hostname + ".log"
 	f, _ := os.Create(fileName)
-	consoleBackend := fancylogger2.NewIOBackend(consoleFormatter, f)
+	consoleBackend := fancylogger.NewIOBackend(consoleFormatter, f)
 
 	rawLogger.SetBackends(consoleBackend)
 	rawLogger.SetEnableCaller(true)
@@ -268,16 +268,16 @@ func newRawLoggerWithHost(hostname string) *fancylogger2.Logger {
 }
 
 // newRawLogger create log file for local cluster tests
-func newRawLogger() *fancylogger2.Logger {
-	rawLogger := fancylogger2.NewLogger("test", fancylogger2.DEBUG)
+func newRawLogger() *fancylogger.Logger {
+	rawLogger := fancylogger.NewLogger("test", fancylogger.DEBUG)
 
-	consoleFormatter := &fancylogger2.StringFormatter{
+	consoleFormatter := &fancylogger.StringFormatter{
 		EnableColors:    true,
 		TimestampFormat: "2006-01-02T15:04:05.000",
 		IsTerminal:      true,
 	}
 
-	consoleBackend := fancylogger2.NewIOBackend(consoleFormatter, os.Stdout)
+	consoleBackend := fancylogger.NewIOBackend(consoleFormatter, os.Stdout)
 
 	rawLogger.SetBackends(consoleBackend)
 	rawLogger.SetEnableCaller(true)

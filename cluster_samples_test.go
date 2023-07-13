@@ -3,13 +3,11 @@ package rbft
 import (
 	"testing"
 
-	consensus "github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
+	"github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestCluster_SendTx_InitCtx(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	unlockCluster[consensus.Transaction](rbfts)
@@ -56,8 +54,6 @@ func TestCluster_SendTx_InitCtx(t *testing.T) {
 }
 
 func TestCluster_SyncEpochThenSyncBlockWithCheckpoint(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	unlockCluster(rbfts)
@@ -152,8 +148,6 @@ func TestCluster_SyncEpochThenSyncBlockWithCheckpoint(t *testing.T) {
 }
 
 func TestCluster_SyncBlockThenSyncEpochWithCheckpoint(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	unlockCluster(rbfts)

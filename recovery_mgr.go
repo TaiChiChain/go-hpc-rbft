@@ -18,7 +18,7 @@ import (
 	"context"
 
 	"github.com/gogo/protobuf/proto"
-	consensus "github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
+	"github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
 )
 
 /**

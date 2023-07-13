@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	consensus "github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
+	"github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
 	"github.com/hyperchain/go-hpc-rbft/v2/common/metrics/disabled"
 	mockexternal "github.com/hyperchain/go-hpc-rbft/v2/mock/mock_external"
 

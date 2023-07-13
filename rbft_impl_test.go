@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	consensus "github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
+	"github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
 	"github.com/hyperchain/go-hpc-rbft/v2/common/metrics/disabled"
 	mockexternal "github.com/hyperchain/go-hpc-rbft/v2/mock/mock_external"
 	txpoolmock "github.com/hyperchain/go-hpc-rbft/v2/txpool/mock"
@@ -83,8 +83,6 @@ func TestRBFT_newRBFT(t *testing.T) {
 //============================================
 
 func TestRBFT_consensusMessageFilter(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	unlockCluster(rbfts)
@@ -115,8 +113,6 @@ func TestRBFT_consensusMessageFilter(t *testing.T) {
 //============================================
 
 func TestRBFT_processReqSetEvent_PrimaryGenerateBatch(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	unlockCluster(rbfts)
@@ -143,8 +139,6 @@ func TestRBFT_processReqSetEvent_PrimaryGenerateBatch(t *testing.T) {
 }
 
 func TestRBFT_processReqSetEvent(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	unlockCluster(rbfts)
@@ -169,8 +163,6 @@ func TestRBFT_processReqSetEvent(t *testing.T) {
 //============================================
 
 func TestRBFT_reportStateUpdated(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 
@@ -194,8 +186,6 @@ func TestRBFT_reportStateUpdated(t *testing.T) {
 }
 
 func TestRBFT_reportStableCheckpointFinished(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	// in pending
@@ -210,8 +200,6 @@ func TestRBFT_reportStableCheckpointFinished(t *testing.T) {
 }
 
 func TestRBFT_postMsg(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	unlockCluster(rbfts)
@@ -226,8 +214,6 @@ func TestRBFT_postMsg(t *testing.T) {
 //============================================
 
 func TestRBFT_getStatus(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	unlockCluster(rbfts)
@@ -279,8 +265,6 @@ func TestRBFT_getStatus(t *testing.T) {
 //============================================
 
 func TestRBFT_processNullRequset(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	nullRequestEvent := &LocalEvent{
@@ -305,8 +289,6 @@ func TestRBFT_processNullRequset(t *testing.T) {
 }
 
 func TestRBFT_handleNullRequestTimerEvent(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 
@@ -329,8 +311,6 @@ func TestRBFT_handleNullRequestTimerEvent(t *testing.T) {
 }
 
 func TestRBFT_fetchMissingTxs(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	prePrep := &consensus.PrePrepare{
@@ -353,8 +333,6 @@ func TestRBFT_fetchMissingTxs(t *testing.T) {
 }
 
 func TestRBFT_start_cache_message(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	assert.Equal(t, true, rbfts[0].atomicIn(Pending))
@@ -391,8 +369,6 @@ func TestRBFT_start_cache_message(t *testing.T) {
 }
 
 func TestRBFT_postConfState_NormalCase(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	vSetNode5 := append(defaultValidatorSet, &consensus.NodeInfo{Hostname: "node5", PubKey: []byte("pub-5")})
@@ -405,8 +381,6 @@ func TestRBFT_postConfState_NormalCase(t *testing.T) {
 }
 
 func TestRBFT_postConfState_NotExitInRouter(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	newVSet := []*consensus.NodeInfo{
@@ -424,8 +398,6 @@ func TestRBFT_postConfState_NotExitInRouter(t *testing.T) {
 }
 
 func TestRBFT_processOutOfDateReqs(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	tx := newTx()
@@ -465,8 +437,6 @@ func TestRBFT_processOutOfDateReqs(t *testing.T) {
 }
 
 func TestRBFT_sendNullRequest(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 
@@ -491,8 +461,6 @@ func TestRBFT_sendNullRequest(t *testing.T) {
 }
 
 func TestRBFT_recvPrePrepare_WrongDigest(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	hashBatch := &consensus.HashBatch{
@@ -511,8 +479,6 @@ func TestRBFT_recvPrePrepare_WrongDigest(t *testing.T) {
 }
 
 func TestRBFT_recvPrePrepare_EmptyDigest(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	hashBatch := &consensus.HashBatch{
@@ -531,8 +497,6 @@ func TestRBFT_recvPrePrepare_EmptyDigest(t *testing.T) {
 }
 
 func TestRBFT_recvPrePrepare_WrongSeqNo(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	tx := newTx()
 	txBytes, err := tx.Marshal()
@@ -588,8 +552,6 @@ func TestRBFT_recvPrePrepare_WrongSeqNo(t *testing.T) {
 }
 
 func TestRBFT_recvFetchMissingResponse(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 

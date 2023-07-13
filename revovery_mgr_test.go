@@ -3,16 +3,13 @@ package rbft
 import (
 	"testing"
 
-	consensus "github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
+	"github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
 	"github.com/hyperchain/go-hpc-rbft/v2/types"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestRecovery_ClusterInitRecovery(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
-
 	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	unlockCluster(rbfts)
 	clusterInitRecovery(t, nodes, rbfts, -1)
@@ -23,8 +20,6 @@ func TestRecovery_ClusterInitRecovery(t *testing.T) {
 }
 
 func TestRecovery_ReplicaSingleRecovery(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	unlockCluster(rbfts)
@@ -91,8 +86,6 @@ func TestRecovery_ReplicaSingleRecovery(t *testing.T) {
 }
 
 func TestRecovery_Disconnect_ClusterRecovery(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	unlockCluster(rbfts)
@@ -196,8 +189,6 @@ func TestRecovery_Disconnect_ClusterRecovery(t *testing.T) {
 }
 
 func TestRecovery_PrimaryRecovery(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	unlockCluster(rbfts)
@@ -222,8 +213,6 @@ func TestRecovery_PrimaryRecovery(t *testing.T) {
 }
 
 func TestRecovery_NormalCheckpointFailing_Recovery(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	unlockCluster(rbfts)
@@ -314,8 +303,6 @@ func TestRecovery_NormalCheckpointFailing_Recovery(t *testing.T) {
 }
 
 func TestRecovery_SyncStateToStateUpdate(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	unlockCluster(rbfts)
@@ -360,8 +347,6 @@ func TestRecovery_SyncStateToStateUpdate(t *testing.T) {
 }
 
 func TestRecovery_ReplicaSyncStateToRecovery(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	unlockCluster(rbfts)
@@ -394,8 +379,6 @@ func TestRecovery_ReplicaSyncStateToRecovery(t *testing.T) {
 }
 
 func TestRecovery_PrimarySyncStateToRecovery(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	unlockCluster(rbfts)

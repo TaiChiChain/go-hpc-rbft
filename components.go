@@ -22,7 +22,7 @@ import (
 	"context"
 	"time"
 
-	consensus "github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
+	"github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
 )
 
 // constant timer names

@@ -15,7 +15,7 @@ require (
 	golang.org/x/crypto v0.0.0-20220622213112-05595931fe9d
 )
 
-replace github.com/meshplus/bitxhub-model => github.com/TaiChiChain/bitxhub-model v1.20.2-0.20230712080157-40a7dce120ba
+replace github.com/meshplus/bitxhub-model => github.com/TaiChiChain/bitxhub-model v1.20.2-0.20230717013620-c1253dc64023
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect

@@ -327,8 +327,6 @@ func TestPersist_restoreState(t *testing.T) {
 }
 
 func TestPersist_parseQPCKey(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	var u1, u2 uint64

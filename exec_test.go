@@ -3,15 +3,13 @@ package rbft
 import (
 	"testing"
 
-	consensus "github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
+	"github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
 	"github.com/hyperchain/go-hpc-rbft/v2/types"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestExec_handleCoreRbftEvent_batchTimerEvent(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 
@@ -52,8 +50,6 @@ func TestExec_handleCoreRbftEvent_batchTimerEvent(t *testing.T) {
 }
 
 func TestExec_handleCoreRbftEvent_NullRequestTimerEvent(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 
@@ -73,8 +69,6 @@ func TestExec_handleCoreRbftEvent_NullRequestTimerEvent(t *testing.T) {
 }
 
 func TestExec_handleCoreRbftEvent_CheckPoolTimerEvent(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 
@@ -96,8 +90,6 @@ func TestExec_handleCoreRbftEvent_CheckPoolTimerEvent(t *testing.T) {
 }
 
 func TestExec_handleCoreRbftEvent_StateUpdatedEvent(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 
@@ -136,8 +128,6 @@ func TestExec_handleCoreRbftEvent_StateUpdatedEvent(t *testing.T) {
 }
 
 func TestExec_handleRecoveryEvent_SyncStateRspTimerEvent(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 
@@ -159,8 +149,6 @@ func TestExec_handleRecoveryEvent_SyncStateRspTimerEvent(t *testing.T) {
 }
 
 func TestExec_handleRecoveryEvent_SyncStateRestartTimerEvent(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 
@@ -175,8 +163,6 @@ func TestExec_handleRecoveryEvent_SyncStateRestartTimerEvent(t *testing.T) {
 }
 
 func TestExec_handleViewChangeEvent_ViewChangeTimerEvent(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 
@@ -198,8 +184,6 @@ func TestExec_handleViewChangeEvent_ViewChangeTimerEvent(t *testing.T) {
 }
 
 func TestExec_handleViewChangeEvent_ViewChangeResendTimerEvent(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 
@@ -214,8 +198,6 @@ func TestExec_handleViewChangeEvent_ViewChangeResendTimerEvent(t *testing.T) {
 }
 
 func TestExec_handleEpochMgrEvent_FetchCheckpointEvent(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 

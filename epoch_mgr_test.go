@@ -3,15 +3,13 @@ package rbft
 import (
 	"testing"
 
-	consensus "github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
+	"github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
 	"github.com/hyperchain/go-hpc-rbft/v2/types"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestEpoch_fetchCheckpoint_and_recv(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 
@@ -30,8 +28,6 @@ func TestEpoch_fetchCheckpoint_and_recv(t *testing.T) {
 }
 
 func TestEpoch_recvFetchCheckpoint_SendBackNormal(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	fetch := &consensus.FetchCheckpoint{
@@ -56,8 +52,6 @@ func TestEpoch_recvFetchCheckpoint_SendBackNormal(t *testing.T) {
 }
 
 func TestEpoch_recvFetchCheckpoint_SendBackStableCheckpoint(t *testing.T) {
-	//ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
 
 	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	fetch := &consensus.FetchCheckpoint{
