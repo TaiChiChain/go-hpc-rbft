@@ -17,9 +17,8 @@ package rbft
 import (
 	"context"
 
-	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
-
 	"github.com/gogo/protobuf/proto"
+	"github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
 )
 
 /**
@@ -28,41 +27,41 @@ This file contains recovery related issues
 
 // recoveryManager manages recovery related events
 type recoveryManager struct {
-	syncRspStore map[uint64]*pb.SyncStateResponse // store sync state response
+	syncRspStore map[uint64]*consensus.SyncStateResponse // store sync state response
 
 	logger Logger
 }
 
 // newRecoveryMgr news an instance of recoveryManager
-func newRecoveryMgr(c Config) *recoveryManager {
+func newRecoveryMgr[T any, Constraint consensus.TXConstraint[T]](c Config[T, Constraint]) *recoveryManager {
 	rm := &recoveryManager{
-		syncRspStore: make(map[uint64]*pb.SyncStateResponse),
+		syncRspStore: make(map[uint64]*consensus.SyncStateResponse),
 		logger:       c.Logger,
 	}
 	return rm
 }
 
 // dispatchRecoveryMsg dispatches recovery service messages using service type
-func (rbft *rbftImpl) dispatchRecoveryMsg(e consensusEvent) consensusEvent {
+func (rbft *rbftImpl[T, Constraint]) dispatchRecoveryMsg(e consensusEvent) consensusEvent {
 	switch et := e.(type) {
-	case *pb.SyncState:
+	case *consensus.SyncState:
 		return rbft.recvSyncState(et)
-	case *pb.SyncStateResponse:
+	case *consensus.SyncStateResponse:
 		return rbft.recvSyncStateResponse(et, false)
-	case *pb.FetchPQCRequest:
+	case *consensus.FetchPQCRequest:
 		return rbft.recvFetchPQCRequest(et)
-	case *pb.FetchPQCResponse:
+	case *consensus.FetchPQCResponse:
 		return rbft.recvFetchPQCResponse(et)
 	}
 	return nil
 }
 
 // fetchRecoveryPQC always fetches PQC info after recovery done to fetch PQC info after target checkpoint
-func (rbft *rbftImpl) fetchRecoveryPQC() consensusEvent {
+func (rbft *rbftImpl[T, Constraint]) fetchRecoveryPQC() consensusEvent {
 
 	rbft.logger.Debugf("Replica %d fetch PQC", rbft.peerPool.ID)
 
-	fetch := &pb.FetchPQCRequest{
+	fetch := &consensus.FetchPQCRequest{
 		H:         rbft.h,
 		ReplicaId: rbft.peerPool.ID,
 	}
@@ -71,8 +70,8 @@ func (rbft *rbftImpl) fetchRecoveryPQC() consensusEvent {
 		rbft.logger.Errorf("ConsensusMessage_FetchPQCRequest marshal error")
 		return nil
 	}
-	conMsg := &pb.ConsensusMessage{
-		Type:    pb.Type_FETCH_PQC_REQUEST,
+	conMsg := &consensus.ConsensusMessage{
+		Type:    consensus.Type_FETCH_PQC_REQUEST,
 		Payload: payload,
 	}
 
@@ -82,7 +81,7 @@ func (rbft *rbftImpl) fetchRecoveryPQC() consensusEvent {
 }
 
 // recvFetchPQCRequest returns all PQC info we have sent before to the sender
-func (rbft *rbftImpl) recvFetchPQCRequest(fetch *pb.FetchPQCRequest) consensusEvent {
+func (rbft *rbftImpl[T, Constraint]) recvFetchPQCRequest(fetch *consensus.FetchPQCRequest) consensusEvent {
 
 	rbft.logger.Debugf("Replica %d received fetchPQCRequest from replica %d", rbft.peerPool.ID, fetch.ReplicaId)
 
@@ -92,9 +91,9 @@ func (rbft *rbftImpl) recvFetchPQCRequest(fetch *pb.FetchPQCRequest) consensusEv
 		return nil
 	}
 
-	var prePres []*pb.PrePrepare
-	var pres []*pb.Prepare
-	var cmts []*pb.Commit
+	var prePres []*consensus.PrePrepare
+	var pres []*consensus.Prepare
+	var cmts []*consensus.Commit
 
 	// replica just send all PQC info we had sent before
 	for idx, cert := range rbft.storeMgr.certStore {
@@ -122,7 +121,7 @@ func (rbft *rbftImpl) recvFetchPQCRequest(fetch *pb.FetchPQCRequest) consensusEv
 		}
 	}
 
-	pqcResponse := &pb.FetchPQCResponse{
+	pqcResponse := &consensus.FetchPQCResponse{
 		ReplicaId: rbft.peerPool.ID,
 	}
 
@@ -141,8 +140,8 @@ func (rbft *rbftImpl) recvFetchPQCRequest(fetch *pb.FetchPQCRequest) consensusEv
 		rbft.logger.Errorf("ConsensusMessage_FetchPQCResponse marshal error: %v", err)
 		return nil
 	}
-	consensusMsg := &pb.ConsensusMessage{
-		Type:    pb.Type_FETCH_PQC_RESPONSE,
+	consensusMsg := &consensus.ConsensusMessage{
+		Type:    consensus.Type_FETCH_PQC_RESPONSE,
 		Payload: payload,
 	}
 	rbft.peerPool.unicast(context.TODO(), consensusMsg, fetch.ReplicaId)
@@ -154,7 +153,7 @@ func (rbft *rbftImpl) recvFetchPQCRequest(fetch *pb.FetchPQCRequest) consensusEv
 }
 
 // recvFetchPQCResponse re-processes all the PQC received from others
-func (rbft *rbftImpl) recvFetchPQCResponse(PQCInfo *pb.FetchPQCResponse) consensusEvent {
+func (rbft *rbftImpl[T, Constraint]) recvFetchPQCResponse(PQCInfo *consensus.FetchPQCResponse) consensusEvent {
 	rbft.logger.Debugf("Replica %d received fetchPQCResponse from replica %d, return_pqc %v",
 		rbft.peerPool.ID, PQCInfo.ReplicaId, PQCInfo)
 
@@ -177,7 +176,7 @@ func (rbft *rbftImpl) recvFetchPQCResponse(PQCInfo *pb.FetchPQCResponse) consens
 // when we are in abnormal or there are some requests in process, we don't need to sync state,
 // we only need to sync state when primary is sending null request which means system is in
 // normal status and there are no requests in process.
-func (rbft *rbftImpl) trySyncState() {
+func (rbft *rbftImpl[T, Constraint]) trySyncState() {
 
 	if !rbft.in(NeedSyncState) {
 		if !rbft.isNormal() {
@@ -199,7 +198,7 @@ func (rbft *rbftImpl) trySyncState() {
 
 // initSyncState prepares to sync state.
 // if we are in syncState, which means last syncState progress hasn't finished, reject a new syncState request
-func (rbft *rbftImpl) initSyncState() consensusEvent {
+func (rbft *rbftImpl[T, Constraint]) initSyncState() consensusEvent {
 
 	if rbft.in(InSyncState) {
 		rbft.logger.Warningf("Replica %d try to send syncState, but it's already in sync state", rbft.peerPool.ID)
@@ -220,10 +219,10 @@ func (rbft *rbftImpl) initSyncState() consensusEvent {
 	// sync state after syncStateRestartTimer expired.
 	rbft.timerMgr.startTimer(syncStateRspTimer, event)
 
-	rbft.recoveryMgr.syncRspStore = make(map[uint64]*pb.SyncStateResponse)
+	rbft.recoveryMgr.syncRspStore = make(map[uint64]*consensus.SyncStateResponse)
 
 	// broadcast sync state message to others.
-	syncStateMsg := &pb.SyncState{
+	syncStateMsg := &consensus.SyncState{
 		ReplicaId: rbft.peerPool.ID,
 	}
 	payload, err := proto.Marshal(syncStateMsg)
@@ -231,8 +230,8 @@ func (rbft *rbftImpl) initSyncState() consensusEvent {
 		rbft.logger.Errorf("ConsensusMessage_SYNC_STATE marshal error: %v", err)
 		return nil
 	}
-	msg := &pb.ConsensusMessage{
-		Type:    pb.Type_SYNC_STATE,
+	msg := &consensus.ConsensusMessage{
+		Type:    consensus.Type_SYNC_STATE,
 		Payload: payload,
 	}
 	rbft.peerPool.broadcast(context.TODO(), msg)
@@ -250,7 +249,7 @@ func (rbft *rbftImpl) initSyncState() consensusEvent {
 		rbft.stopNamespace()
 		return nil
 	}
-	syncStateRsp := &pb.SyncStateResponse{
+	syncStateRsp := &consensus.SyncStateResponse{
 		ReplicaId:        rbft.peerPool.ID,
 		View:             rbft.view,
 		SignedCheckpoint: signedCheckpoint,
@@ -259,7 +258,7 @@ func (rbft *rbftImpl) initSyncState() consensusEvent {
 	return nil
 }
 
-func (rbft *rbftImpl) recvSyncState(sync *pb.SyncState) consensusEvent {
+func (rbft *rbftImpl[T, Constraint]) recvSyncState(sync *consensus.SyncState) consensusEvent {
 	rbft.logger.Debugf("Replica %d received sync state from replica %d", rbft.peerPool.ID, sync.ReplicaId)
 
 	if !rbft.isNormal() {
@@ -280,7 +279,7 @@ func (rbft *rbftImpl) recvSyncState(sync *pb.SyncState) consensusEvent {
 		return nil
 	}
 
-	syncStateRsp := &pb.SyncStateResponse{
+	syncStateRsp := &consensus.SyncStateResponse{
 		ReplicaId:        rbft.peerPool.ID,
 		View:             rbft.view,
 		SignedCheckpoint: signedCheckpoint,
@@ -291,8 +290,8 @@ func (rbft *rbftImpl) recvSyncState(sync *pb.SyncState) consensusEvent {
 		rbft.logger.Errorf("Marshal SyncStateResponse Error!")
 		return nil
 	}
-	consensusMsg := &pb.ConsensusMessage{
-		Type:    pb.Type_SYNC_STATE_RESPONSE,
+	consensusMsg := &consensus.ConsensusMessage{
+		Type:    consensus.Type_SYNC_STATE_RESPONSE,
 		Payload: payload,
 	}
 	rbft.peerPool.unicast(context.TODO(), consensusMsg, sync.ReplicaId)
@@ -301,7 +300,7 @@ func (rbft *rbftImpl) recvSyncState(sync *pb.SyncState) consensusEvent {
 	return nil
 }
 
-func (rbft *rbftImpl) recvSyncStateResponse(rsp *pb.SyncStateResponse, local bool) consensusEvent {
+func (rbft *rbftImpl[T, Constraint]) recvSyncStateResponse(rsp *consensus.SyncStateResponse, local bool) consensusEvent {
 	if !rbft.in(InSyncState) {
 		rbft.logger.Debugf("Replica %d is not in sync state, ignore it...", rbft.peerPool.ID)
 		return nil
@@ -349,11 +348,11 @@ func (rbft *rbftImpl) recvSyncStateResponse(rsp *pb.SyncStateResponse, local boo
 
 // restartSyncState restart syncState immediately, only can be invoked after sync state
 // restart timer expired.
-func (rbft *rbftImpl) restartSyncState() consensusEvent {
+func (rbft *rbftImpl[T, Constraint]) restartSyncState() consensusEvent {
 
 	rbft.logger.Debugf("Replica %d now restart sync state", rbft.peerPool.ID)
 
-	rbft.recoveryMgr.syncRspStore = make(map[uint64]*pb.SyncStateResponse)
+	rbft.recoveryMgr.syncRspStore = make(map[uint64]*consensus.SyncStateResponse)
 
 	event := &LocalEvent{
 		Service:   RecoveryService,
@@ -367,7 +366,7 @@ func (rbft *rbftImpl) restartSyncState() consensusEvent {
 }
 
 // exitSyncState exit syncState immediately.
-func (rbft *rbftImpl) exitSyncState() {
+func (rbft *rbftImpl[T, Constraint]) exitSyncState() {
 	rbft.logger.Debugf("Replica %d now exit sync state", rbft.peerPool.ID)
 	rbft.off(InSyncState)
 	rbft.off(NeedSyncState)

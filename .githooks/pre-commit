@@ -15,7 +15,7 @@ echo "2. golangci-lint run.."
 #    if [[ ! -z $rest ]]; then
 #      # st=1;
 #      # because of pn.go lint will never passed
-#      echo "$rest" | grep -v '.pb.go'
+#      echo "$rest" | grep -v '.consensus.go'
 #      counter=$((counter+1)) ;
 #      if [[ $counter -gt 10 ]]; then
 #         exit 1;

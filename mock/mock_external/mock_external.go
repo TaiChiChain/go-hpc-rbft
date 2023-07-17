@@ -9,8 +9,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	protos "github.com/hyperchain/go-hpc-common/types/protos"
-	rbftpb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
+	"github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
 	types "github.com/hyperchain/go-hpc-rbft/v2/types"
 )
 
@@ -133,7 +132,7 @@ func (m *MockNetwork) EXPECT() *MockNetworkMockRecorder {
 }
 
 // Broadcast mocks base method.
-func (m *MockNetwork) Broadcast(ctx context.Context, msg *rbftpb.ConsensusMessage) error {
+func (m *MockNetwork) Broadcast(ctx context.Context, msg *consensus.ConsensusMessage) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Broadcast", ctx, msg)
 	ret0, _ := ret[0].(error)
@@ -147,7 +146,7 @@ func (mr *MockNetworkMockRecorder) Broadcast(ctx, msg interface{}) *gomock.Call 
 }
 
 // Unicast mocks base method.
-func (m *MockNetwork) Unicast(ctx context.Context, msg *rbftpb.ConsensusMessage, to uint64) error {
+func (m *MockNetwork) Unicast(ctx context.Context, msg *consensus.ConsensusMessage, to uint64) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Unicast", ctx, msg, to)
 	ret0, _ := ret[0].(error)
@@ -161,7 +160,7 @@ func (mr *MockNetworkMockRecorder) Unicast(ctx, msg, to interface{}) *gomock.Cal
 }
 
 // UnicastByHostname mocks base method.
-func (m *MockNetwork) UnicastByHostname(ctx context.Context, msg *rbftpb.ConsensusMessage, to string) error {
+func (m *MockNetwork) UnicastByHostname(ctx context.Context, msg *consensus.ConsensusMessage, to string) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UnicastByHostname", ctx, msg, to)
 	ret0, _ := ret[0].(error)
@@ -250,7 +249,7 @@ func (m *MockServiceOutbound) EXPECT() *MockServiceOutboundMockRecorder {
 }
 
 // Execute mocks base method.
-func (m *MockServiceOutbound) Execute(txs []*protos.Transaction, localList []bool, seqNo uint64, timestamp int64) {
+func (m *MockServiceOutbound) Execute(txs [][]byte, localList []bool, seqNo uint64, timestamp int64) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "Execute", txs, localList, seqNo, timestamp)
 }
@@ -279,7 +278,7 @@ func (mr *MockServiceOutboundMockRecorder) SendFilterEvent(informType interface{
 }
 
 // StateUpdate mocks base method.
-func (m *MockServiceOutbound) StateUpdate(seqNo uint64, digest string, checkpoints []*rbftpb.SignedCheckpoint, epochChanges ...*protos.QuorumCheckpoint) {
+func (m *MockServiceOutbound) StateUpdate(seqNo uint64, digest string, checkpoints []*consensus.SignedCheckpoint, epochChanges ...*consensus.QuorumCheckpoint) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{seqNo, digest, checkpoints}
 	for _, a := range epochChanges {
@@ -333,10 +332,10 @@ func (mr *MockEpochServiceMockRecorder) GetAlgorithmVersion() *gomock.Call {
 }
 
 // GetCheckpointOfEpoch mocks base method.
-func (m *MockEpochService) GetCheckpointOfEpoch(epoch uint64) (*protos.QuorumCheckpoint, error) {
+func (m *MockEpochService) GetCheckpointOfEpoch(epoch uint64) (*consensus.QuorumCheckpoint, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetCheckpointOfEpoch", epoch)
-	ret0, _ := ret[0].(*protos.QuorumCheckpoint)
+	ret0, _ := ret[0].(*consensus.QuorumCheckpoint)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -362,10 +361,10 @@ func (mr *MockEpochServiceMockRecorder) GetEpoch() *gomock.Call {
 }
 
 // GetLastCheckpoint mocks base method.
-func (m *MockEpochService) GetLastCheckpoint() *protos.QuorumCheckpoint {
+func (m *MockEpochService) GetLastCheckpoint() *consensus.QuorumCheckpoint {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetLastCheckpoint")
-	ret0, _ := ret[0].(*protos.QuorumCheckpoint)
+	ret0, _ := ret[0].(*consensus.QuorumCheckpoint)
 	return ret0
 }
 
@@ -376,10 +375,10 @@ func (mr *MockEpochServiceMockRecorder) GetLastCheckpoint() *gomock.Call {
 }
 
 // GetNodeInfos mocks base method.
-func (m *MockEpochService) GetNodeInfos() []*protos.NodeInfo {
+func (m *MockEpochService) GetNodeInfos() []*consensus.NodeInfo {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetNodeInfos")
-	ret0, _ := ret[0].([]*protos.NodeInfo)
+	ret0, _ := ret[0].([]*consensus.NodeInfo)
 	return ret0
 }
 
@@ -418,7 +417,7 @@ func (mr *MockEpochServiceMockRecorder) Reconfiguration() *gomock.Call {
 }
 
 // VerifyEpochChangeProof mocks base method.
-func (m *MockEpochService) VerifyEpochChangeProof(proof *protos.EpochChangeProof, validators protos.Validators) error {
+func (m *MockEpochService) VerifyEpochChangeProof(proof *consensus.EpochChangeProof, validators consensus.Validators) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "VerifyEpochChangeProof", proof, validators)
 	ret0, _ := ret[0].(error)
@@ -432,30 +431,30 @@ func (mr *MockEpochServiceMockRecorder) VerifyEpochChangeProof(proof, validators
 }
 
 // MockExternalStack is a mock of ExternalStack interface.
-type MockExternalStack struct {
+type MockExternalStack[T any, Constraint consensus.TXConstraint[T]] struct {
 	ctrl     *gomock.Controller
-	recorder *MockExternalStackMockRecorder
+	recorder *MockExternalStackMockRecorder[T, Constraint]
 }
 
 // MockExternalStackMockRecorder is the mock recorder for MockExternalStack.
-type MockExternalStackMockRecorder struct {
-	mock *MockExternalStack
+type MockExternalStackMockRecorder[T any, Constraint consensus.TXConstraint[T]] struct {
+	mock *MockExternalStack[T, Constraint]
 }
 
 // NewMockExternalStack creates a new mock instance.
-func NewMockExternalStack(ctrl *gomock.Controller) *MockExternalStack {
-	mock := &MockExternalStack{ctrl: ctrl}
-	mock.recorder = &MockExternalStackMockRecorder{mock}
+func NewMockExternalStack[T any, Constraint consensus.TXConstraint[T]](ctrl *gomock.Controller) *MockExternalStack[T, Constraint] {
+	mock := &MockExternalStack[T, Constraint]{ctrl: ctrl}
+	mock.recorder = &MockExternalStackMockRecorder[T, Constraint]{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockExternalStack) EXPECT() *MockExternalStackMockRecorder {
+func (m *MockExternalStack[T, Constraint]) EXPECT() *MockExternalStackMockRecorder[T, Constraint] {
 	return m.recorder
 }
 
 // Broadcast mocks base method.
-func (m *MockExternalStack) Broadcast(ctx context.Context, msg *rbftpb.ConsensusMessage) error {
+func (m *MockExternalStack[T, Constraint]) Broadcast(ctx context.Context, msg *consensus.ConsensusMessage) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Broadcast", ctx, msg)
 	ret0, _ := ret[0].(error)
@@ -463,13 +462,13 @@ func (m *MockExternalStack) Broadcast(ctx context.Context, msg *rbftpb.Consensus
 }
 
 // Broadcast indicates an expected call of Broadcast.
-func (mr *MockExternalStackMockRecorder) Broadcast(ctx, msg interface{}) *gomock.Call {
+func (mr *MockExternalStackMockRecorder[T, Constraint]) Broadcast(ctx, msg interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Broadcast", reflect.TypeOf((*MockExternalStack)(nil).Broadcast), ctx, msg)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Broadcast", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).Broadcast), ctx, msg)
 }
 
 // DelState mocks base method.
-func (m *MockExternalStack) DelState(key string) error {
+func (m *MockExternalStack[T, Constraint]) DelState(key string) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DelState", key)
 	ret0, _ := ret[0].(error)
@@ -477,13 +476,13 @@ func (m *MockExternalStack) DelState(key string) error {
 }
 
 // DelState indicates an expected call of DelState.
-func (mr *MockExternalStackMockRecorder) DelState(key interface{}) *gomock.Call {
+func (mr *MockExternalStackMockRecorder[T, Constraint]) DelState(key interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DelState", reflect.TypeOf((*MockExternalStack)(nil).DelState), key)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DelState", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).DelState), key)
 }
 
 // Destroy mocks base method.
-func (m *MockExternalStack) Destroy(key string) error {
+func (m *MockExternalStack[T, Constraint]) Destroy(key string) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Destroy", key)
 	ret0, _ := ret[0].(error)
@@ -491,25 +490,25 @@ func (m *MockExternalStack) Destroy(key string) error {
 }
 
 // Destroy indicates an expected call of Destroy.
-func (mr *MockExternalStackMockRecorder) Destroy(key interface{}) *gomock.Call {
+func (mr *MockExternalStackMockRecorder[T, Constraint]) Destroy(key interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Destroy", reflect.TypeOf((*MockExternalStack)(nil).Destroy), key)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Destroy", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).Destroy), key)
 }
 
 // Execute mocks base method.
-func (m *MockExternalStack) Execute(txs []*protos.Transaction, localList []bool, seqNo uint64, timestamp int64) {
+func (m *MockExternalStack[T, Constraint]) Execute(txs [][]byte, localList []bool, seqNo uint64, timestamp int64) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "Execute", txs, localList, seqNo, timestamp)
 }
 
 // Execute indicates an expected call of Execute.
-func (mr *MockExternalStackMockRecorder) Execute(txs, localList, seqNo, timestamp interface{}) *gomock.Call {
+func (mr *MockExternalStackMockRecorder[T, Constraint]) Execute(txs, localList, seqNo, timestamp interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Execute", reflect.TypeOf((*MockExternalStack)(nil).Execute), txs, localList, seqNo, timestamp)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Execute", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).Execute), txs, localList, seqNo, timestamp)
 }
 
 // GetAlgorithmVersion mocks base method.
-func (m *MockExternalStack) GetAlgorithmVersion() string {
+func (m *MockExternalStack[T, Constraint]) GetAlgorithmVersion() string {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetAlgorithmVersion")
 	ret0, _ := ret[0].(string)
@@ -517,28 +516,28 @@ func (m *MockExternalStack) GetAlgorithmVersion() string {
 }
 
 // GetAlgorithmVersion indicates an expected call of GetAlgorithmVersion.
-func (mr *MockExternalStackMockRecorder) GetAlgorithmVersion() *gomock.Call {
+func (mr *MockExternalStackMockRecorder[T, Constraint]) GetAlgorithmVersion() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAlgorithmVersion", reflect.TypeOf((*MockExternalStack)(nil).GetAlgorithmVersion))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAlgorithmVersion", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).GetAlgorithmVersion))
 }
 
 // GetCheckpointOfEpoch mocks base method.
-func (m *MockExternalStack) GetCheckpointOfEpoch(epoch uint64) (*protos.QuorumCheckpoint, error) {
+func (m *MockExternalStack[T, Constraint]) GetCheckpointOfEpoch(epoch uint64) (*consensus.QuorumCheckpoint, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetCheckpointOfEpoch", epoch)
-	ret0, _ := ret[0].(*protos.QuorumCheckpoint)
+	ret0, _ := ret[0].(*consensus.QuorumCheckpoint)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetCheckpointOfEpoch indicates an expected call of GetCheckpointOfEpoch.
-func (mr *MockExternalStackMockRecorder) GetCheckpointOfEpoch(epoch interface{}) *gomock.Call {
+func (mr *MockExternalStackMockRecorder[T, Constraint]) GetCheckpointOfEpoch(epoch interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCheckpointOfEpoch", reflect.TypeOf((*MockExternalStack)(nil).GetCheckpointOfEpoch), epoch)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCheckpointOfEpoch", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).GetCheckpointOfEpoch), epoch)
 }
 
 // GetEpoch mocks base method.
-func (m *MockExternalStack) GetEpoch() uint64 {
+func (m *MockExternalStack[T, Constraint]) GetEpoch() uint64 {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetEpoch")
 	ret0, _ := ret[0].(uint64)
@@ -546,41 +545,41 @@ func (m *MockExternalStack) GetEpoch() uint64 {
 }
 
 // GetEpoch indicates an expected call of GetEpoch.
-func (mr *MockExternalStackMockRecorder) GetEpoch() *gomock.Call {
+func (mr *MockExternalStackMockRecorder[T, Constraint]) GetEpoch() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEpoch", reflect.TypeOf((*MockExternalStack)(nil).GetEpoch))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEpoch", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).GetEpoch))
 }
 
 // GetLastCheckpoint mocks base method.
-func (m *MockExternalStack) GetLastCheckpoint() *protos.QuorumCheckpoint {
+func (m *MockExternalStack[T, Constraint]) GetLastCheckpoint() *consensus.QuorumCheckpoint {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetLastCheckpoint")
-	ret0, _ := ret[0].(*protos.QuorumCheckpoint)
+	ret0, _ := ret[0].(*consensus.QuorumCheckpoint)
 	return ret0
 }
 
 // GetLastCheckpoint indicates an expected call of GetLastCheckpoint.
-func (mr *MockExternalStackMockRecorder) GetLastCheckpoint() *gomock.Call {
+func (mr *MockExternalStackMockRecorder[T, Constraint]) GetLastCheckpoint() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLastCheckpoint", reflect.TypeOf((*MockExternalStack)(nil).GetLastCheckpoint))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLastCheckpoint", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).GetLastCheckpoint))
 }
 
 // GetNodeInfos mocks base method.
-func (m *MockExternalStack) GetNodeInfos() []*protos.NodeInfo {
+func (m *MockExternalStack[T, Constraint]) GetNodeInfos() []*consensus.NodeInfo {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetNodeInfos")
-	ret0, _ := ret[0].([]*protos.NodeInfo)
+	ret0, _ := ret[0].([]*consensus.NodeInfo)
 	return ret0
 }
 
 // GetNodeInfos indicates an expected call of GetNodeInfos.
-func (mr *MockExternalStackMockRecorder) GetNodeInfos() *gomock.Call {
+func (mr *MockExternalStackMockRecorder[T, Constraint]) GetNodeInfos() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNodeInfos", reflect.TypeOf((*MockExternalStack)(nil).GetNodeInfos))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNodeInfos", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).GetNodeInfos))
 }
 
 // IsConfigBlock mocks base method.
-func (m *MockExternalStack) IsConfigBlock(height uint64) bool {
+func (m *MockExternalStack[T, Constraint]) IsConfigBlock(height uint64) bool {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "IsConfigBlock", height)
 	ret0, _ := ret[0].(bool)
@@ -588,13 +587,13 @@ func (m *MockExternalStack) IsConfigBlock(height uint64) bool {
 }
 
 // IsConfigBlock indicates an expected call of IsConfigBlock.
-func (mr *MockExternalStackMockRecorder) IsConfigBlock(height interface{}) *gomock.Call {
+func (mr *MockExternalStackMockRecorder[T, Constraint]) IsConfigBlock(height interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsConfigBlock", reflect.TypeOf((*MockExternalStack)(nil).IsConfigBlock), height)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsConfigBlock", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).IsConfigBlock), height)
 }
 
 // ReadState mocks base method.
-func (m *MockExternalStack) ReadState(key string) ([]byte, error) {
+func (m *MockExternalStack[T, Constraint]) ReadState(key string) ([]byte, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ReadState", key)
 	ret0, _ := ret[0].([]byte)
@@ -603,13 +602,13 @@ func (m *MockExternalStack) ReadState(key string) ([]byte, error) {
 }
 
 // ReadState indicates an expected call of ReadState.
-func (mr *MockExternalStackMockRecorder) ReadState(key interface{}) *gomock.Call {
+func (mr *MockExternalStackMockRecorder[T, Constraint]) ReadState(key interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadState", reflect.TypeOf((*MockExternalStack)(nil).ReadState), key)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadState", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).ReadState), key)
 }
 
 // ReadStateSet mocks base method.
-func (m *MockExternalStack) ReadStateSet(key string) (map[string][]byte, error) {
+func (m *MockExternalStack[T, Constraint]) ReadStateSet(key string) (map[string][]byte, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ReadStateSet", key)
 	ret0, _ := ret[0].(map[string][]byte)
@@ -618,13 +617,13 @@ func (m *MockExternalStack) ReadStateSet(key string) (map[string][]byte, error) 
 }
 
 // ReadStateSet indicates an expected call of ReadStateSet.
-func (mr *MockExternalStackMockRecorder) ReadStateSet(key interface{}) *gomock.Call {
+func (mr *MockExternalStackMockRecorder[T, Constraint]) ReadStateSet(key interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadStateSet", reflect.TypeOf((*MockExternalStack)(nil).ReadStateSet), key)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadStateSet", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).ReadStateSet), key)
 }
 
 // Reconfiguration mocks base method.
-func (m *MockExternalStack) Reconfiguration() uint64 {
+func (m *MockExternalStack[T, Constraint]) Reconfiguration() uint64 {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Reconfiguration")
 	ret0, _ := ret[0].(uint64)
@@ -632,13 +631,13 @@ func (m *MockExternalStack) Reconfiguration() uint64 {
 }
 
 // Reconfiguration indicates an expected call of Reconfiguration.
-func (mr *MockExternalStackMockRecorder) Reconfiguration() *gomock.Call {
+func (mr *MockExternalStackMockRecorder[T, Constraint]) Reconfiguration() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Reconfiguration", reflect.TypeOf((*MockExternalStack)(nil).Reconfiguration))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Reconfiguration", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).Reconfiguration))
 }
 
 // SendFilterEvent mocks base method.
-func (m *MockExternalStack) SendFilterEvent(informType types.InformType, message ...interface{}) {
+func (m *MockExternalStack[T, Constraint]) SendFilterEvent(informType types.InformType, message ...interface{}) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{informType}
 	for _, a := range message {
@@ -648,14 +647,14 @@ func (m *MockExternalStack) SendFilterEvent(informType types.InformType, message
 }
 
 // SendFilterEvent indicates an expected call of SendFilterEvent.
-func (mr *MockExternalStackMockRecorder) SendFilterEvent(informType interface{}, message ...interface{}) *gomock.Call {
+func (mr *MockExternalStackMockRecorder[T, Constraint]) SendFilterEvent(informType interface{}, message ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{informType}, message...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendFilterEvent", reflect.TypeOf((*MockExternalStack)(nil).SendFilterEvent), varargs...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendFilterEvent", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).SendFilterEvent), varargs...)
 }
 
 // Sign mocks base method.
-func (m *MockExternalStack) Sign(msg []byte) ([]byte, error) {
+func (m *MockExternalStack[T, Constraint]) Sign(msg []byte) ([]byte, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Sign", msg)
 	ret0, _ := ret[0].([]byte)
@@ -664,13 +663,13 @@ func (m *MockExternalStack) Sign(msg []byte) ([]byte, error) {
 }
 
 // Sign indicates an expected call of Sign.
-func (mr *MockExternalStackMockRecorder) Sign(msg interface{}) *gomock.Call {
+func (mr *MockExternalStackMockRecorder[T, Constraint]) Sign(msg interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Sign", reflect.TypeOf((*MockExternalStack)(nil).Sign), msg)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Sign", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).Sign), msg)
 }
 
 // StateUpdate mocks base method.
-func (m *MockExternalStack) StateUpdate(seqNo uint64, digest string, checkpoints []*rbftpb.SignedCheckpoint, epochChanges ...*protos.QuorumCheckpoint) {
+func (m *MockExternalStack[T, Constraint]) StateUpdate(seqNo uint64, digest string, checkpoints []*consensus.SignedCheckpoint, epochChanges ...*consensus.QuorumCheckpoint) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{seqNo, digest, checkpoints}
 	for _, a := range epochChanges {
@@ -680,14 +679,14 @@ func (m *MockExternalStack) StateUpdate(seqNo uint64, digest string, checkpoints
 }
 
 // StateUpdate indicates an expected call of StateUpdate.
-func (mr *MockExternalStackMockRecorder) StateUpdate(seqNo, digest, checkpoints interface{}, epochChanges ...interface{}) *gomock.Call {
+func (mr *MockExternalStackMockRecorder[T, Constraint]) StateUpdate(seqNo, digest, checkpoints interface{}, epochChanges ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{seqNo, digest, checkpoints}, epochChanges...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StateUpdate", reflect.TypeOf((*MockExternalStack)(nil).StateUpdate), varargs...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StateUpdate", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).StateUpdate), varargs...)
 }
 
 // StoreState mocks base method.
-func (m *MockExternalStack) StoreState(key string, value []byte) error {
+func (m *MockExternalStack[T, Constraint]) StoreState(key string, value []byte) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "StoreState", key, value)
 	ret0, _ := ret[0].(error)
@@ -695,13 +694,13 @@ func (m *MockExternalStack) StoreState(key string, value []byte) error {
 }
 
 // StoreState indicates an expected call of StoreState.
-func (mr *MockExternalStackMockRecorder) StoreState(key, value interface{}) *gomock.Call {
+func (mr *MockExternalStackMockRecorder[T, Constraint]) StoreState(key, value interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StoreState", reflect.TypeOf((*MockExternalStack)(nil).StoreState), key, value)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StoreState", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).StoreState), key, value)
 }
 
 // Unicast mocks base method.
-func (m *MockExternalStack) Unicast(ctx context.Context, msg *rbftpb.ConsensusMessage, to uint64) error {
+func (m *MockExternalStack[T, Constraint]) Unicast(ctx context.Context, msg *consensus.ConsensusMessage, to uint64) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Unicast", ctx, msg, to)
 	ret0, _ := ret[0].(error)
@@ -709,13 +708,13 @@ func (m *MockExternalStack) Unicast(ctx context.Context, msg *rbftpb.ConsensusMe
 }
 
 // Unicast indicates an expected call of Unicast.
-func (mr *MockExternalStackMockRecorder) Unicast(ctx, msg, to interface{}) *gomock.Call {
+func (mr *MockExternalStackMockRecorder[T, Constraint]) Unicast(ctx, msg, to interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Unicast", reflect.TypeOf((*MockExternalStack)(nil).Unicast), ctx, msg, to)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Unicast", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).Unicast), ctx, msg, to)
 }
 
 // UnicastByHostname mocks base method.
-func (m *MockExternalStack) UnicastByHostname(ctx context.Context, msg *rbftpb.ConsensusMessage, to string) error {
+func (m *MockExternalStack[T, Constraint]) UnicastByHostname(ctx context.Context, msg *consensus.ConsensusMessage, to string) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UnicastByHostname", ctx, msg, to)
 	ret0, _ := ret[0].(error)
@@ -723,13 +722,13 @@ func (m *MockExternalStack) UnicastByHostname(ctx context.Context, msg *rbftpb.C
 }
 
 // UnicastByHostname indicates an expected call of UnicastByHostname.
-func (mr *MockExternalStackMockRecorder) UnicastByHostname(ctx, msg, to interface{}) *gomock.Call {
+func (mr *MockExternalStackMockRecorder[T, Constraint]) UnicastByHostname(ctx, msg, to interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UnicastByHostname", reflect.TypeOf((*MockExternalStack)(nil).UnicastByHostname), ctx, msg, to)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UnicastByHostname", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).UnicastByHostname), ctx, msg, to)
 }
 
 // Verify mocks base method.
-func (m *MockExternalStack) Verify(peerHash string, signature, msg []byte) error {
+func (m *MockExternalStack[T, Constraint]) Verify(peerHash string, signature, msg []byte) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Verify", peerHash, signature, msg)
 	ret0, _ := ret[0].(error)
@@ -737,13 +736,13 @@ func (m *MockExternalStack) Verify(peerHash string, signature, msg []byte) error
 }
 
 // Verify indicates an expected call of Verify.
-func (mr *MockExternalStackMockRecorder) Verify(peerHash, signature, msg interface{}) *gomock.Call {
+func (mr *MockExternalStackMockRecorder[T, Constraint]) Verify(peerHash, signature, msg interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Verify", reflect.TypeOf((*MockExternalStack)(nil).Verify), peerHash, signature, msg)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Verify", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).Verify), peerHash, signature, msg)
 }
 
 // VerifyEpochChangeProof mocks base method.
-func (m *MockExternalStack) VerifyEpochChangeProof(proof *protos.EpochChangeProof, validators protos.Validators) error {
+func (m *MockExternalStack[T, Constraint]) VerifyEpochChangeProof(proof *consensus.EpochChangeProof, validators consensus.Validators) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "VerifyEpochChangeProof", proof, validators)
 	ret0, _ := ret[0].(error)
@@ -751,7 +750,7 @@ func (m *MockExternalStack) VerifyEpochChangeProof(proof *protos.EpochChangeProo
 }
 
 // VerifyEpochChangeProof indicates an expected call of VerifyEpochChangeProof.
-func (mr *MockExternalStackMockRecorder) VerifyEpochChangeProof(proof, validators interface{}) *gomock.Call {
+func (mr *MockExternalStackMockRecorder[T, Constraint]) VerifyEpochChangeProof(proof, validators interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyEpochChangeProof", reflect.TypeOf((*MockExternalStack)(nil).VerifyEpochChangeProof), proof, validators)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyEpochChangeProof", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).VerifyEpochChangeProof), proof, validators)
 }

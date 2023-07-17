@@ -23,14 +23,14 @@ import (
 	"strings"
 	"time"
 
-	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
+	"github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
 	"github.com/hyperchain/go-hpc-rbft/v2/types"
 
 	"github.com/gogo/protobuf/proto"
 )
 
 // persistQSet persists marshaled pre-prepare message to database
-func (rbft *rbftImpl) persistQSet(preprep *pb.PrePrepare) {
+func (rbft *rbftImpl[T, Constraint]) persistQSet(preprep *consensus.PrePrepare) {
 	if preprep == nil {
 		rbft.logger.Debugf("Replica %d ignore nil prePrepare", rbft.peerPool.ID)
 		return
@@ -49,10 +49,10 @@ func (rbft *rbftImpl) persistQSet(preprep *pb.PrePrepare) {
 }
 
 // persistPSet persists marshaled prepare messages in the cert with the given msgID(v,n,d) to database
-func (rbft *rbftImpl) persistPSet(v uint64, n uint64, d string) {
+func (rbft *rbftImpl[T, Constraint]) persistPSet(v uint64, n uint64, d string) {
 	cert := rbft.storeMgr.getCert(v, n, d)
-	set := make([]*pb.Prepare, 0)
-	pset := &pb.Pset{Set: set}
+	set := make([]*consensus.Prepare, 0)
+	pset := &consensus.Pset{Set: set}
 	for p := range cert.prepare {
 		tmp := p
 		pset.Set = append(pset.Set, &tmp)
@@ -71,10 +71,10 @@ func (rbft *rbftImpl) persistPSet(v uint64, n uint64, d string) {
 }
 
 // persistCSet persists marshaled commit messages in the cert with the given msgID(v,n,d) to database
-func (rbft *rbftImpl) persistCSet(v uint64, n uint64, d string) {
+func (rbft *rbftImpl[T, Constraint]) persistCSet(v uint64, n uint64, d string) {
 	cert := rbft.storeMgr.getCert(v, n, d)
-	set := make([]*pb.Commit, 0)
-	cset := &pb.Cset{Set: set}
+	set := make([]*consensus.Commit, 0)
+	cset := &consensus.Cset{Set: set}
 	for c := range cert.commit {
 		tmp := c
 		cset.Set = append(cset.Set, &tmp)
@@ -93,33 +93,33 @@ func (rbft *rbftImpl) persistCSet(v uint64, n uint64, d string) {
 }
 
 // persistDelQSet deletes marshaled pre-prepare message with the given key from database
-func (rbft *rbftImpl) persistDelQSet(v uint64, n uint64, d string) {
+func (rbft *rbftImpl[T, Constraint]) persistDelQSet(v uint64, n uint64, d string) {
 	qset := fmt.Sprintf("qset.%d.%d.%s", v, n, d)
 	_ = rbft.storage.DelState(qset)
 }
 
 // persistDelPSet deletes marshaled prepare messages with the given key from database
-func (rbft *rbftImpl) persistDelPSet(v uint64, n uint64, d string) {
+func (rbft *rbftImpl[T, Constraint]) persistDelPSet(v uint64, n uint64, d string) {
 	pset := fmt.Sprintf("pset.%d.%d.%s", v, n, d)
 	_ = rbft.storage.DelState(pset)
 }
 
 // persistDelCSet deletes marshaled commit messages with the given key from database
-func (rbft *rbftImpl) persistDelCSet(v uint64, n uint64, d string) {
+func (rbft *rbftImpl[T, Constraint]) persistDelCSet(v uint64, n uint64, d string) {
 	cset := fmt.Sprintf("cset.%d.%d.%s", v, n, d)
 	_ = rbft.storage.DelState(cset)
 }
 
 // persistDelQPCSet deletes marshaled pre-prepare,prepare,commit messages with the given key from database
-func (rbft *rbftImpl) persistDelQPCSet(v uint64, n uint64, d string) {
+func (rbft *rbftImpl[T, Constraint]) persistDelQPCSet(v uint64, n uint64, d string) {
 	rbft.persistDelQSet(v, n, d)
 	rbft.persistDelPSet(v, n, d)
 	rbft.persistDelCSet(v, n, d)
 }
 
 // restoreQSet restores pre-prepare messages from database, which, keyed by msgID
-func (rbft *rbftImpl) restoreQSet() (map[msgID]*pb.PrePrepare, error) {
-	qset := make(map[msgID]*pb.PrePrepare)
+func (rbft *rbftImpl[T, Constraint]) restoreQSet() (map[msgID]*consensus.PrePrepare, error) {
+	qset := make(map[msgID]*consensus.PrePrepare)
 	payload, err := rbft.storage.ReadStateSet("qset.")
 	if err == nil {
 		for key, set := range payload {
@@ -129,7 +129,7 @@ func (rbft *rbftImpl) restoreQSet() (map[msgID]*pb.PrePrepare, error) {
 			if err != nil {
 				rbft.logger.Warningf("Replica %d could not restore qset key %s, err: %s", rbft.peerPool.ID, key, err)
 			} else {
-				preprep := &pb.PrePrepare{}
+				preprep := &consensus.PrePrepare{}
 				err = proto.Unmarshal(set, preprep)
 				if err == nil {
 					idx := msgID{v, n, d}
@@ -147,8 +147,8 @@ func (rbft *rbftImpl) restoreQSet() (map[msgID]*pb.PrePrepare, error) {
 }
 
 // restorePSet restores prepare messages from database, which, keyed by msgID
-func (rbft *rbftImpl) restorePSet() (map[msgID]*pb.Pset, error) {
-	pset := make(map[msgID]*pb.Pset)
+func (rbft *rbftImpl[T, Constraint]) restorePSet() (map[msgID]*consensus.Pset, error) {
+	pset := make(map[msgID]*consensus.Pset)
 	payload, err := rbft.storage.ReadStateSet("pset.")
 	if err == nil {
 		for key, set := range payload {
@@ -158,7 +158,7 @@ func (rbft *rbftImpl) restorePSet() (map[msgID]*pb.Pset, error) {
 			if err != nil {
 				rbft.logger.Warningf("Replica %d could not restore pset key %s, err: %s", rbft.peerPool.ID, key, err)
 			} else {
-				prepares := &pb.Pset{}
+				prepares := &consensus.Pset{}
 				err = proto.Unmarshal(set, prepares)
 				if err == nil {
 					idx := msgID{v, n, d}
@@ -176,8 +176,8 @@ func (rbft *rbftImpl) restorePSet() (map[msgID]*pb.Pset, error) {
 }
 
 // restoreCSet restores commit messages from database, which, keyed by msgID
-func (rbft *rbftImpl) restoreCSet() (map[msgID]*pb.Cset, error) {
-	cset := make(map[msgID]*pb.Cset)
+func (rbft *rbftImpl[T, Constraint]) restoreCSet() (map[msgID]*consensus.Cset, error) {
+	cset := make(map[msgID]*consensus.Cset)
 
 	payload, err := rbft.storage.ReadStateSet("cset.")
 	if err == nil {
@@ -188,7 +188,7 @@ func (rbft *rbftImpl) restoreCSet() (map[msgID]*pb.Cset, error) {
 			if err != nil {
 				rbft.logger.Warningf("Replica %d could not restore pset key %s, err: %s", rbft.peerPool.ID, key, err)
 			} else {
-				commits := &pb.Cset{}
+				commits := &consensus.Cset{}
 				err = proto.Unmarshal(set, commits)
 				if err == nil {
 					idx := msgID{v, n, d}
@@ -206,7 +206,7 @@ func (rbft *rbftImpl) restoreCSet() (map[msgID]*pb.Cset, error) {
 }
 
 // persistQList persists marshaled qList into DB before vc.
-func (rbft *rbftImpl) persistQList(ql map[qidx]*pb.Vc_PQ) {
+func (rbft *rbftImpl[T, Constraint]) persistQList(ql map[qidx]*consensus.Vc_PQ) {
 	for idx, q := range ql {
 		raw, err := proto.Marshal(q)
 		if err != nil {
@@ -222,7 +222,7 @@ func (rbft *rbftImpl) persistQList(ql map[qidx]*pb.Vc_PQ) {
 }
 
 // persistPList persists marshaled pList into DB before vc.
-func (rbft *rbftImpl) persistPList(pl map[uint64]*pb.Vc_PQ) {
+func (rbft *rbftImpl[T, Constraint]) persistPList(pl map[uint64]*consensus.Vc_PQ) {
 	for idx, p := range pl {
 		raw, err := proto.Marshal(p)
 		if err != nil {
@@ -238,7 +238,7 @@ func (rbft *rbftImpl) persistPList(pl map[uint64]*pb.Vc_PQ) {
 }
 
 // persistDelQPList deletes all qList and pList stored in DB after finish vc.
-func (rbft *rbftImpl) persistDelQPList() {
+func (rbft *rbftImpl[T, Constraint]) persistDelQPList() {
 	qIndex, err := rbft.external.ReadStateSet("qlist.")
 	if err != nil {
 		rbft.logger.Debug("not found qList to delete")
@@ -259,8 +259,8 @@ func (rbft *rbftImpl) persistDelQPList() {
 }
 
 // restoreQList restores qList from DB, which, keyed by qidx
-func (rbft *rbftImpl) restoreQList() (map[qidx]*pb.Vc_PQ, error) {
-	qList := make(map[qidx]*pb.Vc_PQ)
+func (rbft *rbftImpl[T, Constraint]) restoreQList() (map[qidx]*consensus.Vc_PQ, error) {
+	qList := make(map[qidx]*consensus.Vc_PQ)
 	payload, err := rbft.external.ReadStateSet("qlist.")
 	if err == nil {
 		for key, value := range payload {
@@ -285,7 +285,7 @@ func (rbft *rbftImpl) restoreQList() (map[qidx]*pb.Vc_PQ, error) {
 
 			d = splitKeys[2]
 
-			q := &pb.Vc_PQ{}
+			q := &consensus.Vc_PQ{}
 			err = proto.Unmarshal(value, q)
 			if err == nil {
 				rbft.logger.Debugf("Replica %d restore qList %+v", rbft.peerPool.ID, q)
@@ -302,8 +302,8 @@ func (rbft *rbftImpl) restoreQList() (map[qidx]*pb.Vc_PQ, error) {
 }
 
 // restorePList restores pList from DB
-func (rbft *rbftImpl) restorePList() (map[uint64]*pb.Vc_PQ, error) {
-	pList := make(map[uint64]*pb.Vc_PQ)
+func (rbft *rbftImpl[T, Constraint]) restorePList() (map[uint64]*consensus.Vc_PQ, error) {
+	pList := make(map[uint64]*consensus.Vc_PQ)
 	payload, err := rbft.external.ReadStateSet("plist.")
 	if err == nil {
 		for key, value := range payload {
@@ -325,7 +325,7 @@ func (rbft *rbftImpl) restorePList() (map[uint64]*pb.Vc_PQ, error) {
 				return nil, errors.New("parse failed")
 			}
 
-			p := &pb.Vc_PQ{}
+			p := &consensus.Vc_PQ{}
 			err = proto.Unmarshal(value, p)
 			if err == nil {
 				rbft.logger.Debugf("Replica %d restore pList %+v", rbft.peerPool.ID, p)
@@ -341,7 +341,7 @@ func (rbft *rbftImpl) restorePList() (map[uint64]*pb.Vc_PQ, error) {
 }
 
 // restoreCert restores pre-prepares,prepares,commits from database and remove the messages with seqNo>lastExec
-func (rbft *rbftImpl) restoreCert() {
+func (rbft *rbftImpl[T, Constraint]) restoreCert() {
 	qset, _ := rbft.restoreQSet()
 	for idx, q := range qset {
 		if idx.n > rbft.exec.lastExec {
@@ -353,7 +353,7 @@ func (rbft *rbftImpl) restoreCert() {
 		batch, ok := rbft.storeMgr.batchStore[idx.d]
 		// set isConfig if found.
 		if ok {
-			cert.isConfig = isConfigBatch(batch)
+			cert.isConfig = isConfigBatch[T, Constraint](batch)
 		}
 	}
 
@@ -403,7 +403,7 @@ func (rbft *rbftImpl) restoreCert() {
 }
 
 // persistBatch persists one marshaled tx batch with the given digest to database
-func (rbft *rbftImpl) persistBatch(digest string) {
+func (rbft *rbftImpl[T, Constraint]) persistBatch(digest string) {
 	batch := rbft.storeMgr.batchStore[digest]
 	batchPacked, err := proto.Marshal(batch)
 	if err != nil {
@@ -420,18 +420,18 @@ func (rbft *rbftImpl) persistBatch(digest string) {
 }
 
 // persistDelBatch removes one marshaled tx batch with the given digest from database
-func (rbft *rbftImpl) persistDelBatch(digest string) {
+func (rbft *rbftImpl[T, Constraint]) persistDelBatch(digest string) {
 	_ = rbft.storage.DelState("batch." + digest)
 }
 
 // persistDelAllBatches removes all marshaled tx batches from database
-func (rbft *rbftImpl) persistDelAllBatches() {
+func (rbft *rbftImpl[T, Constraint]) persistDelAllBatches() {
 	_ = rbft.storage.Destroy("batch")
 }
 
 // persistCheckpoint persists checkpoint to database, which, key contains the seqNo of checkpoint, value is the
 // checkpoint ID
-func (rbft *rbftImpl) persistCheckpoint(seqNo uint64, id []byte) {
+func (rbft *rbftImpl[T, Constraint]) persistCheckpoint(seqNo uint64, id []byte) {
 	key := fmt.Sprintf("chkpt.%d", seqNo)
 	err := rbft.storage.StoreState(key, id)
 	if err != nil {
@@ -440,12 +440,12 @@ func (rbft *rbftImpl) persistCheckpoint(seqNo uint64, id []byte) {
 }
 
 // persistDelCheckpoint deletes checkpoint with the given seqNo from database
-func (rbft *rbftImpl) persistDelCheckpoint(seqNo uint64) {
+func (rbft *rbftImpl[T, Constraint]) persistDelCheckpoint(seqNo uint64) {
 	key := fmt.Sprintf("chkpt.%d", seqNo)
 	_ = rbft.storage.DelState(key)
 }
 
-func (rbft *rbftImpl) persistH(seqNo uint64) {
+func (rbft *rbftImpl[T, Constraint]) persistH(seqNo uint64) {
 	err := rbft.storage.StoreState("rbft.h", []byte(strconv.FormatUint(seqNo, 10)))
 	if err != nil {
 		rbft.logger.Errorf("Persist h failed with err: %s ", err)
@@ -453,7 +453,7 @@ func (rbft *rbftImpl) persistH(seqNo uint64) {
 }
 
 // persistNewView persists current view to database
-func (rbft *rbftImpl) persistNewView(nv *pb.NewView) {
+func (rbft *rbftImpl[T, Constraint]) persistNewView(nv *consensus.NewView) {
 	key := "new-view"
 	raw, err := proto.Marshal(nv)
 	if err != nil {
@@ -472,7 +472,7 @@ func (rbft *rbftImpl) persistNewView(nv *pb.NewView) {
 }
 
 // persistN persists current N to database
-func (rbft *rbftImpl) persistN(n int) {
+func (rbft *rbftImpl[T, Constraint]) persistN(n int) {
 	key := "nodes"
 	res := make([]byte, 8)
 	binary.LittleEndian.PutUint64(res, uint64(n))
@@ -483,7 +483,7 @@ func (rbft *rbftImpl) persistN(n int) {
 }
 
 // restoreN restore current N from database
-func (rbft *rbftImpl) restoreN() {
+func (rbft *rbftImpl[T, Constraint]) restoreN() {
 	n, err := rbft.storage.ReadState("nodes")
 	if err == nil {
 		nodes := binary.LittleEndian.Uint64(n)
@@ -494,10 +494,10 @@ func (rbft *rbftImpl) restoreN() {
 }
 
 // restoreView restores current view from database and then re-construct certStore
-func (rbft *rbftImpl) restoreView() {
+func (rbft *rbftImpl[T, Constraint]) restoreView() {
 	raw, err := rbft.storage.ReadState("new-view")
 	if err == nil {
-		nv := &pb.NewView{}
+		nv := &consensus.NewView{}
 		err = proto.Unmarshal(raw, nv)
 		if err == nil {
 			rbft.logger.Debugf("Replica %d restore view %d", rbft.peerPool.ID, nv.View)
@@ -515,7 +515,7 @@ func (rbft *rbftImpl) restoreView() {
 }
 
 // restoreBatchStore restores tx batches from database
-func (rbft *rbftImpl) restoreBatchStore() {
+func (rbft *rbftImpl[T, Constraint]) restoreBatchStore() {
 
 	payload, err := rbft.storage.ReadStateSet("batch.")
 	if err == nil {
@@ -524,7 +524,7 @@ func (rbft *rbftImpl) restoreBatchStore() {
 			if _, err = fmt.Sscanf(key, "batch.%s", &digest); err != nil {
 				rbft.logger.Warningf("Replica %d could not restore pset key %s", rbft.peerPool.ID, key)
 			} else {
-				batch := &pb.RequestBatch{}
+				batch := &consensus.RequestBatch{}
 				err = proto.Unmarshal(set, batch)
 				if err == nil {
 					rbft.logger.Debugf("Replica %d restore batch %s", rbft.peerPool.ID, digest)
@@ -544,7 +544,7 @@ func (rbft *rbftImpl) restoreBatchStore() {
 // consensus data from consensus DB.
 // restoreState restores lastExec, certStore, view, transaction batches, checkpoints, h and other related
 // params from database
-func (rbft *rbftImpl) restoreState() error {
+func (rbft *rbftImpl[T, Constraint]) restoreState() error {
 
 	rbft.batchMgr.setSeqNo(rbft.exec.lastExec)
 	rbft.restoreView()
@@ -597,7 +597,7 @@ func (rbft *rbftImpl) restoreState() error {
 }
 
 // parseQPCKey helps parse view, seqNo, digest from given key with prefix.
-func (rbft *rbftImpl) parseQPCKey(key, prefix string) (uint64, uint64, string, error) {
+func (rbft *rbftImpl[T, Constraint]) parseQPCKey(key, prefix string) (uint64, uint64, string, error) {
 	var (
 		v, n int
 		d    string

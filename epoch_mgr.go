@@ -6,10 +6,8 @@ import (
 	"fmt"
 	"sync"
 
-	commonTypes "github.com/hyperchain/go-hpc-common/types"
-	"github.com/hyperchain/go-hpc-common/types/protos"
+	"github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
 	"github.com/hyperchain/go-hpc-rbft/v2/external"
-	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
 	"github.com/hyperchain/go-hpc-rbft/v2/types"
 
 	"github.com/gogo/protobuf/proto"
@@ -49,7 +47,7 @@ type epochManager struct {
 	logger Logger
 }
 
-func newEpochManager(c Config, pp *peerPool) *epochManager {
+func newEpochManager[T any, Constraint consensus.TXConstraint[T]](c Config[T, Constraint], pp *peerPool) *epochManager {
 	em := &epochManager{
 		epoch:                c.EpochInit,
 		configBatchToCheck:   nil,
@@ -76,27 +74,27 @@ func newEpochManager(c Config, pp *peerPool) *epochManager {
 }
 
 // dispatchEpochMsg dispatches epoch service messages using service type
-func (rbft *rbftImpl) dispatchEpochMsg(e consensusEvent) consensusEvent {
+func (rbft *rbftImpl[T, Constraint]) dispatchEpochMsg(e consensusEvent) consensusEvent {
 	switch et := e.(type) {
-	case *pb.FetchCheckpoint:
+	case *consensus.FetchCheckpoint:
 		return rbft.recvFetchCheckpoint(et)
-	case *pb.EpochChangeRequest:
+	case *consensus.EpochChangeRequest:
 		rbft.logger.Debugf("Replica %d don't process epoch change request from %s in same epoch",
 			rbft.peerPool.ID, et.GetAuthor())
-	case *protos.EpochChangeProof:
+	case *consensus.EpochChangeProof:
 		rbft.logger.Debugf("Replica %d don't process epoch change proof from %s in same epoch",
 			rbft.peerPool.ID, et.GetAuthor())
 	}
 	return nil
 }
 
-func (rbft *rbftImpl) fetchCheckpoint() consensusEvent {
+func (rbft *rbftImpl[T, Constraint]) fetchCheckpoint() consensusEvent {
 	if rbft.epochMgr.configBatchToCheck == nil {
 		rbft.logger.Debugf("Replica %d doesn't need to check any batches", rbft.peerPool.ID)
 		return nil
 	}
 
-	fetch := &pb.FetchCheckpoint{
+	fetch := &consensus.FetchCheckpoint{
 		ReplicaId:      rbft.peerPool.ID,
 		SequenceNumber: rbft.epochMgr.configBatchToCheck.Height,
 	}
@@ -107,8 +105,8 @@ func (rbft *rbftImpl) fetchCheckpoint() consensusEvent {
 		rbft.logger.Errorf("ConsensusMessage_PREPARE Marshal Error: %s", err)
 		return nil
 	}
-	consensusMsg := &pb.ConsensusMessage{
-		Type:    pb.Type_FETCH_CHECKPOINT,
+	consensusMsg := &consensus.ConsensusMessage{
+		Type:    consensus.Type_FETCH_CHECKPOINT,
 		Payload: payload,
 	}
 
@@ -117,7 +115,7 @@ func (rbft *rbftImpl) fetchCheckpoint() consensusEvent {
 	return nil
 }
 
-func (rbft *rbftImpl) recvFetchCheckpoint(fetch *pb.FetchCheckpoint) consensusEvent {
+func (rbft *rbftImpl[T, Constraint]) recvFetchCheckpoint(fetch *consensus.FetchCheckpoint) consensusEvent {
 	signedCheckpoint, ok := rbft.storeMgr.localCheckpoints[fetch.SequenceNumber]
 	// If we can find a checkpoint in corresponding height, just send it back.
 	if !ok {
@@ -136,8 +134,8 @@ func (rbft *rbftImpl) recvFetchCheckpoint(fetch *pb.FetchCheckpoint) consensusEv
 		rbft.logger.Errorf("ConsensusMessage_CHECKPOINT Marshal Error: %s", err)
 		return nil
 	}
-	consensusMsg := &pb.ConsensusMessage{
-		Type:    pb.Type_SIGNED_CHECKPOINT,
+	consensusMsg := &consensus.ConsensusMessage{
+		Type:    consensus.Type_SIGNED_CHECKPOINT,
 		Payload: payload,
 	}
 	rbft.peerPool.unicast(context.TODO(), consensusMsg, fetch.ReplicaId)
@@ -145,8 +143,8 @@ func (rbft *rbftImpl) recvFetchCheckpoint(fetch *pb.FetchCheckpoint) consensusEv
 	return nil
 }
 
-func (rbft *rbftImpl) turnIntoEpoch() {
-	rbft.logger.Trace(commonTypes.TagNameEpochChange, commonTypes.TagStageFinish, commonTypes.TagContentEpochChange{
+func (rbft *rbftImpl[T, Constraint]) turnIntoEpoch() {
+	rbft.logger.Trace(consensus.TagNameEpochChange, consensus.TagStageFinish, consensus.TagContentEpochChange{
 		Epoch: rbft.epoch,
 	})
 
@@ -194,7 +192,7 @@ func (rbft *rbftImpl) turnIntoEpoch() {
 		vset = append(vset, info.Hostname)
 	}
 	algoVersion := rbft.external.GetLastCheckpoint().Version()
-	rbft.logger.Trace(commonTypes.TagNameEpochChange, commonTypes.TagStageStart, commonTypes.TagContentEpochChange{
+	rbft.logger.Trace(consensus.TagNameEpochChange, consensus.TagStageStart, consensus.TagContentEpochChange{
 		Epoch:        epoch,
 		ValidatorSet: vset,
 		AlgoVersion:  algoVersion,
@@ -202,7 +200,7 @@ func (rbft *rbftImpl) turnIntoEpoch() {
 }
 
 // setEpoch sets the epoch with the epochLock.
-func (rbft *rbftImpl) setEpoch(epoch uint64) {
+func (rbft *rbftImpl[T, Constraint]) setEpoch(epoch uint64) {
 	rbft.epochLock.Lock()
 	rbft.epoch = epoch
 	rbft.epochMgr.epoch = epoch
@@ -211,19 +209,19 @@ func (rbft *rbftImpl) setEpoch(epoch uint64) {
 	rbft.metrics.epochGauge.Set(float64(epoch))
 }
 
-func (rbft *rbftImpl) resetConfigBatchToExecute() {
+func (rbft *rbftImpl[T, Constraint]) resetConfigBatchToExecute() {
 	rbft.epochMgr.configBatchToExecuteLock.Lock()
 	defer rbft.epochMgr.configBatchToExecuteLock.Unlock()
 	rbft.epochMgr.configBatchToExecute = uint64(0)
 }
 
-func (rbft *rbftImpl) setConfigBatchToExecute(seqNo uint64) {
+func (rbft *rbftImpl[T, Constraint]) setConfigBatchToExecute(seqNo uint64) {
 	rbft.epochMgr.configBatchToExecuteLock.Lock()
 	defer rbft.epochMgr.configBatchToExecuteLock.Unlock()
 	rbft.epochMgr.configBatchToExecute = seqNo
 }
 
-func (rbft *rbftImpl) readConfigBatchToExecute() uint64 {
+func (rbft *rbftImpl[T, Constraint]) readConfigBatchToExecute() uint64 {
 	rbft.epochMgr.configBatchToExecuteLock.RLock()
 	defer rbft.epochMgr.configBatchToExecuteLock.RUnlock()
 	return rbft.epochMgr.configBatchToExecute
@@ -232,15 +230,15 @@ func (rbft *rbftImpl) readConfigBatchToExecute() uint64 {
 // checkEpoch compares local epoch and remote epoch:
 // 1. remoteEpoch > currentEpoch, only accept EpochChangeProof, else retrieveEpochChange
 // 2. remoteEpoch < currentEpoch, only accept EpochChangeRequest, else ignore
-func (em *epochManager) checkEpoch(msg *pb.ConsensusMessage) consensusEvent {
+func (em *epochManager) checkEpoch(msg *consensus.ConsensusMessage) consensusEvent {
 	currentEpoch := em.epoch
 	remoteEpoch := msg.Epoch
 	if remoteEpoch > currentEpoch {
 		em.logger.Debugf("Replica %d received message type %s from %s with larger epoch, "+
 			"current epoch %d, remote epoch %d", em.peerPool.ID, msg.Type, msg.Author, currentEpoch, remoteEpoch)
 		// first process epoch sync response with higher epoch.
-		if msg.Type == pb.Type_EPOCH_CHANGE_PROOF {
-			proof := &protos.EpochChangeProof{}
+		if msg.Type == consensus.Type_EPOCH_CHANGE_PROOF {
+			proof := &consensus.EpochChangeProof{}
 			if uErr := proto.Unmarshal(msg.Payload, proof); uErr != nil {
 				em.logger.Warningf("Unmarshal EpochChangeProof failed: %s", uErr)
 				return uErr
@@ -254,8 +252,8 @@ func (em *epochManager) checkEpoch(msg *pb.ConsensusMessage) consensusEvent {
 		em.logger.Debugf("Replica %d received message type %s from %s with lower epoch, "+
 			"current epoch %d, remote epoch %d", em.peerPool.ID, msg.Type, msg.Author, currentEpoch, remoteEpoch)
 		// first process epoch sync request with lower epoch.
-		if msg.Type == pb.Type_EPOCH_CHANGE_REQUEST {
-			request := &pb.EpochChangeRequest{}
+		if msg.Type == consensus.Type_EPOCH_CHANGE_REQUEST {
+			request := &consensus.EpochChangeRequest{}
 			if uErr := proto.Unmarshal(msg.Payload, request); uErr != nil {
 				em.logger.Warningf("Unmarshal EpochChangeRequest failed: %s", uErr)
 				return uErr
@@ -270,7 +268,7 @@ func (em *epochManager) checkEpoch(msg *pb.ConsensusMessage) consensusEvent {
 
 func (em *epochManager) retrieveEpochChange(start, target uint64, recipient string) error {
 	em.logger.Debugf("Replica %d request epoch changes %d to %d from %s", em.peerPool.ID, start, target, recipient)
-	req := &pb.EpochChangeRequest{
+	req := &consensus.EpochChangeRequest{
 		Author:      em.peerPool.hostname,
 		StartEpoch:  start,
 		TargetEpoch: target,
@@ -280,15 +278,15 @@ func (em *epochManager) retrieveEpochChange(start, target uint64, recipient stri
 		em.logger.Warningf("Marshal EpochChangeRequest failed: %s", mErr)
 		return mErr
 	}
-	cum := &pb.ConsensusMessage{
-		Type:    pb.Type_EPOCH_CHANGE_REQUEST,
+	cum := &consensus.ConsensusMessage{
+		Type:    consensus.Type_EPOCH_CHANGE_REQUEST,
 		Payload: payload,
 	}
 	em.peerPool.unicastByHostname(context.TODO(), cum, recipient)
 	return nil
 }
 
-func (em *epochManager) processEpochChangeRequest(request *pb.EpochChangeRequest) error {
+func (em *epochManager) processEpochChangeRequest(request *consensus.EpochChangeRequest) error {
 	em.logger.Debugf("Replica %d received epoch change request %s", em.peerPool.ID, request)
 
 	if err := em.verifyEpochChangeRequest(request); err != nil {
@@ -303,8 +301,8 @@ func (em *epochManager) processEpochChangeRequest(request *pb.EpochChangeRequest
 			em.logger.Warningf("Marshal EpochChangeProof failed: %s", mErr)
 			return mErr
 		}
-		cum := &pb.ConsensusMessage{
-			Type:    pb.Type_EPOCH_CHANGE_PROOF,
+		cum := &consensus.ConsensusMessage{
+			Type:    consensus.Type_EPOCH_CHANGE_PROOF,
 			Payload: payload,
 		}
 		em.peerPool.unicastByHostname(context.TODO(), cum, request.Author)
@@ -313,7 +311,7 @@ func (em *epochManager) processEpochChangeRequest(request *pb.EpochChangeRequest
 	return nil
 }
 
-func (em *epochManager) processEpochChangeProof(proof *protos.EpochChangeProof) consensusEvent {
+func (em *epochManager) processEpochChangeProof(proof *consensus.EpochChangeProof) consensusEvent {
 	em.logger.Debugf("Replica %d received epoch change proof from %s", em.peerPool.ID, proof.Author)
 
 	if changeTo := proof.NextEpoch(); changeTo <= em.epoch {
@@ -339,7 +337,7 @@ func (em *epochManager) processEpochChangeProof(proof *protos.EpochChangeProof) 
 }
 
 // verifyEpochChangeRequest verify the legality of epoch change request.
-func (em *epochManager) verifyEpochChangeRequest(request *pb.EpochChangeRequest) error {
+func (em *epochManager) verifyEpochChangeRequest(request *consensus.EpochChangeRequest) error {
 	if request == nil {
 		return errors.New("NIL epoch-change-request")
 	}
@@ -353,7 +351,7 @@ func (em *epochManager) verifyEpochChangeRequest(request *pb.EpochChangeRequest)
 }
 
 // pagingGetEpochChangeProof returns epoch change proof with given page limit.
-func (em *epochManager) pagingGetEpochChangeProof(startEpoch, endEpoch, pageLimit uint64) *protos.EpochChangeProof {
+func (em *epochManager) pagingGetEpochChangeProof(startEpoch, endEpoch, pageLimit uint64) *consensus.EpochChangeProof {
 	pagingEpoch := endEpoch
 	more := uint64(0)
 
@@ -362,7 +360,7 @@ func (em *epochManager) pagingGetEpochChangeProof(startEpoch, endEpoch, pageLimi
 		pagingEpoch = startEpoch + pageLimit
 	}
 
-	checkpoints := make([]*protos.QuorumCheckpoint, 0)
+	checkpoints := make([]*consensus.QuorumCheckpoint, 0)
 	for epoch := startEpoch; epoch < pagingEpoch; epoch++ {
 		cp, err := em.epochService.GetCheckpointOfEpoch(epoch)
 		if err != nil {
@@ -372,14 +370,14 @@ func (em *epochManager) pagingGetEpochChangeProof(startEpoch, endEpoch, pageLimi
 		checkpoints = append(checkpoints, cp)
 	}
 
-	return &protos.EpochChangeProof{
+	return &consensus.EpochChangeProof{
 		Author:      em.peerPool.hostname,
 		More:        more,
 		Checkpoints: checkpoints,
 	}
 }
 
-func (em *epochManager) verifyEpochChangeProof(proof *protos.EpochChangeProof) error {
+func (em *epochManager) verifyEpochChangeProof(proof *consensus.EpochChangeProof) error {
 	// Skip any stale checkpoints in the proof prefix. Note that with
 	// the assertion above, we are guaranteed there is at least one
 	// non-stale checkpoints in the proof.

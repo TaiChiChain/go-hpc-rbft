@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/golang/mock/gomock"
+	"github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
 )
 
 // NewMockMinimalExternal returns a minimal implement of MockExternalStack which accepts
@@ -11,8 +12,8 @@ import (
 // Users can defines custom MockExternalStack like this:
 // func NewMockCustomMockExternalStack(ctrl *gomock.Controller) *MockExternalStack {...}
 // in which users must specify output for all functions.
-func NewMockMinimalExternal(ctrl *gomock.Controller) *MockExternalStack {
-	mock := NewMockExternalStack(ctrl)
+func NewMockMinimalExternal[T any, Constraint consensus.TXConstraint[T]](ctrl *gomock.Controller) *MockExternalStack[T, Constraint] {
+	mock := NewMockExternalStack[T, Constraint](ctrl)
 	mock.EXPECT().StoreState(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	mock.EXPECT().DelState(gomock.Any()).Return(nil).AnyTimes()
 

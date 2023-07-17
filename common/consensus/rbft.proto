@@ -14,10 +14,9 @@
 
 syntax = "proto3";
 
-import "github.com/hyperchain/go-hpc-common/types/protos/transaction.proto";
-import "github.com/hyperchain/go-hpc-common/types/protos/checkpoint.proto";
+import "checkpoint.proto";
 
-package rbftpbV2;
+package consensus;
 
 enum Type {
     NULL_REQUEST = 0;
@@ -81,7 +80,7 @@ message commit {
 }
 
 message request_set {
-    repeated protos.Transaction requests = 1;
+    repeated bytes requests = 1;
     bool local = 2;
 }
 
@@ -89,12 +88,6 @@ message hash_batch {
     repeated string request_hash_list = 1;
     repeated string de_duplicate_request_hash_list = 2;
     int64 timestamp = 3;
-}
-
-message signed_checkpoint {
-    string author = 1;
-    protos.Checkpoint checkpoint = 2;
-    bytes signature = 3;
 }
 
 message fetch_checkpoint {
@@ -115,7 +108,7 @@ message vc_basis {
     uint64   h = 3;
     repeated vc_PQ pset = 4;
     repeated vc_PQ qset = 5;
-    repeated signed_checkpoint cset = 6;
+    repeated consensus.SignedCheckpoint cset = 6;
 }
 
 message vc_PQ {
@@ -144,7 +137,7 @@ message fetch_view {
 
 message recovery_response {
     new_view new_view = 1;
-    signed_checkpoint initial_checkpoint = 2;
+    consensus.SignedCheckpoint initial_checkpoint = 2;
 }
 
 message fetch_batch_request {
@@ -160,7 +153,7 @@ message fetch_batch_response {
 
 message request_batch {
     repeated string request_hash_list = 1;
-    repeated protos.Transaction request_list = 2;
+    repeated bytes request_list = 2;
     int64 timestamp = 3;
     uint64 seq_no = 4;
     repeated bool local_list = 5;
@@ -181,7 +174,7 @@ message fetch_missing_response {
     uint64 sequence_number = 3;
     string batch_digest = 4;
     map<uint64, string> missing_request_hashes = 5;
-    map<uint64, protos.Transaction> missing_requests = 6;
+    map<uint64, bytes> missing_requests = 6;
 }
 
 message fetchPQC_request {
@@ -203,7 +196,7 @@ message sync_state {
 message sync_state_response {
     uint64 replica_id = 1;
     uint64 view = 2;
-    signed_checkpoint signed_checkpoint = 3;
+    consensus.SignedCheckpoint signed_checkpoint = 3;
 }
 
 // EpochChangeRequest is used to get a EpochChangeProof from start_epoch to target_epoch.

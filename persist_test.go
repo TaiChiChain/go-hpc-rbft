@@ -7,20 +7,24 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hyperchain/go-hpc-common/metrics/disabled"
-	"github.com/hyperchain/go-hpc-rbft/v2/external"
+	"github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
+	"github.com/hyperchain/go-hpc-rbft/v2/common/metrics/disabled"
 	mockexternal "github.com/hyperchain/go-hpc-rbft/v2/mock/mock_external"
-	pb "github.com/hyperchain/go-hpc-rbft/v2/rbftpb"
-	txpool "github.com/hyperchain/go-hpc-txpool"
-	txpoolmock "github.com/hyperchain/go-hpc-txpool/mock"
+
+	txpoolmock "github.com/hyperchain/go-hpc-rbft/v2/txpool/mock"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 )
 
-func newPersistTestReplica(ctrl *gomock.Controller, pool txpool.TxPool, log Logger, ext external.ExternalStack) *node {
-	conf := Config{
+func newPersistTestReplica[T any, Constraint consensus.TXConstraint[T]](ctrl *gomock.Controller) (*node[T, Constraint], *mockexternal.MockExternalStack[T, Constraint]) {
+	pool := txpoolmock.NewMockMinimalTxPool[T, Constraint](ctrl)
+	log := newRawLogger()
+	ext := mockexternal.NewMockExternalStack[T, Constraint](ctrl)
+	ext.EXPECT().Sign(gomock.Any()).Return([]byte("sig"), nil).AnyTimes()
+
+	conf := Config[T, Constraint]{
 		ID:                      2,
 		Hash:                    calHash("node2"),
 		Peers:                   peerSet,
@@ -49,24 +53,20 @@ func newPersistTestReplica(ctrl *gomock.Controller, pool txpool.TxPool, log Logg
 		LatestConfig: nil,
 	}
 
-	node, _ := newNode(conf)
-	return node
+	node, _ := newNode[T, Constraint](conf)
+	return node, ext
 }
 
 func TestPersist_restoreView(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
-	log := newRawLogger()
-	ext := mockexternal.NewMockExternalStack(ctrl)
-	ext.EXPECT().Sign(gomock.Any()).Return([]byte("sig"), nil).AnyTimes()
-	node := newPersistTestReplica(ctrl, pool, log, ext)
+	//defer ctrl.Finish()
 
+	node, ext := newPersistTestReplica[consensus.Transaction](ctrl)
 	ext.EXPECT().ReadState("new-view").Return(nil, errors.New("err"))
 	node.rbft.restoreView()
 	assert.Equal(t, uint64(0), node.rbft.view)
 
-	nv := &pb.NewView{
+	nv := &consensus.NewView{
 		View: 1,
 	}
 	nvb, _ := proto.Marshal(nv)
@@ -78,12 +78,8 @@ func TestPersist_restoreView(t *testing.T) {
 
 func TestPersist_restoreQList(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
-	log := newRawLogger()
-	ext := mockexternal.NewMockExternalStack(ctrl)
-	ext.EXPECT().Sign(gomock.Any()).Return([]byte("sig"), nil).AnyTimes()
-	node := newPersistTestReplica(ctrl, pool, log, ext)
+	//defer ctrl.Finish()
+	node, ext := newPersistTestReplica[consensus.Transaction](ctrl)
 
 	var ret map[string][]byte
 	var err error
@@ -116,12 +112,8 @@ func TestPersist_restoreQList(t *testing.T) {
 
 func TestPersist_restorePList(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
-	log := newRawLogger()
-	ext := mockexternal.NewMockExternalStack(ctrl)
-	ext.EXPECT().Sign(gomock.Any()).Return([]byte("sig"), nil).AnyTimes()
-	node := newPersistTestReplica(ctrl, pool, log, ext)
+	//defer ctrl.Finish()
+	node, ext := newPersistTestReplica[consensus.Transaction](ctrl)
 
 	var ret map[string][]byte
 	var err error
@@ -149,12 +141,9 @@ func TestPersist_restorePList(t *testing.T) {
 
 func TestPersist_restoreBatchStore(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
-	log := newRawLogger()
-	ext := mockexternal.NewMockExternalStack(ctrl)
-	ext.EXPECT().Sign(gomock.Any()).Return([]byte("sig"), nil).AnyTimes()
-	node := newPersistTestReplica(ctrl, pool, log, ext)
+	//defer ctrl.Finish()
+
+	node, ext := newPersistTestReplica[consensus.Transaction](ctrl)
 
 	var ret map[string][]byte
 	ret = map[string][]byte{"batch.msg": {24, 10}}
@@ -166,14 +155,11 @@ func TestPersist_restoreBatchStore(t *testing.T) {
 
 func TestPersist_restoreQSet(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
-	log := newRawLogger()
-	ext := mockexternal.NewMockExternalStack(ctrl)
-	ext.EXPECT().Sign(gomock.Any()).Return([]byte("sig"), nil).AnyTimes()
-	node := newPersistTestReplica(ctrl, pool, log, ext)
+	//defer ctrl.Finish()
 
-	q := &pb.PrePrepare{
+	node, ext := newPersistTestReplica[consensus.Transaction](ctrl)
+
+	q := &consensus.PrePrepare{
 		ReplicaId:      1,
 		View:           1,
 		SequenceNumber: 2,
@@ -189,25 +175,22 @@ func TestPersist_restoreQSet(t *testing.T) {
 	ext.EXPECT().ReadStateSet("qset.").Return(retQset, nil)
 
 	qset, _ := node.rbft.restoreQSet()
-	assert.Equal(t, map[msgID]*pb.PrePrepare{{1, 2, "msg"}: q}, qset)
+	assert.Equal(t, map[msgID]*consensus.PrePrepare{{1, 2, "msg"}: q}, qset)
 }
 
 func TestPersist_restorePSet(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
-	log := newRawLogger()
-	ext := mockexternal.NewMockExternalStack(ctrl)
-	ext.EXPECT().Sign(gomock.Any()).Return([]byte("sig"), nil).AnyTimes()
-	node := newPersistTestReplica(ctrl, pool, log, ext)
+	//defer ctrl.Finish()
 
-	p := &pb.Prepare{
+	node, ext := newPersistTestReplica[consensus.Transaction](ctrl)
+
+	p := &consensus.Prepare{
 		ReplicaId:      1,
 		View:           1,
 		SequenceNumber: 2,
 		BatchDigest:    "msg",
 	}
-	set := &pb.Pset{Set: []*pb.Prepare{p}}
+	set := &consensus.Pset{Set: []*consensus.Prepare{p}}
 	PrepareByte, _ := proto.Marshal(set)
 	retPset := map[string][]byte{
 		"pset.1.2.msg": PrepareByte,
@@ -217,25 +200,22 @@ func TestPersist_restorePSet(t *testing.T) {
 	ext.EXPECT().ReadStateSet("pset.").Return(retPset, nil)
 
 	pset, _ := node.rbft.restorePSet()
-	assert.Equal(t, map[msgID]*pb.Pset{{1, 2, "msg"}: set}, pset)
+	assert.Equal(t, map[msgID]*consensus.Pset{{1, 2, "msg"}: set}, pset)
 }
 
 func TestPersist_restoreCSet(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
-	log := newRawLogger()
-	ext := mockexternal.NewMockExternalStack(ctrl)
-	ext.EXPECT().Sign(gomock.Any()).Return([]byte("sig"), nil).AnyTimes()
-	node := newPersistTestReplica(ctrl, pool, log, ext)
+	//defer ctrl.Finish()
 
-	c := &pb.Commit{
+	node, ext := newPersistTestReplica[consensus.Transaction](ctrl)
+
+	c := &consensus.Commit{
 		ReplicaId:      1,
 		View:           1,
 		SequenceNumber: 2,
 		BatchDigest:    "msg",
 	}
-	set := &pb.Cset{Set: []*pb.Commit{c}}
+	set := &consensus.Cset{Set: []*consensus.Commit{c}}
 	CommitByte, _ := proto.Marshal(set)
 	retCset := map[string][]byte{
 		"cset.1.2.msg": CommitByte,
@@ -245,19 +225,15 @@ func TestPersist_restoreCSet(t *testing.T) {
 	ext.EXPECT().ReadStateSet("cset.").Return(retCset, nil)
 
 	cset, _ := node.rbft.restoreCSet()
-	assert.Equal(t, map[msgID]*pb.Cset{{1, 2, "msg"}: set}, cset)
+	assert.Equal(t, map[msgID]*consensus.Cset{{1, 2, "msg"}: set}, cset)
 }
 
 func TestPersist_restoreCert(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
-	log := newRawLogger()
-	ext := mockexternal.NewMockExternalStack(ctrl)
-	ext.EXPECT().Sign(gomock.Any()).Return([]byte("sig"), nil).AnyTimes()
-	node := newPersistTestReplica(ctrl, pool, log, ext)
+	//defer ctrl.Finish()
+	node, ext := newPersistTestReplica[consensus.Transaction](ctrl)
 
-	q := &pb.PrePrepare{
+	q := &consensus.PrePrepare{
 		ReplicaId:      1,
 		View:           1,
 		SequenceNumber: 2,
@@ -270,26 +246,26 @@ func TestPersist_restoreCert(t *testing.T) {
 	}
 	ext.EXPECT().ReadStateSet("qset.").Return(retQset, nil)
 
-	p := &pb.Prepare{
+	p := &consensus.Prepare{
 		ReplicaId:      1,
 		View:           1,
 		SequenceNumber: 2,
 		BatchDigest:    "msg",
 	}
-	pset := &pb.Pset{Set: []*pb.Prepare{p}}
+	pset := &consensus.Pset{Set: []*consensus.Prepare{p}}
 	PrepareByte, _ := proto.Marshal(pset)
 	retPset := map[string][]byte{
 		"pset.1.2.msg": PrepareByte,
 	}
 	ext.EXPECT().ReadStateSet("pset.").Return(retPset, nil)
 
-	c := &pb.Commit{
+	c := &consensus.Commit{
 		ReplicaId:      1,
 		View:           1,
 		SequenceNumber: 2,
 		BatchDigest:    "msg",
 	}
-	cset := &pb.Cset{Set: []*pb.Commit{c}}
+	cset := &consensus.Cset{Set: []*consensus.Commit{c}}
 	CommitByte, _ := proto.Marshal(cset)
 	retCset := map[string][]byte{
 		"cset.1.2.msg": CommitByte,
@@ -301,18 +277,15 @@ func TestPersist_restoreCert(t *testing.T) {
 	ext.EXPECT().ReadStateSet("plist.").Return(map[string][]byte{"plist.": []byte("PList")}, nil).AnyTimes()
 
 	node.rbft.restoreCert()
-	exp := &msgCert{prePrepare: q, prePrepareCtx: context.TODO(), prepare: map[pb.Prepare]bool{*p: true}, commit: map[pb.Commit]bool{*c: true}}
+	exp := &msgCert{prePrepare: q, prePrepareCtx: context.TODO(), prepare: map[consensus.Prepare]bool{*p: true}, commit: map[consensus.Commit]bool{*c: true}}
 	assert.Equal(t, exp, node.rbft.storeMgr.certStore[msgID{1, 2, "msg"}])
 }
 
 func TestPersist_restoreState(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	pool := txpoolmock.NewMockMinimalTxPool(ctrl)
-	log := newRawLogger()
-	ext := mockexternal.NewMockExternalStack(ctrl)
-	ext.EXPECT().Sign(gomock.Any()).Return([]byte("sig"), nil).AnyTimes()
-	node := newPersistTestReplica(ctrl, pool, log, ext)
+	//defer ctrl.Finish()
+
+	node, ext := newPersistTestReplica[consensus.Transaction](ctrl)
 
 	var ret map[string][]byte
 	ret = map[string][]byte{
@@ -323,7 +296,7 @@ func TestPersist_restoreState(t *testing.T) {
 
 	var buff = make([]byte, 8)
 	binary.LittleEndian.PutUint64(buff, uint64(1))
-	nv := &pb.NewView{
+	nv := &consensus.NewView{
 		View: 1,
 	}
 	nvb, _ := proto.Marshal(nv)
@@ -354,10 +327,8 @@ func TestPersist_restoreState(t *testing.T) {
 }
 
 func TestPersist_parseQPCKey(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
-	_, rbfts := newBasicClusterInstance()
+	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
 	var u1, u2 uint64
 	var str string
 	var err error
