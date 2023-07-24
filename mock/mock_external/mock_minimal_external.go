@@ -4,7 +4,7 @@ import (
 	"errors"
 
 	"github.com/golang/mock/gomock"
-	"github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
+	"github.com/hyperchain/go-hpc-rbft/common/consensus"
 )
 
 // NewMockMinimalExternal returns a minimal implement of MockExternalStack which accepts

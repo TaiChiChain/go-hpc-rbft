@@ -17,8 +17,8 @@ package external
 import (
 	"context"
 
-	"github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
-	"github.com/hyperchain/go-hpc-rbft/v2/types"
+	"github.com/hyperchain/go-hpc-rbft/common/consensus"
+	"github.com/hyperchain/go-hpc-rbft/types"
 )
 
 // Storage is an interface that should be implemented by the application using non-volatile

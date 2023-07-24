@@ -1,7 +1,7 @@
 syntax = "proto3";
 package consensus;
 
-//option go_package = "github.com/hyperchain/go-hpc-rbft/v2/common/consensus/protos";
+//option go_package = "github.com/hyperchain/go-hpc-rbft/common/consensus/protos";
 //option java_package = "cn.hyperchain.sdk.transaction.proto";
 //option java_outer_classname = "TransactionValueProto";
 

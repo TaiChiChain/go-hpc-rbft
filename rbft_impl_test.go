@@ -6,11 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
-	"github.com/hyperchain/go-hpc-rbft/v2/common/metrics/disabled"
-	mockexternal "github.com/hyperchain/go-hpc-rbft/v2/mock/mock_external"
-	txpoolmock "github.com/hyperchain/go-hpc-rbft/v2/txpool/mock"
-	"github.com/hyperchain/go-hpc-rbft/v2/types"
+	"github.com/hyperchain/go-hpc-rbft/common/consensus"
+	"github.com/hyperchain/go-hpc-rbft/common/metrics/disabled"
+	mockexternal "github.com/hyperchain/go-hpc-rbft/mock/mock_external"
+	txpoolmock "github.com/hyperchain/go-hpc-rbft/txpool/mock"
+	"github.com/hyperchain/go-hpc-rbft/types"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"

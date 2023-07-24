@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"math/rand"
 	"testing"
-
-	"github.com/meshplus/bitxhub-kit/types"
 )
 
 func newTx() *Transaction {
@@ -16,11 +14,6 @@ func newTx() *Transaction {
 }
 func TestTransaction_GetHash(t *testing.T) {
 	tx := newTx()
-	h := tx.GetHash()
-	fmt.Println(h)
-}
-
-func TestName(t *testing.T) {
-	h := types.NewHash([]byte("feawgfhivbahgfaliughaiorghaeioghrevaeavew"))
+	h := tx.RbftGetTxHash()
 	fmt.Println(h)
 }
