@@ -8,49 +8,77 @@ import (
 	context "context"
 	reflect "reflect"
 
-	gomock "github.com/golang/mock/gomock"
 	rbft "github.com/axiomesh/axiom-bft"
-	"github.com/axiomesh/axiom-bft/common/consensus"
+	consensus "github.com/axiomesh/axiom-bft/common/consensus"
 	types "github.com/axiomesh/axiom-bft/types"
+	gomock "github.com/golang/mock/gomock"
 )
 
 // MockNode is a mock of Node interface.
-type MockNode struct {
+type MockNode[T any, Constraint consensus.TXConstraint[T]] struct {
 	ctrl     *gomock.Controller
-	recorder *MockNodeMockRecorder
+	recorder *MockNodeMockRecorder[T, Constraint]
 }
 
 // MockNodeMockRecorder is the mock recorder for MockNode.
-type MockNodeMockRecorder struct {
-	mock *MockNode
+type MockNodeMockRecorder[T any, Constraint consensus.TXConstraint[T]] struct {
+	mock *MockNode[T, Constraint]
 }
 
 // NewMockNode creates a new mock instance.
-func NewMockNode(ctrl *gomock.Controller) *MockNode {
-	mock := &MockNode{ctrl: ctrl}
-	mock.recorder = &MockNodeMockRecorder{mock}
+func NewMockNode[T any, Constraint consensus.TXConstraint[T]](ctrl *gomock.Controller) *MockNode[T, Constraint] {
+	mock := &MockNode[T, Constraint]{ctrl: ctrl}
+	mock.recorder = &MockNodeMockRecorder[T, Constraint]{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockNode) EXPECT() *MockNodeMockRecorder {
+func (m *MockNode[T, Constraint]) EXPECT() *MockNodeMockRecorder[T, Constraint] {
 	return m.recorder
 }
 
 // ApplyConfChange mocks base method.
-func (m *MockNode) ApplyConfChange(cc *types.ConfState) {
+func (m *MockNode[T, Constraint]) ApplyConfChange(cc *types.ConfState) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "ApplyConfChange", cc)
 }
 
 // ApplyConfChange indicates an expected call of ApplyConfChange.
-func (mr *MockNodeMockRecorder) ApplyConfChange(cc interface{}) *gomock.Call {
+func (mr *MockNodeMockRecorder[T, Constraint]) ApplyConfChange(cc interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ApplyConfChange", reflect.TypeOf((*MockNode)(nil).ApplyConfChange), cc)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ApplyConfChange", reflect.TypeOf((*MockNode[T, Constraint])(nil).ApplyConfChange), cc)
+}
+
+// GetPendingNonceByAccount mocks base method.
+func (m *MockNode[T, Constraint]) GetPendingNonceByAccount(account string) uint64 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPendingNonceByAccount", account)
+	ret0, _ := ret[0].(uint64)
+	return ret0
+}
+
+// GetPendingNonceByAccount indicates an expected call of GetPendingNonceByAccount.
+func (mr *MockNodeMockRecorder[T, Constraint]) GetPendingNonceByAccount(account interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPendingNonceByAccount", reflect.TypeOf((*MockNode[T, Constraint])(nil).GetPendingNonceByAccount), account)
+}
+
+// GetPendingTxByHash mocks base method.
+func (m *MockNode[T, Constraint]) GetPendingTxByHash(hash string) []byte {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPendingTxByHash", hash)
+	ret0, _ := ret[0].([]byte)
+	return ret0
+}
+
+// GetPendingTxByHash indicates an expected call of GetPendingTxByHash.
+func (mr *MockNodeMockRecorder[T, Constraint]) GetPendingTxByHash(hash interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPendingTxByHash", reflect.TypeOf((*MockNode[T, Constraint])(nil).GetPendingTxByHash), hash)
 }
 
 // GetUncommittedTransactions mocks base method.
-func (m *MockNode) GetUncommittedTransactions(maxsize uint64) [][]byte {
+func (m *MockNode[T, Constraint]) GetUncommittedTransactions(maxsize uint64) [][]byte {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetUncommittedTransactions", maxsize)
 	ret0, _ := ret[0].([][]byte)
@@ -58,13 +86,13 @@ func (m *MockNode) GetUncommittedTransactions(maxsize uint64) [][]byte {
 }
 
 // GetUncommittedTransactions indicates an expected call of GetUncommittedTransactions.
-func (mr *MockNodeMockRecorder) GetUncommittedTransactions(maxsize interface{}) *gomock.Call {
+func (mr *MockNodeMockRecorder[T, Constraint]) GetUncommittedTransactions(maxsize interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUncommittedTransactions", reflect.TypeOf((*MockNode)(nil).GetUncommittedTransactions), maxsize)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUncommittedTransactions", reflect.TypeOf((*MockNode[T, Constraint])(nil).GetUncommittedTransactions), maxsize)
 }
 
 // Propose mocks base method.
-func (m *MockNode) Propose(requests *consensus.RequestSet) error {
+func (m *MockNode[T, Constraint]) Propose(requests *consensus.RequestSet) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Propose", requests)
 	ret0, _ := ret[0].(error)
@@ -72,49 +100,49 @@ func (m *MockNode) Propose(requests *consensus.RequestSet) error {
 }
 
 // Propose indicates an expected call of Propose.
-func (mr *MockNodeMockRecorder) Propose(requests interface{}) *gomock.Call {
+func (mr *MockNodeMockRecorder[T, Constraint]) Propose(requests interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Propose", reflect.TypeOf((*MockNode)(nil).Propose), requests)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Propose", reflect.TypeOf((*MockNode[T, Constraint])(nil).Propose), requests)
 }
 
 // ReportExecuted mocks base method.
-func (m *MockNode) ReportExecuted(state *types.ServiceState) {
+func (m *MockNode[T, Constraint]) ReportExecuted(state *types.ServiceState) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "ReportExecuted", state)
 }
 
 // ReportExecuted indicates an expected call of ReportExecuted.
-func (mr *MockNodeMockRecorder) ReportExecuted(state interface{}) *gomock.Call {
+func (mr *MockNodeMockRecorder[T, Constraint]) ReportExecuted(state interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReportExecuted", reflect.TypeOf((*MockNode)(nil).ReportExecuted), state)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReportExecuted", reflect.TypeOf((*MockNode[T, Constraint])(nil).ReportExecuted), state)
 }
 
 // ReportStableCheckpointFinished mocks base method.
-func (m *MockNode) ReportStableCheckpointFinished(height uint64) {
+func (m *MockNode[T, Constraint]) ReportStableCheckpointFinished(height uint64) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "ReportStableCheckpointFinished", height)
 }
 
 // ReportStableCheckpointFinished indicates an expected call of ReportStableCheckpointFinished.
-func (mr *MockNodeMockRecorder) ReportStableCheckpointFinished(height interface{}) *gomock.Call {
+func (mr *MockNodeMockRecorder[T, Constraint]) ReportStableCheckpointFinished(height interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReportStableCheckpointFinished", reflect.TypeOf((*MockNode)(nil).ReportStableCheckpointFinished), height)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReportStableCheckpointFinished", reflect.TypeOf((*MockNode[T, Constraint])(nil).ReportStableCheckpointFinished), height)
 }
 
 // ReportStateUpdated mocks base method.
-func (m *MockNode) ReportStateUpdated(state *types.ServiceState) {
+func (m *MockNode[T, Constraint]) ReportStateUpdated(state *types.ServiceState) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "ReportStateUpdated", state)
 }
 
 // ReportStateUpdated indicates an expected call of ReportStateUpdated.
-func (mr *MockNodeMockRecorder) ReportStateUpdated(state interface{}) *gomock.Call {
+func (mr *MockNodeMockRecorder[T, Constraint]) ReportStateUpdated(state interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReportStateUpdated", reflect.TypeOf((*MockNode)(nil).ReportStateUpdated), state)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReportStateUpdated", reflect.TypeOf((*MockNode[T, Constraint])(nil).ReportStateUpdated), state)
 }
 
 // Start mocks base method.
-func (m *MockNode) Start() error {
+func (m *MockNode[T, Constraint]) Start() error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Start")
 	ret0, _ := ret[0].(error)
@@ -122,13 +150,13 @@ func (m *MockNode) Start() error {
 }
 
 // Start indicates an expected call of Start.
-func (mr *MockNodeMockRecorder) Start() *gomock.Call {
+func (mr *MockNodeMockRecorder[T, Constraint]) Start() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Start", reflect.TypeOf((*MockNode)(nil).Start))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Start", reflect.TypeOf((*MockNode[T, Constraint])(nil).Start))
 }
 
 // Status mocks base method.
-func (m *MockNode) Status() rbft.NodeStatus {
+func (m *MockNode[T, Constraint]) Status() rbft.NodeStatus {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Status")
 	ret0, _ := ret[0].(rbft.NodeStatus)
@@ -136,25 +164,25 @@ func (m *MockNode) Status() rbft.NodeStatus {
 }
 
 // Status indicates an expected call of Status.
-func (mr *MockNodeMockRecorder) Status() *gomock.Call {
+func (mr *MockNodeMockRecorder[T, Constraint]) Status() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Status", reflect.TypeOf((*MockNode)(nil).Status))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Status", reflect.TypeOf((*MockNode[T, Constraint])(nil).Status))
 }
 
 // Step mocks base method.
-func (m *MockNode) Step(ctx context.Context, msg *consensus.ConsensusMessage) {
+func (m *MockNode[T, Constraint]) Step(ctx context.Context, msg *consensus.ConsensusMessage) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "Step", ctx, msg)
 }
 
 // Step indicates an expected call of Step.
-func (mr *MockNodeMockRecorder) Step(ctx, msg interface{}) *gomock.Call {
+func (mr *MockNodeMockRecorder[T, Constraint]) Step(ctx, msg interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Step", reflect.TypeOf((*MockNode)(nil).Step), ctx, msg)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Step", reflect.TypeOf((*MockNode[T, Constraint])(nil).Step), ctx, msg)
 }
 
 // Stop mocks base method.
-func (m *MockNode) Stop() [][]byte {
+func (m *MockNode[T, Constraint]) Stop() [][]byte {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Stop")
 	ret0, _ := ret[0].([][]byte)
@@ -162,9 +190,60 @@ func (m *MockNode) Stop() [][]byte {
 }
 
 // Stop indicates an expected call of Stop.
-func (mr *MockNodeMockRecorder) Stop() *gomock.Call {
+func (mr *MockNodeMockRecorder[T, Constraint]) Stop() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Stop", reflect.TypeOf((*MockNode)(nil).Stop))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Stop", reflect.TypeOf((*MockNode[T, Constraint])(nil).Stop))
+}
+
+// MockExternal is a mock of External interface.
+type MockExternal struct {
+	ctrl     *gomock.Controller
+	recorder *MockExternalMockRecorder
+}
+
+// MockExternalMockRecorder is the mock recorder for MockExternal.
+type MockExternalMockRecorder struct {
+	mock *MockExternal
+}
+
+// NewMockExternal creates a new mock instance.
+func NewMockExternal(ctrl *gomock.Controller) *MockExternal {
+	mock := &MockExternal{ctrl: ctrl}
+	mock.recorder = &MockExternalMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockExternal) EXPECT() *MockExternalMockRecorder {
+	return m.recorder
+}
+
+// GetPendingNonceByAccount mocks base method.
+func (m *MockExternal) GetPendingNonceByAccount(account string) uint64 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPendingNonceByAccount", account)
+	ret0, _ := ret[0].(uint64)
+	return ret0
+}
+
+// GetPendingNonceByAccount indicates an expected call of GetPendingNonceByAccount.
+func (mr *MockExternalMockRecorder) GetPendingNonceByAccount(account interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPendingNonceByAccount", reflect.TypeOf((*MockExternal)(nil).GetPendingNonceByAccount), account)
+}
+
+// GetPendingTxByHash mocks base method.
+func (m *MockExternal) GetPendingTxByHash(hash string) []byte {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPendingTxByHash", hash)
+	ret0, _ := ret[0].([]byte)
+	return ret0
+}
+
+// GetPendingTxByHash indicates an expected call of GetPendingTxByHash.
+func (mr *MockExternalMockRecorder) GetPendingTxByHash(hash interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPendingTxByHash", reflect.TypeOf((*MockExternal)(nil).GetPendingTxByHash), hash)
 }
 
 // MockServiceInbound is a mock of ServiceInbound interface.

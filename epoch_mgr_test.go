@@ -11,7 +11,7 @@ import (
 
 func TestEpoch_fetchCheckpoint_and_recv(t *testing.T) {
 
-	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 
 	rbfts[0].epochMgr.configBatchToCheck = &types.MetaState{
 		Height: 10,
@@ -29,7 +29,7 @@ func TestEpoch_fetchCheckpoint_and_recv(t *testing.T) {
 
 func TestEpoch_recvFetchCheckpoint_SendBackNormal(t *testing.T) {
 
-	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 	fetch := &consensus.FetchCheckpoint{
 		ReplicaId:      2,
 		SequenceNumber: uint64(12),
@@ -53,7 +53,7 @@ func TestEpoch_recvFetchCheckpoint_SendBackNormal(t *testing.T) {
 
 func TestEpoch_recvFetchCheckpoint_SendBackStableCheckpoint(t *testing.T) {
 
-	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 	fetch := &consensus.FetchCheckpoint{
 		ReplicaId:      2,
 		SequenceNumber: uint64(12),

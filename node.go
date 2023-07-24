@@ -41,6 +41,16 @@ type Node[T any, Constraint consensus.TXConstraint[T]] interface {
 	GetUncommittedTransactions(maxsize uint64) [][]byte
 	// ServiceInbound receives and records modifications from application service.
 	ServiceInbound
+
+	External
+}
+
+type External interface {
+	// GetPendingNonceByAccount will return the latest pending nonce of a given account
+	GetPendingNonceByAccount(account string) uint64
+
+	// GetPendingTxByHash will return the tx by tx hash
+	GetPendingTxByHash(hash string) []byte
 }
 
 // ServiceInbound receives and records modifications from application service which includes two events:
@@ -216,4 +226,24 @@ func (n *node[T, Constraint]) getCurrentState() *types.ServiceState {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
 	return n.currentState
+}
+
+// GetPendingNonceByAccount returns pendingNonce by given account.
+func (n *node[T, Constraint]) GetPendingNonceByAccount(account string) uint64 {
+	pendingNonce := n.rbft.batchMgr.requestPool.GetPendingNonceByAccount(account)
+	return pendingNonce
+}
+
+func (n *node[T, Constraint]) GetPendingTxByHash(hash string) []byte {
+	getTxReq := &TxReqMsg{
+		hash: hash,
+		ch:   make(chan []byte),
+	}
+	localEvent := &MiscEvent{
+		EventType: ReqTxEvent,
+		Event:     getTxReq,
+	}
+	n.rbft.postMsg(localEvent)
+
+	return <-getTxReq.ch
 }

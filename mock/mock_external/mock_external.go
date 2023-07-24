@@ -8,9 +8,9 @@ import (
 	context "context"
 	reflect "reflect"
 
-	gomock "github.com/golang/mock/gomock"
-	"github.com/axiomesh/axiom-bft/common/consensus"
+	consensus "github.com/axiomesh/axiom-bft/common/consensus"
 	types "github.com/axiomesh/axiom-bft/types"
+	gomock "github.com/golang/mock/gomock"
 )
 
 // MockStorage is a mock of Storage interface.

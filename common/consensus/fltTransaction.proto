@@ -7,7 +7,7 @@ package consensus;
 
 import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 
-message Transaction {
+message FltTransaction {
   option (gogoproto.goproto_getters) = false;
   bytes version = 1;
 	bytes from = 2;
@@ -40,7 +40,7 @@ message Participant {
 }
 
 message InvalidTransactionRecord {
-    Transaction tx = 1;
+    FltTransaction tx = 1;
     ErrType errType = 2;
     enum ErrType {
         OUTOFBALANCE = 0;

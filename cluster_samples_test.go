@@ -9,8 +9,8 @@ import (
 
 func TestCluster_SendTx_InitCtx(t *testing.T) {
 
-	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
-	unlockCluster[consensus.Transaction](rbfts)
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	unlockCluster[consensus.FltTransaction](rbfts)
 
 	assert.Equal(t, rbfts[0].h, uint64(0))
 	assert.Equal(t, rbfts[1].h, uint64(0))
@@ -55,7 +55,7 @@ func TestCluster_SendTx_InitCtx(t *testing.T) {
 
 func TestCluster_SyncEpochThenSyncBlockWithCheckpoint(t *testing.T) {
 
-	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 	unlockCluster(rbfts)
 
 	ctx := newCTX(defaultValidatorSet)
@@ -148,8 +148,7 @@ func TestCluster_SyncEpochThenSyncBlockWithCheckpoint(t *testing.T) {
 }
 
 func TestCluster_SyncBlockThenSyncEpochWithCheckpoint(t *testing.T) {
-
-	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 	unlockCluster(rbfts)
 
 	// normal nodes execute normal txs to height 50.

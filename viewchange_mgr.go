@@ -23,8 +23,8 @@ import (
 
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/common/metrics"
+	"github.com/axiomesh/axiom-bft/mempool"
 
-	"github.com/axiomesh/axiom-bft/txpool"
 	"github.com/axiomesh/axiom-bft/types"
 
 	"github.com/gogo/protobuf/proto"
@@ -294,7 +294,7 @@ func (rbft *rbftImpl[T, Constraint]) recvViewChange(vc *consensus.ViewChange, vc
 		}
 	}
 
-	vc.Timestamp = time.Now().UnixNano()
+	vc.Timestamp = time.Now().Unix()
 	// store vc to viewChangeStore
 	rbft.vcMgr.viewChangeStore[vcIdx{v: targetView, id: remoteReplicaID}] = vc
 
@@ -311,7 +311,7 @@ func (rbft *rbftImpl[T, Constraint]) recvViewChange(vc *consensus.ViewChange, vc
 	replicas := make(map[uint64]bool)
 	minView := uint64(0)
 	for idx, remoteVC := range rbft.vcMgr.viewChangeStore {
-		if remoteVC.Timestamp+int64(rbft.timerMgr.getTimeoutValue(cleanViewChangeTimer)) < time.Now().UnixNano() {
+		if remoteVC.Timestamp+int64(rbft.timerMgr.getTimeoutValue(cleanViewChangeTimer)) < time.Now().Unix() {
 			rbft.logger.Debugf("Replica %d drop an out-of-time viewChange message from replica %d",
 				rbft.peerPool.ID, idx.id)
 			delete(rbft.vcMgr.viewChangeStore, idx)
@@ -1574,7 +1574,7 @@ func (rbft *rbftImpl[T, Constraint]) processNewView(msgList []*consensus.Vc_PQ) 
 
 			// re-construct batches by order in xSet to de-duplicate txs during different batches in msgList which
 			// may be caused by different primary puts the same txs into different batches with different seqNo'
-			oldBatch := &txpool.RequestHashBatch[T, Constraint]{
+			oldBatch := &mempool.RequestHashBatch[T, Constraint]{
 				BatchHash:  batch.BatchHash,
 				TxHashList: batch.RequestHashList,
 				TxList:     batch.RequestList,
@@ -1597,7 +1597,7 @@ func (rbft *rbftImpl[T, Constraint]) processNewView(msgList []*consensus.Vc_PQ) 
 		cert.prePrepareCtx = context.Background()
 		rbft.persistQSet(prePrep)
 		if metrics.EnableExpensive() {
-			cert.prePreparedTime = time.Now().UnixNano()
+			cert.prePreparedTime = time.Now().Unix()
 			duration := time.Duration(cert.prePreparedTime - prePrep.HashBatch.Timestamp).Seconds()
 			rbft.metrics.batchToPrePrepared.Observe(duration)
 		}

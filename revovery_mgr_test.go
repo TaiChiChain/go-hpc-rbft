@@ -10,7 +10,7 @@ import (
 )
 
 func TestRecovery_ClusterInitRecovery(t *testing.T) {
-	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 	unlockCluster(rbfts)
 	clusterInitRecovery(t, nodes, rbfts, -1)
 
@@ -21,7 +21,7 @@ func TestRecovery_ClusterInitRecovery(t *testing.T) {
 
 func TestRecovery_ReplicaSingleRecovery(t *testing.T) {
 
-	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 	unlockCluster(rbfts)
 	clusterInitRecovery(t, nodes, rbfts, 3)
 
@@ -87,7 +87,7 @@ func TestRecovery_ReplicaSingleRecovery(t *testing.T) {
 
 func TestRecovery_Disconnect_ClusterRecovery(t *testing.T) {
 
-	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 	unlockCluster(rbfts)
 	// init recovery to stable view 1, primary is node2
 	clusterInitRecovery(t, nodes, rbfts, -1)
@@ -190,7 +190,7 @@ func TestRecovery_Disconnect_ClusterRecovery(t *testing.T) {
 
 func TestRecovery_PrimaryRecovery(t *testing.T) {
 
-	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 	unlockCluster(rbfts)
 	clusterInitRecovery(t, nodes, rbfts, -1)
 
@@ -214,11 +214,11 @@ func TestRecovery_PrimaryRecovery(t *testing.T) {
 
 func TestRecovery_NormalCheckpointFailing_Recovery(t *testing.T) {
 
-	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 	unlockCluster(rbfts)
 	clusterInitRecovery(t, nodes, rbfts, -1)
 
-	txSet := make([]*consensus.Transaction, 13)
+	txSet := make([]*consensus.FltTransaction, 13)
 	for index := 0; index < 13; index++ {
 		txSet[index] = newTx()
 	}
@@ -304,7 +304,7 @@ func TestRecovery_NormalCheckpointFailing_Recovery(t *testing.T) {
 
 func TestRecovery_SyncStateToStateUpdate(t *testing.T) {
 
-	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 	unlockCluster(rbfts)
 
 	tx := newTx()
@@ -348,7 +348,7 @@ func TestRecovery_SyncStateToStateUpdate(t *testing.T) {
 
 func TestRecovery_ReplicaSyncStateToRecovery(t *testing.T) {
 
-	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 	unlockCluster(rbfts)
 
 	tx := newTx()
@@ -380,7 +380,7 @@ func TestRecovery_ReplicaSyncStateToRecovery(t *testing.T) {
 
 func TestRecovery_PrimarySyncStateToRecovery(t *testing.T) {
 
-	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 	unlockCluster(rbfts)
 
 	tx := newTx()

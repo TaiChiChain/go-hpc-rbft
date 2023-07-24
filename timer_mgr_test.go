@@ -7,8 +7,8 @@ import (
 
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/common/metrics/disabled"
+	mempoolmock "github.com/axiomesh/axiom-bft/mempool/mock"
 	mockexternal "github.com/axiomesh/axiom-bft/mock/mock_external"
-	txpoolmock "github.com/axiomesh/axiom-bft/txpool/mock"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
@@ -17,7 +17,7 @@ import (
 func newTestTimerMgr[T any, Constraint consensus.TXConstraint[T]](ctrl *gomock.Controller) *timerManager {
 	log := newRawLogger()
 	external := mockexternal.NewMockMinimalExternal[T, Constraint](ctrl)
-	tx := txpoolmock.NewMockMinimalTxPool[T, Constraint](ctrl)
+	tx := mempoolmock.NewMockMinimalMemPool[T, Constraint](ctrl)
 	conf := Config[T, Constraint]{
 		ID:            1,
 		Peers:         peerSet,
@@ -71,7 +71,7 @@ func TestTimerMgr_stopTimer(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	//defer ctrl.Finish()
 
-	timeMgr := newTestTimerMgr[consensus.Transaction](ctrl)
+	timeMgr := newTestTimerMgr[consensus.FltTransaction](ctrl)
 
 	tt := titleTimer{
 		timerName: "test timer",
@@ -92,7 +92,7 @@ func TestTimerMgr_stopOneTimer(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	//defer ctrl.Finish()
 
-	timeMgr := newTestTimerMgr[consensus.Transaction](ctrl)
+	timeMgr := newTestTimerMgr[consensus.FltTransaction](ctrl)
 
 	tt := titleTimer{
 		timerName: "test timer",
@@ -114,7 +114,7 @@ func TestTimerMgr_getTimeoutValue(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	//defer ctrl.Finish()
 
-	timeMgr := newTestTimerMgr[consensus.Transaction](ctrl)
+	timeMgr := newTestTimerMgr[consensus.FltTransaction](ctrl)
 
 	tt := titleTimer{
 		timerName: "test timer",
@@ -133,7 +133,7 @@ func TestTimerMgr_setTimeoutValue(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	//defer ctrl.Finish()
 
-	timeMgr := newTestTimerMgr[consensus.Transaction](ctrl)
+	timeMgr := newTestTimerMgr[consensus.FltTransaction](ctrl)
 
 	tt := titleTimer{
 		timerName: "test timer",
@@ -154,7 +154,7 @@ func TestTimerMgr_makeNullRequestTimeoutLegal(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	//defer ctrl.Finish()
 
-	timeMgr := newTestTimerMgr[consensus.Transaction](ctrl)
+	timeMgr := newTestTimerMgr[consensus.FltTransaction](ctrl)
 
 	tt := titleTimer{
 		timerName: "test timer",
@@ -174,7 +174,7 @@ func TestTimerMgr_makeCleanVcTimeoutLegal(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	//defer ctrl.Finish()
 
-	timeMgr := newTestTimerMgr[consensus.Transaction](ctrl)
+	timeMgr := newTestTimerMgr[consensus.FltTransaction](ctrl)
 
 	tt := titleTimer{
 		timerName: "test timer",
@@ -194,7 +194,7 @@ func TestTimerMgr_makeSyncStateTimeoutLegal(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	//defer ctrl.Finish()
 
-	timeMgr := newTestTimerMgr[consensus.Transaction](ctrl)
+	timeMgr := newTestTimerMgr[consensus.FltTransaction](ctrl)
 
 	tt := titleTimer{
 		timerName: "test timer",
@@ -214,7 +214,7 @@ func TestTimerMgr_newTimer(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	//defer ctrl.Finish()
 
-	timeMgr := newTestTimerMgr[consensus.Transaction](ctrl)
+	timeMgr := newTestTimerMgr[consensus.FltTransaction](ctrl)
 
 	timeMgr.newTimer(requestTimer, 0)
 	timeMgr.newTimer(batchTimer, 0)

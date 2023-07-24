@@ -39,6 +39,8 @@ const (
 	fetchCheckpointTimer  = "fetchCheckpointTimer"  // timer for nodes to trigger fetch checkpoint when we are processing config transaction
 	highWatermarkTimer    = "highWatermarkTimer"    // timer for nodes to find the problem of missing too much checkpoint
 	fetchViewTimer        = "fetchViewTimer"        // timer for nodes to fetch view periodically
+	checkPoolRemoveTimer  = "checkPoolRemoveTimer"  // timer track timeout for check pool which need remove txs
+	noTxBatchTimer        = "noTxBatchTimer"        // timer for primary triggering package a batch which no transaction to send pre-prepare
 )
 
 // constant default
@@ -46,6 +48,7 @@ const (
 	// default timer timeout value
 	DefaultRequestTimeout          = 6 * time.Second
 	DefaultBatchTimeout            = 500 * time.Millisecond
+	DefaultNoTxBatchTimeout        = 2 * time.Second
 	DefaultVcResendTimeout         = 10 * time.Second
 	DefaultNewViewTimeout          = 8 * time.Second
 	DefaultNullRequestTimeout      = 9 * time.Second
@@ -68,6 +71,8 @@ const (
 	CoreCheckPoolTimerEvent
 	CoreStateUpdatedEvent
 	CoreHighWatermarkEvent
+	CoreCheckPoolRemoveTimerEvent
+	CoreNoTxBatchTimerEvent
 
 	// 2.view change
 	ViewChangeTimerEvent
@@ -165,3 +170,16 @@ type vcIdx struct {
 }
 
 type nextDemandNewView uint64
+
+const ReqTxEvent = iota
+
+// MiscEvent represents misc event sent by local modules
+type MiscEvent struct {
+	EventType int // current only ReqTxEvent
+	Event     interface{}
+}
+
+type TxReqMsg struct {
+	hash string
+	ch   chan []byte
+}

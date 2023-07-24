@@ -9,9 +9,8 @@ import (
 
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/common/metrics/disabled"
+	mempoolmock "github.com/axiomesh/axiom-bft/mempool/mock"
 	mockexternal "github.com/axiomesh/axiom-bft/mock/mock_external"
-
-	txpoolmock "github.com/axiomesh/axiom-bft/txpool/mock"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/golang/mock/gomock"
@@ -19,7 +18,7 @@ import (
 )
 
 func newPersistTestReplica[T any, Constraint consensus.TXConstraint[T]](ctrl *gomock.Controller) (*node[T, Constraint], *mockexternal.MockExternalStack[T, Constraint]) {
-	pool := txpoolmock.NewMockMinimalTxPool[T, Constraint](ctrl)
+	pool := mempoolmock.NewMockMinimalMemPool[T, Constraint](ctrl)
 	log := newRawLogger()
 	ext := mockexternal.NewMockExternalStack[T, Constraint](ctrl)
 	ext.EXPECT().Sign(gomock.Any()).Return([]byte("sig"), nil).AnyTimes()
@@ -61,7 +60,7 @@ func TestPersist_restoreView(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	//defer ctrl.Finish()
 
-	node, ext := newPersistTestReplica[consensus.Transaction](ctrl)
+	node, ext := newPersistTestReplica[consensus.FltTransaction](ctrl)
 	ext.EXPECT().ReadState("new-view").Return(nil, errors.New("err"))
 	node.rbft.restoreView()
 	assert.Equal(t, uint64(0), node.rbft.view)
@@ -79,7 +78,7 @@ func TestPersist_restoreView(t *testing.T) {
 func TestPersist_restoreQList(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	//defer ctrl.Finish()
-	node, ext := newPersistTestReplica[consensus.Transaction](ctrl)
+	node, ext := newPersistTestReplica[consensus.FltTransaction](ctrl)
 
 	var ret map[string][]byte
 	var err error
@@ -113,7 +112,7 @@ func TestPersist_restoreQList(t *testing.T) {
 func TestPersist_restorePList(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	//defer ctrl.Finish()
-	node, ext := newPersistTestReplica[consensus.Transaction](ctrl)
+	node, ext := newPersistTestReplica[consensus.FltTransaction](ctrl)
 
 	var ret map[string][]byte
 	var err error
@@ -143,7 +142,7 @@ func TestPersist_restoreBatchStore(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	//defer ctrl.Finish()
 
-	node, ext := newPersistTestReplica[consensus.Transaction](ctrl)
+	node, ext := newPersistTestReplica[consensus.FltTransaction](ctrl)
 
 	var ret map[string][]byte
 	ret = map[string][]byte{"batch.msg": {24, 10}}
@@ -157,7 +156,7 @@ func TestPersist_restoreQSet(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	//defer ctrl.Finish()
 
-	node, ext := newPersistTestReplica[consensus.Transaction](ctrl)
+	node, ext := newPersistTestReplica[consensus.FltTransaction](ctrl)
 
 	q := &consensus.PrePrepare{
 		ReplicaId:      1,
@@ -182,7 +181,7 @@ func TestPersist_restorePSet(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	//defer ctrl.Finish()
 
-	node, ext := newPersistTestReplica[consensus.Transaction](ctrl)
+	node, ext := newPersistTestReplica[consensus.FltTransaction](ctrl)
 
 	p := &consensus.Prepare{
 		ReplicaId:      1,
@@ -207,7 +206,7 @@ func TestPersist_restoreCSet(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	//defer ctrl.Finish()
 
-	node, ext := newPersistTestReplica[consensus.Transaction](ctrl)
+	node, ext := newPersistTestReplica[consensus.FltTransaction](ctrl)
 
 	c := &consensus.Commit{
 		ReplicaId:      1,
@@ -231,7 +230,7 @@ func TestPersist_restoreCSet(t *testing.T) {
 func TestPersist_restoreCert(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	//defer ctrl.Finish()
-	node, ext := newPersistTestReplica[consensus.Transaction](ctrl)
+	node, ext := newPersistTestReplica[consensus.FltTransaction](ctrl)
 
 	q := &consensus.PrePrepare{
 		ReplicaId:      1,
@@ -285,7 +284,7 @@ func TestPersist_restoreState(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	//defer ctrl.Finish()
 
-	node, ext := newPersistTestReplica[consensus.Transaction](ctrl)
+	node, ext := newPersistTestReplica[consensus.FltTransaction](ctrl)
 
 	var ret map[string][]byte
 	ret = map[string][]byte{
@@ -328,7 +327,7 @@ func TestPersist_restoreState(t *testing.T) {
 
 func TestPersist_parseQPCKey(t *testing.T) {
 
-	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 	var u1, u2 uint64
 	var str string
 	var err error
