@@ -3,7 +3,7 @@ package rbft
 import (
 	"testing"
 
-	"github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
+	"github.com/hyperchain/go-hpc-rbft/common/consensus"
 	"github.com/stretchr/testify/assert"
 )
 

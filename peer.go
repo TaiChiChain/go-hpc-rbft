@@ -17,9 +17,9 @@ package rbft
 import (
 	"context"
 
-	"github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
-	"github.com/hyperchain/go-hpc-rbft/v2/external"
-	"github.com/hyperchain/go-hpc-rbft/v2/types"
+	"github.com/hyperchain/go-hpc-rbft/common/consensus"
+	"github.com/hyperchain/go-hpc-rbft/external"
+	"github.com/hyperchain/go-hpc-rbft/types"
 )
 
 // peerPool maintains local peer ID which is the unique peer through the consensus network.

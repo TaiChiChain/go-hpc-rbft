@@ -1,7 +1,7 @@
 package txpool
 
 import (
-	"github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
+	"github.com/hyperchain/go-hpc-rbft/common/consensus"
 )
 
 // CheckRequestHashBatch provide methods for batch type

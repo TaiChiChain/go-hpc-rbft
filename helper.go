@@ -22,8 +22,8 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
-	"github.com/hyperchain/go-hpc-rbft/v2/types"
+	"github.com/hyperchain/go-hpc-rbft/common/consensus"
+	"github.com/hyperchain/go-hpc-rbft/types"
 
 	"github.com/gogo/protobuf/proto"
 	"golang.org/x/crypto/sha3"

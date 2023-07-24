@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	fLogger "github.com/hyperchain/go-hpc-rbft/v2/common/fancylogger"
+	fLogger "github.com/hyperchain/go-hpc-rbft/common/fancylogger"
 
 	"github.com/stretchr/testify/assert"
 )
