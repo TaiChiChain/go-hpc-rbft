@@ -19,7 +19,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
+	"github.com/hyperchain/go-hpc-rbft/common/consensus"
 )
 
 // titleTimer manages timer with the same timer name, which, we allow different timer with the same timer name, such as:

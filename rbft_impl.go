@@ -21,11 +21,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
-	"github.com/hyperchain/go-hpc-rbft/v2/common/metrics"
-	"github.com/hyperchain/go-hpc-rbft/v2/external"
-	"github.com/hyperchain/go-hpc-rbft/v2/txpool"
-	"github.com/hyperchain/go-hpc-rbft/v2/types"
+	"github.com/hyperchain/go-hpc-rbft/common/consensus"
+	"github.com/hyperchain/go-hpc-rbft/common/metrics"
+	"github.com/hyperchain/go-hpc-rbft/external"
+	"github.com/hyperchain/go-hpc-rbft/txpool"
+	"github.com/hyperchain/go-hpc-rbft/types"
 
 	"github.com/gogo/protobuf/proto"
 	"go.opentelemetry.io/otel/attribute"

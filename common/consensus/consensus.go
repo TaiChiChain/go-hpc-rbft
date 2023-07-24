@@ -1,14 +1,12 @@
 package consensus
 
-import "github.com/meshplus/bitxhub-model/pb"
-
 // TXConstraint is used to ensure that the pointer of T must be RbftTransaction
 type TXConstraint[T any] interface {
 	*T
-	pb.RbftTransaction
+	RbftTransaction
 }
 
-type Transactions = []pb.RbftTransaction
+type Transactions = []RbftTransaction
 
 func DecodeTx[T any, Constraint TXConstraint[T]](raw []byte) (*T, error) {
 	var t T

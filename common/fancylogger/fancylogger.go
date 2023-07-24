@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hyperchain/go-hpc-rbft/v2/common/consensus"
+	"github.com/hyperchain/go-hpc-rbft/common/consensus"
 )
 
 const callDepthOffset = 3
