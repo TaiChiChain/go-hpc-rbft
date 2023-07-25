@@ -130,6 +130,7 @@ buildNumber.properties
 *ear
 a
 *.so
+coverage.txt
 
 # gitkeep
 !.gitkeep
