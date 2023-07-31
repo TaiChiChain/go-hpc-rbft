@@ -8,8 +8,8 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	"github.com/hyperchain/go-hpc-rbft/common/consensus"
-	"github.com/hyperchain/go-hpc-rbft/txpool"
+	"github.com/axiomesh/axiom-bft/common/consensus"
+	"github.com/axiomesh/axiom-bft/txpool"
 )
 
 // MockchainSupport is a mock of chainSupport interface.

@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/hyperchain/go-hpc-rbft/common/consensus"
+	"github.com/axiomesh/axiom-bft/common/consensus"
 )
 
 func TestTrace(t *testing.T) {

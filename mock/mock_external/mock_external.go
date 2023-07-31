@@ -9,8 +9,8 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	"github.com/hyperchain/go-hpc-rbft/common/consensus"
-	types "github.com/hyperchain/go-hpc-rbft/types"
+	"github.com/axiomesh/axiom-bft/common/consensus"
+	types "github.com/axiomesh/axiom-bft/types"
 )
 
 // MockStorage is a mock of Storage interface.

@@ -1,5 +1,5 @@
 #!/bin/bash
-cd $GOPATH/src/github.com/hyperchain/go-hpc-rbft
+cd $GOPATH/src/github.com/axiomesh/axiom-bft
 
 st=0
 counter=0

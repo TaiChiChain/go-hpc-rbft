@@ -1,7 +1,7 @@
 package rbft
 
 import (
-	"github.com/hyperchain/go-hpc-rbft/common/metrics"
+	"github.com/axiomesh/axiom-bft/common/metrics"
 )
 
 // rbftMetrics helps collect all metrics in rbft

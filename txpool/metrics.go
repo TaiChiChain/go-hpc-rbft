@@ -1,7 +1,7 @@
 package txpool
 
 import (
-	"github.com/hyperchain/go-hpc-rbft/common/metrics"
+	"github.com/axiomesh/axiom-bft/common/metrics"
 )
 
 // txPoolMetrics defines all metrics needed to be collected in txpool.

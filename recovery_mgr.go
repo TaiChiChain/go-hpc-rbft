@@ -17,8 +17,8 @@ package rbft
 import (
 	"context"
 
+	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/gogo/protobuf/proto"
-	"github.com/hyperchain/go-hpc-rbft/common/consensus"
 )
 
 /**

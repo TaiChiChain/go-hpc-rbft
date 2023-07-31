@@ -20,9 +20,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hyperchain/go-hpc-rbft/common/consensus"
-	"github.com/hyperchain/go-hpc-rbft/common/fancylogger"
-	"github.com/hyperchain/go-hpc-rbft/common/metrics/disabled"
+	"github.com/axiomesh/axiom-bft/common/consensus"
+	"github.com/axiomesh/axiom-bft/common/fancylogger"
+	"github.com/axiomesh/axiom-bft/common/metrics/disabled"
 	"github.com/stretchr/testify/assert"
 )
 

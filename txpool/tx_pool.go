@@ -21,8 +21,8 @@ import (
 	"encoding/hex"
 	"time"
 
-	"github.com/hyperchain/go-hpc-rbft/common/consensus"
-	"github.com/hyperchain/go-hpc-rbft/common/metrics"
+	"github.com/axiomesh/axiom-bft/common/consensus"
+	"github.com/axiomesh/axiom-bft/common/metrics"
 )
 
 const (

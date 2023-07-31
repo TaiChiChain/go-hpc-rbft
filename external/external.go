@@ -17,8 +17,8 @@ package external
 import (
 	"context"
 
-	"github.com/hyperchain/go-hpc-rbft/common/consensus"
-	"github.com/hyperchain/go-hpc-rbft/types"
+	"github.com/axiomesh/axiom-bft/common/consensus"
+	"github.com/axiomesh/axiom-bft/types"
 )
 
 // Storage is an interface that should be implemented by the application using non-volatile

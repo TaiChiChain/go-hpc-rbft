@@ -15,7 +15,7 @@
 package disabled
 
 import (
-	"github.com/hyperchain/go-hpc-rbft/common/metrics"
+	"github.com/axiomesh/axiom-bft/common/metrics"
 )
 
 // Provider is the NIL implementation instance.
