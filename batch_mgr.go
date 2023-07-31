@@ -18,8 +18,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/hyperchain/go-hpc-rbft/common/consensus"
-	"github.com/hyperchain/go-hpc-rbft/txpool"
+	"github.com/axiomesh/axiom-bft/common/consensus"
+	"github.com/axiomesh/axiom-bft/txpool"
 )
 
 // batchManager manages basic batch issues, including:

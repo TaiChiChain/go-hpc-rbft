@@ -9,9 +9,9 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	rbft "github.com/hyperchain/go-hpc-rbft"
-	"github.com/hyperchain/go-hpc-rbft/common/consensus"
-	types "github.com/hyperchain/go-hpc-rbft/types"
+	rbft "github.com/axiomesh/axiom-bft"
+	"github.com/axiomesh/axiom-bft/common/consensus"
+	types "github.com/axiomesh/axiom-bft/types"
 )
 
 // MockNode is a mock of Node interface.

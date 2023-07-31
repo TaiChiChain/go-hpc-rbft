@@ -17,7 +17,7 @@ package prometheus
 import (
 	"strings"
 
-	"github.com/hyperchain/go-hpc-rbft/common/metrics"
+	"github.com/axiomesh/axiom-bft/common/metrics"
 	prom "github.com/prometheus/client_golang/prometheus"
 	promHttp "github.com/prometheus/client_golang/prometheus/promhttp"
 )

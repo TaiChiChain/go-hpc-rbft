@@ -6,11 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hyperchain/go-hpc-rbft/common/consensus"
-	"github.com/hyperchain/go-hpc-rbft/common/metrics/disabled"
-	mockexternal "github.com/hyperchain/go-hpc-rbft/mock/mock_external"
-	txpoolmock "github.com/hyperchain/go-hpc-rbft/txpool/mock"
-	"github.com/hyperchain/go-hpc-rbft/types"
+	"github.com/axiomesh/axiom-bft/common/consensus"
+	"github.com/axiomesh/axiom-bft/common/metrics/disabled"
+	mockexternal "github.com/axiomesh/axiom-bft/mock/mock_external"
+	txpoolmock "github.com/axiomesh/axiom-bft/txpool/mock"
+	"github.com/axiomesh/axiom-bft/types"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"

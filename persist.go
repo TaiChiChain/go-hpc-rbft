@@ -23,8 +23,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hyperchain/go-hpc-rbft/common/consensus"
-	"github.com/hyperchain/go-hpc-rbft/types"
+	"github.com/axiomesh/axiom-bft/common/consensus"
+	"github.com/axiomesh/axiom-bft/types"
 
 	"github.com/gogo/protobuf/proto"
 )

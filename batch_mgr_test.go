@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hyperchain/go-hpc-rbft/common/consensus"
+	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/stretchr/testify/assert"
 )
 

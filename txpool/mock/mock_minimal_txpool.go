@@ -1,8 +1,8 @@
 package txpoolmock
 
 import (
+	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/golang/mock/gomock"
-	"github.com/hyperchain/go-hpc-rbft/common/consensus"
 )
 
 // NewMockMinimalTxPool returns a minimal implement of MockTxPool which accepts

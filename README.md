@@ -1,19 +1,22 @@
-Go-HPC-RBFT
+Axiom-BFT
+
 ======
 
-> RBFT service in go.
+> axiom BFT consensus based on rbft .
 
 ## Table of Contents
 
+- [Table of Contents](#table-of-contents)
 - [Usage](#usage)
 - [API](#api)
+  - [Node](#node)
 - [Mockgen](#mockgen)
 - [GitCZ](#gitcz)
 - [Contribute](#contribute)
 - [License](#license)
 
 ## Usage
-go-hpc-rbft provides RBFT service.
+axiom-bft provides BFT service based on rbft.
 
 You can initialize a RBFT service by: 
 ```
@@ -50,8 +53,8 @@ For more information about the service above, you can catch them from file `exte
 ## API
 ### Node
 import (
-    pb "github.com/hyperchain/go-hpc-rbft/rbftpb"
-    "github.com/hyperchain/go-hpc-rbft/types"
+    pb "github.com/axiomesh/axiom-bft/rbftpb"
+    "github.com/axiomesh/axiom-bft/types"
 )
 
 Instantiate Node
@@ -90,15 +93,6 @@ Report Config Checkpoint Process Finished to RBFT Core
 ## Mockgen
 
 Install **mockgen** : `go get github.com/golang/mock/mockgen`
-
-How to use?
-
-- source： 指定接口文件
-- destination: 生成的文件名
-- package:生成文件的包名
-- imports: 依赖的需要import的包
-- aux_files:接口文件不止一个文件时附加文件
-- build_flags: 传递给build工具的参数
 
 Eg.`mockgen -destination mock/mock_common.go -package common -source consensus.go`
 

@@ -1,7 +1,7 @@
 package txpool
 
 import (
-	"github.com/hyperchain/go-hpc-rbft/common/consensus"
+	"github.com/axiomesh/axiom-bft/common/consensus"
 )
 
 // CheckRequestHashBatch provide methods for batch type
