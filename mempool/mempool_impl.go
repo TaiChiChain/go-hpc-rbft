@@ -862,7 +862,7 @@ func (mpi *mempoolImpl[T, Constraint]) generateRequestBatch() ([]*RequestHashBat
 	}
 	result := make([]txnPointer, 0, mpi.batchSize)
 	// txs has lower nonce will be observed first in priority index iterator.
-	mpi.logger.Infof("Length of non-batched transactions: %d", mpi.txStore.priorityNonBatchSize)
+	mpi.logger.Debugf("Length of non-batched transactions: %d", mpi.txStore.priorityNonBatchSize)
 	var batchSize uint64
 	if mpi.txStore.priorityNonBatchSize > mpi.batchSize {
 		batchSize = mpi.batchSize
