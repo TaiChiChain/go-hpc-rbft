@@ -1,4 +1,4 @@
-package txpool
+package mempool
 
 import (
 	"github.com/axiomesh/axiom-bft/common/consensus"

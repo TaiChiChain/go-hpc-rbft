@@ -12,7 +12,7 @@ import (
 
 func TestVC_FullProcess(t *testing.T) {
 
-	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 	unlockCluster(rbfts)
 	// init recovery to stable view 1, primary is node2
 	clusterInitRecovery(t, nodes, rbfts, -1)
@@ -24,7 +24,7 @@ func TestVC_FullProcess(t *testing.T) {
 	txBytes, err := tx.Marshal()
 	assert.Nil(t, err)
 	// node3 cache some txs.
-	rbfts[2].batchMgr.requestPool.AddNewRequests([][]byte{txBytes}, false, true)
+	rbfts[2].batchMgr.requestPool.AddNewRequests([][]byte{txBytes}, false, true, false)
 
 	// replica 1 send vc
 	rbfts[0].sendViewChange()
@@ -70,7 +70,7 @@ func TestVC_FullProcess(t *testing.T) {
 
 func TestVC_recvViewChange_FromPrimary(t *testing.T) {
 
-	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 	unlockCluster(rbfts)
 	// init recovery to stable view 1, primary is node2
 	clusterInitRecovery(t, nodes, rbfts, -1)
@@ -92,7 +92,7 @@ func TestVC_recvViewChange_FromPrimary(t *testing.T) {
 
 func TestVC_recvViewChange_Quorum(t *testing.T) {
 
-	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 	unlockCluster(rbfts)
 	// init recovery to stable view 1, primary is node2
 	clusterInitRecovery(t, nodes, rbfts, -1)
@@ -120,7 +120,7 @@ func TestVC_recvViewChange_Quorum(t *testing.T) {
 
 func TestVC_fetchRequestBatches(t *testing.T) {
 
-	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 	unlockCluster(rbfts)
 	// init recovery to stable view 1, primary is node2
 	clusterInitRecovery(t, nodes, rbfts, -1)
@@ -132,7 +132,7 @@ func TestVC_fetchRequestBatches(t *testing.T) {
 
 func TestVC_recvFetchRequestBatch(t *testing.T) {
 
-	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 	unlockCluster(rbfts)
 	// init recovery to stable view 1, primary is node2
 	clusterInitRecovery(t, nodes, rbfts, -1)
@@ -154,7 +154,7 @@ func TestVC_recvFetchRequestBatch(t *testing.T) {
 
 func TestVC_recvFetchBatchResponse_AfterViewChanged(t *testing.T) {
 
-	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 	unlockCluster(rbfts)
 	// init recovery to stable view 1, primary is node2
 	clusterInitRecovery(t, nodes, rbfts, -1)
@@ -228,7 +228,7 @@ func TestVC_recvFetchBatchResponse_AfterViewChanged(t *testing.T) {
 
 func TestVC_processNewView_AfterViewChanged_PrimaryNormal(t *testing.T) {
 
-	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 	unlockCluster(rbfts)
 	// init recovery to stable view 1, primary is node2
 	clusterInitRecovery(t, nodes, rbfts, -1)
@@ -238,7 +238,7 @@ func TestVC_processNewView_AfterViewChanged_PrimaryNormal(t *testing.T) {
 	tx := newTx()
 	txBytes, err := tx.Marshal()
 	assert.Nil(t, err)
-	rbfts[1].batchMgr.requestPool.AddNewRequests([][]byte{txBytes}, false, true)
+	rbfts[1].batchMgr.requestPool.AddNewRequests([][]byte{txBytes}, false, true, false)
 	batch := rbfts[1].batchMgr.requestPool.GenerateRequestBatch()
 
 	// a message list
@@ -266,7 +266,7 @@ func TestVC_processNewView_AfterViewChanged_PrimaryNormal(t *testing.T) {
 
 func TestVC_processNewView_AfterViewChanged_ReplicaNormal(t *testing.T) {
 
-	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 	unlockCluster(rbfts)
 	// init recovery to stable view 1, primary is node2
 	clusterInitRecovery(t, nodes, rbfts, -1)
@@ -275,7 +275,7 @@ func TestVC_processNewView_AfterViewChanged_ReplicaNormal(t *testing.T) {
 	tx := newTx()
 	txBytes, err := tx.Marshal()
 	assert.Nil(t, err)
-	rbfts[0].batchMgr.requestPool.AddNewRequests([][]byte{txBytes}, false, true)
+	rbfts[0].batchMgr.requestPool.AddNewRequests([][]byte{txBytes}, false, true, false)
 	batch := rbfts[0].batchMgr.requestPool.GenerateRequestBatch()
 
 	// a message list
@@ -305,19 +305,19 @@ func TestVC_processNewView_AfterViewChanged_ReplicaNormal(t *testing.T) {
 
 func TestVC_processNewView_AfterViewChanged_LargerConfig(t *testing.T) {
 
-	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 
 	tx := newTx()
 	txBytes, err := tx.Marshal()
 	assert.Nil(t, err)
-	rbfts[0].batchMgr.requestPool.AddNewRequests([][]byte{txBytes}, true, true)
+	rbfts[0].batchMgr.requestPool.AddNewRequests([][]byte{txBytes}, true, true, false)
 	batch := rbfts[0].batchMgr.requestPool.GenerateRequestBatch()[0]
 
 	ctx := newCTX(defaultValidatorSet)
 	ctxBytes, err := ctx.Marshal()
 	assert.Nil(t, err)
 
-	batch1, _ := rbfts[0].batchMgr.requestPool.AddNewRequests([][]byte{ctxBytes}, true, true)
+	batch1, _ := rbfts[0].batchMgr.requestPool.AddNewRequests([][]byte{ctxBytes}, true, true, false)
 	configBatch := batch1[0]
 
 	// a message list
@@ -360,18 +360,18 @@ func TestVC_processNewView_AfterViewChanged_LargerConfig(t *testing.T) {
 
 func TestVC_processNewView_AfterViewChanged_LowerConfig(t *testing.T) {
 
-	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 
 	tx := newTx()
 	txBytes, err := tx.Marshal()
 	assert.Nil(t, err)
-	rbfts[0].batchMgr.requestPool.AddNewRequests([][]byte{txBytes}, true, true)
+	rbfts[0].batchMgr.requestPool.AddNewRequests([][]byte{txBytes}, true, true, false)
 	batch := rbfts[0].batchMgr.requestPool.GenerateRequestBatch()[0]
 
 	ctx := newCTX(defaultValidatorSet)
 	ctxBytes, err := ctx.Marshal()
 	assert.Nil(t, err)
-	batch1, _ := rbfts[0].batchMgr.requestPool.AddNewRequests([][]byte{ctxBytes}, true, true)
+	batch1, _ := rbfts[0].batchMgr.requestPool.AddNewRequests([][]byte{ctxBytes}, true, true, false)
 	configBatch := batch1[0]
 
 	// a message list
@@ -414,18 +414,18 @@ func TestVC_processNewView_AfterViewChanged_LowerConfig(t *testing.T) {
 
 func TestVC_processNewView_AfterViewChanged_EqualConfig(t *testing.T) {
 
-	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 
 	tx := newTx()
 	txBytes, err := tx.Marshal()
 	assert.Nil(t, err)
-	rbfts[0].batchMgr.requestPool.AddNewRequests([][]byte{txBytes}, true, true)
+	rbfts[0].batchMgr.requestPool.AddNewRequests([][]byte{txBytes}, true, true, false)
 	batch := rbfts[0].batchMgr.requestPool.GenerateRequestBatch()[0]
 
 	ctx := newCTX(defaultValidatorSet)
 	ctxBytes, err := ctx.Marshal()
 	assert.Nil(t, err)
-	batch1, _ := rbfts[0].batchMgr.requestPool.AddNewRequests([][]byte{ctxBytes}, true, true)
+	batch1, _ := rbfts[0].batchMgr.requestPool.AddNewRequests([][]byte{ctxBytes}, true, true, false)
 	configBatch := batch1[0]
 
 	// a message list
@@ -474,12 +474,12 @@ func TestVC_processNewView_AfterViewChanged_EqualConfig(t *testing.T) {
 
 func TestVC_fetchMissingReqBatchIfNeeded(t *testing.T) {
 
-	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 
 	tx := newTx()
 	txBytes, err := tx.Marshal()
 	assert.Nil(t, err)
-	rbfts[0].batchMgr.requestPool.AddNewRequests([][]byte{txBytes}, false, true)
+	rbfts[0].batchMgr.requestPool.AddNewRequests([][]byte{txBytes}, false, true, false)
 	batch := rbfts[0].batchMgr.requestPool.GenerateRequestBatch()
 
 	// a message list
@@ -511,7 +511,7 @@ func TestVC_fetchMissingReqBatchIfNeeded(t *testing.T) {
 
 func TestVC_correctViewChange(t *testing.T) {
 
-	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 
 	rbfts[2].sendViewChange()
 	vcPayload := nodes[2].broadcastMessageCache.Payload
@@ -556,7 +556,7 @@ func TestVC_correctViewChange(t *testing.T) {
 
 func TestVC_assignSequenceNumbers(t *testing.T) {
 
-	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 
 	//Quorum = 3
 	//oneQuorum = 2

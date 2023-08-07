@@ -56,7 +56,7 @@ func TestHelper_Swap(t *testing.T) {
 
 func TestHelper_RBFT(t *testing.T) {
 
-	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 
 	rbfts[0].N = 4
 
@@ -99,7 +99,7 @@ func TestHelper_RBFT(t *testing.T) {
 
 func TestHelper_Check(t *testing.T) {
 
-	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 
 	var IDTmp = msgID{
 		v: 1,
@@ -189,7 +189,7 @@ func TestHelper_Check(t *testing.T) {
 
 func TestHelper_isPrePrepareLegal(t *testing.T) {
 
-	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 
 	preprep := &consensus.PrePrepare{
 		ReplicaId:      1,
@@ -233,7 +233,7 @@ func TestHelper_isPrePrepareLegal(t *testing.T) {
 
 func TestHelper_isPrepareLegal(t *testing.T) {
 
-	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 
 	prep := &consensus.Prepare{
 		ReplicaId:      2,
@@ -252,7 +252,7 @@ func TestHelper_isPrepareLegal(t *testing.T) {
 
 func TestHelper_isCommitLegal(t *testing.T) {
 
-	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 
 	commit := &consensus.Commit{
 		ReplicaId:      1,
@@ -270,7 +270,7 @@ func TestHelper_isCommitLegal(t *testing.T) {
 
 func TestRBFT_startTimerIfOutstandingRequests(t *testing.T) {
 
-	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 
 	rbfts[0].off(SkipInProgress)
 
@@ -280,7 +280,7 @@ func TestRBFT_startTimerIfOutstandingRequests(t *testing.T) {
 	requestBatchTmp := &consensus.RequestBatch{
 		RequestHashList: []string{"request hash list", "request hash list"},
 		RequestList:     [][]byte{txBytes},
-		Timestamp:       time.Now().UnixNano(),
+		Timestamp:       time.Now().Unix(),
 		SeqNo:           2,
 		LocalList:       []bool{true, true},
 		BatchHash:       "hash",
@@ -294,7 +294,7 @@ func TestRBFT_startTimerIfOutstandingRequests(t *testing.T) {
 
 func TestHelper_stopNamespace(t *testing.T) {
 
-	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 
 	close(rbfts[0].delFlag)
 	rbfts[0].stopNamespace()
@@ -302,7 +302,7 @@ func TestHelper_stopNamespace(t *testing.T) {
 
 func TestHelper_compareCheckpointWithWeakSet(t *testing.T) {
 
-	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 
 	mockCheckpoint2 := &consensus.SignedCheckpoint{
 		Author:     "node2",
@@ -414,7 +414,7 @@ func TestHelper_compareCheckpointWithWeakSet(t *testing.T) {
 
 func TestHelper_CheckIfNeedStateUpdate(t *testing.T) {
 
-	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 	unlockCluster(rbfts)
 	rbfts[0].storeMgr.localCheckpoints = make(map[uint64]*consensus.SignedCheckpoint)
 

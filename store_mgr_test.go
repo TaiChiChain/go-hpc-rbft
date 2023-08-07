@@ -6,16 +6,15 @@ import (
 
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/common/metrics/disabled"
+	mempoolmock "github.com/axiomesh/axiom-bft/mempool/mock"
 	mockexternal "github.com/axiomesh/axiom-bft/mock/mock_external"
-
-	txpoolmock "github.com/axiomesh/axiom-bft/txpool/mock"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 )
 
 func newStorageTestNode[T any, Constraint consensus.TXConstraint[T]](ctrl *gomock.Controller) (*storeManager, Config[T, Constraint]) {
-	pool := txpoolmock.NewMockMinimalTxPool[T, Constraint](ctrl)
+	pool := mempoolmock.NewMockMinimalMemPool[T, Constraint](ctrl)
 	log := newRawLogger()
 	external := mockexternal.NewMockMinimalExternal[T, Constraint](ctrl)
 
@@ -55,7 +54,7 @@ func TestStoreMgr_getCert(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	//defer ctrl.Finish()
 
-	s, _ := newStorageTestNode[consensus.Transaction](ctrl)
+	s, _ := newStorageTestNode[consensus.FltTransaction](ctrl)
 
 	var retCert *msgCert
 	// get default cert
@@ -93,7 +92,7 @@ func TestStoreMgr_existedDigest(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	//defer ctrl.Finish()
 
-	s, _ := newStorageTestNode[consensus.Transaction](ctrl)
+	s, _ := newStorageTestNode[consensus.FltTransaction](ctrl)
 
 	msgIDTmp := msgID{
 		v: 1,

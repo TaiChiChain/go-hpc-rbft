@@ -14,7 +14,7 @@ import (
 
 func TestNode_Start(t *testing.T) {
 
-	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 	n := rbfts[0].node
 	n.rbft.atomicOn(Pending)
 
@@ -31,7 +31,7 @@ func TestNode_Start(t *testing.T) {
 
 func TestNode_Stop(t *testing.T) {
 
-	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 	n := rbfts[0].node
 	n.currentState = &types.ServiceState{
 		MetaState: &types.MetaState{
@@ -77,7 +77,7 @@ func TestNode_Stop(t *testing.T) {
 
 func TestNode_Propose(t *testing.T) {
 
-	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 	unlockCluster(rbfts)
 
 	n := rbfts[0].node
@@ -95,7 +95,7 @@ func TestNode_Propose(t *testing.T) {
 
 func TestNode_Step(t *testing.T) {
 
-	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 	n := rbfts[0].node
 
 	// Post a Type_NULL_REQUEST Msg
@@ -117,7 +117,7 @@ func TestNode_Step(t *testing.T) {
 
 func TestNode_ApplyConfChange(t *testing.T) {
 
-	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 	n := rbfts[0].node
 
 	r := &types.Router{Peers: peerSet}
@@ -128,7 +128,7 @@ func TestNode_ApplyConfChange(t *testing.T) {
 
 func TestNode_ReportExecuted(t *testing.T) {
 
-	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 	n := rbfts[0].node
 
 	state1 := &types.ServiceState{
@@ -175,7 +175,7 @@ func TestNode_ReportExecuted(t *testing.T) {
 
 func TestNode_ReportStateUpdated(t *testing.T) {
 
-	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 	n := rbfts[0].node
 
 	state := &types.ServiceState{
@@ -208,7 +208,7 @@ func TestNode_ReportStateUpdated(t *testing.T) {
 
 func TestNode_getCurrentState(t *testing.T) {
 
-	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 	n := rbfts[0].node
 
 	n.currentState = &types.ServiceState{

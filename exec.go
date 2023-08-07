@@ -20,7 +20,6 @@ import (
 
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/types"
-
 	"github.com/gogo/protobuf/proto"
 )
 
@@ -59,14 +58,21 @@ func (rbft *rbftImpl[T, Constraint]) msgToEvent(msg *consensus.ConsensusMessage)
 		}
 	}
 
-	event := eventCreators[msg.Type]().(proto.Message)
-	err := proto.Unmarshal(msg.Payload, event)
-	if err != nil {
-		rbft.logger.Errorf("Unmarshal error, can not unmarshal %v, error: %v", msg.Type, err)
-		return nil, err
+	if fn, ok := eventCreators[msg.Type]; ok {
+		event, ok := fn().(proto.Message)
+		if !ok {
+			rbft.logger.Errorf("Unmarshal error, can not unmarshal msg type %v", msg.Type)
+			return nil, fmt.Errorf("unknown msg type %v", msg.Type)
+		}
+		err := proto.Unmarshal(msg.Payload, event)
+		if err != nil {
+			rbft.logger.Errorf("Unmarshal error, can not unmarshal %v, error: %v", msg.Type, err)
+			return nil, err
+		}
+		return event, nil
 	}
 
-	return event, nil
+	return nil, fmt.Errorf("unknown msg type %v", msg.Type)
 }
 
 var eventCreators map[consensus.Type]func() interface{}
@@ -116,6 +122,22 @@ func (rbft *rbftImpl[T, Constraint]) dispatchLocalEvent(e *LocalEvent) consensus
 	}
 }
 
+// dispatchMiscEvent dispatches misc Event to corresponding handles using its event type
+func (rbft *rbftImpl[T, Constraint]) dispatchMiscEvent(e *MiscEvent) consensusEvent {
+	switch e.EventType {
+	case ReqTxEvent:
+		return rbft.handleReqTxEvent(e.Event.(*TxReqMsg))
+	default:
+		rbft.logger.Errorf("Not Supported event: %v", e)
+		return nil
+	}
+}
+
+func (rbft *rbftImpl[T, Constraint]) handleReqTxEvent(e *TxReqMsg) consensusEvent {
+	e.ch <- rbft.batchMgr.requestPool.GetPendingTxByHash(e.hash)
+	return nil
+}
+
 // handleCoreRbftEvent handles core RBFT service events
 func (rbft *rbftImpl[T, Constraint]) handleCoreRbftEvent(e *LocalEvent) consensusEvent {
 	switch e.EventType {
@@ -144,6 +166,44 @@ func (rbft *rbftImpl[T, Constraint]) handleCoreRbftEvent(e *LocalEvent) consensu
 			return nil
 		}
 		rbft.stopBatchTimer()
+
+		// call requestPool module to generate a tx batch
+		batches := rbft.batchMgr.requestPool.GenerateRequestBatch()
+		rbft.postBatches(batches)
+
+		return nil
+
+	case CoreNoTxBatchTimerEvent:
+		if !rbft.isNormal() {
+			rbft.logger.Debugf("Replica %d is in abnormal, not try to create a no-tx batch", rbft.peerPool.ID)
+			rbft.stopNoTxBatchTimer()
+			return nil
+		}
+		if !rbft.isPrimary(rbft.peerPool.ID) {
+			rbft.logger.Debugf("Replica %d is not primary, not try to create a no-tx batch", rbft.peerPool.ID)
+			rbft.stopNoTxBatchTimer()
+			return nil
+		}
+		if !rbft.config.IsTimed {
+			rbft.logger.Debugf("Replica %d is not support generate no-tx batch", rbft.peerPool.ID)
+			rbft.stopNoTxBatchTimer()
+			return nil
+		}
+
+		rbft.logger.Debugf("Primary %d no-tx batch timer expired, try to create a no-tx batch", rbft.peerPool.ID)
+
+		if rbft.atomicIn(InConfChange) {
+			rbft.logger.Debugf("Replica %d is processing a config transaction, cannot generate no-tx batches", rbft.peerPool.ID)
+			rbft.restartNoTxBatchTimer()
+			return nil
+		}
+
+		if len(rbft.batchMgr.cacheBatch) > 0 || rbft.batchMgr.requestPool.HasPendingRequestInPool() {
+			rbft.logger.Warningf("mempool is not empty, cannot generate no-tx batches", rbft.peerPool.ID)
+			rbft.stopNoTxBatchTimer()
+			return nil
+		}
+		rbft.stopNoTxBatchTimer()
 
 		// call requestPool module to generate a tx batch
 		batches := rbft.batchMgr.requestPool.GenerateRequestBatch()
@@ -188,6 +248,11 @@ func (rbft *rbftImpl[T, Constraint]) handleCoreRbftEvent(e *LocalEvent) consensu
 		rbft.logger.Infof("Replica %d high-watermark timer expired, send view change: %s",
 			rbft.peerPool.ID, rbft.highWatermarkTimerReason)
 		return rbft.sendViewChange()
+
+	case CoreCheckPoolRemoveTimerEvent:
+		rbft.processNeedRemoveReqs()
+		rbft.restartCheckPoolRemoveTimer()
+		return nil
 
 	default:
 		rbft.logger.Errorf("Invalid core RBFT event: %v", e)
@@ -294,6 +359,13 @@ func (rbft *rbftImpl[T, Constraint]) handleViewChangeEvent(e *LocalEvent) consen
 				"epoch=%d/n=%d/f=%d/view=%d/h=%d/lastExec=%d", rbft.peerPool.ID, primaryID,
 				rbft.epoch, rbft.N, rbft.f, rbft.view, rbft.h, rbft.exec.lastExec)
 			rbft.external.SendFilterEvent(types.InformTypeFilterFinishRecovery, finishMsg)
+
+			// start noTx batch timer if there is no pending tx in pool
+			if rbft.config.IsTimed && !rbft.batchMgr.requestPool.HasPendingRequestInPool() {
+				if !rbft.batchMgr.isNoTxBatchTimerActive() {
+					rbft.startNoTxBatchTimer()
+				}
+			}
 		} else {
 			rbft.logger.Noticef("======== Replica %d finished viewChange, primary=%d, "+
 				"epoch=%d/n=%d/f=%d/view=%d/h=%d/lastExec=%d", rbft.peerPool.ID, primaryID,
@@ -492,7 +564,6 @@ func (rbft *rbftImpl[T, Constraint]) dispatchMsgToService(e consensusEvent) int 
 		return RecoveryService
 	case *consensus.SyncStateResponse:
 		return RecoveryService
-
 	case *consensus.FetchCheckpoint:
 		return EpochMgrService
 	case *consensus.EpochChangeRequest:

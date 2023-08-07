@@ -14,12 +14,12 @@
 
 syntax = "proto3";
 
-import "transaction.proto";
+import "fltTransaction.proto";
 
 package consensus;
 
 message transaction_set {
-    repeated consensus.Transaction tx_list = 1;
+    repeated consensus.FltTransaction tx_list = 1;
     repeated string hash_list = 2;
     repeated bool local_list = 3;
 }

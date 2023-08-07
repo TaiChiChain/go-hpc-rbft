@@ -57,15 +57,15 @@ func setClusterExecExcept[T any, Constraint consensus.TXConstraint[T]](rbfts []*
 // 3) "executeExceptN", the node "N" will be abnormal and others will process transactions normally
 //******************************************************************************************************************
 
-func execute[T any, Constraint consensus.TXConstraint[T]](t *testing.T, rbfts []*rbftImpl[T, Constraint], nodes []*testNode[T, Constraint], tx *consensus.Transaction, checkpoint bool) map[consensus.Type][]*consensusMessageWrapper {
+func execute[T any, Constraint consensus.TXConstraint[T]](t *testing.T, rbfts []*rbftImpl[T, Constraint], nodes []*testNode[T, Constraint], tx *consensus.FltTransaction, checkpoint bool) map[consensus.Type][]*consensusMessageWrapper {
 	return executeExceptN[T, Constraint](t, rbfts, nodes, tx, checkpoint, len(rbfts))
 }
 
-func executeExceptPrimary[T any, Constraint consensus.TXConstraint[T]](t *testing.T, rbfts []*rbftImpl[T, Constraint], nodes []*testNode[T, Constraint], tx *consensus.Transaction, checkpoint bool) map[consensus.Type][]*consensusMessageWrapper {
+func executeExceptPrimary[T any, Constraint consensus.TXConstraint[T]](t *testing.T, rbfts []*rbftImpl[T, Constraint], nodes []*testNode[T, Constraint], tx *consensus.FltTransaction, checkpoint bool) map[consensus.Type][]*consensusMessageWrapper {
 	return executeExceptN[T, Constraint](t, rbfts, nodes, tx, checkpoint, 0)
 }
 
-func executeExceptN[T any, Constraint consensus.TXConstraint[T]](t *testing.T, rbfts []*rbftImpl[T, Constraint], nodes []*testNode[T, Constraint], tx *consensus.Transaction, checkpoint bool, notExec int) map[consensus.Type][]*consensusMessageWrapper {
+func executeExceptN[T any, Constraint consensus.TXConstraint[T]](t *testing.T, rbfts []*rbftImpl[T, Constraint], nodes []*testNode[T, Constraint], tx *consensus.FltTransaction, checkpoint bool, notExec int) map[consensus.Type][]*consensusMessageWrapper {
 
 	var primaryIndex int
 	for index := range rbfts {
@@ -80,10 +80,10 @@ func executeExceptN[T any, Constraint consensus.TXConstraint[T]](t *testing.T, r
 	retMessages := make(map[consensus.Type][]*consensusMessageWrapper)
 	txBytes, err := tx.Marshal()
 	assert.Nil(t, err)
-	rbfts[0].batchMgr.requestPool.AddNewRequests([][]byte{txBytes}, false, true)
-	rbfts[1].batchMgr.requestPool.AddNewRequests([][]byte{txBytes}, false, true)
-	rbfts[2].batchMgr.requestPool.AddNewRequests([][]byte{txBytes}, false, true)
-	rbfts[3].batchMgr.requestPool.AddNewRequests([][]byte{txBytes}, false, true)
+	rbfts[0].batchMgr.requestPool.AddNewRequests([][]byte{txBytes}, false, true, false)
+	rbfts[1].batchMgr.requestPool.AddNewRequests([][]byte{txBytes}, false, true, false)
+	rbfts[2].batchMgr.requestPool.AddNewRequests([][]byte{txBytes}, false, true, false)
+	rbfts[3].batchMgr.requestPool.AddNewRequests([][]byte{txBytes}, false, true, false)
 
 	batchTimerEvent := &LocalEvent{
 		Service:   CoreRbftService,

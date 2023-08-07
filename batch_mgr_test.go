@@ -11,7 +11,7 @@ import (
 
 func TestBatchMgr_startBatchTimer(t *testing.T) {
 
-	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 	assert.False(t, rbfts[0].timerMgr.getTimer(batchTimer))
 	assert.False(t, rbfts[0].batchMgr.isBatchTimerActive())
 	rbfts[0].startBatchTimer()
@@ -22,7 +22,7 @@ func TestBatchMgr_startBatchTimer(t *testing.T) {
 // Test for only this function
 func TestBatchMgr_maybeSendPrePrepare(t *testing.T) {
 
-	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 
 	// Set a Batch
 	txBytes41, err := newTx().Marshal()
@@ -30,7 +30,7 @@ func TestBatchMgr_maybeSendPrePrepare(t *testing.T) {
 	batchTmp41 := &consensus.RequestBatch{
 		RequestHashList: []string{"tx-hash-41"},
 		RequestList:     [][]byte{txBytes41},
-		Timestamp:       time.Now().UnixNano(),
+		Timestamp:       time.Now().Unix(),
 		LocalList:       []bool{true},
 		BatchHash:       "test digest 41",
 	}
@@ -39,7 +39,7 @@ func TestBatchMgr_maybeSendPrePrepare(t *testing.T) {
 	batchTmp42 := &consensus.RequestBatch{
 		RequestHashList: []string{"tx-hash-42"},
 		RequestList:     [][]byte{txBytes42},
-		Timestamp:       time.Now().UnixNano(),
+		Timestamp:       time.Now().Unix(),
 		LocalList:       []bool{true},
 		BatchHash:       "test digest 42",
 	}
@@ -65,7 +65,7 @@ func TestBatchMgr_maybeSendPrePrepare(t *testing.T) {
 
 func TestBatchMgr_findNextPrepareBatch(t *testing.T) {
 
-	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 
 	// Struct of certTmp which stored in rbft.storeMgr.certStore
 	prePrepareTmp := &consensus.PrePrepare{

@@ -1,4 +1,4 @@
-package txpool
+package mempool
 
 import (
 	"testing"
@@ -9,11 +9,11 @@ import (
 )
 
 func TestRequestHashBatch_IsConfBatch(t *testing.T) {
-	testRequestHashBatchIsConfBatch[consensus.Transaction](t)
+	testRequestHashBatchIsConfBatch[consensus.FltTransaction](t)
 }
 
 func testRequestHashBatchIsConfBatch[T any, Constraint consensus.TXConstraint[T]](t *testing.T) {
-	tx1 := &consensus.Transaction{TxType: consensus.Transaction_CTX}
+	tx1 := &consensus.FltTransaction{TxType: consensus.FltTransaction_CTX}
 	txBytes1, err := tx1.Marshal()
 	assert.Nil(t, err)
 	batch1 := &RequestHashBatch[T, Constraint]{
@@ -21,12 +21,11 @@ func testRequestHashBatchIsConfBatch[T any, Constraint consensus.TXConstraint[T]
 		TxHashList: nil,
 		TxList:     [][]byte{txBytes1},
 		LocalList:  nil,
-		TimeList:   nil,
 		Timestamp:  0,
 	}
 	flag1 := batch1.IsConfBatch()
 
-	tx2 := &consensus.Transaction{TxType: consensus.Transaction_NTX}
+	tx2 := &consensus.FltTransaction{TxType: consensus.FltTransaction_NTX}
 	txBytes2, err := tx2.Marshal()
 	assert.Nil(t, err)
 	batch2 := &RequestHashBatch[T, Constraint]{
@@ -34,7 +33,6 @@ func testRequestHashBatchIsConfBatch[T any, Constraint consensus.TXConstraint[T]
 		TxHashList: nil,
 		TxList:     [][]byte{txBytes2},
 		LocalList:  nil,
-		TimeList:   nil,
 		Timestamp:  0,
 	}
 	flag2 := batch2.IsConfBatch()

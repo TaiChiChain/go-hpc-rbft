@@ -10,7 +10,7 @@ import (
 
 func TestCluster_MissingCheckpoint(t *testing.T) {
 
-	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 	unlockCluster(rbfts)
 	var retMessageSet []map[consensus.Type][]*consensusMessageWrapper
 	for i := 0; i < 40; i++ {
@@ -91,7 +91,7 @@ func TestCluster_CheckpointToViewChange(t *testing.T) {
 	// expected: for node2 should open the high-watermark timer
 	// ========================================================================================================
 
-	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 	unlockCluster(rbfts)
 
 	var retMessageSet []map[consensus.Type][]*consensusMessageWrapper
@@ -168,7 +168,7 @@ func TestCluster_CheckpointToViewChange(t *testing.T) {
 
 func TestCluster_ReceiveViewChangeBeforeStart(t *testing.T) {
 
-	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 
 	initRecoveryEvent := &LocalEvent{
 		Service:   RecoveryService,
@@ -269,7 +269,7 @@ func TestCluster_ReceiveViewChangeBeforeStart(t *testing.T) {
 
 func TestCluster_ViewChange_StateUpdate_Timeout_StateUpdated_Replica(t *testing.T) {
 
-	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 	unlockCluster(rbfts)
 
 	for i := 0; i < 40; i++ {
@@ -349,7 +349,7 @@ func TestCluster_ViewChange_StateUpdate_Timeout_StateUpdated_Replica(t *testing.
 
 func TestCluster_ViewChange_StateUpdate_Timeout_StateUpdated_Primary(t *testing.T) {
 
-	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 	unlockCluster(rbfts)
 
 	for i := 0; i < 40; i++ {
@@ -473,7 +473,7 @@ func TestCluster_ViewChange_StateUpdate_Timeout_StateUpdated_Primary(t *testing.
 func TestCluster_Checkpoint_in_StateUpdating(t *testing.T) {
 	// test for update high target while transferring for efficient state-update instance initiation.
 
-	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 	unlockCluster(rbfts)
 
 	var retMessageSet []map[consensus.Type][]*consensusMessageWrapper
@@ -566,7 +566,7 @@ func TestCluster_Checkpoint_in_StateUpdating(t *testing.T) {
 
 func TestCluster_InitRecovery(t *testing.T) {
 
-	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 	unlockCluster(rbfts)
 
 	init := &LocalEvent{

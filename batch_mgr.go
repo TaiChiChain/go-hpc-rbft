@@ -19,18 +19,19 @@ import (
 	"fmt"
 
 	"github.com/axiomesh/axiom-bft/common/consensus"
-	"github.com/axiomesh/axiom-bft/txpool"
+	"github.com/axiomesh/axiom-bft/mempool"
 )
 
 // batchManager manages basic batch issues, including:
 // 1. requestPool which manages all transactions received from client or rpc layer
 // 2. batch events timer management
 type batchManager[T any, Constraint consensus.TXConstraint[T]] struct {
-	seqNo            uint64                    // track the prePrepare batch seqNo
-	cacheBatch       []*consensus.RequestBatch // cache batches wait for prePreparing
-	batchTimerActive bool                      // track the batch timer event, true means there exists an undergoing batch timer event
-	lastBatchTime    int64                     // track last batch time [only used by primary], reset when become primary.
-	requestPool      txpool.TxPool[T, Constraint]
+	seqNo                uint64                    // track the prePrepare batch seqNo
+	cacheBatch           []*consensus.RequestBatch // cache batches wait for prePreparing
+	batchTimerActive     bool                      // track the batch timer event, true means there exists an undergoing batch timer event
+	noTxBatchTimerActive bool                      // track the batch timer event, true means there exists an undergoing batch timer event
+	lastBatchTime        int64                     // track last batch time [only used by primary], reset when become primary.
+	requestPool          mempool.MemPool[T, Constraint]
 }
 
 // newBatchManager initializes an instance of batchManager.
@@ -57,6 +58,11 @@ func (bm *batchManager[T, Constraint]) isBatchTimerActive() bool {
 	return bm.batchTimerActive
 }
 
+// isNoTxBatchTimerActive returns if the no tx batch timer is active or not
+func (bm *batchManager[T, Constraint]) isNoTxBatchTimerActive() bool {
+	return bm.noTxBatchTimerActive
+}
+
 // startBatchTimer starts the batch timer and sets the batchTimerActive to true
 func (rbft *rbftImpl[T, Constraint]) startBatchTimer() bool {
 
@@ -68,6 +74,44 @@ func (rbft *rbftImpl[T, Constraint]) startBatchTimer() bool {
 	rbft.timerMgr.startTimer(batchTimer, localEvent)
 	rbft.batchMgr.batchTimerActive = true
 	rbft.logger.Debugf("Primary %d started the batch timer", rbft.peerPool.ID)
+
+	return true
+}
+
+// startNoTxBatchTimer starts the batch timer and sets the batchTimerActive to true
+func (rbft *rbftImpl[T, Constraint]) startNoTxBatchTimer() bool {
+	localEvent := &LocalEvent{
+		Service:   CoreRbftService,
+		EventType: CoreNoTxBatchTimerEvent,
+	}
+
+	rbft.timerMgr.startTimer(noTxBatchTimer, localEvent)
+	rbft.batchMgr.noTxBatchTimerActive = true
+	rbft.logger.Debugf("Primary %d started the no tx batch timer", rbft.peerPool.ID)
+
+	return true
+}
+
+// stopNoTxBatchTimer stops the batch timer and reset the batchTimerActive to false
+func (rbft *rbftImpl[T, Constraint]) stopNoTxBatchTimer() {
+	rbft.timerMgr.stopTimer(noTxBatchTimer)
+	rbft.batchMgr.noTxBatchTimerActive = false
+	rbft.logger.Debugf("Primary %d stopped the no tx batch timer", rbft.peerPool.ID)
+}
+
+// restartNoTxBatchTimer restarts the no tx batch timer
+func (rbft *rbftImpl[T, Constraint]) restartNoTxBatchTimer() bool {
+
+	rbft.timerMgr.stopTimer(noTxBatchTimer)
+
+	localEvent := &LocalEvent{
+		Service:   CoreRbftService,
+		EventType: CoreNoTxBatchTimerEvent,
+	}
+
+	rbft.timerMgr.startTimer(batchTimer, localEvent)
+	rbft.batchMgr.batchTimerActive = true
+	rbft.logger.Debugf("Primary %d restarted the batch timer", rbft.peerPool.ID)
 
 	return true
 }
@@ -142,6 +186,36 @@ func (rbft *rbftImpl[T, Constraint]) restartCheckPoolTimer() {
 
 	rbft.timerMgr.startTimer(checkPoolTimer, localEvent)
 	rbft.logger.Debugf("Replica %d restarted the check pool timer", rbft.peerPool.ID)
+}
+
+// startCheckPoolTimer starts the check pool remove timer when tx stay mempool too long.
+func (rbft *rbftImpl[T, Constraint]) startCheckPoolRemoveTimer() {
+	localEvent := &LocalEvent{
+		Service:   CoreRbftService,
+		EventType: CoreCheckPoolRemoveTimerEvent,
+	}
+
+	rbft.timerMgr.startTimer(checkPoolRemoveTimer, localEvent)
+	rbft.logger.Debugf("Replica %d started the check pool remove timer", rbft.peerPool.ID)
+}
+
+// stopCheckPoolTimer stops the check pool timer when node enter abnormal status.
+func (rbft *rbftImpl[T, Constraint]) stopCheckPoolRemoveTimer() {
+	rbft.timerMgr.stopTimer(checkPoolRemoveTimer)
+	rbft.logger.Debugf("Replica %d stopped the check pool remove timer", rbft.peerPool.ID)
+}
+
+// restartCheckPoolTimer restarts the check pool timer.
+func (rbft *rbftImpl[T, Constraint]) restartCheckPoolRemoveTimer() {
+	rbft.timerMgr.stopTimer(checkPoolRemoveTimer)
+
+	localEvent := &LocalEvent{
+		Service:   CoreRbftService,
+		EventType: CoreCheckPoolRemoveTimerEvent,
+	}
+
+	rbft.timerMgr.startTimer(checkPoolRemoveTimer, localEvent)
+	rbft.logger.Debugf("Replica %d restarted the check pool remove timer", rbft.peerPool.ID)
 }
 
 // maybeSendPrePrepare used by primary helps primary stores this batch and send prePrepare,

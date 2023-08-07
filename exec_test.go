@@ -11,7 +11,7 @@ import (
 
 func TestExec_handleCoreRbftEvent_batchTimerEvent(t *testing.T) {
 
-	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 
 	// start state
 	ev := &LocalEvent{
@@ -34,7 +34,7 @@ func TestExec_handleCoreRbftEvent_batchTimerEvent(t *testing.T) {
 	tx := newTx()
 	txBytes, err := tx.Marshal()
 	assert.Nil(t, err)
-	rbfts[0].batchMgr.requestPool.AddNewRequests([][]byte{txBytes}, false, true)
+	rbfts[0].batchMgr.requestPool.AddNewRequests([][]byte{txBytes}, false, true, false)
 	reqBatch := rbfts[0].batchMgr.requestPool.GenerateRequestBatch()
 	batch := &consensus.RequestBatch{
 		RequestHashList: reqBatch[0].TxHashList,
@@ -51,7 +51,7 @@ func TestExec_handleCoreRbftEvent_batchTimerEvent(t *testing.T) {
 
 func TestExec_handleCoreRbftEvent_NullRequestTimerEvent(t *testing.T) {
 
-	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 
 	// replica will send view change, primary will send null request
 	ev := &LocalEvent{
@@ -70,7 +70,7 @@ func TestExec_handleCoreRbftEvent_NullRequestTimerEvent(t *testing.T) {
 
 func TestExec_handleCoreRbftEvent_CheckPoolTimerEvent(t *testing.T) {
 
-	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 
 	// node will restart check pool timer
 	ev := &LocalEvent{
@@ -91,7 +91,7 @@ func TestExec_handleCoreRbftEvent_CheckPoolTimerEvent(t *testing.T) {
 
 func TestExec_handleCoreRbftEvent_StateUpdatedEvent(t *testing.T) {
 
-	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 
 	metaS := &types.MetaState{
 		Height: uint64(10),
@@ -129,7 +129,7 @@ func TestExec_handleCoreRbftEvent_StateUpdatedEvent(t *testing.T) {
 
 func TestExec_handleRecoveryEvent_SyncStateRspTimerEvent(t *testing.T) {
 
-	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 
 	ev := &LocalEvent{
 		Service:   RecoveryService,
@@ -150,7 +150,7 @@ func TestExec_handleRecoveryEvent_SyncStateRspTimerEvent(t *testing.T) {
 
 func TestExec_handleRecoveryEvent_SyncStateRestartTimerEvent(t *testing.T) {
 
-	_, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 
 	ev := &LocalEvent{
 		Service:   RecoveryService,
@@ -164,7 +164,7 @@ func TestExec_handleRecoveryEvent_SyncStateRestartTimerEvent(t *testing.T) {
 
 func TestExec_handleViewChangeEvent_ViewChangeTimerEvent(t *testing.T) {
 
-	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 
 	ev := &LocalEvent{
 		Service:   ViewChangeService,
@@ -185,7 +185,7 @@ func TestExec_handleViewChangeEvent_ViewChangeTimerEvent(t *testing.T) {
 
 func TestExec_handleViewChangeEvent_ViewChangeResendTimerEvent(t *testing.T) {
 
-	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 
 	ev := &LocalEvent{
 		Service:   ViewChangeService,
@@ -199,7 +199,7 @@ func TestExec_handleViewChangeEvent_ViewChangeResendTimerEvent(t *testing.T) {
 
 func TestExec_handleEpochMgrEvent_FetchCheckpointEvent(t *testing.T) {
 
-	nodes, rbfts := newBasicClusterInstance[consensus.Transaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
 
 	ev := &LocalEvent{
 		Service:   EpochMgrService,

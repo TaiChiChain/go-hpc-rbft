@@ -22,7 +22,7 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
-var _ RbftTransaction = (*Transaction)(nil)
+var _ RbftTransaction = (*FltTransaction)(nil)
 
 type RbftTransaction interface {
 	RbftGetTxHash() string
@@ -75,7 +75,7 @@ func CompareVersion(a, b string) int {
 }
 
 // Hash returns the transaction hash calculated using Keccak256.
-func hash(tx *Transaction) []byte {
+func hash(tx *FltTransaction) []byte {
 	var h32 [32]byte
 	if CompareVersion(string(tx.Version), TxVersion35) > 0 {
 		binary.BigEndian.PutUint64(h32[0:TimeLength], uint64(tx.RbftGetTimeStamp()))
@@ -120,40 +120,40 @@ func SetBytes(b []byte) []byte {
 	return output
 }
 
-func (m *Transaction) RbftGetTxHash() string {
+func (m *FltTransaction) RbftGetTxHash() string {
 	h := hash(m)
 	return "0x" + base64.StdEncoding.EncodeToString(h)
 }
 
-func (m *Transaction) RbftGetFrom() string {
+func (m *FltTransaction) RbftGetFrom() string {
 	return string(m.From)
 }
 
-func (m *Transaction) RbftGetTimeStamp() int64 {
+func (m *FltTransaction) RbftGetTimeStamp() int64 {
 	return m.Timestamp
 }
 
-func (m *Transaction) RbftGetData() []byte {
+func (m *FltTransaction) RbftGetData() []byte {
 	return m.Value
 }
 
-func (m *Transaction) RbftGetNonce() uint64 {
+func (m *FltTransaction) RbftGetNonce() uint64 {
 	return uint64(m.Nonce)
 }
 
-func (m *Transaction) RbftUnmarshal(raw []byte) error {
+func (m *FltTransaction) RbftUnmarshal(raw []byte) error {
 	return m.Unmarshal(raw)
 }
 
-func (m *Transaction) RbftMarshal() ([]byte, error) {
+func (m *FltTransaction) RbftMarshal() ([]byte, error) {
 	return m.Marshal()
 }
 
-func (m *Transaction) RbftIsConfigTx() bool {
-	return m.TxType == Transaction_CTX || m.TxType == Transaction_ANCHORTX ||
-		m.TxType == Transaction_ANCHORTXAUTO || m.TxType == Transaction_TIMEOUTTX
+func (m *FltTransaction) RbftIsConfigTx() bool {
+	return m.TxType == FltTransaction_CTX || m.TxType == FltTransaction_ANCHORTX ||
+		m.TxType == FltTransaction_ANCHORTXAUTO || m.TxType == FltTransaction_TIMEOUTTX
 }
 
-func (m *Transaction) RbftGetSize() int {
+func (m *FltTransaction) RbftGetSize() int {
 	return m.Size()
 }

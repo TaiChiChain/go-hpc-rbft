@@ -2,8 +2,10 @@ package rbft
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math/rand"
 	"strconv"
 	"time"
@@ -12,9 +14,8 @@ import (
 	"github.com/axiomesh/axiom-bft/common/fancylogger"
 	"github.com/axiomesh/axiom-bft/common/metrics/disabled"
 	"github.com/axiomesh/axiom-bft/external"
-	"github.com/axiomesh/axiom-bft/txpool"
+	"github.com/axiomesh/axiom-bft/mempool"
 	"github.com/axiomesh/axiom-bft/types"
-
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -152,10 +153,10 @@ type channelMsg struct {
 	msg *consensus.ConsensusMessage
 }
 
-// defaultTxpoolSupportSmokeTest
-type defaultTxpoolSupportSmokeTest struct{}
+// defaultMemoolSupportSmokeTest
+type defaultMemoolSupportSmokeTest struct{}
 
-func (lookup *defaultTxpoolSupportSmokeTest) IsRequestsExist(txs [][]byte) []bool {
+func (lookup *defaultMemoolSupportSmokeTest) IsRequestsExist(txs [][]byte) []bool {
 	results := make([]bool, len(txs))
 	for i := range results {
 		results[i] = false
@@ -163,7 +164,7 @@ func (lookup *defaultTxpoolSupportSmokeTest) IsRequestsExist(txs [][]byte) []boo
 	return results
 }
 
-func (lookup *defaultTxpoolSupportSmokeTest) CheckSigns(txs [][]byte) {
+func (lookup *defaultMemoolSupportSmokeTest) CheckSigns(txs [][]byte) {
 }
 
 // =============================================================================
@@ -222,7 +223,7 @@ func (tf *testFramework[T, Constraint]) newNodeConfig(
 	hostname string,
 	log Logger,
 	ext external.ExternalStack[T, Constraint],
-	pool txpool.TxPool[T, Constraint],
+	pool mempool.MemPool[T, Constraint],
 	epoch uint64,
 	vSet []*consensus.NodeInfo,
 	lastConfig *types.MetaState) Config[T, Constraint] {
@@ -295,19 +296,19 @@ func (tf *testFramework[T, Constraint]) newTestNode(id uint64, hostname string, 
 	}
 	ext = testExt
 
-	// TxPool Instance, Parameters in Config are Flexible
-	confTxPool := txpool.Config{
+	// Memool Instance, Parameters in Config are Flexible
+	confMemPool := mempool.Config{
 		PoolSize:      100000,
 		BatchSize:     4,
 		BatchMemLimit: false,
 		BatchMaxMem:   999,
 		ToleranceTime: 999 * time.Millisecond,
-		MetricsProv:   &disabled.Provider{},
 		Logger:        log,
+		GetAccountNonce: func(address string) uint64 {
+			return 0
+		},
 	}
-	dtps := &defaultTxpoolSupportSmokeTest{}
-	namespace := "global"
-	pool := txpool.NewTxPool[T, Constraint](namespace, dtps, confTxPool)
+	pool := mempool.NewMempool[T, Constraint](confMemPool)
 	conf := tf.newNodeConfig(id, hostname, log, ext, pool, 1, defaultValidatorSet, nil)
 	n, _ := newNode[T, Constraint](conf)
 	// init new view.
@@ -497,14 +498,14 @@ func (tf *testFramework[T, Constraint]) frameworkDelNode(hostname string) {
 		tf.log.Infof("[Cluster_Service %s] Target Validator Set: %+v", senderHost, delRouter)
 
 		info, _ := json.Marshal(&delRouter)
-		tx := &consensus.Transaction{
-			Timestamp: time.Now().UnixNano(),
+		tx := &consensus.FltTransaction{
+			Timestamp: time.Now().Unix(),
 			Id:        2,
 			Nonce:     999,
 
 			// use new router as value
 			Value:  info,
-			TxType: consensus.Transaction_CTX,
+			TxType: consensus.FltTransaction_CTX,
 		}
 		txBytes, err := tx.Marshal()
 		if err != nil {
@@ -548,19 +549,16 @@ func (tf *testFramework[T, Constraint]) frameworkAddNode(hostname string, logger
 	}
 	ext = testExt
 
-	// TxPool Instance, Parameters in Config are Flexible
-	confTxPool := txpool.Config{
+	// MemPool Instance, Parameters in Config are Flexible
+	confMemPool := mempool.Config{
 		PoolSize:      100000,
 		BatchSize:     2,
 		BatchMemLimit: false,
 		BatchMaxMem:   999,
 		ToleranceTime: 999 * time.Millisecond,
-		MetricsProv:   &disabled.Provider{},
 		Logger:        log,
 	}
-	dtps := &defaultTxpoolSupportSmokeTest{}
-	namespace := "global"
-	pool := txpool.NewTxPool[T, Constraint](namespace, dtps, confTxPool)
+	pool := mempool.NewMempool[T, Constraint](confMemPool)
 
 	// new peer
 	hash := calHash(hostname)
@@ -612,14 +610,14 @@ func (tf *testFramework[T, Constraint]) frameworkAddNode(hostname string, logger
 		tf.log.Infof("[Cluster_Service %d:%s] Target Validator Set: %+v", senderIndex, senderHost, vSet)
 
 		info, _ := json.Marshal(0)
-		tx := &consensus.Transaction{
-			Timestamp: time.Now().UnixNano(),
+		tx := &consensus.FltTransaction{
+			Timestamp: time.Now().Unix(),
 			Id:        2,
 			Nonce:     999,
 
 			// use new router as value
 			Value:  info,
-			TxType: consensus.Transaction_CTX,
+			TxType: consensus.FltTransaction_CTX,
 		}
 		txBytes, err := tx.Marshal()
 		if err != nil {
@@ -645,7 +643,7 @@ func (tf *testFramework[T, Constraint]) sendTx(no int, sender uint64) {
 	}
 
 	str3 := "tx" + string(rune(no))
-	tx3 := &consensus.Transaction{Value: []byte(str3)}
+	tx3 := &consensus.FltTransaction{Value: []byte(str3)}
 	tx3Bytes, err := tx3.Marshal()
 	if err != nil {
 		tf.log.Errorf("[Cluster_Service %d:%s] Marshal tx error: %s", sender-1, tf.TestNode[sender-1].Hostname, err)
@@ -657,22 +655,31 @@ func (tf *testFramework[T, Constraint]) sendTx(no int, sender uint64) {
 	_ = tf.TestNode[sender-1].N.Propose(txs3)
 }
 
-func newTx() *consensus.Transaction {
-	return &consensus.Transaction{
+func newTx() *consensus.FltTransaction {
+	randomBytes := make([]byte, 20)
+
+	_, err := rand.Read(randomBytes)
+	if err != nil {
+		fmt.Println("Error generating random bytes:", err)
+		return nil
+	}
+	from := hex.EncodeToString(randomBytes)
+	return &consensus.FltTransaction{
+		From:  []byte(from),
 		Value: []byte(string(rune(rand.Int()))),
-		Nonce: int64(rand.Int()),
+		Nonce: 0,
 	}
 }
 
-func newCTX(vSet []*consensus.NodeInfo) *consensus.Transaction {
+func newCTX(vSet []*consensus.NodeInfo) *consensus.FltTransaction {
 	info, _ := json.Marshal(vSet)
-	return &consensus.Transaction{
-		Timestamp: time.Now().UnixNano(),
+	return &consensus.FltTransaction{
+		Timestamp: time.Now().Unix(),
 		Id:        2,
-		Nonce:     999,
+		Nonce:     0,
 		// use new router as value
 		Value:  info,
-		TxType: consensus.Transaction_CTX,
+		TxType: consensus.FltTransaction_CTX,
 	}
 }
 
@@ -680,13 +687,13 @@ func (tf *testFramework[T, Constraint]) sendInitCtx() {
 	tf.log.Info("Send init ctx")
 	senderID3 := uint64(rand.Int()%tf.N + 1)
 	info, _ := json.Marshal(defaultValidatorSet)
-	tx := &consensus.Transaction{
-		Timestamp: time.Now().UnixNano(),
+	tx := &consensus.FltTransaction{
+		Timestamp: time.Now().Unix(),
 		Id:        2,
 		Nonce:     999,
 		// use new router as value
 		Value:  info,
-		TxType: consensus.Transaction_CTX,
+		TxType: consensus.FltTransaction_CTX,
 	}
 	txBytes, err := tx.Marshal()
 	if err != nil {

@@ -85,6 +85,8 @@ func (tm *timerManager) newTimer(name string, d time.Duration) {
 			d = DefaultRequestTimeout
 		case batchTimer:
 			d = DefaultBatchTimeout
+		case noTxBatchTimer:
+			d = DefaultNoTxBatchTimeout
 		case vcResendTimer:
 			d = DefaultVcResendTimeout
 		case newViewTimer:
@@ -146,7 +148,7 @@ func (tm *timerManager) softStartTimerWithNewTT(name string, timeout time.Durati
 
 // createTimer creates a goroutine and waits for timeout. Then check if the timer is active. If so, send event.
 func (tm *timerManager) createTimer(name string, timeout time.Duration, event *LocalEvent) (key string) {
-	timestamp := time.Now().UnixNano()
+	timestamp := time.Now().Unix()
 	key = strconv.FormatInt(timestamp, 10)
 	tm.tTimers[name].store(key, true)
 
@@ -210,11 +212,14 @@ func (rbft *rbftImpl[T, Constraint]) initTimers() {
 	rbft.timerMgr.newTimer(syncStateRspTimer, rbft.config.SyncStateTimeout)
 	rbft.timerMgr.newTimer(syncStateRestartTimer, rbft.config.SyncStateRestartTimeout)
 	rbft.timerMgr.newTimer(batchTimer, rbft.config.BatchTimeout)
+	rbft.timerMgr.newTimer(noTxBatchTimer, rbft.config.NoTxBatchTimeout)
 	rbft.timerMgr.newTimer(requestTimer, rbft.config.RequestTimeout)
 	rbft.timerMgr.newTimer(cleanViewChangeTimer, rbft.config.CleanVCTimeout)
 	rbft.timerMgr.newTimer(checkPoolTimer, rbft.config.CheckPoolTimeout)
 	rbft.timerMgr.newTimer(fetchCheckpointTimer, rbft.config.FetchCheckpointTimeout)
 	rbft.timerMgr.newTimer(fetchViewTimer, rbft.config.FetchViewTimeout)
+
+	rbft.timerMgr.newTimer(checkPoolRemoveTimer, rbft.config.CheckPoolRemoveTimeout)
 
 	rbft.timerMgr.makeNullRequestTimeoutLegal()
 	rbft.timerMgr.makeRequestTimeoutLegal()
