@@ -101,6 +101,8 @@ func (tm *timerManager) newTimer(name string, d time.Duration) {
 			d = DefaultCleanViewChangeTimeout
 		case checkPoolTimer:
 			d = DefaultCheckPoolTimeout
+		case checkPoolRemoveTimer:
+			d = DefaultCheckPoolRemoveTimeout
 		case fetchCheckpointTimer:
 			d = DefaultFetchCheckpointTimeout
 		case fetchViewTimer:
