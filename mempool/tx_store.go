@@ -70,10 +70,10 @@ func (txStore *transactionStore[T, Constraint]) insertTxs(txItems map[string][]*
 			txList.items[txItem.getNonce()] = txItem
 			txList.index.insertBySortedNonceKey(txItem.getNonce())
 			if isLocal {
-				txStore.localTTLIndex.insertByTTLIndexKey(txItem)
+				txStore.localTTLIndex.insertByTTLIndexKey(txItem, Rebroadcast)
 			}
 			// record the tx arrived timestamp
-			txStore.removeTTLIndex.insertByTTLIndexKey(txItem)
+			txStore.removeTTLIndex.insertByTTLIndexKey(txItem, Remove)
 		}
 		dirtyAccounts[account] = true
 	}

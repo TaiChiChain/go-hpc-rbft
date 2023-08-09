@@ -56,6 +56,7 @@ const (
 	DefaultSyncStateRestartTimeout = 10 * time.Second
 	DefaultCleanViewChangeTimeout  = 60 * time.Second
 	DefaultCheckPoolTimeout        = 3 * time.Minute
+	DefaultCheckPoolRemoveTimeout  = 15 * time.Minute
 	DefaultFetchCheckpointTimeout  = 5 * time.Second
 	DefaultFetchViewTimeout        = 1 * time.Second
 

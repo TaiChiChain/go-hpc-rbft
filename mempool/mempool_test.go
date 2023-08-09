@@ -109,25 +109,19 @@ func TestFilterOutOfDateRequests(t *testing.T) {
 	ast := assert.New(t)
 	pool := mockMempoolImpl[consensus.FltTransaction]()
 	poolTx2 := ConstructTxByAccountAndNonce("account2", 1)
-	arrivedTime2 := time.Now().Unix()
+	time.Sleep(1 * time.Second)
 	poolTx1 := ConstructTxByAccountAndNonce("account1", 0)
 	time.Sleep(1 * time.Second)
-	arrivedTime1 := time.Now().Unix()
 	poolTx3 := ConstructTxByAccountAndNonce("account3", 2)
-	time.Sleep(1 * time.Second)
-	arrivedTime3 := time.Now().Unix()
-	pool.txStore.localTTLIndex.insertByOrderedQueueKey(poolTx1.RbftGetTimeStamp(), arrivedTime1, poolTx1.RbftGetFrom(), poolTx1.RbftGetNonce())
-	pool.txStore.localTTLIndex.insertByOrderedQueueKey(poolTx2.RbftGetTimeStamp(), arrivedTime2, poolTx2.RbftGetFrom(), poolTx2.RbftGetNonce())
-	pool.txStore.localTTLIndex.insertByOrderedQueueKey(poolTx3.RbftGetTimeStamp(), arrivedTime3, poolTx3.RbftGetFrom(), poolTx3.RbftGetNonce())
+	pool.txStore.localTTLIndex.insertByOrderedQueueKey(poolTx1.RbftGetTimeStamp(), poolTx1.RbftGetFrom(), poolTx1.RbftGetNonce())
+	pool.txStore.localTTLIndex.insertByOrderedQueueKey(poolTx2.RbftGetTimeStamp(), poolTx2.RbftGetFrom(), poolTx2.RbftGetNonce())
+	pool.txStore.localTTLIndex.insertByOrderedQueueKey(poolTx3.RbftGetTimeStamp(), poolTx3.RbftGetFrom(), poolTx3.RbftGetNonce())
 
 	txs := []*consensus.FltTransaction{&poolTx1, &poolTx2, &poolTx3}
 	pool.txStore.allTxs = constructAllTxs[consensus.FltTransaction](txs)
-	pool.txStore.allTxs[poolTx1.RbftGetFrom()].items[poolTx1.RbftGetNonce()].arrivedTime = arrivedTime1
-	pool.txStore.allTxs[poolTx2.RbftGetFrom()].items[poolTx2.RbftGetNonce()].arrivedTime = arrivedTime2
-	pool.txStore.allTxs[poolTx3.RbftGetFrom()].items[poolTx3.RbftGetNonce()].arrivedTime = arrivedTime3
 
 	pool.toleranceTime = 1 * time.Second
-	time.Sleep(1 * time.Second)
+	time.Sleep(2 * time.Second)
 	// poolTx1, poolTx2, poolTx3 out of date
 	reqs, err := pool.FilterOutOfDateRequests()
 	ast.Nil(err)
@@ -724,12 +718,12 @@ func TestRestoreOneBatch(t *testing.T) {
 	ast.Equal(true, ok)
 	poolTx := list.items[tx1.RbftGetNonce()]
 	ast.NotNil(poolTx)
-	pool.txStore.priorityIndex.removeByOrderedQueueKey(poolTx.getRawTimestamp(), poolTx.arrivedTime,
+	pool.txStore.priorityIndex.removeByOrderedQueueKey(poolTx.getRawTimestamp(),
 		poolTx.getAccount(), poolTx.getNonce())
 	err = pool.RestoreOneBatch(batches[0].BatchHash)
 	ast.NotNil(err, "can't find tx from priorityIndex")
 
-	pool.txStore.priorityIndex.insertByOrderedQueueKey(poolTx.getRawTimestamp(), poolTx.arrivedTime,
+	pool.txStore.priorityIndex.insertByOrderedQueueKey(poolTx.getRawTimestamp(),
 		poolTx.getAccount(), poolTx.getNonce())
 	err = pool.RestoreOneBatch(batches[0].BatchHash)
 	ast.Nil(err)

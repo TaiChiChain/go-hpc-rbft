@@ -1006,7 +1006,7 @@ func (rbft *rbftImpl[T, Constraint]) processNeedRemoveReqs() {
 		rbft.logger.Infof("Replica %d in normal finds 0 tx to remove", rbft.peerPool.ID)
 		return
 	}
-	rbft.logger.Infof("Replica %d successful remove %d tx in local memPool ", rbft.peerPool.ID, reqLen)
+	rbft.logger.Warningf("Replica %d successful remove %d tx in local memPool ", rbft.peerPool.ID, reqLen)
 }
 
 // recvRequestBatch handle logic after receive request batch
