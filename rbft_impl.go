@@ -1003,7 +1003,9 @@ func (rbft *rbftImpl[T, Constraint]) processNeedRemoveReqs() {
 		rbft.logger.Infof("Replica %d in normal finds 0 tx to remove", rbft.peerPool.ID)
 		return
 	}
-	if rbft.batchMgr.requestPool.IsPoolFull() {
+
+	// if requestPool is not full, set rbft state to not full
+	if !rbft.batchMgr.requestPool.IsPoolFull() {
 		rbft.setNotFull()
 	}
 	rbft.logger.Warningf("Replica %d successful remove %d tx in local memPool ", rbft.peerPool.ID, reqLen)
