@@ -755,13 +755,13 @@ func (mpi *mempoolImpl[T, Constraint]) RemoveTimeoutRequests() (uint64, error) {
 			mpi.logger.Debugf("handle orderedKey[account:%s, nonce:%d]", poolTx.getAccount(), poolTx.getNonce())
 			// for those batched txs, we don't need to removedTxs temporarily.
 			if _, ok := mpi.txStore.batchedTxs[txnPointer{orderedKey.account, orderedKey.nonce}]; ok {
-				mpi.logger.Warningf("find tx[account: %s, nonce:%d] from batchedTxs, ignore remove request",
+				mpi.logger.Debugf("find tx[account: %s, nonce:%d] from batchedTxs, ignore remove request",
 					orderedKey.account, orderedKey.nonce)
 				return true
 			}
 
 			if tx := mpi.txStore.priorityIndex.data.Get(orderedKey); tx != nil {
-				mpi.logger.Warningf("find tx[account: %s, nonce:%d] from priorityIndex, ignore remove request",
+				mpi.logger.Debugf("find tx[account: %s, nonce:%d] from priorityIndex, ignore remove request",
 					orderedKey.account, orderedKey.nonce)
 				return true
 			}
