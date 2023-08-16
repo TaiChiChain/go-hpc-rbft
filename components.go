@@ -172,15 +172,23 @@ type vcIdx struct {
 
 type nextDemandNewView uint64
 
-const ReqTxEvent = iota
+const (
+	ReqTxEvent = iota
+	ReqNonceEvent
+)
 
 // MiscEvent represents misc event sent by local modules
 type MiscEvent struct {
-	EventType int // current only ReqTxEvent
+	EventType int
 	Event     interface{}
 }
 
-type TxReqMsg struct {
+type ReqTxMsg struct {
 	hash string
 	ch   chan []byte
+}
+
+type ReqNonceMsg struct {
+	account string
+	ch      chan uint64
 }
