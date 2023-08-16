@@ -126,15 +126,22 @@ func (rbft *rbftImpl[T, Constraint]) dispatchLocalEvent(e *LocalEvent) consensus
 func (rbft *rbftImpl[T, Constraint]) dispatchMiscEvent(e *MiscEvent) consensusEvent {
 	switch e.EventType {
 	case ReqTxEvent:
-		return rbft.handleReqTxEvent(e.Event.(*TxReqMsg))
+		return rbft.handleReqTxEvent(e.Event.(*ReqTxMsg))
+	case ReqNonceEvent:
+		return rbft.handleReqNonceEvent(e.Event.(*ReqNonceMsg))
 	default:
 		rbft.logger.Errorf("Not Supported event: %v", e)
 		return nil
 	}
 }
 
-func (rbft *rbftImpl[T, Constraint]) handleReqTxEvent(e *TxReqMsg) consensusEvent {
+func (rbft *rbftImpl[T, Constraint]) handleReqTxEvent(e *ReqTxMsg) consensusEvent {
 	e.ch <- rbft.batchMgr.requestPool.GetPendingTxByHash(e.hash)
+	return nil
+}
+
+func (rbft *rbftImpl[T, Constraint]) handleReqNonceEvent(e *ReqNonceMsg) consensusEvent {
+	e.ch <- rbft.batchMgr.requestPool.GetPendingNonceByAccount(e.account)
 	return nil
 }
 

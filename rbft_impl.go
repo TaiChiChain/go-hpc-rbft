@@ -694,6 +694,9 @@ func (rbft *rbftImpl[T, Constraint]) processEvent(ee consensusEvent) consensusEv
 	case *LocalEvent:
 		return rbft.dispatchLocalEvent(e)
 
+	case *MiscEvent:
+		return rbft.dispatchMiscEvent(e)
+
 	case *consensusMessageWrapper:
 		return rbft.consensusMessageFilter(e.ctx, e.ConsensusMessage)
 
