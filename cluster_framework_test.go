@@ -298,12 +298,13 @@ func (tf *testFramework[T, Constraint]) newTestNode(id uint64, hostname string, 
 
 	// Memool Instance, Parameters in Config are Flexible
 	confMemPool := mempool.Config{
-		PoolSize:      100000,
-		BatchSize:     4,
-		BatchMemLimit: false,
-		BatchMaxMem:   999,
-		ToleranceTime: 999 * time.Millisecond,
-		Logger:        log,
+		PoolSize:            100000,
+		BatchSize:           4,
+		BatchMemLimit:       false,
+		BatchMaxMem:         999,
+		ToleranceTime:       999 * time.Millisecond,
+		ToleranceRemoveTime: 15 * time.Minute,
+		Logger:              log,
 		GetAccountNonce: func(address string) uint64 {
 			return 0
 		},
@@ -665,9 +666,10 @@ func newTx() *consensus.FltTransaction {
 	}
 	from := hex.EncodeToString(randomBytes)
 	return &consensus.FltTransaction{
-		From:  []byte(from),
-		Value: []byte(string(rune(rand.Int()))),
-		Nonce: 0,
+		From:      []byte(from),
+		Value:     []byte(string(rune(rand.Int()))),
+		Nonce:     0,
+		Timestamp: time.Now().Unix(),
 	}
 }
 

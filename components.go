@@ -56,6 +56,7 @@ const (
 	DefaultSyncStateRestartTimeout = 10 * time.Second
 	DefaultCleanViewChangeTimeout  = 60 * time.Second
 	DefaultCheckPoolTimeout        = 3 * time.Minute
+	DefaultCheckPoolRemoveTimeout  = 15 * time.Minute
 	DefaultFetchCheckpointTimeout  = 5 * time.Second
 	DefaultFetchViewTimeout        = 1 * time.Second
 
@@ -171,15 +172,23 @@ type vcIdx struct {
 
 type nextDemandNewView uint64
 
-const ReqTxEvent = iota
+const (
+	ReqTxEvent = iota
+	ReqNonceEvent
+)
 
 // MiscEvent represents misc event sent by local modules
 type MiscEvent struct {
-	EventType int // current only ReqTxEvent
+	EventType int
 	Event     interface{}
 }
 
-type TxReqMsg struct {
+type ReqTxMsg struct {
 	hash string
 	ch   chan []byte
+}
+
+type ReqNonceMsg struct {
+	account string
+	ch      chan uint64
 }

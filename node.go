@@ -230,12 +230,21 @@ func (n *node[T, Constraint]) getCurrentState() *types.ServiceState {
 
 // GetPendingNonceByAccount returns pendingNonce by given account.
 func (n *node[T, Constraint]) GetPendingNonceByAccount(account string) uint64 {
-	pendingNonce := n.rbft.batchMgr.requestPool.GetPendingNonceByAccount(account)
-	return pendingNonce
+	getNonceReq := &ReqNonceMsg{
+		account: account,
+		ch:      make(chan uint64),
+	}
+	localEvent := &MiscEvent{
+		EventType: ReqNonceEvent,
+		Event:     getNonceReq,
+	}
+	n.rbft.postMsg(localEvent)
+
+	return <-getNonceReq.ch
 }
 
 func (n *node[T, Constraint]) GetPendingTxByHash(hash string) []byte {
-	getTxReq := &TxReqMsg{
+	getTxReq := &ReqTxMsg{
 		hash: hash,
 		ch:   make(chan []byte),
 	}

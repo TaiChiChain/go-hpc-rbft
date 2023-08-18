@@ -694,6 +694,9 @@ func (rbft *rbftImpl[T, Constraint]) processEvent(ee consensusEvent) consensusEv
 	case *LocalEvent:
 		return rbft.dispatchLocalEvent(e)
 
+	case *MiscEvent:
+		return rbft.dispatchMiscEvent(e)
+
 	case *consensusMessageWrapper:
 		return rbft.consensusMessageFilter(e.ctx, e.ConsensusMessage)
 
@@ -999,14 +1002,16 @@ func (rbft *rbftImpl[T, Constraint]) processNeedRemoveReqs() {
 		rbft.logger.Warningf("Replica %d get the remained reqs failed, error: %v", rbft.peerPool.ID, err)
 	}
 
-	if !rbft.batchMgr.requestPool.IsPoolFull() {
-		rbft.setNotFull()
-	}
 	if reqLen == 0 {
 		rbft.logger.Infof("Replica %d in normal finds 0 tx to remove", rbft.peerPool.ID)
 		return
 	}
-	rbft.logger.Infof("Replica %d successful remove %d tx in local memPool ", rbft.peerPool.ID, reqLen)
+
+	// if requestPool is not full, set rbft state to not full
+	if !rbft.batchMgr.requestPool.IsPoolFull() {
+		rbft.setNotFull()
+	}
+	rbft.logger.Warningf("Replica %d successful remove %d tx in local memPool ", rbft.peerPool.ID, reqLen)
 }
 
 // recvRequestBatch handle logic after receive request batch

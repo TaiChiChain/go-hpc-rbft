@@ -188,6 +188,7 @@ func (rbft *rbftImpl[T, Constraint]) maybeSetNormal() {
 	if !rbft.atomicInOne(InViewChange, Pending, SkipInProgress) {
 		rbft.setNormal()
 		rbft.startCheckPoolTimer()
+		rbft.startCheckPoolRemoveTimer()
 	} else {
 		rbft.logger.Debugf("Replica %d not set normal as it's still in abnormal now.", rbft.peerPool.ID)
 	}

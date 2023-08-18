@@ -196,7 +196,7 @@ func (rbft *rbftImpl[T, Constraint]) startCheckPoolRemoveTimer() {
 	}
 
 	rbft.timerMgr.startTimer(checkPoolRemoveTimer, localEvent)
-	rbft.logger.Debugf("Replica %d started the check pool remove timer", rbft.peerPool.ID)
+	rbft.logger.Debugf("Replica %d started the check pool remove timer, need to remove invalid tx in mempool after %v", rbft.peerPool.ID, rbft.timerMgr.getTimeoutValue(checkPoolRemoveTimer))
 }
 
 // stopCheckPoolTimer stops the check pool timer when node enter abnormal status.
@@ -215,7 +215,7 @@ func (rbft *rbftImpl[T, Constraint]) restartCheckPoolRemoveTimer() {
 	}
 
 	rbft.timerMgr.startTimer(checkPoolRemoveTimer, localEvent)
-	rbft.logger.Debugf("Replica %d restarted the check pool remove timer", rbft.peerPool.ID)
+	rbft.logger.Debugf("Replica %d restarted the check pool remove timer, need to remove invalid tx in mempool after %v", rbft.peerPool.ID, rbft.timerMgr.getTimeoutValue(checkPoolRemoveTimer))
 }
 
 // maybeSendPrePrepare used by primary helps primary stores this batch and send prePrepare,
