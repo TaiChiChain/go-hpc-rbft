@@ -718,12 +718,12 @@ func TestRestoreOneBatch(t *testing.T) {
 	ast.Equal(true, ok)
 	poolTx := list.items[tx1.RbftGetNonce()]
 	ast.NotNil(poolTx)
-	pool.txStore.priorityIndex.removeByOrderedQueueKey(poolTx.getRawTimestamp(),
+	pool.txStore.priorityIndex.removeByOrderedQueueKey(poolTx.arrivedTime,
 		poolTx.getAccount(), poolTx.getNonce())
 	err = pool.RestoreOneBatch(batches[0].BatchHash)
 	ast.NotNil(err, "can't find tx from priorityIndex")
 
-	pool.txStore.priorityIndex.insertByOrderedQueueKey(poolTx.getRawTimestamp(),
+	pool.txStore.priorityIndex.insertByOrderedQueueKey(poolTx.arrivedTime,
 		poolTx.getAccount(), poolTx.getNonce())
 	err = pool.RestoreOneBatch(batches[0].BatchHash)
 	ast.Nil(err)

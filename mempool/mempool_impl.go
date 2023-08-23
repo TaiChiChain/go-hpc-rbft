@@ -840,14 +840,14 @@ func (mpi *mempoolImpl[T, Constraint]) processDirtyAccount(dirtyAccounts map[str
 
 			// insert ready txs into priorityIndex
 			for _, poolTx := range readyTxs {
-				mpi.txStore.priorityIndex.insertByOrderedQueueKey(poolTx.getRawTimestamp(), poolTx.getAccount(), poolTx.getNonce())
+				mpi.txStore.priorityIndex.insertByOrderedQueueKey(poolTx.arrivedTime, poolTx.getAccount(), poolTx.getNonce())
 				//mpi.logger.Debugf("insert ready tx[account: %s, nonce: %d] into priorityIndex", poolTx.getAccount(), poolTx.getNonce())
 			}
 			mpi.increasePriorityNonBatchSize(uint64(len(readyTxs)))
 
 			// insert non-ready txs into parkingLotIndex
 			for _, poolTx := range nonReadyTxs {
-				mpi.txStore.parkingLotIndex.insertByOrderedQueueKey(poolTx.getRawTimestamp(), poolTx.getAccount(), poolTx.getNonce())
+				mpi.txStore.parkingLotIndex.insertByOrderedQueueKey(poolTx.arrivedTime, poolTx.getAccount(), poolTx.getNonce())
 			}
 		}
 	}
@@ -996,13 +996,13 @@ func (mpi *mempoolImpl[T, Constraint]) replaceTx(tx *T) {
 	// remove old tx from txHashMap、priorityIndex、parkingLotIndex、localTTLIndex and removeTTLIndex
 	if oldPoolTx != nil {
 		delete(mpi.txStore.txHashMap, oldPoolTx.getHash())
-		mpi.txStore.priorityIndex.removeByOrderedQueueKey(oldPoolTx.getRawTimestamp(), oldPoolTx.getAccount(), oldPoolTx.getNonce())
-		mpi.txStore.parkingLotIndex.removeByOrderedQueueKey(oldPoolTx.getRawTimestamp(), oldPoolTx.getAccount(), oldPoolTx.getNonce())
+		mpi.txStore.priorityIndex.removeByOrderedQueueKey(oldPoolTx.arrivedTime, oldPoolTx.getAccount(), oldPoolTx.getNonce())
+		mpi.txStore.parkingLotIndex.removeByOrderedQueueKey(oldPoolTx.arrivedTime, oldPoolTx.getAccount(), oldPoolTx.getNonce())
 		mpi.txStore.localTTLIndex.removeByTTLIndexByKey(oldPoolTx, Rebroadcast)
 		mpi.txStore.removeTTLIndex.removeByTTLIndexByKey(oldPoolTx, Remove)
 	}
 	// insert new tx received from remote vp
-	mpi.txStore.priorityIndex.insertByOrderedQueueKey(newPoolTx.getRawTimestamp(), newPoolTx.getAccount(), newPoolTx.getNonce())
+	mpi.txStore.priorityIndex.insertByOrderedQueueKey(newPoolTx.arrivedTime, newPoolTx.getAccount(), newPoolTx.getNonce())
 }
 
 // getBatchHash calculate hash of a RequestHashBatch

@@ -88,7 +88,7 @@ func (idx *btreeIndex[T, Constraint]) removeByOrderedQueueKey(timestamp int64, a
 func (idx *btreeIndex[T, Constraint]) removeByOrderedQueueKeys(poolTxs map[string][]*mempoolTransaction[T, Constraint]) {
 	for _, list := range poolTxs {
 		for _, poolTx := range list {
-			idx.removeByOrderedQueueKey(poolTx.getRawTimestamp(), poolTx.getAccount(), poolTx.getNonce())
+			idx.removeByOrderedQueueKey(poolTx.arrivedTime, poolTx.getAccount(), poolTx.getNonce())
 		}
 	}
 }
