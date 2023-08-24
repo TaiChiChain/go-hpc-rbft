@@ -56,6 +56,7 @@ func (mpi *mempoolImpl[T, Constraint]) addNewRequests(txs [][]byte, isPrimary, l
 		txNonce := Constraint(tx).RbftGetNonce()
 		// currentSeqNo means the current wanted nonce of the account
 		currentSeqNo := mpi.txStore.nonceCache.getPendingNonce(txAccount)
+		mpi.logger.Debugf("Receive transaction [account: %s, nonce: %d, hash: %s], we required %d", txAccount, txNonce, txHash, currentSeqNo)
 		if txNonce < currentSeqNo {
 			if !isReplace {
 				mpi.logger.Warningf("Receive transaction [account: %s, nonce: %d, hash: %s], but we required %d", txAccount, txNonce, txHash, currentSeqNo)
@@ -102,6 +103,7 @@ func (mpi *mempoolImpl[T, Constraint]) addNewRequests(txs [][]byte, isPrimary, l
 				}
 				// receive all the missing txs
 				if len(existTxsHash) == len(missingTxsHash) {
+					mpi.logger.Errorf("Receive all the missing txs in batch %s", batchHash)
 					delete(mpi.txStore.missingBatch, batchHash)
 					completionMissingBatchHashes = append(completionMissingBatchHashes, batchHash)
 				}
@@ -471,6 +473,7 @@ func (mpi *mempoolImpl[T, Constraint]) GetRequestsByHashList(batchHash string, t
 		txs = nil
 		localList = nil
 		mpi.txStore.missingBatch[batchHash] = missingTxsHash
+		mpi.logger.Debugf("GetRequestsByHashList failed, find %d missing txs in batch %s", len(missingTxsHash), batchHash)
 		return
 	}
 	for _, txHash := range hashList {
@@ -977,7 +980,7 @@ func (mpi *mempoolImpl[T, Constraint]) replaceTx(tx *T) {
 		account: account,
 		nonce:   txNonce,
 	}
-	mpi.txStore.txHashMap[txHash] = txPointer
+
 	list, ok := mpi.txStore.allTxs[account]
 	if !ok {
 		list = newTxSortedMap[T, Constraint]()
@@ -1001,6 +1004,9 @@ func (mpi *mempoolImpl[T, Constraint]) replaceTx(tx *T) {
 		mpi.txStore.localTTLIndex.removeByTTLIndexByKey(oldPoolTx, Rebroadcast)
 		mpi.txStore.removeTTLIndex.removeByTTLIndexByKey(oldPoolTx, Remove)
 	}
+
+	// replace old tx with new tx in txHashMap
+	mpi.txStore.txHashMap[txHash] = txPointer
 	// insert new tx received from remote vp
 	mpi.txStore.priorityIndex.insertByOrderedQueueKey(newPoolTx.arrivedTime, newPoolTx.getAccount(), newPoolTx.getNonce())
 }
