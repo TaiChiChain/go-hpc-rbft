@@ -4,14 +4,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/common/metrics/disabled"
 )
 
-func newStorageTestNode[T any, Constraint consensus.TXConstraint[T]](ctrl *gomock.Controller) (*storeManager, Config) {
+func newStorageTestNode[T any, Constraint consensus.TXConstraint[T]](ctrl *gomock.Controller) (*storeManager[T, Constraint], Config) {
 	log := newRawLogger()
 
 	conf := Config{
@@ -51,7 +51,7 @@ func newStorageTestNode[T any, Constraint consensus.TXConstraint[T]](ctrl *gomoc
 		DelFlag:     make(chan bool),
 	}
 
-	return newStoreMgr(conf), conf
+	return newStoreMgr[T, Constraint](conf), conf
 }
 
 func TestStoreMgr_getCert(t *testing.T) {

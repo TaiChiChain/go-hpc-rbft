@@ -83,7 +83,7 @@ func (rbft *rbftImpl[T, Constraint]) beyondRange(n uint64) bool {
 
 // cleanAllBatchAndCert cleans all outstandingReqBatches and committedCert
 func (rbft *rbftImpl[T, Constraint]) cleanOutstandingAndCert() {
-	rbft.storeMgr.outstandingReqBatches = make(map[string]*consensus.RequestBatch)
+	rbft.storeMgr.outstandingReqBatches = make(map[string]*RequestBatch[T, Constraint])
 	rbft.storeMgr.committedCert = make(map[msgID]string)
 
 	rbft.metrics.outstandingBatchesGauge.Set(float64(0))
@@ -165,8 +165,8 @@ func (rbft *rbftImpl[T, Constraint]) committed(v uint64, n uint64, d string) boo
 // =============================================================================
 
 // broadcastReqSet helps broadcast requestSet to others.
-func (rbft *rbftImpl[T, Constraint]) broadcastReqSet(set *consensus.RequestSet) {
-	payload, err := proto.Marshal(set)
+func (rbft *rbftImpl[T, Constraint]) broadcastReqSet(set *RequestSet[T, Constraint]) {
+	payload, err := set.Marshal()
 	if err != nil {
 		rbft.logger.Errorf("ConsensusMessage_TRANSACTION_SET Marshal Error: %s", err)
 		return
@@ -699,14 +699,6 @@ func (rbft *rbftImpl[T, Constraint]) stopNamespace() {
 	rbft.delFlag <- true
 }
 
-func requestHash[T any, Constraint consensus.TXConstraint[T]](data []byte) string {
-	tx, err := consensus.DecodeTx[T, Constraint](data)
-	if err != nil {
-		panic("decodeTx err in requestHash")
-	}
-	return Constraint(tx).RbftGetTxHash()
-}
-
 // calculateMD5Hash calculate hash by MD5
 func calculateMD5Hash(list []string, timestamp int64) string {
 	h := md5.New()
@@ -721,14 +713,14 @@ func calculateMD5Hash(list []string, timestamp int64) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-func drainChannel(ch chan consensusEvent) ([][]byte, error) {
-	remainTxs := make([][]byte, 0)
+func (rbft *rbftImpl[T, Constraint]) drainChannel(ch chan consensusEvent) ([]*T, error) {
+	remainTxs := make([]*T, 0)
 
 	for len(ch) > 0 {
 		select {
 		case ee := <-ch:
 			switch e := ee.(type) {
-			case *consensus.RequestSet:
+			case *RequestSet[T, Constraint]:
 				remainTxs = append(remainTxs, e.Requests...)
 			default:
 			}
@@ -809,18 +801,18 @@ func (rbft *rbftImpl[T, Constraint]) syncConfigCheckpoint(checkpointHeight uint6
 // if epoch has been changed.
 // turn into new epoch when epoch has been changed.
 func (rbft *rbftImpl[T, Constraint]) syncEpoch() bool {
-	currenEpochInfo, err := rbft.external.GetCurrenEpochInfo()
+	currentEpochInfo, err := rbft.external.GetCurrentEpochInfo()
 	if err != nil {
 		rbft.logger.Errorf("Replica %d failed to get current epoch from ledger: %v", rbft.peerMgr.selfID, err)
 		rbft.stopNamespace()
 		return false
 	}
 
-	epochChanged := currenEpochInfo.Epoch != rbft.chainConfig.EpochInfo.Epoch
+	epochChanged := currentEpochInfo.Epoch != rbft.chainConfig.EpochInfo.Epoch
 	if epochChanged {
-		rbft.logger.Infof("epoch changed from %d to %d, epoch start block: %d, epoch period: %d", rbft.chainConfig.EpochInfo.Epoch, currenEpochInfo.Epoch, currenEpochInfo.StartBlock, currenEpochInfo.EpochPeriod)
+		rbft.logger.Infof("epoch changed from %d to %d, epoch start block: %d, epoch period: %d", rbft.chainConfig.EpochInfo.Epoch, currentEpochInfo.Epoch, currentEpochInfo.StartBlock, currentEpochInfo.EpochPeriod)
 		rbft.turnIntoEpoch()
-		rbft.moveWatermarks(currenEpochInfo.StartBlock-1, true)
+		rbft.moveWatermarks(currentEpochInfo.StartBlock-1, true)
 	} else {
 		rbft.logger.Debugf("Replica %d don't change epoch as epoch %d has not been changed",
 			rbft.peerMgr.selfID, rbft.chainConfig.EpochInfo.Epoch)

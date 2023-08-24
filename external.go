@@ -67,10 +67,10 @@ type Crypto interface {
 //     seqNos, it's applications responsibility to implement a fast sync algorithm to ensure node
 //     can catch up as soon as possible. Applications should call ServiceInbound.ReportStateUpdated
 //     to inform RBFT library the latest service state after StateUpdate.
-type ServiceOutbound interface {
+type ServiceOutbound[T any, Constraint consensus.TXConstraint[T]] interface {
 	// Execute informs application layer to apply one batch with given request list and batch seqNo.
 	// Users can apply different batches asynchronously but ensure the order by seqNo.
-	Execute(txs [][]byte, localList []bool, seqNo uint64, timestamp int64)
+	Execute(txs []*T, localList []bool, seqNo uint64, timestamp int64)
 
 	// StateUpdate informs application layer to catch up to given seqNo with specified state digest.
 	// epochChanges should be provided when the sync request has a backwardness of epoch changes
@@ -83,17 +83,17 @@ type ServiceOutbound interface {
 
 // EpochService provides service for epoch management.
 type EpochService interface {
-	GetCurrenEpochInfo() (*EpochInfo, error)
+	GetCurrentEpochInfo() (*EpochInfo, error)
 	GetEpochInfo(epoch uint64) (*EpochInfo, error)
 }
 
 // ExternalStack integrates all external interfaces which must be implemented by application users.
 //
-//go:generate mockgen -destination ./mock_external.go -package rbft -source ./external.go
+//go:generate mockgen -destination ./mock_external.go -package rbft -source ./external.go -typed
 type ExternalStack[T any, Constraint consensus.TXConstraint[T]] interface {
 	Storage
 	Network
 	Crypto
-	ServiceOutbound
+	ServiceOutbound[T, Constraint]
 	EpochService
 }

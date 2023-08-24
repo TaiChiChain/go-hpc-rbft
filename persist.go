@@ -352,7 +352,7 @@ func (rbft *rbftImpl[T, Constraint]) restoreCert() {
 		batch, ok := rbft.storeMgr.batchStore[idx.d]
 		// set isConfig if found.
 		if ok {
-			cert.isConfig = isConfigBatch[T, Constraint](batch.SeqNo, rbft.chainConfig.EpochInfo)
+			cert.isConfig = isConfigBatch(batch.SeqNo, rbft.chainConfig.EpochInfo)
 		}
 	}
 
@@ -404,7 +404,7 @@ func (rbft *rbftImpl[T, Constraint]) restoreCert() {
 // persistBatch persists one marshaled tx batch with the given digest to database
 func (rbft *rbftImpl[T, Constraint]) persistBatch(digest string) {
 	batch := rbft.storeMgr.batchStore[digest]
-	batchPacked, err := proto.Marshal(batch)
+	batchPacked, err := batch.Marshal()
 	if err != nil {
 		rbft.logger.Warningf("Replica %d could not persist request batch %s: %s", rbft.peerMgr.selfID, digest, err)
 		return
@@ -494,8 +494,8 @@ func (rbft *rbftImpl[T, Constraint]) restoreBatchStore() {
 			if _, err = fmt.Sscanf(key, "batch.%s", &digest); err != nil {
 				rbft.logger.Warningf("Replica %d could not restore pset key %s", rbft.peerMgr.selfID, key)
 			} else {
-				batch := &consensus.RequestBatch{}
-				err = proto.Unmarshal(set, batch)
+				batch := &RequestBatch[T, Constraint]{}
+				err = batch.Unmarshal(set)
 				if err == nil {
 					rbft.logger.Debugf("Replica %d restore batch %s", rbft.peerMgr.selfID, digest)
 					rbft.storeMgr.batchStore[digest] = batch
@@ -511,7 +511,7 @@ func (rbft *rbftImpl[T, Constraint]) restoreBatchStore() {
 }
 
 func (rbft *rbftImpl[T, Constraint]) restoreEpochInfo() {
-	e, err := rbft.external.GetCurrenEpochInfo()
+	e, err := rbft.external.GetCurrentEpochInfo()
 	if err != nil {
 		rbft.logger.Warningf("Replica %d failed to get current epoch from ledger: %v, will use genesis epoch info", rbft.peerMgr.selfID, err)
 		rbft.chainConfig.EpochInfo = rbft.config.GenesisEpochInfo
@@ -565,7 +565,7 @@ func (rbft *rbftImpl[T, Constraint]) restoreState() error {
 					MetaState: &types.MetaState{Height: seqNo, Digest: digest},
 					Epoch:     rbft.chainConfig.EpochInfo.Epoch,
 				}
-				signedC, gErr := rbft.generateSignedCheckpoint(state, isConfigBatch[T, Constraint](seqNo, rbft.chainConfig.EpochInfo))
+				signedC, gErr := rbft.generateSignedCheckpoint(state, isConfigBatch(seqNo, rbft.chainConfig.EpochInfo))
 				if gErr != nil {
 					return gErr
 				}

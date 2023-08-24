@@ -24,20 +24,18 @@ func TestBatchMgr_maybeSendPrePrepare(t *testing.T) {
 	_, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 
 	// Set a Batch
-	txBytes41, err := newTx().Marshal()
-	assert.NoError(t, err)
-	batchTmp41 := &consensus.RequestBatch{
+	txx41 := newTx()
+	batchTmp41 := &RequestBatch[consensus.FltTransaction, *consensus.FltTransaction]{
 		RequestHashList: []string{"tx-hash-41"},
-		RequestList:     [][]byte{txBytes41},
+		RequestList:     []*consensus.FltTransaction{txx41},
 		Timestamp:       time.Now().Unix(),
 		LocalList:       []bool{true},
 		BatchHash:       "test digest 41",
 	}
-	txBytes42, err := newTx().Marshal()
-	assert.NoError(t, err)
-	batchTmp42 := &consensus.RequestBatch{
+	tx42 := newTx()
+	batchTmp42 := &RequestBatch[consensus.FltTransaction, *consensus.FltTransaction]{
 		RequestHashList: []string{"tx-hash-42"},
-		RequestList:     [][]byte{txBytes42},
+		RequestList:     []*consensus.FltTransaction{tx42},
 		Timestamp:       time.Now().Unix(),
 		LocalList:       []bool{true},
 		BatchHash:       "test digest 42",

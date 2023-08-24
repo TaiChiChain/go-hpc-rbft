@@ -132,7 +132,7 @@ func (rbft *rbftImpl[T, Constraint]) turnIntoEpoch() {
 	})
 
 	// validator set has been changed, start a new epoch and check new epoch
-	newEpoch, err := rbft.external.GetCurrenEpochInfo()
+	newEpoch, err := rbft.external.GetCurrentEpochInfo()
 	if err != nil {
 		rbft.logger.Errorf("Replica %d failed to get current epoch from ledger: %v", rbft.peerMgr.selfID, err)
 		rbft.stopNamespace()

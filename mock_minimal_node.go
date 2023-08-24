@@ -1,7 +1,7 @@
 package rbft
 
 import (
-	"github.com/golang/mock/gomock"
+	"go.uber.org/mock/gomock"
 
 	"github.com/axiomesh/axiom-bft/common/consensus"
 )
@@ -15,7 +15,7 @@ func NewMockMinimalNode[T any, Constraint consensus.TXConstraint[T]](ctrl *gomoc
 	mock := NewMockNode[T, Constraint](ctrl)
 	mock.EXPECT().Start().Return(nil).AnyTimes()
 	mock.EXPECT().Step(gomock.Any(), gomock.Any()).Return().AnyTimes()
-	mock.EXPECT().Stop().Return([][]byte{}).AnyTimes()
+	mock.EXPECT().Stop().Return([]*T{}).AnyTimes()
 	mock.EXPECT().ReportExecuted(gomock.Any()).Return().AnyTimes()
 	mock.EXPECT().ReportStateUpdated(gomock.Any()).Return().AnyTimes()
 	return mock

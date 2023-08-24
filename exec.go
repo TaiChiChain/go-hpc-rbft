@@ -127,7 +127,7 @@ func (rbft *rbftImpl[T, Constraint]) dispatchLocalEvent(e *LocalEvent) consensus
 func (rbft *rbftImpl[T, Constraint]) dispatchMiscEvent(e *MiscEvent) consensusEvent {
 	switch e.EventType {
 	case ReqTxEvent:
-		return rbft.handleReqTxEvent(e.Event.(*ReqTxMsg))
+		return rbft.handleReqTxEvent(e.Event.(*ReqTxMsg[T, Constraint]))
 	case ReqNonceEvent:
 		return rbft.handleReqNonceEvent(e.Event.(*ReqNonceMsg))
 	default:
@@ -136,7 +136,7 @@ func (rbft *rbftImpl[T, Constraint]) dispatchMiscEvent(e *MiscEvent) consensusEv
 	}
 }
 
-func (rbft *rbftImpl[T, Constraint]) handleReqTxEvent(e *ReqTxMsg) consensusEvent {
+func (rbft *rbftImpl[T, Constraint]) handleReqTxEvent(e *ReqTxMsg[T, Constraint]) consensusEvent {
 	e.ch <- rbft.batchMgr.requestPool.GetPendingTxByHash(e.hash)
 	return nil
 }

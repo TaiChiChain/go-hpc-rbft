@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/common/metrics/disabled"
@@ -103,9 +103,7 @@ func TestRBFT_consensusMessageFilter(t *testing.T) {
 	rbfts[1].consensusMessageFilter(context.TODO(), sync.ConsensusMessage)
 
 	tx := newTx()
-	txBytes, err := tx.Marshal()
-	assert.Nil(t, err)
-	rbfts[0].batchMgr.requestPool.AddNewRequests([][]byte{txBytes}, false, true, false)
+	rbfts[0].batchMgr.requestPool.AddNewRequests([]*consensus.FltTransaction{tx}, false, true, false)
 	batchTimerEvent := &LocalEvent{
 		Service:   CoreRbftService,
 		EventType: CoreBatchTimerEvent,
@@ -347,16 +345,14 @@ func TestRBFT_start_cache_message(t *testing.T) {
 	}
 	rbfts[0].step(context.TODO(), correctMsg)
 
-	rs := &consensus.RequestSet{}
+	rs := &RequestSet[consensus.FltTransaction, *consensus.FltTransaction]{}
 	rbfts[0].postRequests(rs)
 }
 
 func TestRBFT_processOutOfDateReqs(t *testing.T) {
 	_, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	tx := newTx()
-	txBytes, err := tx.Marshal()
-	assert.Nil(t, err)
-	rbfts[1].batchMgr.requestPool.AddNewRequests([][]byte{txBytes}, false, true, false)
+	rbfts[1].batchMgr.requestPool.AddNewRequests([]*consensus.FltTransaction{tx}, false, true, false)
 	rbfts[1].setFull()
 	rbfts[1].processOutOfDateReqs()
 	assert.Equal(t, true, rbfts[1].isPoolFull())
@@ -366,12 +362,10 @@ func TestRBFT_processOutOfDateReqs(t *testing.T) {
 	assert.Equal(t, false, rbfts[1].isPoolFull())
 
 	// split according to set size when broadcast.
-	batch := make([][]byte, 100)
+	batch := make([]*consensus.FltTransaction, 100)
 	for i := 0; i < 100; i++ {
-		transaction := newTx()
-		data, err := transaction.Marshal()
-		assert.Nil(t, err)
-		batch[i] = data
+		tx := newTx()
+		batch[i] = tx
 	}
 	rbfts[1].batchMgr.requestPool.AddNewRequests(batch, false, true, false)
 	// sleep to trigger txpool tolerance time.
@@ -450,8 +444,8 @@ func TestRBFT_recvPrePrepare_WrongSeqNo(t *testing.T) {
 	tx := newTx()
 	txBytes, err := tx.Marshal()
 	assert.Nil(t, err)
-	txHash := requestHash[consensus.FltTransaction, *consensus.FltTransaction](txBytes)
 
+	txHash := tx.RbftGetTxHash()
 	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	hashBatch := &consensus.HashBatch{
 		RequestHashList: []string{txHash},
@@ -506,7 +500,7 @@ func TestRBFT_recvFetchMissingResponse(t *testing.T) {
 	tx := newTx()
 	txBytes, err := tx.Marshal()
 	assert.Nil(t, err)
-	txHash := requestHash[consensus.FltTransaction, *consensus.FltTransaction](txBytes)
+	txHash := tx.RbftGetTxHash()
 
 	hashBatch := &consensus.HashBatch{
 		RequestHashList: []string{txHash},
@@ -531,9 +525,9 @@ func TestRBFT_recvFetchMissingResponse(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Nil(t, nodes[0].unicastMessageCache)
 
-	rbfts[0].storeMgr.batchStore[fetch.BatchDigest] = &consensus.RequestBatch{
+	rbfts[0].storeMgr.batchStore[fetch.BatchDigest] = &RequestBatch[consensus.FltTransaction, *consensus.FltTransaction]{
 		RequestHashList: []string{txHash},
-		RequestList:     [][]byte{txBytes},
+		RequestList:     []*consensus.FltTransaction{tx},
 		SeqNo:           uint64(1),
 		LocalList:       []bool{true},
 	}

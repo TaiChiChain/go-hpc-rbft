@@ -11,7 +11,7 @@ help: Makefile
 
 ## make prepare: Preparation before development
 prepare:
-	${GO_BIN} install github.com/golang/mock/mockgen@v1.7.0-rc.1
+	${GO_BIN} install go.uber.org/mock/mockgen@main
 	${GO_BIN} install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.53.3
 	${GO_BIN} install github.com/fsgo/go_fmt@v0.5.0
 

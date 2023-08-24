@@ -27,7 +27,7 @@ import (
 // 2. batch events timer management
 type batchManager[T any, Constraint consensus.TXConstraint[T]] struct {
 	seqNo                uint64                    // track the prePrepare batch seqNo
-	cacheBatch           []*consensus.RequestBatch // cache batches wait for prePreparing
+	cacheBatch           []*RequestBatch[T, Constraint] // cache batches wait for prePreparing
 	batchTimerActive     bool                      // track the batch timer event, true means there exists an undergoing batch timer event
 	noTxBatchTimerActive bool                      // track the batch timer event, true means there exists an undergoing batch timer event
 	lastBatchTime        int64                     // track last batch time [only used by primary], reset when become primary.
@@ -212,10 +212,10 @@ func (rbft *rbftImpl[T, Constraint]) restartCheckPoolRemoveTimer() {
 // flag findCache indicates whether we need to get request batch from cacheBatch or not as
 // we may store batch into cacheBatch temporarily if next demand seqNo is higher than our
 // high watermark. (this is where we restrict the speed of consensus)
-func (rbft *rbftImpl[T, Constraint]) maybeSendPrePrepare(batch *consensus.RequestBatch, findCache bool) {
+func (rbft *rbftImpl[T, Constraint]) maybeSendPrePrepare(batch *RequestBatch[T, Constraint], findCache bool) {
 	var (
 		nextSeqNo uint64
-		nextBatch *consensus.RequestBatch
+		nextBatch *RequestBatch[T, Constraint]
 	)
 
 	nextSeqNo = rbft.batchMgr.getSeqNo() + 1
@@ -309,7 +309,7 @@ func (rbft *rbftImpl[T, Constraint]) findNextPrepareBatch(ctx context.Context, v
 	// with seqNo <= lastExec. However, those batches may have been deleted from requestPool,
 	// so we can get those batches from batchStore first.
 	if existBatch, ok := rbft.storeMgr.batchStore[d]; ok {
-		if isConfigBatch[T, Constraint](existBatch.SeqNo, rbft.chainConfig.EpochInfo) {
+		if isConfigBatch(existBatch.SeqNo, rbft.chainConfig.EpochInfo) {
 			rbft.logger.Debugf("Replica %d generate a config batch", rbft.peerMgr.selfID)
 			rbft.atomicOn(InConfChange)
 			cert.isConfig = true
@@ -332,7 +332,7 @@ func (rbft *rbftImpl[T, Constraint]) findNextPrepareBatch(ctx context.Context, v
 		return nil
 	}
 
-	batch := &consensus.RequestBatch{
+	batch := &RequestBatch[T, Constraint]{
 		RequestHashList: prePrep.HashBatch.RequestHashList,
 		RequestList:     txList,
 		Timestamp:       prePrep.HashBatch.Timestamp,
@@ -348,7 +348,7 @@ func (rbft *rbftImpl[T, Constraint]) findNextPrepareBatch(ctx context.Context, v
 	rbft.metrics.batchesGauge.Add(float64(1))
 	rbft.metrics.outstandingBatchesGauge.Add(float64(1))
 
-	if isConfigBatch[T, Constraint](batch.SeqNo, rbft.chainConfig.EpochInfo) {
+	if isConfigBatch(batch.SeqNo, rbft.chainConfig.EpochInfo) {
 		rbft.logger.Debugf("Replica %d generate a config batch", rbft.peerMgr.selfID)
 		rbft.atomicOn(InConfChange)
 		cert.isConfig = true
@@ -404,7 +404,7 @@ func (rbft *rbftImpl[T, Constraint]) primaryResubmitTransactions() {
 	}
 }
 
-func isConfigBatch[T any, Constraint consensus.TXConstraint[T]](seqNo uint64, epochInfo *EpochInfo) bool {
+func isConfigBatch(seqNo uint64, epochInfo *EpochInfo) bool {
 	// when epoch change trigger
 	return seqNo == epochInfo.StartBlock+epochInfo.EpochPeriod-1
 }

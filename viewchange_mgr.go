@@ -592,6 +592,7 @@ func (rbft *rbftImpl[T, Constraint]) checkNewView(nv *consensus.NewView) (uint64
 		return 0, "", nil, false
 	}
 
+
 	expectedPrimaryID := rbft.chainConfig.calPrimaryIDByView(nv.View)
 	if expectedPrimaryID != nv.ReplicaId {
 		rbft.logger.Warningf("Replica %d reject invalid newView from %d, v:%d, expected primary: %d",
@@ -1060,8 +1061,14 @@ func (rbft *rbftImpl[T, Constraint]) recvFetchRequestBatch(fr *consensus.FetchBa
 
 	rbft.logger.Debugf("Replica %d response request batch with digest: %s", rbft.peerMgr.selfID, fr.BatchDigest)
 	reqBatch := rbft.storeMgr.batchStore[digest]
+
+	pbBatch, err := reqBatch.ToPB()
+	if err != nil {
+		rbft.logger.Errorf("RequestBatch marshal Error: %s", err)
+		return nil
+	}
 	batch := &consensus.FetchBatchResponse{
-		Batch:       reqBatch,
+		Batch:       pbBatch,
 		BatchDigest: digest,
 		ReplicaId:   rbft.peerMgr.selfID,
 	}
@@ -1097,7 +1104,12 @@ func (rbft *rbftImpl[T, Constraint]) recvFetchBatchResponse(batch *consensus.Fet
 		return nil // either the wrong digest, or we got it already from someone else
 	}
 	// store into batchStore only, and store into requestPool by order when processNewView.
-	rbft.storeMgr.batchStore[digest] = batch.Batch
+	receiveBatch := &RequestBatch[T, Constraint]{}
+	if err := receiveBatch.FromPB(batch.Batch); err != nil {
+		rbft.logger.Errorf("RequestBatch unmarshal Error: %s", err)
+		return nil
+	}
+	rbft.storeMgr.batchStore[digest] = receiveBatch
 	rbft.persistBatch(digest)
 	rbft.metrics.batchesGauge.Add(float64(1))
 
@@ -1589,7 +1601,7 @@ func (rbft *rbftImpl[T, Constraint]) processNewView(msgList []*consensus.Vc_PQ) 
 			maxN = n
 		}
 
-		if isConfigBatch[T, Constraint](n, rbft.chainConfig.EpochInfo) {
+		if isConfigBatch(n, rbft.chainConfig.EpochInfo) {
 			rbft.logger.Noticef("Replica %d is processing a config batch %d, skip the following", rbft.peerMgr.selfID, n)
 			if n == rbft.exec.lastExec {
 				rbft.atomicOn(InConfChange)

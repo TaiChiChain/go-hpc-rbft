@@ -31,11 +31,10 @@ func TestExec_handleCoreRbftEvent_batchTimerEvent(t *testing.T) {
 	rbfts[0].atomicOff(InConfChange)
 
 	tx := newTx()
-	txBytes, err := tx.Marshal()
-	assert.Nil(t, err)
-	rbfts[0].batchMgr.requestPool.AddNewRequests([][]byte{txBytes}, false, true, false)
+
+	rbfts[0].batchMgr.requestPool.AddNewRequests([]*consensus.FltTransaction{tx}, false, true, false)
 	reqBatch := rbfts[0].batchMgr.requestPool.GenerateRequestBatch()
-	batch := &consensus.RequestBatch{
+	batch := &RequestBatch[consensus.FltTransaction, *consensus.FltTransaction]{
 		RequestHashList: reqBatch[0].TxHashList,
 		RequestList:     reqBatch[0].TxList,
 		Timestamp:       reqBatch[0].Timestamp,

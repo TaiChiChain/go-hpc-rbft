@@ -3,7 +3,7 @@ package rbft
 import (
 	"errors"
 
-	"github.com/golang/mock/gomock"
+	"go.uber.org/mock/gomock"
 
 	"github.com/axiomesh/axiom-bft/common/consensus"
 )
@@ -33,7 +33,7 @@ func NewMockMinimalExternal[T any, Constraint consensus.TXConstraint[T]](ctrl *g
 	mock.EXPECT().SendFilterEvent(gomock.Any(), gomock.Any()).Return().AnyTimes()
 
 	mock.EXPECT().GetEpochInfo(gomock.Any()).Return(nil, nil).AnyTimes()
-	mock.EXPECT().GetCurrenEpochInfo().Return(nil, errors.New("not found epoch info for mock")).AnyTimes()
+	mock.EXPECT().GetCurrentEpochInfo().Return(nil, errors.New("not found epoch info for mock")).AnyTimes()
 
 	return mock
 }

@@ -451,10 +451,10 @@ func (ext *testExternal[T, Constraint]) Verify(peerHash string, signature []byte
 }
 
 // ServiceOutbound
-func (ext *testExternal[T, Constraint]) Execute(requests [][]byte, localList []bool, seqNo uint64, timestamp int64) {
+func (ext *testExternal[T, Constraint]) Execute(requests []*T, localList []bool, seqNo uint64, timestamp int64) {
 	var txHashList []string
 	for _, req := range requests {
-		txHash := requestHash[T, Constraint](req)
+		txHash := Constraint(req).RbftGetTxHash()
 		txHashList = append(txHashList, txHash)
 	}
 	blockHash := calculateMD5Hash(txHashList, timestamp)
@@ -562,7 +562,7 @@ func (ext *testExternal[T, Constraint]) SendFilterEvent(informType types.InformT
 }
 
 // TODO: supported epoch change
-func (ext *testExternal[T, Constraint]) GetCurrenEpochInfo() (*EpochInfo, error) {
+func (ext *testExternal[T, Constraint]) GetCurrentEpochInfo() (*EpochInfo, error) {
 	return ext.testNode.n.config.GenesisEpochInfo, nil
 }
 

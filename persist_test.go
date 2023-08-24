@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/gogo/protobuf/proto"
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/common/metrics/disabled"
@@ -61,7 +61,7 @@ func newPersistTestReplica[T any, Constraint consensus.TXConstraint[T]](ctrl *go
 	}
 
 	ext.EXPECT().GetEpochInfo(gomock.Any()).Return(conf.GenesisEpochInfo, nil).AnyTimes()
-	ext.EXPECT().GetCurrenEpochInfo().Return(conf.GenesisEpochInfo, nil).AnyTimes()
+	ext.EXPECT().GetCurrentEpochInfo().Return(conf.GenesisEpochInfo, nil).AnyTimes()
 
 	node, _ := newNode[T, Constraint](conf, ext, pool)
 	return node, ext

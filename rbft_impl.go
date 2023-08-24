@@ -120,7 +120,7 @@ type rbftImpl[T any, Constraint consensus.TXConstraint[T]] struct {
 	status      *statusManager               // keep all basic status of rbft in this object
 	timerMgr    *timerManager                // manage rbft event timers
 	exec        *executor                    // manage transaction execution
-	storeMgr    *storeManager                // manage memory log storage
+	storeMgr    *storeManager[T, Constraint] // manage memory log storage
 	batchMgr    *batchManager[T, Constraint] // manage request batch related issues
 	recoveryMgr *recoveryManager             // manage recovery issues
 	vcMgr       *vcManager                   // manage viewchange issues
@@ -201,7 +201,7 @@ func newRBFT[T any, Constraint consensus.TXConstraint[T]](c Config, external Ext
 	rbft.exec = newExecutor()
 
 	// new store manager
-	rbft.storeMgr = newStoreMgr(c)
+	rbft.storeMgr = newStoreMgr[T, Constraint](c)
 
 	// new batch manager
 	rbft.batchMgr = newBatchManager(requestPool, c)
@@ -307,7 +307,7 @@ func (rbft *rbftImpl[T, Constraint]) start() error {
 }
 
 // stop the consensus service
-func (rbft *rbftImpl[T, Constraint]) stop() [][]byte {
+func (rbft *rbftImpl[T, Constraint]) stop() []*T {
 	rbft.logger.Notice("RBFT stopping...")
 
 	// reset status to pending.
@@ -322,7 +322,7 @@ func (rbft *rbftImpl[T, Constraint]) stop() [][]byte {
 	rbft.logger.Notice("close channel: checkpoint")
 	close(rbft.cpChan)
 
-	remainTxs, err := drainChannel(rbft.recvChan)
+	remainTxs, err := rbft.drainChannel(rbft.recvChan)
 	if err != nil {
 		rbft.logger.Errorf("drain channel error: %s", err)
 	}
@@ -424,7 +424,7 @@ func (rbft *rbftImpl[T, Constraint]) step(ctx context.Context, msg *consensus.Co
 }
 
 // postRequests informs RBFT tx set event which is posted from application layer.
-func (rbft *rbftImpl[T, Constraint]) postRequests(requests *consensus.RequestSet) {
+func (rbft *rbftImpl[T, Constraint]) postRequests(requests *RequestSet[T, Constraint]) {
 	if rbft.atomicIn(Pending) {
 		rbft.logger.Debugf("Replica %d is in pending status, reject propose request", rbft.peerMgr.selfID)
 		return
@@ -563,7 +563,7 @@ func (rbft *rbftImpl[T, Constraint]) listenEvent() {
 // processEvent process consensus messages and local events cyclically.
 func (rbft *rbftImpl[T, Constraint]) processEvent(ee consensusEvent) consensusEvent {
 	switch e := ee.(type) {
-	case *consensus.RequestSet:
+	case *RequestSet[T, Constraint]:
 		// e.Local indicates whether this RequestSet was generated locally or received
 		// from remote nodes.
 		if e.Local {
@@ -575,6 +575,25 @@ func (rbft *rbftImpl[T, Constraint]) processEvent(ee consensusEvent) consensusEv
 		}
 
 		rbft.processReqSetEvent(e)
+
+		return nil
+	case *consensus.RequestSet:
+		// e.Local indicates whether this RequestSet was generated locally or received
+		// from remote nodes.
+		if e.Local {
+			rbft.metrics.incomingLocalTxSets.Add(float64(1))
+			rbft.metrics.incomingLocalTxs.Add(float64(len(e.Requests)))
+		} else {
+			rbft.metrics.incomingRemoteTxSets.Add(float64(1))
+			rbft.metrics.incomingRemoteTxs.Add(float64(len(e.Requests)))
+		}
+
+		var requestSet RequestSet[T, Constraint]
+		if err := requestSet.FromPB(e); err != nil {
+			rbft.logger.Errorf("RequestSet unmarshal error: %v", err)
+			return nil
+		}
+		rbft.processReqSetEvent(&requestSet)
 
 		return nil
 
@@ -711,7 +730,7 @@ func (rbft *rbftImpl[T, Constraint]) recvNullRequest(msg *consensus.NullRequest)
 // 1. pool is full, reject txs relayed from other nodes
 // 2. node is in config change, add another config tx into txpool
 // 3. node is in skipInProgress, rejects any txs from other nodes
-func (rbft *rbftImpl[T, Constraint]) processReqSetEvent(req *consensus.RequestSet) consensusEvent {
+func (rbft *rbftImpl[T, Constraint]) processReqSetEvent(req *RequestSet[T, Constraint]) consensusEvent {
 	// if pool already full, rejects the tx, unless it's from RPC because of time difference or we have opened flow control
 	if rbft.isPoolFull() && !req.Local && !rbft.flowControl {
 		rbft.rejectRequestSet(req)
@@ -783,7 +802,7 @@ func (rbft *rbftImpl[T, Constraint]) processReqSetEvent(req *consensus.RequestSe
 }
 
 // rejectRequestSet rejects tx set and update related metrics.
-func (rbft *rbftImpl[T, Constraint]) rejectRequestSet(req *consensus.RequestSet) {
+func (rbft *rbftImpl[T, Constraint]) rejectRequestSet(req *RequestSet[T, Constraint]) {
 	if req.Local {
 		rbft.metrics.rejectedLocalTxs.Add(float64(len(req.Requests)))
 	} else {
@@ -853,12 +872,12 @@ func (rbft *rbftImpl[T, Constraint]) processOutOfDateReqs() {
 	// limit TransactionSet size by setSize before re-broadcast reqs
 	for reqLen > 0 {
 		if reqLen <= setSize {
-			set := &consensus.RequestSet{Requests: reqs}
+			set := &RequestSet[T, Constraint]{Requests: reqs}
 			rbft.broadcastReqSet(set)
 			reqLen = 0
 		} else {
 			bTxs := reqs[0:setSize]
-			set := &consensus.RequestSet{Requests: bTxs}
+			set := &RequestSet[T, Constraint]{Requests: bTxs}
 			rbft.broadcastReqSet(set)
 			reqs = reqs[setSize:]
 			reqLen -= setSize
@@ -891,7 +910,7 @@ func (rbft *rbftImpl[T, Constraint]) processNeedRemoveReqs() {
 func (rbft *rbftImpl[T, Constraint]) recvRequestBatch(reqBatch *mempool.RequestHashBatch[T, Constraint]) error {
 	rbft.logger.Debugf("Replica %d received request batch %s", rbft.peerMgr.selfID, reqBatch.BatchHash)
 
-	batch := &consensus.RequestBatch{
+	batch := &RequestBatch[T, Constraint]{
 		RequestHashList: reqBatch.TxHashList,
 		RequestList:     reqBatch.TxList,
 		Timestamp:       reqBatch.Timestamp,
@@ -903,7 +922,7 @@ func (rbft *rbftImpl[T, Constraint]) recvRequestBatch(reqBatch *mempool.RequestH
 	// primary node should reject generate batch when there is a config batch in ordering.
 	if rbft.isPrimary(rbft.peerMgr.selfID) && rbft.isNormal() && !rbft.atomicIn(InConfChange) {
 		// enter config change status once we generate a config batch.
-		if isConfigBatch[T, Constraint](batch.SeqNo, rbft.chainConfig.EpochInfo) {
+		if isConfigBatch(batch.SeqNo, rbft.chainConfig.EpochInfo) {
 			rbft.logger.Noticef("Primary %d has generated a config batch, start config change", rbft.peerMgr.selfID)
 			rbft.atomicOn(InConfChange)
 			rbft.metrics.statusGaugeInConfChange.Set(InConfChange)
@@ -932,7 +951,7 @@ func (rbft *rbftImpl[T, Constraint]) recvRequestBatch(reqBatch *mempool.RequestH
 // normal case: pre-prepare, prepare, commit methods
 // =============================================================================
 // sendPrePrepare send prePrepare message.
-func (rbft *rbftImpl[T, Constraint]) sendPrePrepare(seqNo uint64, digest string, reqBatch *consensus.RequestBatch) {
+func (rbft *rbftImpl[T, Constraint]) sendPrePrepare(seqNo uint64, digest string, reqBatch *RequestBatch[T, Constraint]) {
 	rbft.logger.Debugf("Primary %d sending prePrepare for view=%d/seqNo=%d/digest=%s, "+
 		"batch size: %d, timestamp: %d", rbft.peerMgr.selfID, rbft.chainConfig.View, seqNo, digest, len(reqBatch.RequestHashList), reqBatch.Timestamp)
 
@@ -954,7 +973,7 @@ func (rbft *rbftImpl[T, Constraint]) sendPrePrepare(seqNo uint64, digest string,
 	}
 
 	cert := rbft.storeMgr.getCert(rbft.chainConfig.View, seqNo, digest)
-	cert.isConfig = isConfigBatch[T, Constraint](reqBatch.SeqNo, rbft.chainConfig.EpochInfo)
+	cert.isConfig = isConfigBatch(reqBatch.SeqNo, rbft.chainConfig.EpochInfo)
 	cert.prePrepare = preprepare
 	cert.prePrepareCtx = ctx
 	rbft.persistQSet(preprepare)
@@ -1313,10 +1332,14 @@ func (rbft *rbftImpl[T, Constraint]) recvFetchMissingRequest(ctx context.Context
 					"fetch missing requests", rbft.peerMgr.selfID)
 				return nil
 			}
-			requests[i] = batch.RequestList[i]
+			requests[i], err = Constraint(batch.RequestList[i]).RbftMarshal()
+			if err != nil {
+				rbft.logger.Errorf("Tx marshal Error: %s", err)
+				return nil
+			}
 		}
 	} else {
-		var missingTxs map[uint64][]byte
+		var missingTxs map[uint64]*T
 		missingTxs, err = rbft.batchMgr.requestPool.SendMissingRequests(fetch.BatchDigest, fetch.MissingRequestHashes)
 		if err != nil {
 			rbft.logger.Warningf("Primary %d cannot find the digest %s, missing tx hashes: %+v, err: %s",
@@ -1324,7 +1347,11 @@ func (rbft *rbftImpl[T, Constraint]) recvFetchMissingRequest(ctx context.Context
 			return nil
 		}
 		for i, tx := range missingTxs {
-			requests[i] = tx
+			requests[i], err = Constraint(tx).RbftMarshal()
+			if err != nil {
+				rbft.logger.Errorf("Tx marshal Error: %s", err)
+				return nil
+			}
 		}
 	}
 
@@ -1402,7 +1429,17 @@ func (rbft *rbftImpl[T, Constraint]) recvFetchMissingResponse(ctx context.Contex
 		return nil
 	}
 
-	err := rbft.batchMgr.requestPool.ReceiveMissingRequests(re.BatchDigest, re.MissingRequests)
+	requests := make(map[uint64]*T)
+	for i, reqRaw := range re.MissingRequests {
+		var req T
+		if err := Constraint(&req).RbftUnmarshal(reqRaw); err != nil {
+			rbft.logger.Errorf("Tx unmarshal Error: %s", err)
+			return nil
+		}
+		requests[i] = &req
+	}
+
+	err := rbft.batchMgr.requestPool.ReceiveMissingRequests(re.BatchDigest, requests)
 	if err != nil {
 		// there is something wrong with primary for it propose a transaction with mismatched hash,
 		// so that we should send view-change directly to expect a new leader.
@@ -1439,7 +1476,7 @@ func (rbft *rbftImpl[T, Constraint]) commitPendingBlocks() {
 			}
 
 			if idx.d == "" {
-				txList := make([][]byte, 0)
+				txList := make([]*T, 0)
 				localList := make([]bool, 0)
 				rbft.metrics.committedEmptyBlockNumber.Add(float64(1))
 				rbft.metrics.txsPerBlock.Observe(float64(0))
@@ -1479,9 +1516,9 @@ func (rbft *rbftImpl[T, Constraint]) commitPendingBlocks() {
 }
 
 // filterExecutableTxs flatten txs into txs and kick out duplicate txs with hash included in deDuplicateTxHashes.
-func (rbft *rbftImpl[T, Constraint]) filterExecutableTxs(digest string, deDuplicateRequestHashes []string) ([][]byte, []bool) {
+func (rbft *rbftImpl[T, Constraint]) filterExecutableTxs(digest string, deDuplicateRequestHashes []string) ([]*T, []bool) {
 	var (
-		txList, executableTxs          [][]byte
+		txList, executableTxs          []*T
 		localList, executableLocalList []bool
 	)
 	txList = rbft.storeMgr.batchStore[digest].RequestList
@@ -1491,7 +1528,7 @@ func (rbft *rbftImpl[T, Constraint]) filterExecutableTxs(digest string, deDuplic
 		dupHashes[dupHash] = true
 	}
 	for i, request := range txList {
-		reqHash := requestHash[T, Constraint](request)
+		reqHash := Constraint(request).RbftGetTxHash()
 		if dupHashes[reqHash] {
 			rbft.logger.Noticef("Replica %d kick out de-duplicate request %s before execute batch %s", rbft.peerMgr.selfID, reqHash, digest)
 			continue

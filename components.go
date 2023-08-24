@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/axiomesh/axiom-bft/common/consensus"
+	"github.com/gogo/protobuf/proto"
 )
 
 // constant timer names
@@ -100,6 +101,102 @@ const (
 	EpochMgrService
 	NotSupportService
 )
+
+type RequestSet[T any, Constraint consensus.TXConstraint[T]] struct {
+	Requests []*T
+	Local    bool
+}
+
+func (s *RequestSet[T, Constraint]) ToPB() (*consensus.RequestSet, error) {
+	rawTxs, err := consensus.EncodeTxs[T, Constraint](s.Requests)
+	if err != nil {
+		return nil, err
+	}
+	return &consensus.RequestSet{
+		Requests: rawTxs,
+		Local:    s.Local,
+	}, nil
+}
+
+func (s *RequestSet[T, Constraint]) FromPB(pb *consensus.RequestSet) error {
+	txs, err := consensus.DecodeTxs[T, Constraint](pb.Requests)
+	if err != nil {
+		return err
+	}
+	s.Requests = txs
+	s.Local = pb.Local
+	return nil
+}
+
+func (s *RequestSet[T, Constraint]) Marshal() ([]byte, error) {
+	pbData, err := s.ToPB()
+	if err != nil {
+		return nil, err
+	}
+	return proto.Marshal(pbData)
+}
+
+func (s *RequestSet[T, Constraint]) Unmarshal(raw []byte) error {
+	var pbData consensus.RequestSet
+	if err := proto.Unmarshal(raw, &pbData); err != nil {
+		return err
+	}
+	return s.FromPB(&pbData)
+}
+
+type RequestBatch[T any, Constraint consensus.TXConstraint[T]] struct {
+	RequestHashList []string
+	RequestList     []*T
+	Timestamp       int64
+	SeqNo           uint64
+	LocalList       []bool
+	BatchHash       string
+}
+
+func (b *RequestBatch[T, Constraint]) ToPB() (*consensus.RequestBatch, error) {
+	rawTxs, err := consensus.EncodeTxs[T, Constraint](b.RequestList)
+	if err != nil {
+		return nil, err
+	}
+	return &consensus.RequestBatch{
+		RequestHashList: b.RequestHashList,
+		RequestList:     rawTxs,
+		Timestamp:       b.Timestamp,
+		SeqNo:           b.SeqNo,
+		LocalList:       b.LocalList,
+		BatchHash:       b.BatchHash,
+	}, nil
+}
+
+func (b *RequestBatch[T, Constraint]) FromPB(pb *consensus.RequestBatch) error {
+	txs, err := consensus.DecodeTxs[T, Constraint](pb.RequestList)
+	if err != nil {
+		return err
+	}
+	b.RequestHashList = pb.RequestHashList
+	b.RequestList = txs
+	b.Timestamp = pb.Timestamp
+	b.SeqNo = pb.SeqNo
+	b.LocalList = pb.LocalList
+	b.BatchHash = pb.BatchHash
+	return nil
+}
+
+func (b *RequestBatch[T, Constraint]) Marshal() ([]byte, error) {
+	pbData, err := b.ToPB()
+	if err != nil {
+		return nil, err
+	}
+	return proto.Marshal(pbData)
+}
+
+func (b *RequestBatch[T, Constraint]) Unmarshal(raw []byte) error {
+	var pbData consensus.RequestBatch
+	if err := proto.Unmarshal(raw, &pbData); err != nil {
+		return err
+	}
+	return b.FromPB(&pbData)
+}
 
 // LocalEvent represents event sent by local modules
 type LocalEvent struct {
@@ -183,9 +280,9 @@ type MiscEvent struct {
 	Event     any
 }
 
-type ReqTxMsg struct {
+type ReqTxMsg[T any, Constraint consensus.TXConstraint[T]] struct {
 	hash string
-	ch   chan []byte
+	ch   chan *T
 }
 
 type ReqNonceMsg struct {

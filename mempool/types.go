@@ -24,7 +24,7 @@ const (
 type RequestHashBatch[T any, Constraint consensus.TXConstraint[T]] struct {
 	BatchHash  string   // hash of this batch calculated by MD5
 	TxHashList []string // list of all txs' hashes
-	TxList     [][]byte // list of all txs
+	TxList     []*T     // list of all txs
 	LocalList  []bool   // list track if tx is received locally or not
 	Timestamp  int64    // generation time of this batch
 }

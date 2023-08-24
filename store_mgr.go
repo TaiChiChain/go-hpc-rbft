@@ -24,7 +24,7 @@ This file provides a mechanism to manage the memory storage in RBFT
 */
 
 // storeManager manages consensus store data structures for RBFT.
-type storeManager struct {
+type storeManager[T any, Constraint consensus.TXConstraint[T]] struct {
 	logger Logger
 
 	// track quorum certificates for messages
@@ -34,10 +34,10 @@ type storeManager struct {
 	committedCert map[msgID]string
 
 	// track whether we are waiting for transaction batches to execute
-	outstandingReqBatches map[string]*consensus.RequestBatch
+	outstandingReqBatches map[string]*RequestBatch[T, Constraint]
 
 	// track L cached transaction batches produced from requestPool
-	batchStore map[string]*consensus.RequestBatch
+	batchStore map[string]*RequestBatch[T, Constraint]
 
 	// for all the assigned, non-checkpointed request batches we might miss
 	// some transactions in some batches, record batch no
@@ -82,16 +82,16 @@ type stateUpdateTarget struct {
 }
 
 // newStoreMgr news an instance of storeManager
-func newStoreMgr(c Config) *storeManager {
-	sm := &storeManager{
+func newStoreMgr[T any, Constraint consensus.TXConstraint[T]](c Config) *storeManager[T, Constraint] {
+	sm := &storeManager[T, Constraint]{
 		localCheckpoints:         make(map[uint64]*consensus.SignedCheckpoint),
 		higherCheckpoints:        make(map[uint64]*consensus.SignedCheckpoint),
 		checkpointStore:          make(map[chkptID]*consensus.SignedCheckpoint),
 		certStore:                make(map[msgID]*msgCert),
 		committedCert:            make(map[msgID]string),
 		seqMap:                   make(map[uint64]string),
-		outstandingReqBatches:    make(map[string]*consensus.RequestBatch),
-		batchStore:               make(map[string]*consensus.RequestBatch),
+		outstandingReqBatches:    make(map[string]*RequestBatch[T, Constraint]),
+		batchStore:               make(map[string]*RequestBatch[T, Constraint]),
 		missingReqBatches:        make(map[string]bool),
 		missingBatchesInFetching: make(map[string]msgID),
 		logger:                   c.Logger,
@@ -100,13 +100,13 @@ func newStoreMgr(c Config) *storeManager {
 }
 
 // saveCheckpoint saves checkpoint information to localCheckpoints
-func (sm *storeManager) saveCheckpoint(height uint64, signedCheckpoint *consensus.SignedCheckpoint) {
+func (sm *storeManager[T, Constraint]) saveCheckpoint(height uint64, signedCheckpoint *consensus.SignedCheckpoint) {
 	sm.localCheckpoints[height] = signedCheckpoint
 }
 
 // Given a digest/view/seq, is there an entry in the certStore?
 // If so, return it else, create a new entry
-func (sm *storeManager) getCert(v uint64, n uint64, d string) *msgCert {
+func (sm *storeManager[T, Constraint]) getCert(v uint64, n uint64, d string) *msgCert {
 	idx := msgID{v: v, n: n, d: d}
 	cert, ok := sm.certStore[idx]
 
@@ -126,7 +126,7 @@ func (sm *storeManager) getCert(v uint64, n uint64, d string) *msgCert {
 
 // existedDigest checks if there exists another PRE-PREPARE message in certStore which has the same digest, same view,
 // but different seqNo with the given one
-func (sm *storeManager) existedDigest(v uint64, n uint64, d string) bool {
+func (sm *storeManager[T, Constraint]) existedDigest(v uint64, n uint64, d string) bool {
 	for _, cert := range sm.certStore {
 		if p := cert.prePrepare; p != nil {
 			if p.View == v && p.SequenceNumber != n && p.BatchDigest == d && d != "" {

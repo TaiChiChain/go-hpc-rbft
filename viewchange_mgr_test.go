@@ -19,10 +19,8 @@ func TestVC_FullProcess(t *testing.T) {
 	assert.Equal(t, uint64(1), rbfts[3].chainConfig.View)
 
 	tx := newTx()
-	txBytes, err := tx.Marshal()
-	assert.Nil(t, err)
 	// node3 cache some txs.
-	rbfts[2].batchMgr.requestPool.AddNewRequests([][]byte{txBytes}, false, true, false)
+	rbfts[2].batchMgr.requestPool.AddNewRequests([]*consensus.FltTransaction{tx}, false, true, false)
 
 	// replica 1 send vc
 	rbfts[0].sendViewChange()
@@ -140,7 +138,7 @@ func TestVC_recvFetchRequestBatch(t *testing.T) {
 	assert.Nil(t, ret1)
 	assert.Nil(t, nodes[1].unicastMessageCache)
 
-	rbfts[1].storeMgr.batchStore["lost-batch"] = &consensus.RequestBatch{}
+	rbfts[1].storeMgr.batchStore["lost-batch"] = &RequestBatch[consensus.FltTransaction, *consensus.FltTransaction]{}
 	ret2 := rbfts[1].processEvent(fr)
 	assert.Nil(t, ret2)
 	assert.Equal(t, consensus.Type_FETCH_BATCH_RESPONSE, nodes[1].unicastMessageCache.Type)
@@ -186,18 +184,18 @@ func TestVC_recvFetchBatchResponse_AfterViewChanged(t *testing.T) {
 
 	// construct a fetch request batch response
 	tx := newTx()
-	txBytes, err := tx.Marshal()
-	assert.Nil(t, err)
-	batch := &consensus.RequestBatch{
+	batch := &RequestBatch[consensus.FltTransaction, *consensus.FltTransaction]{
 		RequestHashList: []string{"tx-hash"},
-		RequestList:     [][]byte{txBytes},
+		RequestList:     []*consensus.FltTransaction{tx},
 		SeqNo:           uint64(1),
 		LocalList:       []bool{true},
 		BatchHash:       "lost-batch",
 	}
+	pbBatch, err := batch.ToPB()
+	assert.Nil(t, err)
 	sr := &consensus.FetchBatchResponse{
 		ReplicaId:   uint64(2),
-		Batch:       batch,
+		Batch:       pbBatch,
 		BatchDigest: batch.BatchHash,
 	}
 
@@ -228,9 +226,7 @@ func TestVC_processNewView_AfterViewChanged_PrimaryNormal(t *testing.T) {
 	// mock primary node2 cached some txs.
 	nodes[1].broadcastMessageCache = nil
 	tx := newTx()
-	txBytes, err := tx.Marshal()
-	assert.Nil(t, err)
-	rbfts[1].batchMgr.requestPool.AddNewRequests([][]byte{txBytes}, false, true, false)
+	rbfts[1].batchMgr.requestPool.AddNewRequests([]*consensus.FltTransaction{tx}, false, true, false)
 	batch := rbfts[1].batchMgr.requestPool.GenerateRequestBatch()
 
 	// a message list
@@ -242,7 +238,7 @@ func TestVC_processNewView_AfterViewChanged_PrimaryNormal(t *testing.T) {
 
 	rbfts[1].putBackRequestBatches(msgList)
 
-	batch3 := &consensus.RequestBatch{
+	batch3 := &RequestBatch[consensus.FltTransaction, *consensus.FltTransaction]{
 		RequestHashList: batch[0].TxHashList,
 		RequestList:     batch[0].TxList,
 		Timestamp:       batch[0].Timestamp,
@@ -264,9 +260,7 @@ func TestVC_processNewView_AfterViewChanged_ReplicaNormal(t *testing.T) {
 
 	// mock backup node1 cached some txs.
 	tx := newTx()
-	txBytes, err := tx.Marshal()
-	assert.Nil(t, err)
-	rbfts[0].batchMgr.requestPool.AddNewRequests([][]byte{txBytes}, false, true, false)
+	rbfts[0].batchMgr.requestPool.AddNewRequests([]*consensus.FltTransaction{tx}, false, true, false)
 	batch := rbfts[0].batchMgr.requestPool.GenerateRequestBatch()
 
 	// a message list
@@ -278,7 +272,7 @@ func TestVC_processNewView_AfterViewChanged_ReplicaNormal(t *testing.T) {
 
 	rbfts[0].putBackRequestBatches(msgList)
 
-	batch3 := &consensus.RequestBatch{
+	batch3 := &RequestBatch[consensus.FltTransaction, *consensus.FltTransaction]{
 		RequestHashList: batch[0].TxHashList,
 		RequestList:     batch[0].TxList,
 		Timestamp:       batch[0].Timestamp,
@@ -298,9 +292,7 @@ func TestVC_fetchMissingReqBatchIfNeeded(t *testing.T) {
 	_, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 
 	tx := newTx()
-	txBytes, err := tx.Marshal()
-	assert.Nil(t, err)
-	rbfts[0].batchMgr.requestPool.AddNewRequests([][]byte{txBytes}, false, true, false)
+	rbfts[0].batchMgr.requestPool.AddNewRequests([]*consensus.FltTransaction{tx}, false, true, false)
 	batch := rbfts[0].batchMgr.requestPool.GenerateRequestBatch()
 
 	// a message list
@@ -312,7 +304,7 @@ func TestVC_fetchMissingReqBatchIfNeeded(t *testing.T) {
 
 	rbfts[0].putBackRequestBatches(msgList)
 
-	batch3 := &consensus.RequestBatch{
+	batch3 := &RequestBatch[consensus.FltTransaction, *consensus.FltTransaction]{
 		RequestHashList: batch[0].TxHashList,
 		RequestList:     batch[0].TxList,
 		Timestamp:       batch[0].Timestamp,

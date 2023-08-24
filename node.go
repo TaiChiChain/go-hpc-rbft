@@ -25,7 +25,7 @@ import (
 
 // Node represents a node in a RBFT cluster.
 //
-//go:generate mockgen -destination ./mock_node.go -package rbft -source ./node.go
+//go:generate mockgen -destination ./mock_node.go -package rbft -source ./node.go -typed
 type Node[T any, Constraint consensus.TXConstraint[T]] interface {
 	// Init a RBFT node state.
 	Init() error
@@ -34,11 +34,11 @@ type Node[T any, Constraint consensus.TXConstraint[T]] interface {
 	Start() error
 
 	// Stop performs any necessary termination of the Node.
-	Stop() [][]byte
+	Stop() []*T
 
 	// Propose proposes requests to RBFT core, requests are ensured to be eventually
 	// submitted to all non-fault nodes unless current node crash down.
-	Propose(requests *consensus.RequestSet) error
+	Propose(requests []*T, local bool) error
 
 	// Step advances the state machine using the given message.
 	Step(ctx context.Context, msg *consensus.ConsensusMessage)
@@ -47,20 +47,20 @@ type Node[T any, Constraint consensus.TXConstraint[T]] interface {
 	Status() NodeStatus
 
 	// GetUncommittedTransactions returns uncommitted txs
-	GetUncommittedTransactions(maxsize uint64) [][]byte
+	GetUncommittedTransactions(maxsize uint64) []*T
 
 	// ServiceInbound receives and records modifications from application service.
 	ServiceInbound
 
-	External
+	External[T, Constraint]
 }
 
-type External interface {
+type External[T any, Constraint consensus.TXConstraint[T]] interface {
 	// GetPendingNonceByAccount will return the latest pending nonce of a given account
 	GetPendingNonceByAccount(account string) uint64
 
 	// GetPendingTxByHash will return the tx by tx hash
-	GetPendingTxByHash(hash string) []byte
+	GetPendingTxByHash(hash string) *T
 }
 
 // ServiceInbound receives and records modifications from application service which includes two events:
@@ -138,7 +138,7 @@ func (n *node[T, Constraint]) Start() error {
 }
 
 // Stop stops a Node instance.
-func (n *node[T, Constraint]) Stop() [][]byte {
+func (n *node[T, Constraint]) Stop() []*T {
 	// stop RBFT core.
 	remainTxs := n.rbft.stop()
 
@@ -151,8 +151,11 @@ func (n *node[T, Constraint]) Stop() [][]byte {
 
 // Propose proposes requests to RBFT core, requests are ensured to be eventually
 // submitted to all non-fault nodes unless current node crash down.
-func (n *node[T, Constraint]) Propose(requests *consensus.RequestSet) error {
-	n.rbft.postRequests(requests)
+func (n *node[T, Constraint]) Propose(requests []*T, local bool) error {
+	n.rbft.postRequests(&RequestSet[T, Constraint]{
+		Requests: requests,
+		Local:    local,
+	})
 
 	return nil
 }
@@ -208,7 +211,7 @@ func (n *node[T, Constraint]) Status() NodeStatus {
 	return n.rbft.getStatus()
 }
 
-func (n *node[T, Constraint]) GetUncommittedTransactions(maxsize uint64) [][]byte {
+func (n *node[T, Constraint]) GetUncommittedTransactions(maxsize uint64) []*T {
 	// get hash of transactions that had committed
 	var digestList []string
 	committedHeight := n.rbft.chainConfig.H
@@ -245,10 +248,10 @@ func (n *node[T, Constraint]) GetPendingNonceByAccount(account string) uint64 {
 	return <-getNonceReq.ch
 }
 
-func (n *node[T, Constraint]) GetPendingTxByHash(hash string) []byte {
-	getTxReq := &ReqTxMsg{
+func (n *node[T, Constraint]) GetPendingTxByHash(hash string) *T {
+	getTxReq := &ReqTxMsg[T, Constraint]{
 		hash: hash,
-		ch:   make(chan []byte),
+		ch:   make(chan *T),
 	}
 	localEvent := &MiscEvent{
 		EventType: ReqTxEvent,

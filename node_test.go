@@ -45,16 +45,8 @@ func TestNode_Stop(t *testing.T) {
 	go func() {
 		for i := 1; i < 100; i++ {
 			tx1 := newTx()
-			txBytes1, err := tx1.Marshal()
-			assert.Nil(t, err)
 			tx2 := newTx()
-			txBytes2, err := tx2.Marshal()
-			assert.Nil(t, err)
-			txs := &consensus.RequestSet{
-				Requests: [][]byte{txBytes1, txBytes2},
-				Local:    true,
-			}
-			_ = n.Propose(txs)
+			_ = n.Propose([]*consensus.FltTransaction{tx1, tx2}, true)
 		}
 		wg.Done()
 	}()
@@ -79,13 +71,11 @@ func TestNode_Propose(t *testing.T) {
 
 	n := rbfts[0].node
 	tx1 := newTx()
-	txBytes1, err := tx1.Marshal()
-	assert.Nil(t, err)
-	requestsTmp := &consensus.RequestSet{
-		Requests: [][]byte{txBytes1},
+	requestsTmp := &RequestSet[consensus.FltTransaction, *consensus.FltTransaction]{
+		Requests: []*consensus.FltTransaction{tx1},
 		Local:    true,
 	}
-	_ = n.Propose(requestsTmp)
+	_ = n.Propose([]*consensus.FltTransaction{tx1}, true)
 	obj := <-n.rbft.recvChan
 	assert.Equal(t, requestsTmp, obj)
 }
