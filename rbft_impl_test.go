@@ -6,30 +6,43 @@ import (
 	"testing"
 	"time"
 
-	"github.com/axiomesh/axiom-bft/common/consensus"
-	"github.com/axiomesh/axiom-bft/common/metrics/disabled"
-	mempoolmock "github.com/axiomesh/axiom-bft/mempool/mock"
-	mockexternal "github.com/axiomesh/axiom-bft/mock/mock_external"
-	"github.com/axiomesh/axiom-bft/types"
-
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/axiomesh/axiom-bft/common/consensus"
+	"github.com/axiomesh/axiom-bft/common/metrics/disabled"
+	"github.com/axiomesh/axiom-bft/mempool"
+	"github.com/axiomesh/axiom-bft/types"
 )
 
 // ============================================
 // Basic Tools
 // ============================================
-func newMockConfig[T any, Constraint consensus.TXConstraint[T]](t *testing.T, ctrl *gomock.Controller) Config[T, Constraint] {
-	pool := mempoolmock.NewMockMemPool[T, Constraint](ctrl)
+func newMockRbft[T any, Constraint consensus.TXConstraint[T]](t *testing.T, ctrl *gomock.Controller) *rbftImpl[T, Constraint] {
+	pool := mempool.NewMockMemPool[T, Constraint](ctrl)
 	log := newRawLogger()
-	external := mockexternal.NewMockMinimalExternal[T, Constraint](ctrl)
+	external := NewMockMinimalExternal[T, Constraint](ctrl)
 
-	conf := Config[T, Constraint]{
-		ID:                      1,
-		Hash:                    calHash("node1"),
-		Peers:                   peerSet,
-		K:                       10,
-		LogMultiplier:           4,
+	conf := Config{
+		SelfAccountAddress: "node1",
+		GenesisEpochInfo: &EpochInfo{
+			Version:                   1,
+			Epoch:                     1,
+			EpochPeriod:               1000,
+			CandidateSet:              []*NodeInfo{},
+			ValidatorSet:              peerSet,
+			StartBlock:                1,
+			P2PBootstrapNodeAddresses: []string{},
+			ConsensusParams: &ConsensusParams{
+				CheckpointPeriod:              10,
+				HighWatermarkCheckpointPeriod: 4,
+				MaxValidatorNum:               10,
+				BlockMaxTxNum:                 500,
+				NotActiveWeight:               1,
+				ExcludeView:                   10,
+				ProposerElectionType:          ProposerElectionTypeRotating,
+			},
+		},
 		SetSize:                 25,
 		SetTimeout:              100 * time.Millisecond,
 		BatchTimeout:            500 * time.Millisecond,
@@ -42,22 +55,18 @@ func newMockConfig[T any, Constraint consensus.TXConstraint[T]](t *testing.T, ct
 		SyncStateRestartTimeout: 10 * time.Second,
 		CheckPoolTimeout:        3 * time.Minute,
 
-		Logger:      log,
-		External:    external,
-		RequestPool: pool,
+		Logger: log,
+
 		MetricsProv: &disabled.Provider{},
 		DelFlag:     make(chan bool),
-
-		EpochInit:    uint64(0),
-		LatestConfig: nil,
 	}
-	return conf
+	rbft, _ := newRBFT[T, Constraint](conf, external, pool)
+	return rbft
 }
+
 func TestRBFT_newRBFT(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
-	conf := newMockConfig[consensus.FltTransaction](t, ctrl)
-	rbft, _ := newRBFT[consensus.FltTransaction](conf)
+	rbft := newMockRbft[consensus.FltTransaction, *consensus.FltTransaction](t, ctrl)
 
 	// Normal case
 	structName, nilElems, err := checkNilElems(rbft)
@@ -67,24 +76,24 @@ func TestRBFT_newRBFT(t *testing.T) {
 	}
 
 	// Nil Peers
-	conf.Peers = nil
-	_, err = newRBFT(conf)
+	rbft.config.GenesisEpochInfo.ValidatorSet = []*NodeInfo{}
+	rbft2, err := newRBFT(rbft.config, rbft.external, rbft.batchMgr.requestPool)
+	assert.Nil(t, err)
+	err = rbft2.init()
 	assert.Equal(t, errors.New("nil peers"), err)
 
 	// Is a New Node
-	conf.Peers = peerSet
-	conf.ID = 4
-	rbft, _ = newRBFT(conf)
-	assert.Equal(t, 4, rbft.N)
+	rbft.config.GenesisEpochInfo.ValidatorSet = peerSet
+	rbft.config.SelfAccountAddress = "node4"
+	rbft, _ = newRBFT(rbft.config, rbft.external, rbft.batchMgr.requestPool)
+	assert.Equal(t, 4, rbft.chainConfig.N)
 }
 
-//============================================
+// ============================================
 // Consensus Message Filter
-//============================================
-
+// ============================================
 func TestRBFT_consensusMessageFilter(t *testing.T) {
-
-	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	unlockCluster(rbfts)
 
 	rbfts[2].initSyncState()
@@ -108,13 +117,11 @@ func TestRBFT_consensusMessageFilter(t *testing.T) {
 	rbfts[1].consensusMessageFilter(context.TODO(), preprepMsg.ConsensusMessage)
 }
 
-//============================================
+// ============================================
 // Process Request Set
-//============================================
-
+// ============================================
 func TestRBFT_processReqSetEvent_PrimaryGenerateBatch(t *testing.T) {
-
-	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	unlockCluster(rbfts)
 
 	// the batch size is 4
@@ -139,11 +146,10 @@ func TestRBFT_processReqSetEvent_PrimaryGenerateBatch(t *testing.T) {
 }
 
 func TestRBFT_processReqSetEvent(t *testing.T) {
-
-	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	_, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	unlockCluster(rbfts)
 
-	ctx := newCTX(defaultValidatorSet)
+	ctx := newTx()
 	ctxBytes, err := ctx.Marshal()
 	assert.Nil(t, err)
 	req := &consensus.RequestSet{
@@ -157,14 +163,12 @@ func TestRBFT_processReqSetEvent(t *testing.T) {
 	assert.NotNil(t, batch)
 }
 
-//============================================
+// ============================================
 // Post Tools
 // Test Case: Should receive target Event from rbft.recvChan
-//============================================
-
+// ============================================
 func TestRBFT_reportStateUpdated(t *testing.T) {
-
-	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	_, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 
 	unlockCluster(rbfts)
 
@@ -185,23 +189,8 @@ func TestRBFT_reportStateUpdated(t *testing.T) {
 	assert.Equal(t, event, obj)
 }
 
-func TestRBFT_reportStableCheckpointFinished(t *testing.T) {
-
-	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
-	// in pending
-	rbfts[0].reportStableCheckpointFinished(20)
-	unlockCluster(rbfts)
-	// not in conf change
-	rbfts[0].reportStableCheckpointFinished(20)
-	rbfts[0].atomicOn(InConfChange)
-	rbfts[0].reportStableCheckpointFinished(20)
-	obj := <-rbfts[0].confChan
-	assert.EqualValues(t, 20, obj)
-}
-
 func TestRBFT_postMsg(t *testing.T) {
-
-	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	_, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	unlockCluster(rbfts)
 
 	rbfts[0].postMsg([]byte("postMsg"))
@@ -209,13 +198,11 @@ func TestRBFT_postMsg(t *testing.T) {
 	assert.Equal(t, []byte("postMsg"), obj)
 }
 
-//============================================
+// ============================================
 // Get Status
-//============================================
-
+// ============================================
 func TestRBFT_getStatus(t *testing.T) {
-
-	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	_, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	unlockCluster(rbfts)
 
 	var status NodeStatus
@@ -260,13 +247,11 @@ func TestRBFT_getStatus(t *testing.T) {
 	assert.Equal(t, Normal, int(status.Status))
 }
 
-//============================================
+// ============================================
 // General Event Process Method
-//============================================
-
+// ============================================
 func TestRBFT_processNullRequset(t *testing.T) {
-
-	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	nullRequestEvent := &LocalEvent{
 		Service:   CoreRbftService,
 		EventType: CoreNullRequestTimerEvent,
@@ -289,31 +274,30 @@ func TestRBFT_processNullRequset(t *testing.T) {
 }
 
 func TestRBFT_handleNullRequestTimerEvent(t *testing.T) {
-
-	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 
 	rbfts[0].atomicOn(InViewChange)
 	rbfts[0].handleNullRequestTimerEvent()
-	assert.Equal(t, uint64(0), rbfts[0].view)
+	assert.Equal(t, uint64(0), rbfts[0].chainConfig.View)
 	assert.Nil(t, nodes[0].broadcastMessageCache)
 	rbfts[0].atomicOff(InViewChange)
 
 	rbfts[0].setView(uint64(1))
 	rbfts[0].handleNullRequestTimerEvent()
-	assert.Equal(t, uint64(2), rbfts[0].view)
+	assert.Equal(t, uint64(2), rbfts[0].chainConfig.View)
 	assert.Equal(t, consensus.Type_VIEW_CHANGE, nodes[0].broadcastMessageCache.Type)
 	rbfts[0].atomicOff(InViewChange)
 
 	rbfts[0].setView(uint64(4))
 	rbfts[0].handleNullRequestTimerEvent()
-	assert.Equal(t, uint64(4), rbfts[0].view)
+	assert.Equal(t, uint64(4), rbfts[0].chainConfig.View)
 	assert.Equal(t, consensus.Type_NULL_REQUEST, nodes[0].broadcastMessageCache.Type)
 }
 
 func TestRBFT_fetchMissingTxs(t *testing.T) {
-
-	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	prePrep := &consensus.PrePrepare{
+		ReplicaId:      uint64(1),
 		SequenceNumber: uint64(1),
 	}
 	missingTxHashes := map[uint64]string{
@@ -333,8 +317,7 @@ func TestRBFT_fetchMissingTxs(t *testing.T) {
 }
 
 func TestRBFT_start_cache_message(t *testing.T) {
-
-	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	_, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	assert.Equal(t, true, rbfts[0].atomicIn(Pending))
 	// unknown author.
 	errorMsg1 := &consensus.ConsensusMessage{
@@ -368,38 +351,8 @@ func TestRBFT_start_cache_message(t *testing.T) {
 	rbfts[0].postRequests(rs)
 }
 
-func TestRBFT_postConfState_NormalCase(t *testing.T) {
-
-	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
-	vSetNode5 := append(defaultValidatorSet, &consensus.NodeInfo{Hostname: "node5", PubKey: []byte("pub-5")})
-	r := vSetToRouters(vSetNode5)
-	cc := &types.ConfState{
-		QuorumRouter: &r,
-	}
-	rbfts[0].postConfState(cc)
-	assert.Equal(t, 5, len(rbfts[0].peerPool.router))
-}
-
-func TestRBFT_postConfState_NotExitInRouter(t *testing.T) {
-
-	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
-	newVSet := []*consensus.NodeInfo{
-		{Hostname: "node2", PubKey: []byte("pub-2")},
-		{Hostname: "node3", PubKey: []byte("pub-3")},
-		{Hostname: "node4", PubKey: []byte("pub-4")},
-		{Hostname: "node5", PubKey: []byte("pub-5")},
-	}
-	r := vSetToRouters(newVSet)
-	cc := &types.ConfState{
-		QuorumRouter: &r,
-	}
-	go rbfts[0].postConfState(cc)
-	assert.Equal(t, true, rbfts[0].atomicIn(Pending))
-}
-
 func TestRBFT_processOutOfDateReqs(t *testing.T) {
-
-	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	_, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	tx := newTx()
 	txBytes, err := tx.Marshal()
 	assert.Nil(t, err)
@@ -428,7 +381,7 @@ func TestRBFT_processOutOfDateReqs(t *testing.T) {
 
 	// split according to set mem size when broadcast.
 	rbfts[1].flowControl = true
-	//rbfts[1].flowControlMaxMem = 3 * batch[0].Size()
+	// rbfts[1].flowControlMaxMem = 3 * batch[0].Size()
 	rbfts[1].batchMgr.requestPool.AddNewRequests(batch, false, true, false)
 	// sleep to trigger txpool tolerance time.
 	time.Sleep(1 * time.Second)
@@ -437,8 +390,7 @@ func TestRBFT_processOutOfDateReqs(t *testing.T) {
 }
 
 func TestRBFT_sendNullRequest(t *testing.T) {
-
-	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 
 	rbfts[0].atomicOn(InConfChange)
 	rbfts[0].sendNullRequest()
@@ -447,7 +399,7 @@ func TestRBFT_sendNullRequest(t *testing.T) {
 	rbfts[0].sendNullRequest()
 
 	nullRequest := &consensus.NullRequest{
-		ReplicaId: rbfts[0].peerPool.ID,
+		ReplicaId: rbfts[0].peerMgr.selfID,
 	}
 	consensusMsg := rbfts[0].consensusMessagePacker(nullRequest)
 	assert.Equal(t, consensusMsg, nodes[0].broadcastMessageCache.ConsensusMessage)
@@ -461,17 +413,16 @@ func TestRBFT_sendNullRequest(t *testing.T) {
 }
 
 func TestRBFT_recvPrePrepare_WrongDigest(t *testing.T) {
-
-	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	hashBatch := &consensus.HashBatch{
 		RequestHashList: []string{"tx-hash"},
 	}
 	preprep1 := &consensus.PrePrepare{
-		View:           rbfts[0].view,
+		View:           rbfts[0].chainConfig.View,
 		SequenceNumber: uint64(1),
 		BatchDigest:    "wrong hash",
 		HashBatch:      hashBatch,
-		ReplicaId:      rbfts[0].peerPool.ID,
+		ReplicaId:      rbfts[0].peerMgr.selfID,
 	}
 	err := rbfts[1].recvPrePrepare(context.TODO(), preprep1)
 	assert.Nil(t, err)
@@ -479,17 +430,16 @@ func TestRBFT_recvPrePrepare_WrongDigest(t *testing.T) {
 }
 
 func TestRBFT_recvPrePrepare_EmptyDigest(t *testing.T) {
-
-	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	hashBatch := &consensus.HashBatch{
 		RequestHashList: []string{"tx-hash"},
 	}
 	preprep1 := &consensus.PrePrepare{
-		View:           rbfts[0].view,
+		View:           rbfts[0].chainConfig.View,
 		SequenceNumber: uint64(1),
 		BatchDigest:    "",
 		HashBatch:      hashBatch,
-		ReplicaId:      rbfts[0].peerPool.ID,
+		ReplicaId:      rbfts[0].peerMgr.selfID,
 	}
 	err := rbfts[1].recvPrePrepare(context.TODO(), preprep1)
 	assert.Nil(t, err)
@@ -497,21 +447,20 @@ func TestRBFT_recvPrePrepare_EmptyDigest(t *testing.T) {
 }
 
 func TestRBFT_recvPrePrepare_WrongSeqNo(t *testing.T) {
-
 	tx := newTx()
 	txBytes, err := tx.Marshal()
 	assert.Nil(t, err)
-	txHash := requestHash[consensus.FltTransaction](txBytes)
+	txHash := requestHash[consensus.FltTransaction, *consensus.FltTransaction](txBytes)
 
-	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	hashBatch := &consensus.HashBatch{
 		RequestHashList: []string{txHash},
 	}
 	preprep := &consensus.PrePrepare{
-		View:           rbfts[0].view,
+		View:           rbfts[0].chainConfig.View,
 		SequenceNumber: uint64(1),
 		HashBatch:      hashBatch,
-		ReplicaId:      rbfts[0].peerPool.ID,
+		ReplicaId:      rbfts[0].peerMgr.selfID,
 	}
 	batchHash := calculateMD5Hash(preprep.HashBatch.RequestHashList, preprep.HashBatch.Timestamp)
 	preprep.BatchDigest = batchHash
@@ -521,8 +470,8 @@ func TestRBFT_recvPrePrepare_WrongSeqNo(t *testing.T) {
 	assert.Equal(t, consensus.Type_FETCH_MISSING_REQUEST, nodes[1].unicastMessageCache.Type) // fetching missing tx for preprepare message
 
 	rbfts[1].recvFetchMissingResponse(context.TODO(), &consensus.FetchMissingResponse{
-		ReplicaId:      rbfts[0].peerPool.ID,
-		View:           rbfts[0].view,
+		ReplicaId:      rbfts[0].peerMgr.selfID,
+		View:           rbfts[0].chainConfig.View,
 		SequenceNumber: uint64(1),
 		BatchDigest:    batchHash,
 		MissingRequestHashes: map[uint64]string{
@@ -539,10 +488,10 @@ func TestRBFT_recvPrePrepare_WrongSeqNo(t *testing.T) {
 		RequestHashList: []string{"tx-hash-wrong"},
 	}
 	preprepDup := &consensus.PrePrepare{
-		View:           rbfts[0].view,
+		View:           rbfts[0].chainConfig.View,
 		SequenceNumber: uint64(1),
 		HashBatch:      hashBatchWrong,
-		ReplicaId:      rbfts[0].peerPool.ID,
+		ReplicaId:      rbfts[0].peerMgr.selfID,
 	}
 	preprepDup.BatchDigest = calculateMD5Hash(preprepDup.HashBatch.RequestHashList, preprepDup.HashBatch.Timestamp)
 	err = rbfts[1].recvPrePrepare(context.TODO(), preprepDup)
@@ -552,22 +501,21 @@ func TestRBFT_recvPrePrepare_WrongSeqNo(t *testing.T) {
 }
 
 func TestRBFT_recvFetchMissingResponse(t *testing.T) {
-
-	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 
 	tx := newTx()
 	txBytes, err := tx.Marshal()
 	assert.Nil(t, err)
-	txHash := requestHash[consensus.FltTransaction](txBytes)
+	txHash := requestHash[consensus.FltTransaction, *consensus.FltTransaction](txBytes)
 
 	hashBatch := &consensus.HashBatch{
 		RequestHashList: []string{txHash},
 	}
 	preprep := &consensus.PrePrepare{
-		View:           rbfts[0].view,
+		View:           rbfts[0].chainConfig.View,
 		SequenceNumber: uint64(1),
 		HashBatch:      hashBatch,
-		ReplicaId:      rbfts[0].peerPool.ID,
+		ReplicaId:      rbfts[0].peerMgr.selfID,
 	}
 	preprep.BatchDigest = calculateMD5Hash(preprep.HashBatch.RequestHashList, preprep.HashBatch.Timestamp)
 
@@ -576,7 +524,7 @@ func TestRBFT_recvFetchMissingResponse(t *testing.T) {
 		SequenceNumber:       preprep.SequenceNumber,
 		BatchDigest:          preprep.BatchDigest,
 		MissingRequestHashes: map[uint64]string{0: txHash},
-		ReplicaId:            rbfts[1].peerPool.ID,
+		ReplicaId:            rbfts[1].peerMgr.selfID,
 	}
 
 	err = rbfts[0].recvFetchMissingRequest(context.TODO(), fetch)
@@ -599,7 +547,7 @@ func TestRBFT_recvFetchMissingResponse(t *testing.T) {
 		BatchDigest:          fetch.BatchDigest,
 		MissingRequestHashes: fetch.MissingRequestHashes,
 		MissingRequests:      map[uint64][]byte{0: txBytes},
-		ReplicaId:            rbfts[0].peerPool.ID,
+		ReplicaId:            rbfts[0].peerMgr.selfID,
 	}
 
 	var ret consensusEvent

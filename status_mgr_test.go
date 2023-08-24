@@ -3,42 +3,58 @@ package rbft
 import (
 	"testing"
 
-	"github.com/axiomesh/axiom-bft/common/consensus"
-	"github.com/axiomesh/axiom-bft/common/metrics/disabled"
-	mempoolmock "github.com/axiomesh/axiom-bft/mempool/mock"
-	mockexternal "github.com/axiomesh/axiom-bft/mock/mock_external"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/axiomesh/axiom-bft/common/consensus"
+	"github.com/axiomesh/axiom-bft/common/metrics/disabled"
+	"github.com/axiomesh/axiom-bft/mempool"
 )
 
 func newTestStatusNode[T any, Constraint consensus.TXConstraint[T]](ctrl *gomock.Controller) *rbftImpl[T, Constraint] {
 	log := newRawLogger()
-	external := mockexternal.NewMockMinimalExternal[T, Constraint](ctrl)
-	pool := mempoolmock.NewMockMinimalMemPool[T, Constraint](ctrl)
-
-	conf := Config[T, Constraint]{
-		ID:          1,
-		Hash:        calHash("node1"),
-		Peers:       peerSet,
+	external := NewMockMinimalExternal[T, Constraint](ctrl)
+	pool := mempool.NewMockMinimalMemPool[T, Constraint](ctrl)
+	conf := Config{
+		SelfAccountAddress: "node1",
+		GenesisEpochInfo: &EpochInfo{
+			Version:                   1,
+			Epoch:                     1,
+			EpochPeriod:               1000,
+			CandidateSet:              []*NodeInfo{},
+			ValidatorSet:              peerSet,
+			StartBlock:                1,
+			P2PBootstrapNodeAddresses: []string{},
+			ConsensusParams: &ConsensusParams{
+				CheckpointPeriod:              10,
+				HighWatermarkCheckpointPeriod: 4,
+				MaxValidatorNum:               10,
+				BlockMaxTxNum:                 500,
+				NotActiveWeight:               1,
+				ExcludeView:                   10,
+			},
+		},
 		Logger:      log,
-		External:    external,
-		RequestPool: pool,
 		MetricsProv: &disabled.Provider{},
 		DelFlag:     make(chan bool),
-
-		EpochInit:    uint64(0),
-		LatestConfig: nil,
 	}
 
-	rbft, _ := newRBFT(conf)
+	rbft, err := newRBFT[T, Constraint](conf, external, pool)
+	if err != nil {
+		panic(err)
+	}
+	err = rbft.init()
+	if err != nil {
+		panic(err)
+	}
 	return rbft
 }
 
 func TestStatusMgr_inOne(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
+	// defer ctrl.Finish()
 
-	rbft := newTestStatusNode[consensus.FltTransaction](ctrl)
+	rbft := newTestStatusNode[consensus.FltTransaction, *consensus.FltTransaction](ctrl)
 
 	rbft.atomicOn(InViewChange)
 	assert.Equal(t, true, rbft.atomicInOne(InViewChange, InRecovery))
@@ -46,9 +62,9 @@ func TestStatusMgr_inOne(t *testing.T) {
 
 func TestStatusMgr_setState(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
+	// defer ctrl.Finish()
 
-	rbft := newTestStatusNode[consensus.FltTransaction](ctrl)
+	rbft := newTestStatusNode[consensus.FltTransaction, *consensus.FltTransaction](ctrl)
 
 	rbft.setNormal()
 	assert.Equal(t, true, rbft.in(Normal))
@@ -59,9 +75,9 @@ func TestStatusMgr_setState(t *testing.T) {
 
 func TestStatusMgr_maybeSetNormal(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
+	// defer ctrl.Finish()
 
-	rbft := newTestStatusNode[consensus.FltTransaction](ctrl)
+	rbft := newTestStatusNode[consensus.FltTransaction, *consensus.FltTransaction](ctrl)
 
 	rbft.atomicOff(InRecovery)
 	rbft.atomicOff(InConfChange)

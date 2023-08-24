@@ -3,51 +3,69 @@ package rbft
 import (
 	"context"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
-	"fmt"
 	"math/rand"
 	"strconv"
 	"time"
 
+	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/axiomesh/axiom-bft/common/consensus"
-	"github.com/axiomesh/axiom-bft/common/fancylogger"
 	"github.com/axiomesh/axiom-bft/common/metrics/disabled"
-	"github.com/axiomesh/axiom-bft/external"
 	"github.com/axiomesh/axiom-bft/mempool"
 	"github.com/axiomesh/axiom-bft/types"
-	"go.opentelemetry.io/otel/trace"
 )
 
-var (
-	defaultValidatorSet = []*consensus.NodeInfo{
-		{Hostname: "node1", PubKey: []byte("pub-1")},
-		{Hostname: "node2", PubKey: []byte("pub-2")},
-		{Hostname: "node3", PubKey: []byte("pub-3")},
-		{Hostname: "node4", PubKey: []byte("pub-4")},
-	}
-)
+type testLogger struct {
+	logrus.FieldLogger
+}
 
-var peerSet = []*types.Peer{
+// Trace implements rbft.Logger.
+func (lg *testLogger) Trace(name string, stage string, content any) {
+	lg.Info(name, stage, content)
+}
+
+func (lg *testLogger) Critical(v ...any) {
+	lg.Info(v...)
+}
+
+func (lg *testLogger) Criticalf(format string, v ...any) {
+	lg.Infof(format, v...)
+}
+
+func (lg *testLogger) Notice(v ...any) {
+	lg.Info(v...)
+}
+
+func (lg *testLogger) Noticef(format string, v ...any) {
+	lg.Infof(format, v...)
+}
+
+var peerSet = []*NodeInfo{
 	{
-		ID:       uint64(1),
-		Hostname: "node1",
-		Hash:     calHash("node1"),
+		ID:                   1,
+		AccountAddress:       "node1",
+		P2PNodeID:            "node1",
+		ConsensusVotingPower: 1000,
 	},
 	{
-		ID:       uint64(2),
-		Hostname: "node2",
-		Hash:     calHash("node2"),
+		ID:                   2,
+		AccountAddress:       "node2",
+		P2PNodeID:            "node2",
+		ConsensusVotingPower: 1000,
 	},
 	{
-		ID:       uint64(3),
-		Hostname: "node3",
-		Hash:     calHash("node3"),
+		ID:                   3,
+		AccountAddress:       "node3",
+		P2PNodeID:            "node3",
+		ConsensusVotingPower: 1000,
 	},
 	{
-		ID:       uint64(4),
-		Hostname: "node4",
-		Hash:     calHash("node4"),
+		ID:                   4,
+		AccountAddress:       "node4",
+		P2PNodeID:            "node4",
+		ConsensusVotingPower: 1000,
 	},
 }
 
@@ -60,7 +78,7 @@ type testFramework[T any, Constraint consensus.TXConstraint[T]] struct {
 
 	// testFramework.Peers is the router map in cluster.
 	// we could regard it as the routerInfo of epoch in trusted node
-	Router types.Router
+	Router []*NodeInfo
 
 	// Channel to close this event process.
 	close chan bool
@@ -85,23 +103,23 @@ type testNode[T any, Constraint consensus.TXConstraint[T]] struct {
 	n *node[T, Constraint]
 
 	// testNode.Peers is the router map in one node.
-	Router types.Router
+	Router []*NodeInfo
 
 	// epoch info in mem-chain
 	Epoch uint64
-	VSet  []*consensus.NodeInfo
 
 	// last config transaction in mem-chain
 	Applied uint64
-	Digest  string
+
+	Digest string
 
 	// block storage
 	blocks map[uint64]string
 
-	// ID is the num-identity of the local rbft.peerPool.localIDde.
-	ID       uint64
-	Hash     string
-	Hostname string
+	// ID is the num-identity of the local rbft.peerMgr.localIDde.
+	ID uint64
+
+	P2PNodeID string
 
 	// Normal indicates if current node could deal with messages.
 	normal bool
@@ -153,36 +171,23 @@ type channelMsg struct {
 	msg *consensus.ConsensusMessage
 }
 
-// defaultMemoolSupportSmokeTest
-type defaultMemoolSupportSmokeTest struct{}
-
-func (lookup *defaultMemoolSupportSmokeTest) IsRequestsExist(txs [][]byte) []bool {
-	results := make([]bool, len(txs))
-	for i := range results {
-		results[i] = false
-	}
-	return results
-}
-
-func (lookup *defaultMemoolSupportSmokeTest) CheckSigns(txs [][]byte) {
-}
-
 // =============================================================================
 // init process
 // =============================================================================
 // newTestFramework init the testFramework instance
 func newTestFramework[T any, Constraint consensus.TXConstraint[T]](account int, loggerFile bool) *testFramework[T, Constraint] {
 	// Init PeerSet
-	routers := types.Router{}
+	var routers []*NodeInfo
 	for i := 0; i < account; i++ {
 		id := uint64(i + 1)
-		hostname := "node" + strconv.Itoa(i+1)
-		peer := &types.Peer{
-			ID:       id,
-			Hash:     calHash(hostname),
-			Hostname: hostname,
+		n := "node" + strconv.Itoa(i+1)
+		peer := &NodeInfo{
+			ID:                   id,
+			AccountAddress:       n,
+			P2PNodeID:            n,
+			ConsensusVotingPower: 1,
 		}
-		routers.Peers = append(routers.Peers, peer)
+		routers = append(routers, peer)
 	}
 
 	cc := make(chan *channelMsg, 1)
@@ -201,16 +206,16 @@ func newTestFramework[T any, Constraint consensus.TXConstraint[T]](account int, 
 	}
 
 	tf.log.Debugf("routers:")
-	for _, peer := range tf.Router.Peers {
-		tf.log.Debugf("ID: %d, hostname: %s, hash: %s", peer.ID, peer.Hostname, peer.Hash)
+	for _, peer := range tf.Router {
+		tf.log.Debugf("ID: %d", peer.ID)
 	}
 
 	// set node number
-	tf.setN(len(tf.Router.Peers))
+	tf.setN(len(tf.Router))
 
 	// Init testNode in TestFramework
-	for i := range tf.Router.Peers {
-		tn := tf.newTestNode(tf.Router.Peers[i].ID, tf.Router.Peers[i].Hostname, cc, loggerFile)
+	for i := range tf.Router {
+		tn := tf.newTestNode(tf.Router[i].ID, tf.Router[i].AccountAddress, cc, loggerFile)
 		tf.TestNode = append(tf.TestNode, tn)
 	}
 
@@ -220,39 +225,29 @@ func newTestFramework[T any, Constraint consensus.TXConstraint[T]](account int, 
 // newNodeConfig init the Config of Node.
 func (tf *testFramework[T, Constraint]) newNodeConfig(
 	id uint64,
-	hostname string,
+	p2pNodeID string,
 	log Logger,
-	ext external.ExternalStack[T, Constraint],
-	pool mempool.MemPool[T, Constraint],
-	epoch uint64,
-	vSet []*consensus.NodeInfo,
-	lastConfig *types.MetaState) Config[T, Constraint] {
-
-	if len(vSet) < 4 {
-		vSet = defaultValidatorSet
-	}
-
-	var peers []*types.Peer
-	for index, info := range vSet {
-		peer := &types.Peer{
-			ID:       uint64(index + 1),
-			Hostname: info.Hostname,
-			Hash:     calHash(info.Hostname),
-		}
-		peers = append(peers, peer)
-	}
-
-	return Config[T, Constraint]{
-		ID:       id,
-		Hash:     calHash(hostname),
-		Hostname: hostname,
-
-		EpochInit:    epoch,
-		Peers:        peers,
-		LatestConfig: lastConfig,
-
-		K:                       10,
-		LogMultiplier:           4,
+	epoch uint64) Config {
+	return Config{
+		GenesisEpochInfo: &EpochInfo{
+			Version:                   1,
+			Epoch:                     epoch,
+			EpochPeriod:               1000,
+			CandidateSet:              []*NodeInfo{},
+			ValidatorSet:              peerSet,
+			StartBlock:                1,
+			P2PBootstrapNodeAddresses: []string{},
+			ConsensusParams: &ConsensusParams{
+				CheckpointPeriod:              10,
+				HighWatermarkCheckpointPeriod: 4,
+				MaxValidatorNum:               10,
+				BlockMaxTxNum:                 100,
+				NotActiveWeight:               1,
+				ExcludeView:                   10,
+				ProposerElectionType:          ProposerElectionTypeRotating,
+			},
+		},
+		SelfAccountAddress:      p2pNodeID,
 		SetSize:                 25,
 		SetTimeout:              100 * time.Millisecond,
 		BatchTimeout:            500 * time.Millisecond,
@@ -268,8 +263,6 @@ func (tf *testFramework[T, Constraint]) newNodeConfig(
 		FlowControl:             false,
 
 		Logger:      log,
-		External:    ext,
-		RequestPool: pool,
 		MetricsProv: &disabled.Provider{},
 		Tracer:      trace.NewNoopTracerProvider().Tracer("hyperchain"),
 		DelFlag:     make(chan bool),
@@ -277,17 +270,12 @@ func (tf *testFramework[T, Constraint]) newNodeConfig(
 }
 
 // newTestNode init the testNode instance
-func (tf *testFramework[T, Constraint]) newTestNode(id uint64, hostname string, cc chan *channelMsg, loggerFile bool) *testNode[T, Constraint] {
+func (tf *testFramework[T, Constraint]) newTestNode(id uint64, p2pNodeID string, cc chan *channelMsg, loggerFile bool) *testNode[T, Constraint] {
 	// Init logger
-	var log *fancylogger.Logger
-	if loggerFile {
-		log = newRawLoggerWithHost(hostname)
-	} else {
-		log = newRawLogger()
-	}
+	log := newRawLogger()
 
 	// Simulation Function of External
-	var ext external.ExternalStack[T, Constraint]
+	var ext ExternalStack[T, Constraint]
 	testExt := &testExternal[T, Constraint]{
 		tf:                     tf,
 		testNode:               nil,
@@ -310,19 +298,17 @@ func (tf *testFramework[T, Constraint]) newTestNode(id uint64, hostname string, 
 		},
 	}
 	pool := mempool.NewMempool[T, Constraint](confMemPool)
-	conf := tf.newNodeConfig(id, hostname, log, ext, pool, 1, defaultValidatorSet, nil)
-	n, _ := newNode[T, Constraint](conf)
+	conf := tf.newNodeConfig(id, p2pNodeID, log, 1)
+	n, _ := newNode[T, Constraint](conf, ext, pool)
 	// init new view.
 	n.rbft.vcMgr.latestNewView = initialNewView
-	routers := vSetToRouters(defaultValidatorSet)
 	tn := &testNode[T, Constraint]{
 		N:          n,
 		n:          n,
-		Router:     routers,
+		Router:     peerSet,
 		Epoch:      0,
 		ID:         id,
-		Hash:       calHash(hostname),
-		Hostname:   hostname,
+		P2PNodeID:  p2pNodeID,
 		normal:     true,
 		online:     true,
 		close:      make(chan bool),
@@ -346,323 +332,13 @@ func (tf *testFramework[T, Constraint]) newTestNode(id uint64, hostname string, 
 // =============================================================================
 // general process method
 // =============================================================================
-// clusterListen listens and process the messages sent from nodes.
-func (tf *testFramework[T, Constraint]) clusterListen() {
-	for {
-		select {
-		case <-tf.close:
-			return
-		case obj := <-tf.clusterChan:
-			for i := range tf.TestNode {
-				if obj.to == "" || obj.to == tf.TestNode[i].Hash {
-					if tf.TestNode[i].online && obj.msg.From != tf.TestNode[i].ID {
-						tf.TestNode[i].recvChan <- &consensusMessageWrapper{
-							ctx:              context.TODO(),
-							ConsensusMessage: obj.msg,
-						}
-					}
-				}
-			}
-		}
-	}
-}
-
-// nodeListen listens and process the messages received from cluster.
-func (tn *testNode[T, Constraint]) nodeListen() {
-	for {
-		if tn.online == false {
-			tn.N.Stop()
-		}
-
-		select {
-		case <-tn.close:
-			return
-		case w := <-tn.recvChan:
-			if tn.normal {
-				tn.N.Step(w.ctx, w.ConsensusMessage)
-			}
-		}
-	}
-}
-
-// frameworkStart starts the cluster of RBFT test nodes.
-func (tf *testFramework[T, Constraint]) frameworkStart() {
-	tf.log.Notice("Test Framework starting...")
-
-	go tf.clusterListen()
-
-	for i := range tf.TestNode {
-		_ = tf.TestNode[i].N.Start()
-		go tf.TestNode[i].nodeListen()
-	}
-}
-
-// startNode starts node according to id
-func (tf *testFramework[T, Constraint]) startNode(id uint64) {
-	for i := range tf.TestNode {
-		if uint64(i) == id {
-			tf.TestNode[i].online = true
-			_ = tf.TestNode[i].N.Start()
-			go tf.TestNode[i].nodeListen()
-		}
-	}
-}
-
-// stopNode stops node according to id
-func (tf *testFramework[T, Constraint]) stopNode(id uint64) {
-	for i := range tf.TestNode {
-		if uint64(i) == id {
-			if tf.TestNode[i].close != nil {
-				close(tf.TestNode[i].close)
-				tf.TestNode[i].close = nil
-			}
-
-			tf.TestNode[i].online = false
-			tf.TestNode[i].N.Stop()
-		}
-	}
-}
-
-// frameworkStop stops the cluster of RBFT test nodes.
-func (tf *testFramework[T, Constraint]) frameworkStop() {
-	tf.log.Notice("Test Framework stopping...")
-
-	for i := range tf.TestNode {
-		if tf.TestNode[i].close != nil {
-			close(tf.TestNode[i].close)
-			tf.TestNode[i].close = nil
-		}
-	}
-
-	if tf.close != nil {
-		close(tf.close)
-		tf.close = nil
-	}
-
-	for i := range tf.TestNode {
-		tf.TestNode[i].online = false
-		tf.TestNode[i].N.Stop()
-	}
-	tf.log.Noticef("======== Every Node in Cluster stopped!")
-}
-
-// frameworkDelNode adds one node to the cluster.
-func (tf *testFramework[T, Constraint]) frameworkDelNode(hostname string) {
-	hash := calHash(hostname)
-	tf.log.Noticef("Test Framework delete Node, Hash: %s...", hostname)
-
-	// stop node id
-	for i, node := range tf.TestNode {
-		if node.Hostname == hostname {
-			tf.TestNode[i].online = false
-			tf.TestNode[i].N.Stop()
-		}
-	}
-
-	// send config change tx
-	go func() {
-		var (
-			senderID     uint64
-			senderHost   string
-			senderIndex  int
-			senderRouter types.Router
-		)
-
-		senderID = uint64(2)
-		delRouter := types.Router{}
-		for index, node := range tf.TestNode {
-			if node.ID == senderID {
-				senderHost = node.Hostname
-				senderIndex = index
-				senderRouter = getRouter(&node.Router)
-				break
-			}
-		}
-
-		delPeer := types.Peer{
-			Hash:     hash,
-			Hostname: hostname,
-		}
-
-		index := uint64(0)
-		for _, node := range senderRouter.Peers {
-			if node.Hostname != hostname {
-				index++
-				node.ID = index
-				delRouter.Peers = append(delRouter.Peers, node)
-			} else {
-				delPeer.ID = node.ID
-			}
-		}
-
-		tf.log.Infof("[Cluster_Service %s] Del Node Req: %+v", senderHost, delPeer)
-		tf.log.Infof("[Cluster_Service %s] Target Validator Set: %+v", senderHost, delRouter)
-
-		info, _ := json.Marshal(&delRouter)
-		tx := &consensus.FltTransaction{
-			Timestamp: time.Now().Unix(),
-			Id:        2,
-			Nonce:     999,
-
-			// use new router as value
-			Value:  info,
-			TxType: consensus.FltTransaction_CTX,
-		}
-		txBytes, err := tx.Marshal()
-		if err != nil {
-			tf.log.Errorf("[Cluster_Service %s] Marshal tx error: %s", senderHost, err)
-		}
-		txSet := &consensus.RequestSet{
-			Requests: [][]byte{txBytes},
-			Local:    true,
-		}
-		_ = tf.TestNode[senderIndex].N.Propose(txSet)
-	}()
-}
-
-// frameworkAddNode adds one node to the cluster.
-func (tf *testFramework[T, Constraint]) frameworkAddNode(hostname string, loggerFile bool, vSet []*consensus.NodeInfo) {
-	tf.log.Noticef("Test Framework add Node, Host: %s...", hostname)
-
-	maxID := uint64(0)
-	for _, node := range tf.TestNode {
-		if node.online {
-			maxID++
-		}
-	}
-	id := maxID + 1
-
-	// Init logger
-	var log *fancylogger.Logger
-	if loggerFile {
-		log = newRawLoggerWithHost(hostname)
-	} else {
-		log = newRawLogger()
-	}
-
-	// Simulation Function of External
-	var ext external.ExternalStack[T, Constraint]
-	testExt := &testExternal[T, Constraint]{
-		tf:                     tf,
-		testNode:               nil,
-		clusterChan:            tf.clusterChan,
-		configCheckpointRecord: make(map[uint64]*consensus.QuorumCheckpoint),
-	}
-	ext = testExt
-
-	// MemPool Instance, Parameters in Config are Flexible
-	confMemPool := mempool.Config{
-		PoolSize:      100000,
-		BatchSize:     2,
-		BatchMemLimit: false,
-		BatchMaxMem:   999,
-		ToleranceTime: 999 * time.Millisecond,
-		Logger:        log,
-	}
-	pool := mempool.NewMempool[T, Constraint](confMemPool)
-
-	// new peer
-	hash := calHash(hostname)
-	newPeer := &types.Peer{
-		ID:       id,
-		Hash:     hash,
-		Hostname: hostname,
-	}
-
-	// Add Peer Info to Framework
-	var (
-		senderHost  string
-		senderIndex int
-	)
-	conf := tf.newNodeConfig(id, hostname, log, ext, pool, 1, vSet, nil)
-	n, _ := newNode[T, Constraint](conf)
-	N := n
-
-	routers := vSetToRouters(vSet)
-	tn := &testNode[T, Constraint]{
-		N:        N,
-		n:        n,
-		Router:   routers,
-		Epoch:    n.rbft.epoch,
-		ID:       id,
-		Hash:     hash,
-		Hostname: hostname,
-		normal:   true,
-		online:   true,
-		close:    make(chan bool),
-		recvChan: make(chan *consensusMessageWrapper),
-		blocks:   make(map[uint64]string),
-	}
-	tf.TestNode = append(tf.TestNode, tn)
-	testExt.testNode = tn
-
-	// Init State
-	stateInit := &types.ServiceState{}
-	stateInit.MetaState = &types.MetaState{
-		Height: 0,
-		Digest: "XXX GENESIS",
-	}
-	tn.N.ReportExecuted(stateInit)
-
-	// send config change tx
-	// node4 propose a ctx to add node
-	go func() {
-		tf.log.Infof("[Cluster_Service %d:%s] Add Node Req: %s", senderIndex, senderHost, newPeer.Hash)
-		tf.log.Infof("[Cluster_Service %d:%s] Target Validator Set: %+v", senderIndex, senderHost, vSet)
-
-		info, _ := json.Marshal(0)
-		tx := &consensus.FltTransaction{
-			Timestamp: time.Now().Unix(),
-			Id:        2,
-			Nonce:     999,
-
-			// use new router as value
-			Value:  info,
-			TxType: consensus.FltTransaction_CTX,
-		}
-		txBytes, err := tx.Marshal()
-		if err != nil {
-			tf.log.Errorf("[Cluster_Service %d:%s] Marshal tx error: %s", senderIndex, senderHost, err)
-		}
-		txSet := &consensus.RequestSet{
-			Requests: [][]byte{txBytes},
-			Local:    true,
-		}
-		_ = tf.TestNode[senderIndex].N.Propose(txSet)
-	}()
-
-	// Start the New Node listen, but don't start consensus
-	go tn.nodeListen()
-	go func() {
-		_ = tn.N.Start()
-	}()
-}
-
-func (tf *testFramework[T, Constraint]) sendTx(no int, sender uint64) {
-	if sender == uint64(0) {
-		sender = uint64(rand.Int()%tf.N + 1)
-	}
-
-	str3 := "tx" + string(rune(no))
-	tx3 := &consensus.FltTransaction{Value: []byte(str3)}
-	tx3Bytes, err := tx3.Marshal()
-	if err != nil {
-		tf.log.Errorf("[Cluster_Service %d:%s] Marshal tx error: %s", sender-1, tf.TestNode[sender-1].Hostname, err)
-	}
-	txs3 := &consensus.RequestSet{
-		Requests: [][]byte{tx3Bytes},
-		Local:    true,
-	}
-	_ = tf.TestNode[sender-1].N.Propose(txs3)
-}
 
 func newTx() *consensus.FltTransaction {
 	randomBytes := make([]byte, 20)
 
 	_, err := rand.Read(randomBytes)
 	if err != nil {
-		fmt.Println("Error generating random bytes:", err)
-		return nil
+		panic(err)
 	}
 	from := hex.EncodeToString(randomBytes)
 	return &consensus.FltTransaction{
@@ -671,41 +347,6 @@ func newTx() *consensus.FltTransaction {
 		Nonce:     0,
 		Timestamp: time.Now().Unix(),
 	}
-}
-
-func newCTX(vSet []*consensus.NodeInfo) *consensus.FltTransaction {
-	info, _ := json.Marshal(vSet)
-	return &consensus.FltTransaction{
-		Timestamp: time.Now().Unix(),
-		Id:        2,
-		Nonce:     0,
-		// use new router as value
-		Value:  info,
-		TxType: consensus.FltTransaction_CTX,
-	}
-}
-
-func (tf *testFramework[T, Constraint]) sendInitCtx() {
-	tf.log.Info("Send init ctx")
-	senderID3 := uint64(rand.Int()%tf.N + 1)
-	info, _ := json.Marshal(defaultValidatorSet)
-	tx := &consensus.FltTransaction{
-		Timestamp: time.Now().Unix(),
-		Id:        2,
-		Nonce:     999,
-		// use new router as value
-		Value:  info,
-		TxType: consensus.FltTransaction_CTX,
-	}
-	txBytes, err := tx.Marshal()
-	if err != nil {
-		tf.log.Errorf("[Cluster_Service %d:%s] Marshal tx error: %s", senderID3-1, tf.TestNode[senderID3-1].Hostname, err)
-	}
-	txSet := &consensus.RequestSet{
-		Requests: [][]byte{txBytes},
-		Local:    true,
-	}
-	_ = tf.TestNode[senderID3-1].N.Propose(txSet)
 }
 
 // =============================================================================
@@ -756,6 +397,7 @@ func (ext *testExternal[T, Constraint]) Destroy(key string) error {
 func (ext *testExternal[T, Constraint]) postMsg(msg *channelMsg) {
 	ext.clusterChan <- msg
 }
+
 func (ext *testExternal[T, Constraint]) Broadcast(ctx context.Context, msg *consensus.ConsensusMessage) error {
 	if !ext.testNode.online {
 		return errors.New("node offline")
@@ -765,7 +407,7 @@ func (ext *testExternal[T, Constraint]) Broadcast(ctx context.Context, msg *cons
 		msg: msg,
 		to:  "",
 	}
-	ext.tf.log.Debugf("%s broadcast msg %v", ext.testNode.Hostname, msg.Type)
+	ext.tf.log.Debugf("%d broadcast msg %v", ext.testNode.ID, msg.Type)
 	ext.testNode.broadcastMessageCache = &consensusMessageWrapper{
 		ctx:              ctx,
 		ConsensusMessage: msg,
@@ -774,7 +416,8 @@ func (ext *testExternal[T, Constraint]) Broadcast(ctx context.Context, msg *cons
 	go ext.postMsg(cm)
 	return nil
 }
-func (ext *testExternal[T, Constraint]) Unicast(ctx context.Context, msg *consensus.ConsensusMessage, to uint64) error {
+
+func (ext *testExternal[T, Constraint]) Unicast(ctx context.Context, msg *consensus.ConsensusMessage, to string) error {
 	if !ext.testNode.online {
 		return errors.New("node offline")
 	}
@@ -783,28 +426,11 @@ func (ext *testExternal[T, Constraint]) Unicast(ctx context.Context, msg *consen
 		msg: msg,
 	}
 
-	for _, peer := range ext.testNode.Router.Peers {
-		if peer.ID == to {
-			cm.to = peer.Hash
+	for _, peer := range ext.testNode.Router {
+		if peer.P2PNodeID == to {
+			cm.to = peer.P2PNodeID
 			break
 		}
-	}
-	ext.testNode.unicastMessageCache = &consensusMessageWrapper{
-		ctx:              ctx,
-		ConsensusMessage: msg,
-	}
-
-	go ext.postMsg(cm)
-	return nil
-}
-func (ext *testExternal[T, Constraint]) UnicastByHostname(ctx context.Context, msg *consensus.ConsensusMessage, to string) error {
-	if !ext.testNode.online {
-		return errors.New("node offline")
-	}
-
-	cm := &channelMsg{
-		msg: msg,
-		to:  to,
 	}
 	ext.testNode.unicastMessageCache = &consensusMessageWrapper{
 		ctx:              ctx,
@@ -845,51 +471,9 @@ func (ext *testExternal[T, Constraint]) Execute(requests [][]byte, localList []b
 		ext.testNode.blocks[state.MetaState.Height] = state.MetaState.Digest
 		ext.testNode.n.logger.Debugf("Block Number %d", state.MetaState.Height)
 		ext.testNode.n.logger.Debugf("Block Hash %s", state.MetaState.Digest)
-		//report latest validator set
-		if len(requests) != 0 {
-			if consensus.IsConfigTx[T, Constraint](requests[0]) {
-				var vSet []*consensus.NodeInfo
-				tmp := &vSet
-				tx, err := consensus.DecodeTx[T, Constraint](requests[0])
-				if err != nil {
-					ext.tf.log.Errorf("DecodeTx error: %v", err)
-				}
-				val := Constraint(tx).RbftGetData()
-				_ = json.Unmarshal(val, tmp)
-				var peers []*types.Peer
-				for index, nodeInfo := range vSet {
-					peer := &types.Peer{
-						ID:       uint64(index + 1),
-						Hostname: nodeInfo.Hostname,
-					}
-					peers = append(peers, peer)
-				}
-				router := &types.Router{
-					Peers: peers,
-				}
+		// report latest validator set
 
-				ext.testNode.Epoch = state.MetaState.Height
-				ext.testNode.VSet = vSet
-
-				ext.testNode.n.logger.Debugf("Validator Set %+v", router)
-				ext.tf.log.Infof("router: %+v", router)
-			}
-		}
 		go ext.testNode.N.ReportExecuted(state)
-
-		if !consensus.IsConfigTx[T, Constraint](requests[0]) && state.MetaState.Height%10 != 0 {
-			success := make(chan bool)
-			go func() {
-				for {
-					s := ext.testNode.n.getCurrentState()
-					if s.MetaState.Height == state.MetaState.Height {
-						success <- true
-						break
-					}
-				}
-			}()
-			<-success
-		}
 	}
 }
 
@@ -906,11 +490,10 @@ func (ext *testExternal[T, Constraint]) StateUpdate(seqNo uint64, digest string,
 			}
 		}
 	}
-	ext.testNode.VSet = ext.tf.TestNode[0].VSet
 	ext.testNode.Epoch = ext.tf.TestNode[0].Epoch
 
 	var checkpoint *consensus.Checkpoint
-	signatures := make(map[string][]byte, len(signedCheckpoints))
+	signatures := make(map[uint64][]byte, len(signedCheckpoints))
 	for _, signedCheckpoint := range signedCheckpoints {
 		if checkpoint == nil {
 			checkpoint = signedCheckpoint.Checkpoint
@@ -934,16 +517,16 @@ func (ext *testExternal[T, Constraint]) StateUpdate(seqNo uint64, digest string,
 	ext.lastConfigCheckpoint = quorumCheckpoint
 
 	state := &types.ServiceState{}
-	state.Epoch = ext.GetEpoch()
+	state.Epoch = ext.testNode.n.config.GenesisEpochInfo.Epoch
 	state.MetaState = &types.MetaState{
 		Height: ext.testNode.Applied,
 		Digest: ext.testNode.Digest,
 	}
-	ext.tf.log.Infof("report state updated state: %+v", state)
+	ext.tf.log.Infof("Replica %d report state updated state: %+v", ext.testNode.ID, state)
 	ext.testNode.N.ReportStateUpdated(state)
 }
 
-func (ext *testExternal[T, Constraint]) SendFilterEvent(informType types.InformType, message ...interface{}) {
+func (ext *testExternal[T, Constraint]) SendFilterEvent(informType types.InformType, message ...any) {
 	switch informType {
 	case types.InformTypeFilterStableCheckpoint:
 		signedCheckpoints, ok := message[0].([]*consensus.SignedCheckpoint)
@@ -951,7 +534,7 @@ func (ext *testExternal[T, Constraint]) SendFilterEvent(informType types.InformT
 			return
 		}
 		var checkpoint *consensus.Checkpoint
-		signatures := make(map[string][]byte, len(signedCheckpoints))
+		signatures := make(map[uint64][]byte, len(signedCheckpoints))
 		for _, signedCheckpoint := range signedCheckpoints {
 			if checkpoint == nil {
 				checkpoint = signedCheckpoint.Checkpoint
@@ -969,78 +552,20 @@ func (ext *testExternal[T, Constraint]) SendFilterEvent(informType types.InformT
 			Checkpoint: checkpoint,
 			Signatures: signatures,
 		}
-		if quorumCheckpoint.Reconfiguration() {
+		if quorumCheckpoint.NeedUpdateEpoch() {
 			ext.lastConfigCheckpoint = quorumCheckpoint
 			ext.configCheckpointRecord[quorumCheckpoint.Epoch()] = quorumCheckpoint
 			ext.testNode.n.logger.Noticef("update latest checkpoint to epoch: %d, height: %d",
 				quorumCheckpoint.Epoch(), quorumCheckpoint.Height())
 		}
-		height := signedCheckpoints[0].Checkpoint.Height()
-		if ext.testNode.n.rbft.atomicIn(InConfChange) {
-			go ext.testNode.N.ReportStableCheckpointFinished(height)
-		}
 	}
 }
 
-func (ext *testExternal[T, Constraint]) Reconfiguration() uint64 {
-	var newPeers []*types.Peer
-	for index, peer := range ext.testNode.VSet {
-		newPeer := &types.Peer{
-			ID:       uint64(index + 1),
-			Hostname: peer.Hostname,
-			Hash:     calHash(peer.Hostname),
-		}
-		newPeers = append(newPeers, newPeer)
-	}
-	newRouter := &types.Router{Peers: newPeers}
-	ext.testNode.Router = getRouter(newRouter)
-	ext.tf.log.Noticef("[Cluster_Service %s update] router: %+v", ext.testNode.Hostname, newRouter)
-	cc := &types.ConfState{QuorumRouter: newRouter}
-	ext.testNode.N.ApplyConfChange(cc)
-	return ext.GetEpoch()
+// TODO: supported epoch change
+func (ext *testExternal[T, Constraint]) GetCurrenEpochInfo() (*EpochInfo, error) {
+	return ext.testNode.n.config.GenesisEpochInfo, nil
 }
 
-func (ext *testExternal[T, Constraint]) GetNodeInfos() []*consensus.NodeInfo {
-	return ext.testNode.VSet
-}
-
-func (ext *testExternal[T, Constraint]) GetAlgorithmVersion() string {
-	return "RBFT"
-}
-
-func (ext *testExternal[T, Constraint]) GetEpoch() uint64 {
-	return ext.GetLastCheckpoint().NextEpoch()
-}
-
-func (ext *testExternal[T, Constraint]) IsConfigBlock(height uint64) bool {
-	return false
-}
-
-// GetLastCheckpoint return the last QuorumCheckpoint in ledger
-func (ext *testExternal[T, Constraint]) GetLastCheckpoint() *consensus.QuorumCheckpoint {
-	if ext.lastConfigCheckpoint != nil {
-		return ext.lastConfigCheckpoint
-	}
-	return &consensus.QuorumCheckpoint{
-		Checkpoint: &consensus.Checkpoint{
-			Epoch:          ext.testNode.Epoch,
-			ConsensusState: &consensus.Checkpoint_ConsensusState{},
-			ExecuteState: &consensus.Checkpoint_ExecuteState{
-				Height: 0,
-				Digest: "XXX GENESIS",
-			},
-			NextEpochState: &consensus.Checkpoint_NextEpochState{},
-		},
-		Signatures: nil,
-	}
-}
-
-// GetCheckpointOfEpoch gets checkpoint of given epoch.
-func (ext *testExternal[T, Constraint]) GetCheckpointOfEpoch(epoch uint64) (*consensus.QuorumCheckpoint, error) {
-	return ext.configCheckpointRecord[epoch], nil
-}
-
-// VerifyEpochChangeProof verifies the proof is correctly chained with known validator verifier.
-func (ext *testExternal[T, Constraint]) VerifyEpochChangeProof(proof *consensus.EpochChangeProof, validators consensus.Validators) error {
-	return nil
+func (ext *testExternal[T, Constraint]) GetEpochInfo(epoch uint64) (*EpochInfo, error) {
+	return ext.testNode.n.config.GenesisEpochInfo, nil
 }

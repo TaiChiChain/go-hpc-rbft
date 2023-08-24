@@ -23,70 +23,16 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 
-type NodeInfo struct {
-	// hostname identity.
-	Hostname string `protobuf:"bytes,1,opt,name=hostname,proto3" json:"hostname,omitempty"`
-	// public key of certain node.
-	PubKey []byte `protobuf:"bytes,2,opt,name=pub_key,json=pubKey,proto3" json:"pub_key,omitempty"`
-}
-
-func (m *NodeInfo) Reset()      { *m = NodeInfo{} }
-func (*NodeInfo) ProtoMessage() {}
-func (*NodeInfo) Descriptor() ([]byte, []int) {
-	return fileDescriptor_9bab050ffa824783, []int{0}
-}
-func (m *NodeInfo) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *NodeInfo) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	if deterministic {
-		return xxx_messageInfo_NodeInfo.Marshal(b, m, deterministic)
-	} else {
-		b = b[:cap(b)]
-		n, err := m.MarshalToSizedBuffer(b)
-		if err != nil {
-			return nil, err
-		}
-		return b[:n], nil
-	}
-}
-func (m *NodeInfo) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_NodeInfo.Merge(m, src)
-}
-func (m *NodeInfo) XXX_Size() int {
-	return m.Size()
-}
-func (m *NodeInfo) XXX_DiscardUnknown() {
-	xxx_messageInfo_NodeInfo.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_NodeInfo proto.InternalMessageInfo
-
-func (m *NodeInfo) GetHostname() string {
-	if m != nil {
-		return m.Hostname
-	}
-	return ""
-}
-
-func (m *NodeInfo) GetPubKey() []byte {
-	if m != nil {
-		return m.PubKey
-	}
-	return nil
-}
-
 type Checkpoint struct {
-	Epoch          uint64                     `protobuf:"varint,1,opt,name=epoch,proto3" json:"epoch,omitempty"`
-	ConsensusState *Checkpoint_ConsensusState `protobuf:"bytes,2,opt,name=consensus_state,json=consensusState,proto3" json:"consensus_state,omitempty"`
-	ExecuteState   *Checkpoint_ExecuteState   `protobuf:"bytes,3,opt,name=execute_state,json=executeState,proto3" json:"execute_state,omitempty"`
-	NextEpochState *Checkpoint_NextEpochState `protobuf:"bytes,4,opt,name=next_epoch_state,json=nextEpochState,proto3" json:"next_epoch_state,omitempty"`
+	Epoch           uint64                   `protobuf:"varint,1,opt,name=epoch,proto3" json:"epoch,omitempty"`
+	ExecuteState    *Checkpoint_ExecuteState `protobuf:"bytes,2,opt,name=execute_state,json=executeState,proto3" json:"execute_state,omitempty"`
+	NeedUpdateEpoch bool                     `protobuf:"varint,3,opt,name=need_update_epoch,json=needUpdateEpoch,proto3" json:"need_update_epoch,omitempty"`
 }
 
 func (m *Checkpoint) Reset()      { *m = Checkpoint{} }
 func (*Checkpoint) ProtoMessage() {}
 func (*Checkpoint) Descriptor() ([]byte, []int) {
-	return fileDescriptor_9bab050ffa824783, []int{1}
+	return fileDescriptor_9bab050ffa824783, []int{0}
 }
 func (m *Checkpoint) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -122,13 +68,6 @@ func (m *Checkpoint) GetEpoch() uint64 {
 	return 0
 }
 
-func (m *Checkpoint) GetConsensusState() *Checkpoint_ConsensusState {
-	if m != nil {
-		return m.ConsensusState
-	}
-	return nil
-}
-
 func (m *Checkpoint) GetExecuteState() *Checkpoint_ExecuteState {
 	if m != nil {
 		return m.ExecuteState
@@ -136,64 +75,11 @@ func (m *Checkpoint) GetExecuteState() *Checkpoint_ExecuteState {
 	return nil
 }
 
-func (m *Checkpoint) GetNextEpochState() *Checkpoint_NextEpochState {
+func (m *Checkpoint) GetNeedUpdateEpoch() bool {
 	if m != nil {
-		return m.NextEpochState
+		return m.NeedUpdateEpoch
 	}
-	return nil
-}
-
-// Consensus state of the committed block
-type Checkpoint_ConsensusState struct {
-	Round uint64 `protobuf:"varint,1,opt,name=round,proto3" json:"round,omitempty"`
-	Id    string `protobuf:"bytes,2,opt,name=id,proto3" json:"id,omitempty"`
-}
-
-func (m *Checkpoint_ConsensusState) Reset()         { *m = Checkpoint_ConsensusState{} }
-func (m *Checkpoint_ConsensusState) String() string { return proto.CompactTextString(m) }
-func (*Checkpoint_ConsensusState) ProtoMessage()    {}
-func (*Checkpoint_ConsensusState) Descriptor() ([]byte, []int) {
-	return fileDescriptor_9bab050ffa824783, []int{1, 0}
-}
-func (m *Checkpoint_ConsensusState) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *Checkpoint_ConsensusState) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	if deterministic {
-		return xxx_messageInfo_Checkpoint_ConsensusState.Marshal(b, m, deterministic)
-	} else {
-		b = b[:cap(b)]
-		n, err := m.MarshalToSizedBuffer(b)
-		if err != nil {
-			return nil, err
-		}
-		return b[:n], nil
-	}
-}
-func (m *Checkpoint_ConsensusState) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Checkpoint_ConsensusState.Merge(m, src)
-}
-func (m *Checkpoint_ConsensusState) XXX_Size() int {
-	return m.Size()
-}
-func (m *Checkpoint_ConsensusState) XXX_DiscardUnknown() {
-	xxx_messageInfo_Checkpoint_ConsensusState.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_Checkpoint_ConsensusState proto.InternalMessageInfo
-
-func (m *Checkpoint_ConsensusState) GetRound() uint64 {
-	if m != nil {
-		return m.Round
-	}
-	return 0
-}
-
-func (m *Checkpoint_ConsensusState) GetId() string {
-	if m != nil {
-		return m.Id
-	}
-	return ""
+	return false
 }
 
 // Execute state of the executed block
@@ -206,7 +92,7 @@ func (m *Checkpoint_ExecuteState) Reset()         { *m = Checkpoint_ExecuteState
 func (m *Checkpoint_ExecuteState) String() string { return proto.CompactTextString(m) }
 func (*Checkpoint_ExecuteState) ProtoMessage()    {}
 func (*Checkpoint_ExecuteState) Descriptor() ([]byte, []int) {
-	return fileDescriptor_9bab050ffa824783, []int{1, 1}
+	return fileDescriptor_9bab050ffa824783, []int{0, 0}
 }
 func (m *Checkpoint_ExecuteState) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -249,66 +135,12 @@ func (m *Checkpoint_ExecuteState) GetDigest() string {
 	return ""
 }
 
-// Next epoch state with next validators
-// Optional if this is a reconfiguration checkpoint
-type Checkpoint_NextEpochState struct {
-	ValidatorSet     []*NodeInfo `protobuf:"bytes,1,rep,name=validator_set,json=validatorSet,proto3" json:"validator_set,omitempty"`
-	ConsensusVersion string      `protobuf:"bytes,2,opt,name=consensus_version,json=consensusVersion,proto3" json:"consensus_version,omitempty"`
-}
-
-func (m *Checkpoint_NextEpochState) Reset()         { *m = Checkpoint_NextEpochState{} }
-func (m *Checkpoint_NextEpochState) String() string { return proto.CompactTextString(m) }
-func (*Checkpoint_NextEpochState) ProtoMessage()    {}
-func (*Checkpoint_NextEpochState) Descriptor() ([]byte, []int) {
-	return fileDescriptor_9bab050ffa824783, []int{1, 2}
-}
-func (m *Checkpoint_NextEpochState) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *Checkpoint_NextEpochState) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	if deterministic {
-		return xxx_messageInfo_Checkpoint_NextEpochState.Marshal(b, m, deterministic)
-	} else {
-		b = b[:cap(b)]
-		n, err := m.MarshalToSizedBuffer(b)
-		if err != nil {
-			return nil, err
-		}
-		return b[:n], nil
-	}
-}
-func (m *Checkpoint_NextEpochState) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Checkpoint_NextEpochState.Merge(m, src)
-}
-func (m *Checkpoint_NextEpochState) XXX_Size() int {
-	return m.Size()
-}
-func (m *Checkpoint_NextEpochState) XXX_DiscardUnknown() {
-	xxx_messageInfo_Checkpoint_NextEpochState.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_Checkpoint_NextEpochState proto.InternalMessageInfo
-
-func (m *Checkpoint_NextEpochState) GetValidatorSet() []*NodeInfo {
-	if m != nil {
-		return m.ValidatorSet
-	}
-	return nil
-}
-
-func (m *Checkpoint_NextEpochState) GetConsensusVersion() string {
-	if m != nil {
-		return m.ConsensusVersion
-	}
-	return ""
-}
-
 // SignedCheckpoint contains the actual checkpoint with signature
 type SignedCheckpoint struct {
 	// Checkpoint is the info of checkpoint.
 	Checkpoint *Checkpoint `protobuf:"bytes,1,opt,name=checkpoint,proto3" json:"checkpoint,omitempty"`
 	// Author is the signer for signature.
-	Author string `protobuf:"bytes,2,opt,name=author,proto3" json:"author,omitempty"`
+	Author uint64 `protobuf:"varint,2,opt,name=author,proto3" json:"author,omitempty"`
 	// Signature is the signature for checkpoint.
 	Signature []byte `protobuf:"bytes,3,opt,name=signature,proto3" json:"signature,omitempty"`
 }
@@ -316,7 +148,7 @@ type SignedCheckpoint struct {
 func (m *SignedCheckpoint) Reset()      { *m = SignedCheckpoint{} }
 func (*SignedCheckpoint) ProtoMessage() {}
 func (*SignedCheckpoint) Descriptor() ([]byte, []int) {
-	return fileDescriptor_9bab050ffa824783, []int{2}
+	return fileDescriptor_9bab050ffa824783, []int{1}
 }
 func (m *SignedCheckpoint) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -352,11 +184,11 @@ func (m *SignedCheckpoint) GetCheckpoint() *Checkpoint {
 	return nil
 }
 
-func (m *SignedCheckpoint) GetAuthor() string {
+func (m *SignedCheckpoint) GetAuthor() uint64 {
 	if m != nil {
 		return m.Author
 	}
-	return ""
+	return 0
 }
 
 func (m *SignedCheckpoint) GetSignature() []byte {
@@ -372,13 +204,13 @@ type QuorumCheckpoint struct {
 	// Checkpoint is the info of checkpoint.
 	Checkpoint *Checkpoint `protobuf:"bytes,1,opt,name=checkpoint,proto3" json:"checkpoint,omitempty"`
 	// Signatures is the aggregated signature for checkpoint.
-	Signatures map[string][]byte `protobuf:"bytes,2,rep,name=signatures,proto3" json:"signatures,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	Signatures map[uint64][]byte `protobuf:"bytes,2,rep,name=signatures,proto3" json:"signatures,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 }
 
 func (m *QuorumCheckpoint) Reset()      { *m = QuorumCheckpoint{} }
 func (*QuorumCheckpoint) ProtoMessage() {}
 func (*QuorumCheckpoint) Descriptor() ([]byte, []int) {
-	return fileDescriptor_9bab050ffa824783, []int{3}
+	return fileDescriptor_9bab050ffa824783, []int{2}
 }
 func (m *QuorumCheckpoint) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -414,80 +246,11 @@ func (m *QuorumCheckpoint) GetCheckpoint() *Checkpoint {
 	return nil
 }
 
-func (m *QuorumCheckpoint) GetSignatures() map[string][]byte {
+func (m *QuorumCheckpoint) GetSignatures() map[uint64][]byte {
 	if m != nil {
 		return m.Signatures
 	}
 	return nil
-}
-
-// EpochInfo is legacy struct to change epoch
-type EpochInfo struct {
-	Epoch                 uint64   `protobuf:"varint,1,opt,name=epoch,proto3" json:"epoch,omitempty"`
-	Vset                  []string `protobuf:"bytes,2,rep,name=vset,proto3" json:"vset,omitempty"`
-	Digest                []byte   `protobuf:"bytes,3,opt,name=digest,proto3" json:"digest,omitempty"`
-	LastConfigBlockHeight uint64   `protobuf:"varint,4,opt,name=lastConfigBlockHeight,proto3" json:"lastConfigBlockHeight,omitempty"`
-}
-
-func (m *EpochInfo) Reset()         { *m = EpochInfo{} }
-func (m *EpochInfo) String() string { return proto.CompactTextString(m) }
-func (*EpochInfo) ProtoMessage()    {}
-func (*EpochInfo) Descriptor() ([]byte, []int) {
-	return fileDescriptor_9bab050ffa824783, []int{4}
-}
-func (m *EpochInfo) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *EpochInfo) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	if deterministic {
-		return xxx_messageInfo_EpochInfo.Marshal(b, m, deterministic)
-	} else {
-		b = b[:cap(b)]
-		n, err := m.MarshalToSizedBuffer(b)
-		if err != nil {
-			return nil, err
-		}
-		return b[:n], nil
-	}
-}
-func (m *EpochInfo) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_EpochInfo.Merge(m, src)
-}
-func (m *EpochInfo) XXX_Size() int {
-	return m.Size()
-}
-func (m *EpochInfo) XXX_DiscardUnknown() {
-	xxx_messageInfo_EpochInfo.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_EpochInfo proto.InternalMessageInfo
-
-func (m *EpochInfo) GetEpoch() uint64 {
-	if m != nil {
-		return m.Epoch
-	}
-	return 0
-}
-
-func (m *EpochInfo) GetVset() []string {
-	if m != nil {
-		return m.Vset
-	}
-	return nil
-}
-
-func (m *EpochInfo) GetDigest() []byte {
-	if m != nil {
-		return m.Digest
-	}
-	return nil
-}
-
-func (m *EpochInfo) GetLastConfigBlockHeight() uint64 {
-	if m != nil {
-		return m.LastConfigBlockHeight
-	}
-	return 0
 }
 
 // EpochChangeProof is a slice of checkpoints with contiguous increasing epoch numbers
@@ -498,13 +261,13 @@ type EpochChangeProof struct {
 	// Indicate whether the node where proof comes from has more epoch changes
 	More uint64 `protobuf:"varint,2,opt,name=more,proto3" json:"more,omitempty"`
 	// Where the proof comes from
-	Author string `protobuf:"bytes,3,opt,name=author,proto3" json:"author,omitempty"`
+	Author uint64 `protobuf:"varint,3,opt,name=author,proto3" json:"author,omitempty"`
 }
 
 func (m *EpochChangeProof) Reset()      { *m = EpochChangeProof{} }
 func (*EpochChangeProof) ProtoMessage() {}
 func (*EpochChangeProof) Descriptor() ([]byte, []int) {
-	return fileDescriptor_9bab050ffa824783, []int{5}
+	return fileDescriptor_9bab050ffa824783, []int{3}
 }
 func (m *EpochChangeProof) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -547,107 +310,54 @@ func (m *EpochChangeProof) GetMore() uint64 {
 	return 0
 }
 
-func (m *EpochChangeProof) GetAuthor() string {
+func (m *EpochChangeProof) GetAuthor() uint64 {
 	if m != nil {
 		return m.Author
 	}
-	return ""
+	return 0
 }
 
 func init() {
-	proto.RegisterType((*NodeInfo)(nil), "consensus.NodeInfo")
 	proto.RegisterType((*Checkpoint)(nil), "consensus.Checkpoint")
-	proto.RegisterType((*Checkpoint_ConsensusState)(nil), "consensus.Checkpoint.ConsensusState")
 	proto.RegisterType((*Checkpoint_ExecuteState)(nil), "consensus.Checkpoint.ExecuteState")
-	proto.RegisterType((*Checkpoint_NextEpochState)(nil), "consensus.Checkpoint.NextEpochState")
 	proto.RegisterType((*SignedCheckpoint)(nil), "consensus.SignedCheckpoint")
 	proto.RegisterType((*QuorumCheckpoint)(nil), "consensus.QuorumCheckpoint")
-	proto.RegisterMapType((map[string][]byte)(nil), "consensus.QuorumCheckpoint.SignaturesEntry")
-	proto.RegisterType((*EpochInfo)(nil), "consensus.EpochInfo")
+	proto.RegisterMapType((map[uint64][]byte)(nil), "consensus.QuorumCheckpoint.SignaturesEntry")
 	proto.RegisterType((*EpochChangeProof)(nil), "consensus.EpochChangeProof")
 }
 
 func init() { proto.RegisterFile("checkpoint.proto", fileDescriptor_9bab050ffa824783) }
 
 var fileDescriptor_9bab050ffa824783 = []byte{
-	// 627 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xa4, 0x54, 0x4f, 0x6f, 0xd3, 0x4e,
-	0x10, 0x8d, 0x13, 0xff, 0xfa, 0x6b, 0x26, 0x69, 0x6a, 0x16, 0x0a, 0x51, 0x40, 0xa1, 0xaa, 0x38,
-	0x54, 0xaa, 0x70, 0xa5, 0xf2, 0x47, 0x55, 0xa5, 0x72, 0x68, 0x14, 0x01, 0xaa, 0xa8, 0x60, 0x23,
-	0x71, 0x8d, 0x1c, 0x7b, 0x63, 0x5b, 0x4d, 0x76, 0x23, 0xef, 0x6e, 0x68, 0x8f, 0x08, 0x71, 0xe7,
-	0xc8, 0x91, 0x8f, 0xc3, 0xb1, 0x47, 0x24, 0x2e, 0xa8, 0xf9, 0x22, 0x68, 0xff, 0xc4, 0x71, 0xaa,
-	0xa8, 0x17, 0x6e, 0xfb, 0x76, 0x67, 0x9e, 0xdf, 0xcc, 0xbc, 0x31, 0x78, 0x61, 0x42, 0xc2, 0xf3,
-	0x09, 0x4b, 0xa9, 0xf0, 0x27, 0x19, 0x13, 0x0c, 0x55, 0x43, 0x46, 0x39, 0xa1, 0x5c, 0xf2, 0xd6,
-	0xd3, 0x38, 0x15, 0x89, 0x1c, 0xf8, 0x21, 0x1b, 0xef, 0xc7, 0x2c, 0x66, 0xfb, 0x3a, 0x62, 0x20,
-	0x87, 0x1a, 0x69, 0xa0, 0x4f, 0x26, 0x73, 0xa7, 0x0b, 0xeb, 0x67, 0x2c, 0x22, 0x6f, 0xe9, 0x90,
-	0xa1, 0x16, 0xac, 0x27, 0x8c, 0x0b, 0x1a, 0x8c, 0x49, 0xd3, 0xd9, 0x76, 0x76, 0xab, 0x38, 0xc7,
-	0xe8, 0x01, 0xfc, 0x3f, 0x91, 0x83, 0xfe, 0x39, 0xb9, 0x6c, 0x96, 0xb7, 0x9d, 0xdd, 0x3a, 0x5e,
-	0x9b, 0xc8, 0xc1, 0x29, 0xb9, 0x3c, 0x72, 0xbf, 0xff, 0x78, 0x5c, 0xda, 0xf9, 0xec, 0x02, 0x74,
-	0x72, 0x55, 0xe8, 0x1e, 0xfc, 0x47, 0x26, 0x2c, 0x4c, 0x34, 0x8d, 0x8b, 0x0d, 0x40, 0xef, 0x60,
-	0x33, 0xd7, 0xd9, 0xe7, 0x22, 0x10, 0x44, 0x73, 0xd5, 0x0e, 0x9e, 0xf8, 0xf9, 0xbd, 0xbf, 0x60,
-	0xf1, 0x3b, 0xf3, 0xcb, 0x9e, 0x8a, 0xc5, 0x8d, 0x70, 0x09, 0xa3, 0xd7, 0xb0, 0x41, 0x2e, 0x48,
-	0x28, 0x05, 0xb1, 0x64, 0x15, 0x4d, 0xb6, 0xb3, 0x9a, 0xac, 0x6b, 0x42, 0x0d, 0x55, 0x9d, 0x14,
-	0x10, 0x3a, 0x03, 0x8f, 0x92, 0x0b, 0xd1, 0xd7, 0x2a, 0x2d, 0x97, 0x7b, 0x9b, 0xb0, 0x33, 0x72,
-	0x21, 0xba, 0x2a, 0xd8, 0x0a, 0xa3, 0x4b, 0xb8, 0xf5, 0x12, 0x1a, 0xcb, 0xd2, 0x55, 0x3f, 0x32,
-	0x26, 0x69, 0x34, 0xef, 0x87, 0x06, 0xa8, 0x01, 0xe5, 0x34, 0xd2, 0x2d, 0xa8, 0xe2, 0x72, 0x1a,
-	0xb5, 0x5e, 0x41, 0xbd, 0xa8, 0x12, 0xdd, 0x87, 0xb5, 0x84, 0xa4, 0x71, 0x22, 0x6c, 0x9a, 0x45,
-	0xea, 0x3e, 0x4a, 0x63, 0xc2, 0x85, 0xcd, 0xb5, 0xa8, 0xf5, 0x09, 0x1a, 0xcb, 0xca, 0xd0, 0x21,
-	0x6c, 0x4c, 0x83, 0x51, 0x1a, 0x05, 0x82, 0x65, 0x7d, 0x4e, 0x14, 0x51, 0x65, 0xb7, 0x76, 0x70,
-	0xb7, 0x50, 0xd6, 0x7c, 0xfa, 0xb8, 0x9e, 0x47, 0xf6, 0x88, 0x40, 0x7b, 0x70, 0x67, 0x31, 0xab,
-	0x29, 0xc9, 0x78, 0xca, 0xa8, 0xfd, 0x9c, 0x97, 0x3f, 0x7c, 0x34, 0xf7, 0xd6, 0x03, 0x5f, 0x1d,
-	0xf0, 0x7a, 0x69, 0x4c, 0x49, 0x54, 0x70, 0xc2, 0x0b, 0x80, 0x85, 0x5b, 0x75, 0x1d, 0xb5, 0x83,
-	0xad, 0x95, 0x5d, 0xc5, 0x85, 0x40, 0x55, 0x62, 0x20, 0x45, 0xc2, 0xb2, 0x79, 0x89, 0x06, 0xa1,
-	0x47, 0x50, 0xe5, 0x69, 0x4c, 0x03, 0x21, 0x33, 0x33, 0xef, 0x3a, 0x5e, 0x5c, 0x58, 0x1d, 0xbf,
-	0x1d, 0xf0, 0x3e, 0x48, 0x96, 0xc9, 0xf1, 0xbf, 0xeb, 0x38, 0x05, 0xc8, 0xe9, 0x79, 0xb3, 0xac,
-	0xbb, 0xb7, 0x57, 0x48, 0xbb, 0xf9, 0x1d, 0xbf, 0x97, 0x47, 0x77, 0xa9, 0xc8, 0x2e, 0x71, 0x21,
-	0xbd, 0x75, 0x0c, 0x9b, 0x37, 0x9e, 0x91, 0x07, 0x15, 0xb5, 0x52, 0x66, 0xdb, 0xd4, 0x51, 0x59,
-	0x65, 0x1a, 0x8c, 0x24, 0xb1, 0x6b, 0x66, 0xc0, 0x51, 0xf9, 0xd0, 0xb1, 0xd5, 0x7d, 0x71, 0xa0,
-	0xaa, 0x27, 0xac, 0x57, 0x76, 0xf5, 0xa2, 0x21, 0x70, 0xa7, 0x6a, 0xda, 0x4a, 0x6f, 0x15, 0xeb,
-	0x73, 0xc1, 0x34, 0xa6, 0x6d, 0x16, 0xa1, 0xe7, 0xb0, 0x35, 0x0a, 0xb8, 0xe8, 0x30, 0x3a, 0x4c,
-	0xe3, 0x93, 0x11, 0x0b, 0xcf, 0xdf, 0x18, 0xcf, 0xb9, 0x9a, 0x71, 0xf5, 0xa3, 0x52, 0xe1, 0x69,
-	0x15, 0x9d, 0x24, 0xa0, 0x31, 0x79, 0x9f, 0x31, 0x36, 0x44, 0xc7, 0x50, 0x5b, 0xb4, 0x8e, 0x5b,
-	0xaf, 0x3d, 0xbc, 0xa5, 0x5b, 0xb8, 0x18, 0xaf, 0x54, 0x8f, 0x59, 0x66, 0x0a, 0x77, 0xb1, 0x3e,
-	0x17, 0x7c, 0x50, 0x29, 0xfa, 0xc0, 0xf4, 0xe2, 0xa4, 0xf9, 0xf3, 0xba, 0xed, 0x5c, 0x5d, 0xb7,
-	0x9d, 0x3f, 0xd7, 0x6d, 0xe7, 0xdb, 0xac, 0x5d, 0xba, 0x9a, 0xb5, 0x4b, 0xbf, 0x66, 0xed, 0xd2,
-	0x60, 0x4d, 0xff, 0xdd, 0x9e, 0xfd, 0x0d, 0x00, 0x00, 0xff, 0xff, 0xe0, 0xd5, 0xdc, 0x2e, 0x2b,
-	0x05, 0x00, 0x00,
-}
-
-func (m *NodeInfo) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalToSizedBuffer(dAtA[:size])
-	if err != nil {
-		return nil, err
-	}
-	return dAtA[:n], nil
-}
-
-func (m *NodeInfo) MarshalTo(dAtA []byte) (int, error) {
-	size := m.Size()
-	return m.MarshalToSizedBuffer(dAtA[:size])
-}
-
-func (m *NodeInfo) MarshalToSizedBuffer(dAtA []byte) (int, error) {
-	i := len(dAtA)
-	_ = i
-	var l int
-	_ = l
-	if len(m.PubKey) > 0 {
-		i -= len(m.PubKey)
-		copy(dAtA[i:], m.PubKey)
-		i = encodeVarintCheckpoint(dAtA, i, uint64(len(m.PubKey)))
-		i--
-		dAtA[i] = 0x12
-	}
-	if len(m.Hostname) > 0 {
-		i -= len(m.Hostname)
-		copy(dAtA[i:], m.Hostname)
-		i = encodeVarintCheckpoint(dAtA, i, uint64(len(m.Hostname)))
-		i--
-		dAtA[i] = 0xa
-	}
-	return len(dAtA) - i, nil
+	// 440 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xa4, 0x52, 0xc1, 0x8a, 0x13, 0x41,
+	0x10, 0x4d, 0x27, 0x71, 0x31, 0x95, 0xc8, 0x8e, 0x8d, 0xca, 0x10, 0x65, 0x0c, 0x39, 0x05, 0xc5,
+	0x59, 0x88, 0x08, 0xb2, 0xb0, 0x1e, 0x5c, 0x82, 0x07, 0x2f, 0xda, 0xc1, 0x73, 0x98, 0x4c, 0x6a,
+	0x7b, 0x86, 0x35, 0xdd, 0xc3, 0x74, 0xb7, 0xb8, 0x67, 0xf1, 0xee, 0xd1, 0xa3, 0x9f, 0xe3, 0x71,
+	0x8f, 0x82, 0x08, 0x92, 0xfc, 0x88, 0x4c, 0x4f, 0x33, 0xd3, 0x04, 0xf1, 0xe2, 0xad, 0x5e, 0xf5,
+	0xab, 0x7a, 0xaf, 0xaa, 0x1a, 0x82, 0x34, 0xc3, 0xf4, 0xb2, 0x90, 0xb9, 0xd0, 0x71, 0x51, 0x4a,
+	0x2d, 0xe9, 0x20, 0x95, 0x42, 0xa1, 0x50, 0x46, 0x8d, 0x9f, 0xf0, 0x5c, 0x67, 0x66, 0x1d, 0xa7,
+	0x72, 0x7b, 0xc2, 0x25, 0x97, 0x27, 0x96, 0xb1, 0x36, 0x17, 0x16, 0x59, 0x60, 0xa3, 0xba, 0x72,
+	0xfa, 0x8b, 0x00, 0x9c, 0x37, 0xed, 0xe8, 0x1d, 0xb8, 0x81, 0x85, 0x4c, 0xb3, 0x90, 0x4c, 0xc8,
+	0xac, 0xcf, 0x6a, 0x40, 0x5f, 0xc1, 0x2d, 0xfc, 0x88, 0xa9, 0xd1, 0xb8, 0x52, 0x3a, 0xd1, 0x18,
+	0x76, 0x27, 0x64, 0x36, 0x9c, 0x4f, 0xe3, 0x46, 0x36, 0x6e, 0x7b, 0xc4, 0x8b, 0x9a, 0xba, 0xac,
+	0x98, 0x6c, 0x84, 0x1e, 0xa2, 0x8f, 0xe0, 0xb6, 0x40, 0xdc, 0xac, 0x4c, 0xb1, 0x49, 0x34, 0xae,
+	0x6a, 0xa9, 0xde, 0x84, 0xcc, 0x6e, 0xb2, 0xe3, 0xea, 0xe1, 0x9d, 0xcd, 0x2f, 0xaa, 0xf4, 0xf8,
+	0x05, 0x8c, 0xfc, 0x4e, 0xf4, 0x1e, 0x1c, 0x65, 0x98, 0xf3, 0x4c, 0x3b, 0x6f, 0x0e, 0x55, 0xf9,
+	0x4d, 0xce, 0x51, 0x69, 0xeb, 0x6a, 0xc0, 0x1c, 0x3a, 0xed, 0x7f, 0xfd, 0xf6, 0xb0, 0x33, 0xfd,
+	0x4c, 0x20, 0x58, 0xe6, 0x5c, 0xe0, 0xc6, 0x9b, 0xf2, 0x19, 0x40, 0xbb, 0x42, 0xdb, 0x6e, 0x38,
+	0xbf, 0xfb, 0xd7, 0x61, 0x98, 0x47, 0xac, 0x94, 0x12, 0xa3, 0x33, 0x59, 0x5a, 0xa5, 0x3e, 0x73,
+	0x88, 0x3e, 0x80, 0x81, 0xca, 0xb9, 0x48, 0xb4, 0x29, 0xd1, 0x4e, 0x33, 0x62, 0x6d, 0xc2, 0xf9,
+	0xf8, 0x49, 0x20, 0x78, 0x6b, 0x64, 0x69, 0xb6, 0xff, 0xef, 0xe3, 0x35, 0x40, 0xd3, 0x5e, 0x85,
+	0xdd, 0x49, 0x6f, 0x36, 0x9c, 0x3f, 0xf6, 0xca, 0x0e, 0x75, 0xe2, 0x65, 0xc3, 0x5e, 0x08, 0x5d,
+	0x5e, 0x31, 0xaf, 0x7c, 0x7c, 0x06, 0xc7, 0x07, 0xcf, 0x34, 0x80, 0xde, 0x25, 0x5e, 0xb9, 0x35,
+	0x57, 0x61, 0xf5, 0x2d, 0x3e, 0x24, 0xef, 0x4d, 0x7d, 0xf8, 0x11, 0xab, 0xc1, 0x69, 0xf7, 0x39,
+	0x71, 0xd3, 0x7d, 0x22, 0x10, 0xd8, 0xab, 0x9d, 0x67, 0x89, 0xe0, 0xf8, 0xa6, 0x94, 0xf2, 0x82,
+	0x9e, 0xc1, 0xb0, 0x35, 0xad, 0x42, 0x62, 0x7d, 0xde, 0xff, 0x87, 0x4f, 0xe6, 0xf3, 0x29, 0x85,
+	0xfe, 0x56, 0x96, 0xe8, 0x76, 0x6d, 0x63, 0xef, 0x02, 0x3d, 0xff, 0x02, 0xb5, 0x8b, 0x97, 0xe1,
+	0xf7, 0x5d, 0x44, 0xae, 0x77, 0x11, 0xf9, 0xbd, 0x8b, 0xc8, 0x97, 0x7d, 0xd4, 0xb9, 0xde, 0x47,
+	0x9d, 0x1f, 0xfb, 0xa8, 0xb3, 0x3e, 0xb2, 0x9f, 0xfd, 0xe9, 0x9f, 0x00, 0x00, 0x00, 0xff, 0xff,
+	0xc5, 0xcf, 0xf9, 0xfe, 0x3a, 0x03, 0x00, 0x00,
 }
 
 func (m *Checkpoint) Marshal() (dAtA []byte, err error) {
@@ -670,17 +380,15 @@ func (m *Checkpoint) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if m.NextEpochState != nil {
-		{
-			size, err := m.NextEpochState.MarshalToSizedBuffer(dAtA[:i])
-			if err != nil {
-				return 0, err
-			}
-			i -= size
-			i = encodeVarintCheckpoint(dAtA, i, uint64(size))
+	if m.NeedUpdateEpoch {
+		i--
+		if m.NeedUpdateEpoch {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
 		}
 		i--
-		dAtA[i] = 0x22
+		dAtA[i] = 0x18
 	}
 	if m.ExecuteState != nil {
 		{
@@ -692,57 +400,10 @@ func (m *Checkpoint) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 			i = encodeVarintCheckpoint(dAtA, i, uint64(size))
 		}
 		i--
-		dAtA[i] = 0x1a
-	}
-	if m.ConsensusState != nil {
-		{
-			size, err := m.ConsensusState.MarshalToSizedBuffer(dAtA[:i])
-			if err != nil {
-				return 0, err
-			}
-			i -= size
-			i = encodeVarintCheckpoint(dAtA, i, uint64(size))
-		}
-		i--
 		dAtA[i] = 0x12
 	}
 	if m.Epoch != 0 {
 		i = encodeVarintCheckpoint(dAtA, i, uint64(m.Epoch))
-		i--
-		dAtA[i] = 0x8
-	}
-	return len(dAtA) - i, nil
-}
-
-func (m *Checkpoint_ConsensusState) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalToSizedBuffer(dAtA[:size])
-	if err != nil {
-		return nil, err
-	}
-	return dAtA[:n], nil
-}
-
-func (m *Checkpoint_ConsensusState) MarshalTo(dAtA []byte) (int, error) {
-	size := m.Size()
-	return m.MarshalToSizedBuffer(dAtA[:size])
-}
-
-func (m *Checkpoint_ConsensusState) MarshalToSizedBuffer(dAtA []byte) (int, error) {
-	i := len(dAtA)
-	_ = i
-	var l int
-	_ = l
-	if len(m.Id) > 0 {
-		i -= len(m.Id)
-		copy(dAtA[i:], m.Id)
-		i = encodeVarintCheckpoint(dAtA, i, uint64(len(m.Id)))
-		i--
-		dAtA[i] = 0x12
-	}
-	if m.Round != 0 {
-		i = encodeVarintCheckpoint(dAtA, i, uint64(m.Round))
 		i--
 		dAtA[i] = 0x8
 	}
@@ -784,50 +445,6 @@ func (m *Checkpoint_ExecuteState) MarshalToSizedBuffer(dAtA []byte) (int, error)
 	return len(dAtA) - i, nil
 }
 
-func (m *Checkpoint_NextEpochState) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalToSizedBuffer(dAtA[:size])
-	if err != nil {
-		return nil, err
-	}
-	return dAtA[:n], nil
-}
-
-func (m *Checkpoint_NextEpochState) MarshalTo(dAtA []byte) (int, error) {
-	size := m.Size()
-	return m.MarshalToSizedBuffer(dAtA[:size])
-}
-
-func (m *Checkpoint_NextEpochState) MarshalToSizedBuffer(dAtA []byte) (int, error) {
-	i := len(dAtA)
-	_ = i
-	var l int
-	_ = l
-	if len(m.ConsensusVersion) > 0 {
-		i -= len(m.ConsensusVersion)
-		copy(dAtA[i:], m.ConsensusVersion)
-		i = encodeVarintCheckpoint(dAtA, i, uint64(len(m.ConsensusVersion)))
-		i--
-		dAtA[i] = 0x12
-	}
-	if len(m.ValidatorSet) > 0 {
-		for iNdEx := len(m.ValidatorSet) - 1; iNdEx >= 0; iNdEx-- {
-			{
-				size, err := m.ValidatorSet[iNdEx].MarshalToSizedBuffer(dAtA[:i])
-				if err != nil {
-					return 0, err
-				}
-				i -= size
-				i = encodeVarintCheckpoint(dAtA, i, uint64(size))
-			}
-			i--
-			dAtA[i] = 0xa
-		}
-	}
-	return len(dAtA) - i, nil
-}
-
 func (m *SignedCheckpoint) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -855,12 +472,10 @@ func (m *SignedCheckpoint) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		i--
 		dAtA[i] = 0x1a
 	}
-	if len(m.Author) > 0 {
-		i -= len(m.Author)
-		copy(dAtA[i:], m.Author)
-		i = encodeVarintCheckpoint(dAtA, i, uint64(len(m.Author)))
+	if m.Author != 0 {
+		i = encodeVarintCheckpoint(dAtA, i, uint64(m.Author))
 		i--
-		dAtA[i] = 0x12
+		dAtA[i] = 0x10
 	}
 	if m.Checkpoint != nil {
 		{
@@ -908,11 +523,9 @@ func (m *QuorumCheckpoint) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 				i--
 				dAtA[i] = 0x12
 			}
-			i -= len(k)
-			copy(dAtA[i:], k)
-			i = encodeVarintCheckpoint(dAtA, i, uint64(len(k)))
+			i = encodeVarintCheckpoint(dAtA, i, uint64(k))
 			i--
-			dAtA[i] = 0xa
+			dAtA[i] = 0x8
 			i = encodeVarintCheckpoint(dAtA, i, uint64(baseI-i))
 			i--
 			dAtA[i] = 0x12
@@ -929,55 +542,6 @@ func (m *QuorumCheckpoint) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		}
 		i--
 		dAtA[i] = 0xa
-	}
-	return len(dAtA) - i, nil
-}
-
-func (m *EpochInfo) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalToSizedBuffer(dAtA[:size])
-	if err != nil {
-		return nil, err
-	}
-	return dAtA[:n], nil
-}
-
-func (m *EpochInfo) MarshalTo(dAtA []byte) (int, error) {
-	size := m.Size()
-	return m.MarshalToSizedBuffer(dAtA[:size])
-}
-
-func (m *EpochInfo) MarshalToSizedBuffer(dAtA []byte) (int, error) {
-	i := len(dAtA)
-	_ = i
-	var l int
-	_ = l
-	if m.LastConfigBlockHeight != 0 {
-		i = encodeVarintCheckpoint(dAtA, i, uint64(m.LastConfigBlockHeight))
-		i--
-		dAtA[i] = 0x20
-	}
-	if len(m.Digest) > 0 {
-		i -= len(m.Digest)
-		copy(dAtA[i:], m.Digest)
-		i = encodeVarintCheckpoint(dAtA, i, uint64(len(m.Digest)))
-		i--
-		dAtA[i] = 0x1a
-	}
-	if len(m.Vset) > 0 {
-		for iNdEx := len(m.Vset) - 1; iNdEx >= 0; iNdEx-- {
-			i -= len(m.Vset[iNdEx])
-			copy(dAtA[i:], m.Vset[iNdEx])
-			i = encodeVarintCheckpoint(dAtA, i, uint64(len(m.Vset[iNdEx])))
-			i--
-			dAtA[i] = 0x12
-		}
-	}
-	if m.Epoch != 0 {
-		i = encodeVarintCheckpoint(dAtA, i, uint64(m.Epoch))
-		i--
-		dAtA[i] = 0x8
 	}
 	return len(dAtA) - i, nil
 }
@@ -1002,12 +566,10 @@ func (m *EpochChangeProof) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if len(m.Author) > 0 {
-		i -= len(m.Author)
-		copy(dAtA[i:], m.Author)
-		i = encodeVarintCheckpoint(dAtA, i, uint64(len(m.Author)))
+	if m.Author != 0 {
+		i = encodeVarintCheckpoint(dAtA, i, uint64(m.Author))
 		i--
-		dAtA[i] = 0x1a
+		dAtA[i] = 0x18
 	}
 	if m.More != 0 {
 		i = encodeVarintCheckpoint(dAtA, i, uint64(m.More))
@@ -1042,23 +604,6 @@ func encodeVarintCheckpoint(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return base
 }
-func (m *NodeInfo) Size() (n int) {
-	if m == nil {
-		return 0
-	}
-	var l int
-	_ = l
-	l = len(m.Hostname)
-	if l > 0 {
-		n += 1 + l + sovCheckpoint(uint64(l))
-	}
-	l = len(m.PubKey)
-	if l > 0 {
-		n += 1 + l + sovCheckpoint(uint64(l))
-	}
-	return n
-}
-
 func (m *Checkpoint) Size() (n int) {
 	if m == nil {
 		return 0
@@ -1068,33 +613,12 @@ func (m *Checkpoint) Size() (n int) {
 	if m.Epoch != 0 {
 		n += 1 + sovCheckpoint(uint64(m.Epoch))
 	}
-	if m.ConsensusState != nil {
-		l = m.ConsensusState.Size()
-		n += 1 + l + sovCheckpoint(uint64(l))
-	}
 	if m.ExecuteState != nil {
 		l = m.ExecuteState.Size()
 		n += 1 + l + sovCheckpoint(uint64(l))
 	}
-	if m.NextEpochState != nil {
-		l = m.NextEpochState.Size()
-		n += 1 + l + sovCheckpoint(uint64(l))
-	}
-	return n
-}
-
-func (m *Checkpoint_ConsensusState) Size() (n int) {
-	if m == nil {
-		return 0
-	}
-	var l int
-	_ = l
-	if m.Round != 0 {
-		n += 1 + sovCheckpoint(uint64(m.Round))
-	}
-	l = len(m.Id)
-	if l > 0 {
-		n += 1 + l + sovCheckpoint(uint64(l))
+	if m.NeedUpdateEpoch {
+		n += 2
 	}
 	return n
 }
@@ -1115,25 +639,6 @@ func (m *Checkpoint_ExecuteState) Size() (n int) {
 	return n
 }
 
-func (m *Checkpoint_NextEpochState) Size() (n int) {
-	if m == nil {
-		return 0
-	}
-	var l int
-	_ = l
-	if len(m.ValidatorSet) > 0 {
-		for _, e := range m.ValidatorSet {
-			l = e.Size()
-			n += 1 + l + sovCheckpoint(uint64(l))
-		}
-	}
-	l = len(m.ConsensusVersion)
-	if l > 0 {
-		n += 1 + l + sovCheckpoint(uint64(l))
-	}
-	return n
-}
-
 func (m *SignedCheckpoint) Size() (n int) {
 	if m == nil {
 		return 0
@@ -1144,9 +649,8 @@ func (m *SignedCheckpoint) Size() (n int) {
 		l = m.Checkpoint.Size()
 		n += 1 + l + sovCheckpoint(uint64(l))
 	}
-	l = len(m.Author)
-	if l > 0 {
-		n += 1 + l + sovCheckpoint(uint64(l))
+	if m.Author != 0 {
+		n += 1 + sovCheckpoint(uint64(m.Author))
 	}
 	l = len(m.Signature)
 	if l > 0 {
@@ -1173,34 +677,9 @@ func (m *QuorumCheckpoint) Size() (n int) {
 			if len(v) > 0 {
 				l = 1 + len(v) + sovCheckpoint(uint64(len(v)))
 			}
-			mapEntrySize := 1 + len(k) + sovCheckpoint(uint64(len(k))) + l
+			mapEntrySize := 1 + sovCheckpoint(uint64(k)) + l
 			n += mapEntrySize + 1 + sovCheckpoint(uint64(mapEntrySize))
 		}
-	}
-	return n
-}
-
-func (m *EpochInfo) Size() (n int) {
-	if m == nil {
-		return 0
-	}
-	var l int
-	_ = l
-	if m.Epoch != 0 {
-		n += 1 + sovCheckpoint(uint64(m.Epoch))
-	}
-	if len(m.Vset) > 0 {
-		for _, s := range m.Vset {
-			l = len(s)
-			n += 1 + l + sovCheckpoint(uint64(l))
-		}
-	}
-	l = len(m.Digest)
-	if l > 0 {
-		n += 1 + l + sovCheckpoint(uint64(l))
-	}
-	if m.LastConfigBlockHeight != 0 {
-		n += 1 + sovCheckpoint(uint64(m.LastConfigBlockHeight))
 	}
 	return n
 }
@@ -1220,9 +699,8 @@ func (m *EpochChangeProof) Size() (n int) {
 	if m.More != 0 {
 		n += 1 + sovCheckpoint(uint64(m.More))
 	}
-	l = len(m.Author)
-	if l > 0 {
-		n += 1 + l + sovCheckpoint(uint64(l))
+	if m.Author != 0 {
+		n += 1 + sovCheckpoint(uint64(m.Author))
 	}
 	return n
 }
@@ -1232,122 +710,6 @@ func sovCheckpoint(x uint64) (n int) {
 }
 func sozCheckpoint(x uint64) (n int) {
 	return sovCheckpoint(uint64((x << 1) ^ uint64((int64(x) >> 63))))
-}
-func (m *NodeInfo) Unmarshal(dAtA []byte) error {
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowCheckpoint
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= uint64(b&0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: NodeInfo: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: NodeInfo: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Hostname", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowCheckpoint
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= uint64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthCheckpoint
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex < 0 {
-				return ErrInvalidLengthCheckpoint
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Hostname = string(dAtA[iNdEx:postIndex])
-			iNdEx = postIndex
-		case 2:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field PubKey", wireType)
-			}
-			var byteLen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowCheckpoint
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				byteLen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if byteLen < 0 {
-				return ErrInvalidLengthCheckpoint
-			}
-			postIndex := iNdEx + byteLen
-			if postIndex < 0 {
-				return ErrInvalidLengthCheckpoint
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.PubKey = append(m.PubKey[:0], dAtA[iNdEx:postIndex]...)
-			if m.PubKey == nil {
-				m.PubKey = []byte{}
-			}
-			iNdEx = postIndex
-		default:
-			iNdEx = preIndex
-			skippy, err := skipCheckpoint(dAtA[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if (skippy < 0) || (iNdEx+skippy) < 0 {
-				return ErrInvalidLengthCheckpoint
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
 }
 func (m *Checkpoint) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
@@ -1399,42 +761,6 @@ func (m *Checkpoint) Unmarshal(dAtA []byte) error {
 			}
 		case 2:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ConsensusState", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowCheckpoint
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthCheckpoint
-			}
-			postIndex := iNdEx + msglen
-			if postIndex < 0 {
-				return ErrInvalidLengthCheckpoint
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			if m.ConsensusState == nil {
-				m.ConsensusState = &Checkpoint_ConsensusState{}
-			}
-			if err := m.ConsensusState.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		case 3:
-			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field ExecuteState", wireType)
 			}
 			var msglen int
@@ -1469,97 +795,11 @@ func (m *Checkpoint) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-		case 4:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field NextEpochState", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowCheckpoint
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthCheckpoint
-			}
-			postIndex := iNdEx + msglen
-			if postIndex < 0 {
-				return ErrInvalidLengthCheckpoint
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			if m.NextEpochState == nil {
-				m.NextEpochState = &Checkpoint_NextEpochState{}
-			}
-			if err := m.NextEpochState.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		default:
-			iNdEx = preIndex
-			skippy, err := skipCheckpoint(dAtA[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if (skippy < 0) || (iNdEx+skippy) < 0 {
-				return ErrInvalidLengthCheckpoint
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-func (m *Checkpoint_ConsensusState) Unmarshal(dAtA []byte) error {
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowCheckpoint
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= uint64(b&0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: ConsensusState: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: ConsensusState: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
+		case 3:
 			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Round", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field NeedUpdateEpoch", wireType)
 			}
-			m.Round = 0
+			var v int
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowCheckpoint
@@ -1569,43 +809,12 @@ func (m *Checkpoint_ConsensusState) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.Round |= uint64(b&0x7F) << shift
+				v |= int(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
-		case 2:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Id", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowCheckpoint
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= uint64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthCheckpoint
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex < 0 {
-				return ErrInvalidLengthCheckpoint
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Id = string(dAtA[iNdEx:postIndex])
-			iNdEx = postIndex
+			m.NeedUpdateEpoch = bool(v != 0)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipCheckpoint(dAtA[iNdEx:])
@@ -1728,122 +937,6 @@ func (m *Checkpoint_ExecuteState) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *Checkpoint_NextEpochState) Unmarshal(dAtA []byte) error {
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowCheckpoint
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= uint64(b&0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: NextEpochState: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: NextEpochState: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ValidatorSet", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowCheckpoint
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthCheckpoint
-			}
-			postIndex := iNdEx + msglen
-			if postIndex < 0 {
-				return ErrInvalidLengthCheckpoint
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.ValidatorSet = append(m.ValidatorSet, &NodeInfo{})
-			if err := m.ValidatorSet[len(m.ValidatorSet)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		case 2:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ConsensusVersion", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowCheckpoint
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= uint64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthCheckpoint
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex < 0 {
-				return ErrInvalidLengthCheckpoint
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.ConsensusVersion = string(dAtA[iNdEx:postIndex])
-			iNdEx = postIndex
-		default:
-			iNdEx = preIndex
-			skippy, err := skipCheckpoint(dAtA[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if (skippy < 0) || (iNdEx+skippy) < 0 {
-				return ErrInvalidLengthCheckpoint
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
 func (m *SignedCheckpoint) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1910,10 +1003,10 @@ func (m *SignedCheckpoint) Unmarshal(dAtA []byte) error {
 			}
 			iNdEx = postIndex
 		case 2:
-			if wireType != 2 {
+			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Author", wireType)
 			}
-			var stringLen uint64
+			m.Author = 0
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowCheckpoint
@@ -1923,24 +1016,11 @@ func (m *SignedCheckpoint) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				stringLen |= uint64(b&0x7F) << shift
+				m.Author |= uint64(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthCheckpoint
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex < 0 {
-				return ErrInvalidLengthCheckpoint
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Author = string(dAtA[iNdEx:postIndex])
-			iNdEx = postIndex
 		case 3:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Signature", wireType)
@@ -2091,9 +1171,9 @@ func (m *QuorumCheckpoint) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			if m.Signatures == nil {
-				m.Signatures = make(map[string][]byte)
+				m.Signatures = make(map[uint64][]byte)
 			}
-			var mapkey string
+			var mapkey uint64
 			mapvalue := []byte{}
 			for iNdEx < postIndex {
 				entryPreIndex := iNdEx
@@ -2114,7 +1194,6 @@ func (m *QuorumCheckpoint) Unmarshal(dAtA []byte) error {
 				}
 				fieldNum := int32(wire >> 3)
 				if fieldNum == 1 {
-					var stringLenmapkey uint64
 					for shift := uint(0); ; shift += 7 {
 						if shift >= 64 {
 							return ErrIntOverflowCheckpoint
@@ -2124,24 +1203,11 @@ func (m *QuorumCheckpoint) Unmarshal(dAtA []byte) error {
 						}
 						b := dAtA[iNdEx]
 						iNdEx++
-						stringLenmapkey |= uint64(b&0x7F) << shift
+						mapkey |= uint64(b&0x7F) << shift
 						if b < 0x80 {
 							break
 						}
 					}
-					intStringLenmapkey := int(stringLenmapkey)
-					if intStringLenmapkey < 0 {
-						return ErrInvalidLengthCheckpoint
-					}
-					postStringIndexmapkey := iNdEx + intStringLenmapkey
-					if postStringIndexmapkey < 0 {
-						return ErrInvalidLengthCheckpoint
-					}
-					if postStringIndexmapkey > l {
-						return io.ErrUnexpectedEOF
-					}
-					mapkey = string(dAtA[iNdEx:postStringIndexmapkey])
-					iNdEx = postStringIndexmapkey
 				} else if fieldNum == 2 {
 					var mapbyteLen uint64
 					for shift := uint(0); ; shift += 7 {
@@ -2189,160 +1255,6 @@ func (m *QuorumCheckpoint) Unmarshal(dAtA []byte) error {
 			}
 			m.Signatures[mapkey] = mapvalue
 			iNdEx = postIndex
-		default:
-			iNdEx = preIndex
-			skippy, err := skipCheckpoint(dAtA[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if (skippy < 0) || (iNdEx+skippy) < 0 {
-				return ErrInvalidLengthCheckpoint
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-func (m *EpochInfo) Unmarshal(dAtA []byte) error {
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowCheckpoint
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= uint64(b&0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: EpochInfo: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: EpochInfo: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Epoch", wireType)
-			}
-			m.Epoch = 0
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowCheckpoint
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				m.Epoch |= uint64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-		case 2:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Vset", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowCheckpoint
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= uint64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthCheckpoint
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex < 0 {
-				return ErrInvalidLengthCheckpoint
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Vset = append(m.Vset, string(dAtA[iNdEx:postIndex]))
-			iNdEx = postIndex
-		case 3:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Digest", wireType)
-			}
-			var byteLen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowCheckpoint
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				byteLen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if byteLen < 0 {
-				return ErrInvalidLengthCheckpoint
-			}
-			postIndex := iNdEx + byteLen
-			if postIndex < 0 {
-				return ErrInvalidLengthCheckpoint
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Digest = append(m.Digest[:0], dAtA[iNdEx:postIndex]...)
-			if m.Digest == nil {
-				m.Digest = []byte{}
-			}
-			iNdEx = postIndex
-		case 4:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field LastConfigBlockHeight", wireType)
-			}
-			m.LastConfigBlockHeight = 0
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowCheckpoint
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				m.LastConfigBlockHeight |= uint64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
 		default:
 			iNdEx = preIndex
 			skippy, err := skipCheckpoint(dAtA[iNdEx:])
@@ -2447,10 +1359,10 @@ func (m *EpochChangeProof) Unmarshal(dAtA []byte) error {
 				}
 			}
 		case 3:
-			if wireType != 2 {
+			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Author", wireType)
 			}
-			var stringLen uint64
+			m.Author = 0
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowCheckpoint
@@ -2460,24 +1372,11 @@ func (m *EpochChangeProof) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				stringLen |= uint64(b&0x7F) << shift
+				m.Author |= uint64(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthCheckpoint
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex < 0 {
-				return ErrInvalidLengthCheckpoint
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Author = string(dAtA[iNdEx:postIndex])
-			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipCheckpoint(dAtA[iNdEx:])

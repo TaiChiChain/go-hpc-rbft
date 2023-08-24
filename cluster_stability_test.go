@@ -4,19 +4,17 @@ import (
 	"context"
 	"testing"
 
-	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/axiomesh/axiom-bft/common/consensus"
 )
 
 func TestCluster_MissingCheckpoint(t *testing.T) {
-
-	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	unlockCluster(rbfts)
-	var retMessageSet []map[consensus.Type][]*consensusMessageWrapper
 	for i := 0; i < 40; i++ {
 		tx := newTx()
-		retMessages := execute(t, rbfts, nodes, tx, false)
-		retMessageSet = append(retMessageSet, retMessages)
+		execute(t, rbfts, nodes, tx, false)
 	}
 
 	newPrimaryIndex := 1
@@ -29,7 +27,7 @@ func TestCluster_MissingCheckpoint(t *testing.T) {
 		event := &LocalEvent{
 			Service:   CoreRbftService,
 			EventType: CoreHighWatermarkEvent,
-			Event:     rbfts[index].h,
+			Event:     rbfts[index].chainConfig.H,
 		}
 		rbfts[index].processEvent(event)
 		ntf := nodes[index].broadcastMessageCache
@@ -75,7 +73,7 @@ func TestCluster_MissingCheckpoint(t *testing.T) {
 	}
 
 	for index := range rbfts {
-		assert.Equal(t, uint64(40), rbfts[index].h)
+		assert.Equal(t, uint64(40), rbfts[index].chainConfig.H)
 	}
 }
 
@@ -91,14 +89,12 @@ func TestCluster_CheckpointToViewChange(t *testing.T) {
 	// expected: for node2 should open the high-watermark timer
 	// ========================================================================================================
 
-	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	unlockCluster(rbfts)
 
-	var retMessageSet []map[consensus.Type][]*consensusMessageWrapper
 	for i := 0; i < 40; i++ {
 		tx := newTx()
-		retMessages := execute(t, rbfts, nodes, tx, false)
-		retMessageSet = append(retMessageSet, retMessages)
+		execute(t, rbfts, nodes, tx, false)
 	}
 
 	missingNodeIndex := 1
@@ -167,8 +163,7 @@ func TestCluster_CheckpointToViewChange(t *testing.T) {
 }
 
 func TestCluster_ReceiveViewChangeBeforeStart(t *testing.T) {
-
-	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 
 	initRecoveryEvent := &LocalEvent{
 		Service:   RecoveryService,
@@ -262,14 +257,13 @@ func TestCluster_ReceiveViewChangeBeforeStart(t *testing.T) {
 	}
 
 	for index := range rbfts {
-		assert.Equal(t, uint64(1), rbfts[index].view)
+		assert.Equal(t, uint64(1), rbfts[index].chainConfig.View)
 		assert.True(t, rbfts[index].isNormal())
 	}
 }
 
 func TestCluster_ViewChange_StateUpdate_Timeout_StateUpdated_Replica(t *testing.T) {
-
-	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	unlockCluster(rbfts)
 
 	for i := 0; i < 40; i++ {
@@ -281,10 +275,10 @@ func TestCluster_ViewChange_StateUpdate_Timeout_StateUpdated_Replica(t *testing.
 			executeExceptN(t, rbfts, nodes, tx, checkpoint, 2)
 		}
 	}
-	assert.Equal(t, uint64(40), rbfts[0].h)
-	assert.Equal(t, uint64(40), rbfts[1].h)
-	assert.Equal(t, uint64(30), rbfts[2].h)
-	assert.Equal(t, uint64(40), rbfts[3].h)
+	assert.Equal(t, uint64(40), rbfts[0].chainConfig.H)
+	assert.Equal(t, uint64(40), rbfts[1].chainConfig.H)
+	assert.Equal(t, uint64(30), rbfts[2].chainConfig.H)
+	assert.Equal(t, uint64(40), rbfts[3].chainConfig.H)
 
 	var vcMsgs []*consensusMessageWrapper
 	for index := range rbfts {
@@ -348,8 +342,7 @@ func TestCluster_ViewChange_StateUpdate_Timeout_StateUpdated_Replica(t *testing.
 }
 
 func TestCluster_ViewChange_StateUpdate_Timeout_StateUpdated_Primary(t *testing.T) {
-
-	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	unlockCluster(rbfts)
 
 	for i := 0; i < 40; i++ {
@@ -361,10 +354,10 @@ func TestCluster_ViewChange_StateUpdate_Timeout_StateUpdated_Primary(t *testing.
 			executeExceptN(t, rbfts, nodes, tx, checkpoint, 1)
 		}
 	}
-	assert.Equal(t, uint64(40), rbfts[0].h)
-	assert.Equal(t, uint64(30), rbfts[1].h)
-	assert.Equal(t, uint64(40), rbfts[2].h)
-	assert.Equal(t, uint64(40), rbfts[3].h)
+	assert.Equal(t, uint64(40), rbfts[0].chainConfig.H)
+	assert.Equal(t, uint64(30), rbfts[1].chainConfig.H)
+	assert.Equal(t, uint64(40), rbfts[2].chainConfig.H)
+	assert.Equal(t, uint64(40), rbfts[3].chainConfig.H)
 
 	var vcMsgs []*consensusMessageWrapper
 	for index := range rbfts {
@@ -473,7 +466,7 @@ func TestCluster_ViewChange_StateUpdate_Timeout_StateUpdated_Primary(t *testing.
 func TestCluster_Checkpoint_in_StateUpdating(t *testing.T) {
 	// test for update high target while transferring for efficient state-update instance initiation.
 
-	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	unlockCluster(rbfts)
 
 	var retMessageSet []map[consensus.Type][]*consensusMessageWrapper
@@ -561,12 +554,11 @@ func TestCluster_Checkpoint_in_StateUpdating(t *testing.T) {
 	updatedEv3 := <-rbfts[1].recvChan
 	assert.Equal(t, CoreStateUpdatedEvent, updatedEv3.(*LocalEvent).EventType)
 	rbfts[1].processEvent(updatedEv3)
-	assert.Equal(t, uint64(70), rbfts[1].h)
+	assert.Equal(t, uint64(70), rbfts[1].chainConfig.H)
 }
 
 func TestCluster_InitRecovery(t *testing.T) {
-
-	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	unlockCluster(rbfts)
 
 	init := &LocalEvent{
@@ -593,9 +585,9 @@ func TestCluster_InitRecovery(t *testing.T) {
 
 	// delayed some time for init recovery event on replica 1
 	// replica 1 should reject init recovery event
-	assert.Equal(t, uint64(1), rbfts[0].view)
+	assert.Equal(t, uint64(1), rbfts[0].chainConfig.View)
 	rbfts[0].processEvent(init)
-	assert.Equal(t, uint64(1), rbfts[0].view)
+	assert.Equal(t, uint64(1), rbfts[0].chainConfig.View)
 
 	// replica 4 received recoveryVCs from 2&3 and generate a recovery view change in view=1
 	rbfts[3].processEvent(recoveryVCs[1])
@@ -606,9 +598,9 @@ func TestCluster_InitRecovery(t *testing.T) {
 
 	// delayed some time for init recovery event on replica 4
 	// replica 4 should reject init recovery event
-	assert.Equal(t, uint64(1), rbfts[3].view)
+	assert.Equal(t, uint64(1), rbfts[3].chainConfig.View)
 	rbfts[0].processEvent(init)
-	assert.Equal(t, uint64(1), rbfts[3].view)
+	assert.Equal(t, uint64(1), rbfts[3].chainConfig.View)
 
 	// replica 1 receives recoveryVCs
 	rbfts[0].processEvent(recoveryVCs[3])
@@ -659,7 +651,7 @@ func TestCluster_InitRecovery(t *testing.T) {
 
 	// check status
 	for index := range rbfts {
-		assert.Equal(t, uint64(1), rbfts[index].view)
+		assert.Equal(t, uint64(1), rbfts[index].chainConfig.View)
 		assert.True(t, rbfts[index].isNormal())
 	}
 }

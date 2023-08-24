@@ -33,7 +33,6 @@ type GetAccountNonceFunc func(address string) uint64
 
 // Config defines the mempool config items.
 type Config struct {
-	ID                  uint64
 	BatchSize           uint64
 	PoolSize            uint64
 	BatchMemLimit       bool
@@ -59,23 +58,23 @@ type txnPointer struct {
 
 // Logger is the mempool logger interface which managers logger output.
 type Logger interface {
-	Debug(v ...interface{})
-	Debugf(format string, v ...interface{})
+	Debug(v ...any)
+	Debugf(format string, v ...any)
 
-	Info(v ...interface{})
-	Infof(format string, v ...interface{})
+	Info(v ...any)
+	Infof(format string, v ...any)
 
-	Notice(v ...interface{})
-	Noticef(format string, v ...interface{})
+	Notice(v ...any)
+	Noticef(format string, v ...any)
 
-	Warning(v ...interface{})
-	Warningf(format string, v ...interface{})
+	Warning(v ...any)
+	Warningf(format string, v ...any)
 
-	Error(v ...interface{})
-	Errorf(format string, v ...interface{})
+	Error(v ...any)
+	Errorf(format string, v ...any)
 
-	Critical(v ...interface{})
-	Criticalf(format string, v ...interface{})
+	Critical(v ...any)
+	Criticalf(format string, v ...any)
 }
 
 type LogWrapper struct {
@@ -88,50 +87,50 @@ func NewLogWrapper() Logger {
 	}
 }
 
-func (lw *LogWrapper) Debug(v ...interface{}) {
+func (lw *LogWrapper) Debug(v ...any) {
 	lw.logger.Println("[DEBUG]", fmt.Sprint(v...))
 }
 
-func (lw *LogWrapper) Debugf(format string, v ...interface{}) {
+func (lw *LogWrapper) Debugf(format string, v ...any) {
 	lw.logger.Printf("[DEBUG] "+format, v...)
 }
 
-func (lw *LogWrapper) Info(v ...interface{}) {
+func (lw *LogWrapper) Info(v ...any) {
 	lw.logger.Println("[INFO]", fmt.Sprint(v...))
 }
 
-func (lw *LogWrapper) Infof(format string, v ...interface{}) {
+func (lw *LogWrapper) Infof(format string, v ...any) {
 	lw.logger.Printf("[INFO] "+format, v...)
 }
 
-func (lw *LogWrapper) Notice(v ...interface{}) {
+func (lw *LogWrapper) Notice(v ...any) {
 	lw.logger.Println("[NOTICE]", fmt.Sprint(v...))
 }
 
-func (lw *LogWrapper) Noticef(format string, v ...interface{}) {
+func (lw *LogWrapper) Noticef(format string, v ...any) {
 	lw.logger.Printf("[NOTICE] "+format, v...)
 }
 
-func (lw *LogWrapper) Warning(v ...interface{}) {
+func (lw *LogWrapper) Warning(v ...any) {
 	lw.logger.Println("[WARNING]", fmt.Sprint(v...))
 }
 
-func (lw *LogWrapper) Warningf(format string, v ...interface{}) {
+func (lw *LogWrapper) Warningf(format string, v ...any) {
 	lw.logger.Printf("[WARNING] "+format, v...)
 }
 
-func (lw *LogWrapper) Error(v ...interface{}) {
+func (lw *LogWrapper) Error(v ...any) {
 	lw.logger.Println("[ERROR]", fmt.Sprint(v...))
 }
 
-func (lw *LogWrapper) Errorf(format string, v ...interface{}) {
+func (lw *LogWrapper) Errorf(format string, v ...any) {
 	lw.logger.Printf("[ERROR] "+format, v...)
 }
 
-func (lw *LogWrapper) Critical(v ...interface{}) {
+func (lw *LogWrapper) Critical(v ...any) {
 	lw.logger.Println("[CRITICAL]", fmt.Sprint(v...))
 }
 
-func (lw *LogWrapper) Criticalf(format string, v ...interface{}) {
+func (lw *LogWrapper) Criticalf(format string, v ...any) {
 	lw.logger.Printf("[CRITICAL] "+format, v...)
 }

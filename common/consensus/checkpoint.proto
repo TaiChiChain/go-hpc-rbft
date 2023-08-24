@@ -7,41 +7,19 @@ package consensus;
 
 import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 
-message NodeInfo {
-  option (gogoproto.goproto_stringer) = false;
-
-  // hostname identity.
-  string hostname = 1;
-  // public key of certain node.
-  bytes pub_key = 2;
-}
-
 message Checkpoint {
   option (gogoproto.goproto_stringer) = false;
 
   uint64 epoch = 1;
-
-  // Consensus state of the committed block
-  message ConsensusState {
-    uint64 round = 1;
-    string id = 2;
-  }
-  ConsensusState consensus_state = 2;
 
   // Execute state of the executed block
   message ExecuteState {
     uint64 height = 1;
     string digest = 2;
   }
-  ExecuteState execute_state = 3;
+  ExecuteState execute_state = 2;
 
-  // Next epoch state with next validators
-  // Optional if this is a reconfiguration checkpoint
-  message NextEpochState {
-    repeated consensus.NodeInfo validator_set = 1;
-    string consensus_version = 2;
-  }
-  NextEpochState next_epoch_state = 4;
+  bool need_update_epoch = 3;
 }
 
 // SignedCheckpoint contains the actual checkpoint with signature
@@ -51,7 +29,7 @@ message SignedCheckpoint {
   // Checkpoint is the info of checkpoint.
   Checkpoint checkpoint = 1;
   // Author is the signer for signature.
-  string author = 2;
+  uint64 author = 2;
   // Signature is the signature for checkpoint.
   bytes signature = 3;
 }
@@ -64,16 +42,7 @@ message QuorumCheckpoint {
   // Checkpoint is the info of checkpoint.
   Checkpoint checkpoint = 1;
   // Signatures is the aggregated signature for checkpoint.
-  map<string, bytes> signatures = 2;
-}
-
-// EpochInfo is legacy struct to change epoch
-message EpochInfo{
-  uint64 epoch = 1;
-  repeated string vset = 2;
-  bytes digest = 3;
-  uint64 lastConfigBlockHeight = 4;
-  //    repeated NodeInfo pre_vset = 5;
+  map<uint64, bytes> signatures = 2;
 }
 
 // EpochChangeProof is a slice of checkpoints with contiguous increasing epoch numbers
@@ -86,5 +55,5 @@ message EpochChangeProof {
   // Indicate whether the node where proof comes from has more epoch changes
   uint64 more = 2;
   // Where the proof comes from
-  string author = 3;
+  uint64 author = 3;
 }

@@ -32,15 +32,6 @@ func DecodeTxs[T any, Constraint TXConstraint[T]](rawTxs [][]byte) ([]*T, error)
 	return txs, nil
 }
 
-// IsConfigTx returns if this tx is corresponding with a config tx.
-func IsConfigTx[T any, Constraint TXConstraint[T]](txData []byte) bool {
-	tx, err := DecodeTx[T, Constraint](txData)
-	if err != nil {
-		panic(err)
-	}
-	return Constraint(tx).RbftIsConfigTx()
-}
-
 func GetAccount[T any, Constraint TXConstraint[T]](txData []byte) (string, error) {
 	tx, err := DecodeTx[T, Constraint](txData)
 	if err != nil {
@@ -56,6 +47,7 @@ func GetTxHash[T any, Constraint TXConstraint[T]](txData []byte) (string, error)
 	}
 	return Constraint(tx).RbftGetTxHash(), nil
 }
+
 func GetNonce[T any, Constraint TXConstraint[T]](txData []byte) (uint64, error) {
 	tx, err := DecodeTx[T, Constraint](txData)
 	if err != nil {

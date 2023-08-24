@@ -5,13 +5,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/axiomesh/axiom-bft/common/consensus"
 )
 
 func TestBatchMgr_startBatchTimer(t *testing.T) {
-
-	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	_, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	assert.False(t, rbfts[0].timerMgr.getTimer(batchTimer))
 	assert.False(t, rbfts[0].batchMgr.isBatchTimerActive())
 	rbfts[0].startBatchTimer()
@@ -21,8 +21,7 @@ func TestBatchMgr_startBatchTimer(t *testing.T) {
 
 // Test for only this function
 func TestBatchMgr_maybeSendPrePrepare(t *testing.T) {
-
-	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	_, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 
 	// Set a Batch
 	txBytes41, err := newTx().Marshal()
@@ -58,14 +57,13 @@ func TestBatchMgr_maybeSendPrePrepare(t *testing.T) {
 	// Set rbft.h 10, 10~50
 	rbfts[0].moveWatermarks(10, false)
 	rbfts[0].maybeSendPrePrepare(nil, true)
-	//assume that
+	// assume that
 	assert.Equal(t, batchTmp41, rbfts[0].storeMgr.batchStore[batchTmp41.BatchHash])
 	assert.Equal(t, batchTmp42, rbfts[0].storeMgr.batchStore[batchTmp42.BatchHash])
 }
 
 func TestBatchMgr_findNextPrepareBatch(t *testing.T) {
-
-	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	_, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 
 	// Struct of certTmp which stored in rbft.storeMgr.certStore
 	prePrepareTmp := &consensus.PrePrepare{
@@ -97,9 +95,9 @@ func TestBatchMgr_findNextPrepareBatch(t *testing.T) {
 	certTmp := &msgCert{
 		prePrepare:  nil,
 		sentPrepare: false,
-		prepare:     nil, //map[consensus.Prepare]bool{prePareTmp: true},
+		prepare:     nil, // map[consensus.Prepare]bool{prePareTmp: true},
 		sentCommit:  false,
-		commit:      nil, //map[consensus.Commit]bool{commitTmp: true},
+		commit:      nil, // map[consensus.Commit]bool{commitTmp: true},
 		sentExecute: false,
 	}
 	rbfts[0].storeMgr.certStore[msgIDTmp] = certTmp
@@ -122,7 +120,6 @@ func TestBatchMgr_findNextPrepareBatch(t *testing.T) {
 	})
 
 	t.Run("Normal case, there are no batches in storeMgr", func(t *testing.T) {
-
 		// store the HashBatch which was input by certTmp
 		certTmp.prepare = map[consensus.Prepare]bool{prePareTmp: true}
 		certTmp.commit = map[consensus.Commit]bool{commitTmp: true}
@@ -199,15 +196,5 @@ func TestBatchMgr_findNextPrepareBatch(t *testing.T) {
 			sentExecute: false,
 		}
 		rbfts[0].storeMgr.certStore[msgIDConfBatch] = certConfBatch
-		ctx := newCTX(defaultValidatorSet)
-		txBytes, err := ctx.Marshal()
-		assert.Nil(t, err)
-		confBatch := &consensus.RequestBatch{
-			BatchHash:   "conf-batch-hash",
-			RequestList: [][]byte{txBytes},
-		}
-		rbfts[0].storeMgr.batchStore["conf-batch-hash"] = confBatch
-		_ = rbfts[0].findNextPrepareBatch(context.TODO(), 0, 35, "conf-batch-hash")
 	})
-
 }

@@ -103,13 +103,13 @@ const (
 
 // LocalEvent represents event sent by local modules
 type LocalEvent struct {
-	Service   int // service type range from {CoreRbftService, ViewChangeService, RecoveryService, NodeMgrService}
+	Service   int // service type range from {CoreRbftService, ViewChangeService, RecoveryService, peerMgrService}
 	EventType int
-	Event     interface{}
+	Event     any
 }
 
 // consensusEvent is a type meant to clearly convey that the return type or parameter to a function will be supplied to/from an events.Manager
-type consensusEvent interface{}
+type consensusEvent any
 
 // consensusMessageWrapper is used to wrap the *consensus.ConsensusMessage type, providing an additional context field
 type consensusMessageWrapper struct {
@@ -148,7 +148,7 @@ type msgCert struct {
 
 // ----------checkpoint related structs------------------
 type chkptID struct {
-	author   string
+	author   uint64
 	sequence uint64
 }
 
@@ -180,7 +180,7 @@ const (
 // MiscEvent represents misc event sent by local modules
 type MiscEvent struct {
 	EventType int
-	Event     interface{}
+	Event     any
 }
 
 type ReqTxMsg struct {

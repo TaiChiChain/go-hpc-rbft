@@ -1,10 +1,11 @@
-package mockexternal
+package rbft
 
 import (
 	"errors"
 
-	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/golang/mock/gomock"
+
+	"github.com/axiomesh/axiom-bft/common/consensus"
 )
 
 // NewMockMinimalExternal returns a minimal implement of MockExternalStack which accepts
@@ -23,7 +24,6 @@ func NewMockMinimalExternal[T any, Constraint consensus.TXConstraint[T]](ctrl *g
 
 	mock.EXPECT().Broadcast(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	mock.EXPECT().Unicast(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
-	mock.EXPECT().UnicastByHostname(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
 	mock.EXPECT().Sign(gomock.Any()).Return(nil, nil).AnyTimes()
 	mock.EXPECT().Verify(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
@@ -32,14 +32,8 @@ func NewMockMinimalExternal[T any, Constraint consensus.TXConstraint[T]](ctrl *g
 	mock.EXPECT().StateUpdate(gomock.Any(), gomock.Any(), gomock.Any()).Return().AnyTimes()
 	mock.EXPECT().SendFilterEvent(gomock.Any(), gomock.Any()).Return().AnyTimes()
 
-	mock.EXPECT().Reconfiguration().Return(uint64(0)).AnyTimes()
-	mock.EXPECT().GetNodeInfos().Return(nil).AnyTimes()
-
-	mock.EXPECT().IsConfigBlock(gomock.Any()).Return(false).AnyTimes()
-	mock.EXPECT().GetLastCheckpoint().Return(nil).AnyTimes()
-	// TODO(DH): return meaningful value.
-	mock.EXPECT().GetCheckpointOfEpoch(gomock.Any()).Return(nil, nil).AnyTimes()
-	mock.EXPECT().VerifyEpochChangeProof(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	mock.EXPECT().GetEpochInfo(gomock.Any()).Return(nil, nil).AnyTimes()
+	mock.EXPECT().GetCurrenEpochInfo().Return(nil, errors.New("not found epoch info for mock")).AnyTimes()
 
 	return mock
 }

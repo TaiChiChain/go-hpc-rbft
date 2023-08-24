@@ -3,30 +3,33 @@ package rbft
 import (
 	"testing"
 
-	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/axiomesh/axiom-bft/common/consensus"
 )
 
 func TestCluster_SendTx_InitCtx(t *testing.T) {
+	// TODO: complete, because config tx is not supported
+	t.Skip()
 
-	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
-	unlockCluster[consensus.FltTransaction](rbfts)
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
+	unlockCluster[consensus.FltTransaction, *consensus.FltTransaction](rbfts)
 
-	assert.Equal(t, rbfts[0].h, uint64(0))
-	assert.Equal(t, rbfts[1].h, uint64(0))
-	assert.Equal(t, rbfts[2].h, uint64(0))
-	assert.Equal(t, rbfts[3].h, uint64(0))
+	assert.Equal(t, rbfts[0].chainConfig.H, uint64(0))
+	assert.Equal(t, rbfts[1].chainConfig.H, uint64(0))
+	assert.Equal(t, rbfts[2].chainConfig.H, uint64(0))
+	assert.Equal(t, rbfts[3].chainConfig.H, uint64(0))
 
-	ctx := newCTX(defaultValidatorSet)
+	ctx := newTx()
 	execute(t, rbfts, nodes, ctx, true)
 
 	tx := newTx()
 	execute(t, rbfts, nodes, tx, false)
 
-	assert.Equal(t, uint64(1), rbfts[0].h)
-	assert.Equal(t, uint64(1), rbfts[1].h)
-	assert.Equal(t, uint64(1), rbfts[2].h)
-	assert.Equal(t, uint64(1), rbfts[3].h)
+	assert.Equal(t, uint64(1), rbfts[0].chainConfig.H)
+	assert.Equal(t, uint64(1), rbfts[1].chainConfig.H)
+	assert.Equal(t, uint64(1), rbfts[2].chainConfig.H)
+	assert.Equal(t, uint64(1), rbfts[3].chainConfig.H)
 
 	assert.Equal(t, uint64(2), rbfts[0].exec.lastExec)
 	assert.Equal(t, uint64(2), rbfts[1].exec.lastExec)
@@ -34,18 +37,18 @@ func TestCluster_SendTx_InitCtx(t *testing.T) {
 	assert.Equal(t, uint64(2), rbfts[3].exec.lastExec)
 
 	setClusterExec(rbfts, nodes, uint64(59))
-	assert.Equal(t, uint64(50), rbfts[0].h)
-	assert.Equal(t, uint64(50), rbfts[1].h)
-	assert.Equal(t, uint64(50), rbfts[2].h)
-	assert.Equal(t, uint64(50), rbfts[3].h)
+	assert.Equal(t, uint64(50), rbfts[0].chainConfig.H)
+	assert.Equal(t, uint64(50), rbfts[1].chainConfig.H)
+	assert.Equal(t, uint64(50), rbfts[2].chainConfig.H)
+	assert.Equal(t, uint64(50), rbfts[3].chainConfig.H)
 
 	tx2 := newTx()
 	execute(t, rbfts, nodes, tx2, true)
 
-	assert.Equal(t, uint64(60), rbfts[0].h)
-	assert.Equal(t, uint64(60), rbfts[1].h)
-	assert.Equal(t, uint64(60), rbfts[2].h)
-	assert.Equal(t, uint64(60), rbfts[3].h)
+	assert.Equal(t, uint64(60), rbfts[0].chainConfig.H)
+	assert.Equal(t, uint64(60), rbfts[1].chainConfig.H)
+	assert.Equal(t, uint64(60), rbfts[2].chainConfig.H)
+	assert.Equal(t, uint64(60), rbfts[3].chainConfig.H)
 
 	assert.Equal(t, uint64(60), rbfts[0].exec.lastExec)
 	assert.Equal(t, uint64(60), rbfts[1].exec.lastExec)
@@ -54,11 +57,13 @@ func TestCluster_SendTx_InitCtx(t *testing.T) {
 }
 
 func TestCluster_SyncEpochThenSyncBlockWithCheckpoint(t *testing.T) {
+	// TODO: complete, because config tx is not supported
+	t.Skip()
 
-	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	unlockCluster(rbfts)
 
-	ctx := newCTX(defaultValidatorSet)
+	ctx := newTx()
 	retMessagesCtx := executeExceptN(t, rbfts, nodes, ctx, true, 2)
 
 	var retMessageSet []map[consensus.Type][]*consensusMessageWrapper
@@ -114,8 +119,8 @@ func TestCluster_SyncEpochThenSyncBlockWithCheckpoint(t *testing.T) {
 	// first state update to 1(last epoch change height), then trigger recovery view change.
 	ev := <-rbfts[2].recvChan
 	rbfts[2].processEvent(ev)
-	assert.Equal(t, uint64(2), rbfts[2].epoch)
-	assert.Equal(t, uint64(1), rbfts[2].h)
+	assert.Equal(t, uint64(2), rbfts[2].chainConfig.EpochInfo.Epoch)
+	assert.Equal(t, uint64(1), rbfts[2].chainConfig.H)
 	rvc := nodes[2].broadcastMessageCache
 	// try recovery view change after epoch change.
 	assert.Equal(t, consensus.Type_VIEW_CHANGE, rvc.Type)
@@ -144,11 +149,14 @@ func TestCluster_SyncEpochThenSyncBlockWithCheckpoint(t *testing.T) {
 	// then state update to 60
 	ev = <-rbfts[2].recvChan
 	rbfts[2].processEvent(ev)
-	assert.Equal(t, uint64(60), rbfts[2].h)
+	assert.Equal(t, uint64(60), rbfts[2].chainConfig.H)
 }
 
 func TestCluster_SyncBlockThenSyncEpochWithCheckpoint(t *testing.T) {
-	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	// TODO: complete, because config tx is not supported
+	t.Skip()
+
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	unlockCluster(rbfts)
 
 	// normal nodes execute normal txs to height 50.
@@ -177,12 +185,12 @@ func TestCluster_SyncBlockThenSyncEpochWithCheckpoint(t *testing.T) {
 	// first state update to 50(last checkpoint height).
 	ev := <-rbfts[2].recvChan
 	rbfts[2].processEvent(ev)
-	assert.Equal(t, uint64(1), rbfts[2].epoch)
-	assert.Equal(t, uint64(50), rbfts[2].h)
+	assert.Equal(t, uint64(1), rbfts[2].chainConfig.EpochInfo.Epoch)
+	assert.Equal(t, uint64(50), rbfts[2].chainConfig.H)
 
 	// normal nodes execute config txs to height 51 and broadcast recovery vc to view
 	// change.
-	ctx := newCTX(defaultValidatorSet)
+	ctx := newTx()
 	retMessagesCtx := executeExceptN(t, rbfts, nodes, ctx, true, 2)
 
 	// node2 receives recovery view change and found self's epoch behind.
@@ -221,8 +229,8 @@ func TestCluster_SyncBlockThenSyncEpochWithCheckpoint(t *testing.T) {
 	// first state update to 1(last epoch change height), then trigger recovery view change.
 	ev = <-rbfts[2].recvChan
 	rbfts[2].processEvent(ev)
-	assert.Equal(t, uint64(2), rbfts[2].epoch)
-	assert.Equal(t, uint64(51), rbfts[2].h)
+	assert.Equal(t, uint64(2), rbfts[2].chainConfig.EpochInfo.Epoch)
+	assert.Equal(t, uint64(51), rbfts[2].chainConfig.H)
 	rvc := nodes[2].broadcastMessageCache
 	// try recovery view change after epoch change.
 	assert.Equal(t, consensus.Type_VIEW_CHANGE, rvc.Type)
@@ -247,5 +255,4 @@ func TestCluster_SyncBlockThenSyncEpochWithCheckpoint(t *testing.T) {
 			break
 		}
 	}
-
 }

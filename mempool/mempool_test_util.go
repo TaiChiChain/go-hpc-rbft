@@ -22,7 +22,6 @@ func mockMempoolImpl[T any, Constraint consensus.TXConstraint[T]]() *mempoolImpl
 // NewMockMempoolConfig returns the default test config
 func NewMockMempoolConfig() Config {
 	poolConfig := Config{
-		ID:            1,
 		BatchSize:     DefaultTestBatchSize,
 		PoolSize:      DefaultPoolSize,
 		Logger:        NewRawLogger(),
