@@ -844,14 +844,14 @@ func (rbft *rbftImpl[T, Constraint]) processReqSetEvent(req *consensus.RequestSe
 		}
 	}
 
-	// if current node is in skipInProgress, it should reject the transactions coming from other nodes, but has the responsibility to keep its own transactions
-	if rbft.in(SkipInProgress) && !req.Local {
-		rbft.rejectRequestSet(req)
-		return nil
-	}
+	//// if current node is in skipInProgress, it should reject the transactions coming from other nodes, but has the responsibility to keep its own transactions
+	//if rbft.in(SkipInProgress) && !req.Local {
+	//	rbft.rejectRequestSet(req)
+	//	return nil
+	//}
 
 	// if current node is in abnormal, add normal txs into txPool without generate batches.
-	if !rbft.isNormal() {
+	if !rbft.isNormal() || rbft.in(SkipInProgress) {
 		_, completionMissingBatchHashes := rbft.batchMgr.requestPool.AddNewRequests(req.Requests, false, req.Local, false)
 		for _, batchHash := range completionMissingBatchHashes {
 			delete(rbft.storeMgr.missingBatchesInFetching, batchHash)
