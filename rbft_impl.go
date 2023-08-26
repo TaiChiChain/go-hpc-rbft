@@ -1475,6 +1475,16 @@ func (rbft *rbftImpl[T, Constraint]) commitPendingBlocks() {
 				rbft.softRestartBatchTimer()
 			}
 
+			var proposerAccount string
+			if cert != nil && cert.prePrepare != nil {
+				proposer := rbft.peerMgr.nodes[cert.prePrepare.ReplicaId]
+				if proposer != nil {
+					proposerAccount = proposer.AccountAddress
+				} else {
+					rbft.logger.Warningf("Replica %d did not find the proposer in the epoch", rbft.peerMgr.selfID)
+				}
+			}
+
 			if idx.d == "" {
 				txList := make([]*T, 0)
 				localList := make([]bool, 0)
@@ -1482,7 +1492,8 @@ func (rbft *rbftImpl[T, Constraint]) commitPendingBlocks() {
 				rbft.metrics.txsPerBlock.Observe(float64(0))
 				rbft.logger.Noticef("======== Replica %d Call execute a no-nop, epoch=%d/view=%d/seqNo=%d",
 					rbft.peerMgr.selfID, rbft.chainConfig.EpochInfo.Epoch, idx.v, idx.n)
-				rbft.external.Execute(txList, localList, idx.n, 0)
+
+				rbft.external.Execute(txList, localList, idx.n, 0, proposerAccount)
 			} else {
 				// find batch in batchStore rather than outstandingBatch as after viewChange
 				// we may clear outstandingBatch and save all batches in batchStore.
@@ -1500,7 +1511,7 @@ func (rbft *rbftImpl[T, Constraint]) commitPendingBlocks() {
 				rbft.metrics.batchToCommitDuration.Observe(batchToCommit)
 				rbft.logger.Noticef("======== Replica %d Call execute, epoch=%d/view=%d/seqNo=%d/txCount=%d/digest=%s",
 					rbft.peerMgr.selfID, rbft.chainConfig.EpochInfo.Epoch, idx.v, idx.n, len(txList), idx.d)
-				rbft.external.Execute(txList, localList, idx.n, cert.prePrepare.HashBatch.Timestamp)
+				rbft.external.Execute(txList, localList, idx.n, cert.prePrepare.HashBatch.Timestamp, proposerAccount)
 			}
 			delete(rbft.storeMgr.outstandingReqBatches, idx.d)
 			rbft.metrics.outstandingBatchesGauge.Set(float64(len(rbft.storeMgr.outstandingReqBatches)))

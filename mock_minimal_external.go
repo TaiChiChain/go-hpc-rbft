@@ -28,7 +28,7 @@ func NewMockMinimalExternal[T any, Constraint consensus.TXConstraint[T]](ctrl *g
 	mock.EXPECT().Sign(gomock.Any()).Return(nil, nil).AnyTimes()
 	mock.EXPECT().Verify(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
-	mock.EXPECT().Execute(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return().AnyTimes()
+	mock.EXPECT().Execute(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return().AnyTimes()
 	mock.EXPECT().StateUpdate(gomock.Any(), gomock.Any(), gomock.Any()).Return().AnyTimes()
 	mock.EXPECT().SendFilterEvent(gomock.Any(), gomock.Any()).Return().AnyTimes()
 

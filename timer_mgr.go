@@ -33,7 +33,10 @@ func (tt *titleTimer) store(key, value any) {
 }
 
 func (tt *titleTimer) delete(key any) {
-	tt.isActive.Delete(key)
+	afterTimer, ok := tt.isActive.LoadAndDelete(key)
+	if ok {
+		afterTimer.(*time.Timer).Stop()
+	}
 }
 
 func (tt *titleTimer) has(key string) bool {
@@ -51,8 +54,9 @@ func (tt *titleTimer) count() int {
 }
 
 func (tt *titleTimer) clear() {
-	tt.isActive.Range(func(key, _ any) bool {
+	tt.isActive.Range(func(key, afterTimer any) bool {
 		tt.isActive.Delete(key)
+		afterTimer.(*time.Timer).Stop()
 		return true
 	})
 }
@@ -150,14 +154,14 @@ func (tm *timerManager) softStartTimerWithNewTT(name string, timeout time.Durati
 func (tm *timerManager) createTimer(name string, timeout time.Duration, event *LocalEvent) (key string) {
 	timestamp := time.Now().Unix()
 	key = strconv.FormatInt(timestamp, 10)
-	tm.tTimers[name].store(key, true)
-
 	send := func() {
 		if tm.tTimers[name].has(key) {
 			tm.eventChan <- event
 		}
 	}
-	time.AfterFunc(timeout, send)
+	afterTimer := time.AfterFunc(timeout, send)
+	tm.tTimers[name].store(key, afterTimer)
+
 	return key
 }
 

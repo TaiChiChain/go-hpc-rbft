@@ -70,7 +70,7 @@ type Crypto interface {
 type ServiceOutbound[T any, Constraint consensus.TXConstraint[T]] interface {
 	// Execute informs application layer to apply one batch with given request list and batch seqNo.
 	// Users can apply different batches asynchronously but ensure the order by seqNo.
-	Execute(txs []*T, localList []bool, seqNo uint64, timestamp int64)
+	Execute(txs []*T, localList []bool, seqNo uint64, timestamp int64, proposerAccount string)
 
 	// StateUpdate informs application layer to catch up to given seqNo with specified state digest.
 	// epochChanges should be provided when the sync request has a backwardness of epoch changes

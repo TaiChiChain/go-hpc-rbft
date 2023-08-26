@@ -580,6 +580,15 @@ func (rbft *rbftImpl[T, Constraint]) checkNewView(nv *consensus.NewView) (uint64
 	rbft.logger.Infof("Replica %d received newView %d from replica %d", rbft.peerMgr.selfID,
 		nv.View, nv.ReplicaId)
 
+	// TODO: support check auto switched new view
+	// if auto view change
+	if nv.ViewChangeSet == nil {
+		nv.ViewChangeSet = &consensus.QuorumViewChange{
+			ReplicaId:   nv.ReplicaId,
+			ViewChanges: []*consensus.ViewChange{},
+		}
+	}
+
 	// view 0 is the initial view of every epoch, but valid NewView should start from 1.
 	if nv.View == 0 {
 		rbft.logger.Debugf("Replica %d reject invalid newView 0", rbft.peerMgr.selfID)
@@ -591,7 +600,6 @@ func (rbft *rbftImpl[T, Constraint]) checkNewView(nv *consensus.NewView) (uint64
 		rbft.logger.Debugf("Replica %d reject newView as we are in state transfer", rbft.peerMgr.selfID)
 		return 0, "", nil, false
 	}
-
 
 	expectedPrimaryID := rbft.chainConfig.calPrimaryIDByView(nv.View)
 	if expectedPrimaryID != nv.ReplicaId {

@@ -175,7 +175,7 @@ type channelMsg struct {
 // init process
 // =============================================================================
 // newTestFramework init the testFramework instance
-func newTestFramework[T any, Constraint consensus.TXConstraint[T]](account int, loggerFile bool) *testFramework[T, Constraint] {
+func newTestFramework[T any, Constraint consensus.TXConstraint[T]](account int) *testFramework[T, Constraint] {
 	// Init PeerSet
 	var routers []*NodeInfo
 	for i := 0; i < account; i++ {
@@ -215,7 +215,7 @@ func newTestFramework[T any, Constraint consensus.TXConstraint[T]](account int, 
 
 	// Init testNode in TestFramework
 	for i := range tf.Router {
-		tn := tf.newTestNode(tf.Router[i].ID, tf.Router[i].AccountAddress, cc, loggerFile)
+		tn := tf.newTestNode(tf.Router[i].ID, tf.Router[i].AccountAddress, cc)
 		tf.TestNode = append(tf.TestNode, tn)
 	}
 
@@ -224,7 +224,6 @@ func newTestFramework[T any, Constraint consensus.TXConstraint[T]](account int, 
 
 // newNodeConfig init the Config of Node.
 func (tf *testFramework[T, Constraint]) newNodeConfig(
-	id uint64,
 	p2pNodeID string,
 	log Logger,
 	epoch uint64) Config {
@@ -270,7 +269,7 @@ func (tf *testFramework[T, Constraint]) newNodeConfig(
 }
 
 // newTestNode init the testNode instance
-func (tf *testFramework[T, Constraint]) newTestNode(id uint64, p2pNodeID string, cc chan *channelMsg, loggerFile bool) *testNode[T, Constraint] {
+func (tf *testFramework[T, Constraint]) newTestNode(id uint64, p2pNodeID string, cc chan *channelMsg) *testNode[T, Constraint] {
 	// Init logger
 	log := newRawLogger()
 
@@ -298,7 +297,7 @@ func (tf *testFramework[T, Constraint]) newTestNode(id uint64, p2pNodeID string,
 		},
 	}
 	pool := mempool.NewMempool[T, Constraint](confMemPool)
-	conf := tf.newNodeConfig(id, p2pNodeID, log, 1)
+	conf := tf.newNodeConfig(p2pNodeID, log, 1)
 	n, _ := newNode[T, Constraint](conf, ext, pool)
 	// init new view.
 	n.rbft.vcMgr.latestNewView = initialNewView
@@ -389,7 +388,7 @@ func (ext *testExternal[T, Constraint]) ReadStateSet(key string) (map[string][]b
 	return nil, errors.New("empty")
 }
 
-func (ext *testExternal[T, Constraint]) Destroy(key string) error {
+func (ext *testExternal[T, Constraint]) Destroy(_ string) error {
 	return nil
 }
 
@@ -446,12 +445,12 @@ func (ext *testExternal[T, Constraint]) Sign(msg []byte) ([]byte, error) {
 	return nil, nil
 }
 
-func (ext *testExternal[T, Constraint]) Verify(peerHash string, signature []byte, msg []byte) error {
+func (ext *testExternal[T, Constraint]) Verify(_ string, _ []byte, _ []byte) error {
 	return nil
 }
 
 // ServiceOutbound
-func (ext *testExternal[T, Constraint]) Execute(requests []*T, localList []bool, seqNo uint64, timestamp int64) {
+func (ext *testExternal[T, Constraint]) Execute(requests []*T, _ []bool, seqNo uint64, timestamp int64, _ string) {
 	var txHashList []string
 	for _, req := range requests {
 		txHash := Constraint(req).RbftGetTxHash()

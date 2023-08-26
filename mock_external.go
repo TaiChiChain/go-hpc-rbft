@@ -455,15 +455,15 @@ func (m *MockServiceOutbound[T, Constraint]) EXPECT() *MockServiceOutboundMockRe
 }
 
 // Execute mocks base method.
-func (m *MockServiceOutbound[T, Constraint]) Execute(txs []*T, localList []bool, seqNo uint64, timestamp int64) {
+func (m *MockServiceOutbound[T, Constraint]) Execute(txs []*T, localList []bool, seqNo uint64, timestamp int64, proposerAccount string) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Execute", txs, localList, seqNo, timestamp)
+	m.ctrl.Call(m, "Execute", txs, localList, seqNo, timestamp, proposerAccount)
 }
 
 // Execute indicates an expected call of Execute.
-func (mr *MockServiceOutboundMockRecorder[T, Constraint]) Execute(txs, localList, seqNo, timestamp any) *ServiceOutboundExecuteCall[T, Constraint] {
+func (mr *MockServiceOutboundMockRecorder[T, Constraint]) Execute(txs, localList, seqNo, timestamp, proposerAccount any) *ServiceOutboundExecuteCall[T, Constraint] {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Execute", reflect.TypeOf((*MockServiceOutbound[T, Constraint])(nil).Execute), txs, localList, seqNo, timestamp)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Execute", reflect.TypeOf((*MockServiceOutbound[T, Constraint])(nil).Execute), txs, localList, seqNo, timestamp, proposerAccount)
 	return &ServiceOutboundExecuteCall[T, Constraint]{Call: call}
 }
 
@@ -479,13 +479,13 @@ func (c *ServiceOutboundExecuteCall[T, Constraint]) Return() *ServiceOutboundExe
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *ServiceOutboundExecuteCall[T, Constraint]) Do(f func([]*T, []bool, uint64, int64)) *ServiceOutboundExecuteCall[T, Constraint] {
+func (c *ServiceOutboundExecuteCall[T, Constraint]) Do(f func([]*T, []bool, uint64, int64, string)) *ServiceOutboundExecuteCall[T, Constraint] {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *ServiceOutboundExecuteCall[T, Constraint]) DoAndReturn(f func([]*T, []bool, uint64, int64)) *ServiceOutboundExecuteCall[T, Constraint] {
+func (c *ServiceOutboundExecuteCall[T, Constraint]) DoAndReturn(f func([]*T, []bool, uint64, int64, string)) *ServiceOutboundExecuteCall[T, Constraint] {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -811,15 +811,15 @@ func (c *ExternalStackDestroyCall[T, Constraint]) DoAndReturn(f func(string) err
 }
 
 // Execute mocks base method.
-func (m *MockExternalStack[T, Constraint]) Execute(txs []*T, localList []bool, seqNo uint64, timestamp int64) {
+func (m *MockExternalStack[T, Constraint]) Execute(txs []*T, localList []bool, seqNo uint64, timestamp int64, proposerAccount string) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Execute", txs, localList, seqNo, timestamp)
+	m.ctrl.Call(m, "Execute", txs, localList, seqNo, timestamp, proposerAccount)
 }
 
 // Execute indicates an expected call of Execute.
-func (mr *MockExternalStackMockRecorder[T, Constraint]) Execute(txs, localList, seqNo, timestamp any) *ExternalStackExecuteCall[T, Constraint] {
+func (mr *MockExternalStackMockRecorder[T, Constraint]) Execute(txs, localList, seqNo, timestamp, proposerAccount any) *ExternalStackExecuteCall[T, Constraint] {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Execute", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).Execute), txs, localList, seqNo, timestamp)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Execute", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).Execute), txs, localList, seqNo, timestamp, proposerAccount)
 	return &ExternalStackExecuteCall[T, Constraint]{Call: call}
 }
 
@@ -835,13 +835,13 @@ func (c *ExternalStackExecuteCall[T, Constraint]) Return() *ExternalStackExecute
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *ExternalStackExecuteCall[T, Constraint]) Do(f func([]*T, []bool, uint64, int64)) *ExternalStackExecuteCall[T, Constraint] {
+func (c *ExternalStackExecuteCall[T, Constraint]) Do(f func([]*T, []bool, uint64, int64, string)) *ExternalStackExecuteCall[T, Constraint] {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *ExternalStackExecuteCall[T, Constraint]) DoAndReturn(f func([]*T, []bool, uint64, int64)) *ExternalStackExecuteCall[T, Constraint] {
+func (c *ExternalStackExecuteCall[T, Constraint]) DoAndReturn(f func([]*T, []bool, uint64, int64, string)) *ExternalStackExecuteCall[T, Constraint] {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
