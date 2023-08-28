@@ -96,6 +96,8 @@ type MemPool[T any, Constraint consensus.TXConstraint[T]] interface {
 	// Stop stops txPool service
 	Stop()
 
+	Init(selfID uint64) error
+
 	External[T, Constraint]
 }
 

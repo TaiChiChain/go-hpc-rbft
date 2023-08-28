@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	ProposerElectionTypeVRF      uint64 = 0
+	ProposerElectionTypeWRF      uint64 = 0
 	ProposerElectionTypeRotating uint64 = 1
 )
 
@@ -63,10 +63,10 @@ type ConsensusParams struct {
 	// The low weight of the viewchange node is restored to normal after the specified number of rounds.
 	ExcludeView uint64 `mapstructure:"exclude_view" toml:"exclude_view" json:"exclude_view"`
 
-	// The proposer election type, default is vrf
-	// 0: VEF
+	// The proposer election type, default is wrf
+	// 0: WRF
 	// 1: Rotating by view(pbft logic, disable auto change proposer)
-	ProposerElectionType uint64
+	ProposerElectionType uint64 `mapstructure:"proposer_election_type" toml:"proposer_election_type" json:"proposer_election_type"`
 }
 
 type EpochInfo struct {
@@ -100,8 +100,7 @@ func (e *EpochInfo) Clone() *EpochInfo {
 		Version:     e.Version,
 		Epoch:       e.Epoch,
 		EpochPeriod: e.EpochPeriod,
-
-		StartBlock: e.StartBlock,
+		StartBlock:  e.StartBlock,
 		P2PBootstrapNodeAddresses: lo.Map(e.P2PBootstrapNodeAddresses, func(item string, idx int) string {
 			return item
 		}),
@@ -113,6 +112,7 @@ func (e *EpochInfo) Clone() *EpochInfo {
 			EnableTimedGenEmptyBlock:      e.ConsensusParams.EnableTimedGenEmptyBlock,
 			NotActiveWeight:               e.ConsensusParams.NotActiveWeight,
 			ExcludeView:                   e.ConsensusParams.ExcludeView,
+			ProposerElectionType:          e.ConsensusParams.ProposerElectionType,
 		},
 		CandidateSet: lo.Map(e.CandidateSet, func(item *NodeInfo, idx int) *NodeInfo {
 			return &NodeInfo{
@@ -174,7 +174,7 @@ func (c *ChainConfig) updateDerivedData() {
 	c.L = c.EpochInfo.ConsensusParams.CheckpointPeriod * c.EpochInfo.ConsensusParams.HighWatermarkCheckpointPeriod
 }
 
-func (c *ChainConfig) vrfCalPrimaryIDByView(v uint64) uint64 {
+func (c *ChainConfig) wrfCalPrimaryIDByView(v uint64) uint64 {
 	// clone validatorSet
 	validatorSet := lo.Map(c.EpochInfo.ValidatorSet, func(item *NodeInfo, idx int) *NodeInfo {
 		return item.Clone()
@@ -213,12 +213,12 @@ func (c *ChainConfig) vrfCalPrimaryIDByView(v uint64) uint64 {
 // primaryID returns the expected primary id with the given view v
 func (c *ChainConfig) calPrimaryIDByView(v uint64) uint64 {
 	switch c.EpochInfo.ConsensusParams.ProposerElectionType {
-	case ProposerElectionTypeVRF:
-		return c.vrfCalPrimaryIDByView(v)
+	case ProposerElectionTypeWRF:
+		return c.wrfCalPrimaryIDByView(v)
 	case ProposerElectionTypeRotating:
 		return v%uint64(c.N) + 1
 	default:
-		return c.vrfCalPrimaryIDByView(v)
+		return c.wrfCalPrimaryIDByView(v)
 	}
 }
 

@@ -17,6 +17,7 @@ import (
 // Mempool contains all currently known transactions.
 type mempoolImpl[T any, Constraint consensus.TXConstraint[T]] struct {
 	logger              Logger
+	selfID              uint64
 	batchSize           uint64
 	isTimed             bool
 	txStore             *transactionStore[T, Constraint] // store all transactions info
@@ -57,13 +58,14 @@ func (mpi *mempoolImpl[T, Constraint]) addNewRequests(txs []*T, isPrimary, local
 				if txPointer := mpi.txStore.txHashMap[txHash]; txPointer != nil {
 					continue
 				}
-				mpi.logger.Warningf("Receive missing transaction [account: %s, nonce: %d, hash: %s] from primary, we will replace the old transaction", txAccount, txNonce, txHash)
+				//mpi.logger.Warningf("Receive missing transaction [account: %s, nonce: %d, hash: %s] from primary, we will replace the old transaction", txAccount, txNonce, txHash)
 				mpi.replaceTx(tx)
 				continue
 			}
 		}
 		if txPointer := mpi.txStore.txHashMap[txHash]; txPointer != nil {
-			mpi.logger.Debugf("Transaction [account: %s, nonce: %d, hash: %s] has already existed in txHashMap", txAccount, txNonce, txHash)
+			// because simultaneous broadcast and active pull may be repeated
+			//mpi.logger.Debugf("Transaction [account: %s, nonce: %d, hash: %s] has already existed in txHashMap", txAccount, txNonce, txHash)
 			continue
 		}
 		_, ok := validTxs[txAccount]
@@ -168,6 +170,11 @@ func newMempoolImpl[T any, Constraint consensus.TXConstraint[T]](config Config) 
 	mpi.logger.Infof("MemPool tolerance time = %v", config.ToleranceTime)
 	mpi.logger.Infof("MemPool tolerance remove time = %v", mpi.toleranceRemoveTime)
 	return mpi
+}
+
+func (mpi *mempoolImpl[T, Constraint]) Init(selfID uint64) error {
+	mpi.selfID = selfID
+	return nil
 }
 
 // GetPendingNonceByAccount returns the latest pending nonce of the account in mempool

@@ -244,6 +244,7 @@ func (rbft *rbftImpl[T, Constraint]) init() error {
 	rbft.metrics.clusterSizeGauge.Set(float64(rbft.chainConfig.N))
 	rbft.metrics.quorumSizeGauge.Set(float64(rbft.commonCaseQuorum()))
 
+	rbft.logger.Infof("RBFT enable wrf = %v", rbft.chainConfig.EpochInfo.ConsensusParams.ProposerElectionType == ProposerElectionTypeWRF)
 	rbft.logger.Infof("RBFT current epoch = %v", rbft.chainConfig.EpochInfo.Epoch)
 	rbft.logger.Infof("RBFT current view = %v", rbft.chainConfig.View)
 	rbft.logger.Infof("RBFT last exec block = %v", rbft.exec.lastExec)
@@ -255,6 +256,10 @@ func (rbft *rbftImpl[T, Constraint]) init() error {
 	rbft.logger.Infof("RBFT log size (L) = %v", rbft.chainConfig.L)
 	rbft.logger.Infof("RBFT ID: %d", rbft.peerMgr.selfID)
 	rbft.logger.Infof("RBFT isTimed: %v", rbft.chainConfig.EpochInfo.ConsensusParams.EnableTimedGenEmptyBlock)
+
+	if err := rbft.batchMgr.requestPool.Init(rbft.peerMgr.selfID); err != nil {
+		return err
+	}
 	rbft.isInited = true
 	return nil
 }
@@ -429,10 +434,7 @@ func (rbft *rbftImpl[T, Constraint]) postRequests(requests *RequestSet[T, Constr
 		rbft.logger.Debugf("Replica %d is in pending status, reject propose request", rbft.peerMgr.selfID)
 		return
 	}
-	if rbft.atomicIn(inEpochSyncing) {
-		rbft.logger.Debugf("Replica %d is in epoch syncing status, reject propose request", rbft.peerMgr.selfID)
-		return
-	}
+
 	rbft.postMsg(requests)
 }
 
@@ -538,6 +540,13 @@ func (rbft *rbftImpl[T, Constraint]) listenEvent() {
 			rbft.logger.Notice("exit RBFT event listener")
 			return
 		case next := <-rbft.recvChan:
+			if _, ok := next.(*RequestSet[T, Constraint]); !ok {
+				if rbft.atomicIn(inEpochSyncing) {
+					rbft.logger.Debugf("Replica %d is in epoch syncing status, reject propose request", rbft.peerMgr.selfID)
+					return
+				}
+			}
+
 			cm, isConsensusMessage := next.(*consensusMessageWrapper)
 			for {
 				select {
@@ -738,13 +747,13 @@ func (rbft *rbftImpl[T, Constraint]) processReqSetEvent(req *RequestSet[T, Const
 	}
 
 	// if current node is in skipInProgress, it should reject the transactions coming from other nodes, but has the responsibility to keep its own transactions
-	if rbft.in(SkipInProgress) && !req.Local {
-		rbft.rejectRequestSet(req)
-		return nil
-	}
+	//if rbft.in(SkipInProgress) && !req.Local {
+	//	rbft.rejectRequestSet(req)
+	//	return nil
+	//}
 
 	// if current node is in abnormal, add normal txs into txPool without generate batches.
-	if !rbft.isNormal() {
+	if !rbft.isNormal() || rbft.in(SkipInProgress) {
 		_, completionMissingBatchHashes := rbft.batchMgr.requestPool.AddNewRequests(req.Requests, false, req.Local, false)
 		for _, batchHash := range completionMissingBatchHashes {
 			delete(rbft.storeMgr.missingBatchesInFetching, batchHash)
@@ -1825,7 +1834,7 @@ func (rbft *rbftImpl[T, Constraint]) finishNormalCheckpoint(checkpointHeight uin
 
 	rbft.moveWatermarks(checkpointHeight, false)
 
-	if rbft.chainConfig.EpochInfo.ConsensusParams.ProposerElectionType == ProposerElectionTypeVRF {
+	if rbft.chainConfig.EpochInfo.ConsensusParams.ProposerElectionType == ProposerElectionTypeWRF {
 		// update view after checkpoint
 		rbft.setView(rbft.chainConfig.View + uint64(1))
 
@@ -1843,7 +1852,7 @@ func (rbft *rbftImpl[T, Constraint]) finishNormalCheckpoint(checkpointHeight uin
 		rbft.persistNewView(nv)
 	}
 
-	rbft.batchMgr.setSeqNo(rbft.exec.lastExec)
+	// rbft.batchMgr.setSeqNo(rbft.exec.lastExec)
 	rbft.logger.Infof("Replica %d post stable checkpoint event for seqNo %d after executed to the height with the same digest, update to new view: %d, new primary ID: %d", rbft.peerMgr.selfID, rbft.chainConfig.H, rbft.chainConfig.View, rbft.chainConfig.PrimaryID)
 	rbft.nullReqTimerReset()
 	rbft.restartBatchTimer()
