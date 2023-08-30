@@ -336,7 +336,7 @@ func (mpi *mempoolImpl[T, Constraint]) RemoveBatches(hashList []string) {
 			commitNonce := mpi.txStore.nonceCache.getCommitNonce(account)
 			if list, ok := mpi.txStore.allTxs[account]; ok {
 				// remove all previous seq number txs for this account.
-				removedTxs := list.forward(commitNonce + 1)
+				removedTxs := list.forward(commitNonce)
 				// remove index smaller than commitNonce delete index.
 				var wg sync.WaitGroup
 				wg.Add(5)
