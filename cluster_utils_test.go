@@ -2,16 +2,18 @@ package rbft
 
 import (
 	"errors"
+	"fmt"
 	"os"
+	"path/filepath"
 	"reflect"
+	"runtime"
 	"testing"
 
-	"github.com/axiomesh/axiom-bft/common/consensus"
-	"github.com/axiomesh/axiom-bft/common/fancylogger"
-	"github.com/axiomesh/axiom-bft/types"
-
 	"github.com/gogo/protobuf/proto"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/axiomesh/axiom-bft/common/consensus"
 )
 
 // ******************************************************************************************************************
@@ -21,15 +23,6 @@ func unlockCluster[T any, Constraint consensus.TXConstraint[T]](rbfts []*rbftImp
 	for index := range rbfts {
 		rbfts[index].atomicOff(Pending)
 		rbfts[index].setNormal()
-	}
-}
-
-func setClusterViewExcept[T any, Constraint consensus.TXConstraint[T]](rbfts []*rbftImpl[T, Constraint], nodes []*testNode[T, Constraint], view uint64, noSet int) {
-	for index := range rbfts {
-		if index == noSet {
-			continue
-		}
-		rbfts[index].setView(view)
 	}
 }
 
@@ -50,40 +43,37 @@ func setClusterExecExcept[T any, Constraint consensus.TXConstraint[T]](rbfts []*
 	}
 }
 
-//******************************************************************************************************************
+// ******************************************************************************************************************
 // assume that, it is in view 0, and the primary is node1, then we will process transactions:
 // 1) "execute", we process transactions normally
 // 2) "executeExceptPrimary", the backup replicas will process tx, but the primary only send a pre-prepare message
 // 3) "executeExceptN", the node "N" will be abnormal and others will process transactions normally
-//******************************************************************************************************************
-
-func execute[T any, Constraint consensus.TXConstraint[T]](t *testing.T, rbfts []*rbftImpl[T, Constraint], nodes []*testNode[T, Constraint], tx *consensus.FltTransaction, checkpoint bool) map[consensus.Type][]*consensusMessageWrapper {
+// ******************************************************************************************************************
+func execute[T any, Constraint consensus.TXConstraint[T]](t *testing.T, rbfts []*rbftImpl[T, Constraint], nodes []*testNode[T, Constraint], tx *T, checkpoint bool) map[consensus.Type][]*consensusMessageWrapper {
 	return executeExceptN[T, Constraint](t, rbfts, nodes, tx, checkpoint, len(rbfts))
 }
 
-func executeExceptPrimary[T any, Constraint consensus.TXConstraint[T]](t *testing.T, rbfts []*rbftImpl[T, Constraint], nodes []*testNode[T, Constraint], tx *consensus.FltTransaction, checkpoint bool) map[consensus.Type][]*consensusMessageWrapper {
+func executeExceptPrimary[T any, Constraint consensus.TXConstraint[T]](t *testing.T, rbfts []*rbftImpl[T, Constraint], nodes []*testNode[T, Constraint], tx *T, checkpoint bool) map[consensus.Type][]*consensusMessageWrapper {
 	return executeExceptN[T, Constraint](t, rbfts, nodes, tx, checkpoint, 0)
 }
 
-func executeExceptN[T any, Constraint consensus.TXConstraint[T]](t *testing.T, rbfts []*rbftImpl[T, Constraint], nodes []*testNode[T, Constraint], tx *consensus.FltTransaction, checkpoint bool, notExec int) map[consensus.Type][]*consensusMessageWrapper {
-
+func executeExceptN[T any, Constraint consensus.TXConstraint[T]](t *testing.T, rbfts []*rbftImpl[T, Constraint], nodes []*testNode[T, Constraint], tx *T, checkpoint bool, notExec int) map[consensus.Type][]*consensusMessageWrapper {
 	var primaryIndex int
 	for index := range rbfts {
 		if index == notExec {
 			continue
 		}
-		if rbfts[index].isPrimary(rbfts[index].peerPool.ID) {
+		if rbfts[index].isPrimary(rbfts[index].peerMgr.selfID) {
 			primaryIndex = index
 			break
 		}
 	}
 	retMessages := make(map[consensus.Type][]*consensusMessageWrapper)
-	txBytes, err := tx.Marshal()
-	assert.Nil(t, err)
-	rbfts[0].batchMgr.requestPool.AddNewRequests([][]byte{txBytes}, false, true, false)
-	rbfts[1].batchMgr.requestPool.AddNewRequests([][]byte{txBytes}, false, true, false)
-	rbfts[2].batchMgr.requestPool.AddNewRequests([][]byte{txBytes}, false, true, false)
-	rbfts[3].batchMgr.requestPool.AddNewRequests([][]byte{txBytes}, false, true, false)
+
+	rbfts[0].batchMgr.requestPool.AddNewRequests([]*T{tx}, false, true, false)
+	rbfts[1].batchMgr.requestPool.AddNewRequests([]*T{tx}, false, true, false)
+	rbfts[2].batchMgr.requestPool.AddNewRequests([]*T{tx}, false, true, false)
+	rbfts[3].batchMgr.requestPool.AddNewRequests([]*T{tx}, false, true, false)
 
 	batchTimerEvent := &LocalEvent{
 		Service:   CoreRbftService,
@@ -104,7 +94,7 @@ func executeExceptN[T any, Constraint consensus.TXConstraint[T]](t *testing.T, r
 		if index == primaryIndex || index == notExec {
 			continue
 		}
-		t.Logf("%s process pre-prepare", rbfts[index].peerPool.hostname)
+		t.Logf("%d process pre-prepare", rbfts[index].peerMgr.selfID)
 		rbfts[index].processEvent(preprepMsg)
 		prepMsg[index] = nodes[index].broadcastMessageCache
 		assert.Equal(t, consensus.Type_PREPARE, prepMsg[index].Type)
@@ -147,93 +137,15 @@ func executeExceptN[T any, Constraint consensus.TXConstraint[T]](t *testing.T, r
 	retMessages[consensus.Type_SIGNED_CHECKPOINT] = checkpointMsg
 
 	if checkpoint {
-		txBytes, err := tx.Marshal()
-		assert.Nil(t, err)
-		if consensus.IsConfigTx[T, Constraint](txBytes) {
-			vcMsg := make([]*consensusMessageWrapper, len(rbfts))
-			epochChanged := false
-			// process checkpoint, if epoch changed, trigger and process view change.
-			for index := range rbfts {
-				oldEpoch := rbfts[index].epoch
-				if index == notExec {
+		for index := range rbfts {
+			if index == notExec {
+				continue
+			}
+			for j := range checkpointMsg {
+				if j == notExec {
 					continue
 				}
-				for j := range checkpointMsg {
-					if j == notExec {
-						continue
-					}
-					rbfts[index].processEvent(checkpointMsg[j])
-				}
-				newEpoch := rbfts[index].epoch
-				if oldEpoch != newEpoch {
-					epochChanged = true
-					t.Logf("%s epoch changed from %d to %d, should trigger vc",
-						rbfts[index].peerPool.hostname, oldEpoch, newEpoch)
-					vcMsg[index] = nodes[index].broadcastMessageCache
-				}
-			}
-			retMessages[consensus.Type_VIEW_CHANGE] = vcMsg
-
-			// trigger view change after epoch change.
-			if epochChanged {
-				for index := range rbfts {
-					if index == notExec {
-						continue
-					}
-					for j := range vcMsg {
-						if j == notExec {
-							continue
-						}
-						rbfts[index].processEvent(vcMsg[j])
-					}
-				}
-				// view change quorum event
-				// new primary should be replica 2(view = 1)
-				primaryIndex = 1
-				quorumVC := &LocalEvent{Service: ViewChangeService, EventType: ViewChangeQuorumEvent}
-				for index := range rbfts {
-					if index == notExec {
-						continue
-					}
-					finished := rbfts[index].processEvent(quorumVC)
-					if index == primaryIndex {
-						assert.Equal(t, ViewChangeDoneEvent, finished.(*LocalEvent).EventType)
-					}
-				}
-				// new view message
-				newView := nodes[1].broadcastMessageCache
-				assert.Equal(t, consensus.Type_NEW_VIEW, newView.Type)
-				for index := range rbfts {
-					if index == notExec || index == primaryIndex {
-						continue
-					}
-
-					finished := rbfts[index].processEvent(newView)
-					assert.Equal(t, ViewChangeDoneEvent, finished.(*LocalEvent).EventType)
-				}
-
-				// recovery done event
-				done := &LocalEvent{Service: ViewChangeService, EventType: ViewChangeDoneEvent}
-				for index := range rbfts {
-					if index == notExec {
-						continue
-					}
-
-					rbfts[index].processEvent(done)
-				}
-			}
-
-		} else {
-			for index := range rbfts {
-				if index == notExec {
-					continue
-				}
-				for j := range checkpointMsg {
-					if j == notExec {
-						continue
-					}
-					rbfts[index].processEvent(checkpointMsg[j])
-				}
+				rbfts[index].processEvent(checkpointMsg[j])
 			}
 		}
 	}
@@ -241,83 +153,33 @@ func executeExceptN[T any, Constraint consensus.TXConstraint[T]](t *testing.T, r
 	return retMessages
 }
 
-//=============================================================================
+// =============================================================================
 // Tools for Cluster Check Stable State
-//=============================================================================
-
-// newRawLoggerWithHost create log file for local cluster tests
-func newRawLoggerWithHost(hostname string) *fancylogger.Logger {
-	rawLogger := fancylogger.NewLogger("test", fancylogger.DEBUG)
-
-	consoleFormatter := &fancylogger.StringFormatter{
-		EnableColors:    true,
-		TimestampFormat: "2006-01-02T15:04:05.000",
-		IsTerminal:      true,
-	}
-
-	//test with logger files
-	_ = os.Mkdir("testLogger", os.ModePerm)
-	fileName := "testLogger/" + hostname + ".log"
-	f, _ := os.Create(fileName)
-	consoleBackend := fancylogger.NewIOBackend(consoleFormatter, f)
-
-	rawLogger.SetBackends(consoleBackend)
-	rawLogger.SetEnableCaller(true)
-
-	return rawLogger
-}
+// =============================================================================
 
 // newRawLogger create log file for local cluster tests
-func newRawLogger() *fancylogger.Logger {
-	rawLogger := fancylogger.NewLogger("test", fancylogger.DEBUG)
-
-	consoleFormatter := &fancylogger.StringFormatter{
-		EnableColors:    true,
+func newRawLogger() *testLogger {
+	logger := logrus.New()
+	logger.SetFormatter(&logrus.TextFormatter{
+		ForceColors:     true,
+		FullTimestamp:   true,
 		TimestampFormat: "2006-01-02T15:04:05.000",
-		IsTerminal:      true,
+		CallerPrettyfier: func(f *runtime.Frame) (string, string) {
+			_, filename := filepath.Split(f.File)
+			return "", fmt.Sprintf("%12s:%-4d", filename, f.Line)
+		},
+	})
+	logger.SetReportCaller(false)
+	logger.SetOutput(os.Stdout)
+	logger.SetLevel(logrus.DebugLevel)
+	return &testLogger{
+		FieldLogger: logger,
 	}
-
-	consoleBackend := fancylogger.NewIOBackend(consoleFormatter, os.Stdout)
-
-	rawLogger.SetBackends(consoleBackend)
-	rawLogger.SetEnableCaller(true)
-
-	return rawLogger
-}
-
-func vSetToRouters(vSet []*consensus.NodeInfo) types.Router {
-	var routers types.Router
-	for index, info := range vSet {
-		peer := &types.Peer{
-			ID:       uint64(index + 1),
-			Hash:     calHash(info.Hostname),
-			Hostname: info.Hostname,
-		}
-		routers.Peers = append(routers.Peers, peer)
-	}
-	return routers
-}
-
-func getRouter(router *types.Router) types.Router {
-	var r types.Router
-	for _, p := range router.Peers {
-		peer := types.Peer{
-			ID:       p.ID,
-			Hash:     p.Hash,
-			Hostname: p.Hostname,
-		}
-		r.Peers = append(r.Peers, &peer)
-	}
-	return r
 }
 
 // set N/f of cluster
 func (tf *testFramework[T, Constraint]) setN(num int) {
 	tf.N = num
-}
-
-func calHash(hostname string) string {
-	return hostname
 }
 
 func newBasicClusterInstance[T any, Constraint consensus.TXConstraint[T]]() ([]*testNode[T, Constraint], []*rbftImpl[T, Constraint]) {
@@ -327,7 +189,14 @@ func newBasicClusterInstance[T any, Constraint consensus.TXConstraint[T]]() ([]*
 	for _, tn := range tf.TestNode {
 		rbfts = append(rbfts, tn.n.rbft)
 		nodes = append(nodes, tn)
-		_ = tn.n.rbft.batchMgr.requestPool.Start()
+		err := tn.n.rbft.init()
+		if err != nil {
+			panic(err)
+		}
+		err = tn.n.rbft.batchMgr.requestPool.Start()
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	return nodes, rbfts
@@ -407,7 +276,7 @@ func clusterInitRecovery[T any, Constraint consensus.TXConstraint[T]](t *testing
 
 	// check status
 	for index := range rbfts {
-		assert.Equal(t, uint64(1), rbfts[index].view)
+		assert.Equal(t, uint64(1), rbfts[index].chainConfig.View)
 		assert.True(t, rbfts[index].isNormal())
 	}
 }
@@ -498,10 +367,9 @@ func (rbft *rbftImpl[T, Constraint]) consensusMessagePacker(e consensusEvent) *c
 
 	consensusMsg := &consensus.ConsensusMessage{
 		Type:    eventType,
-		From:    rbft.peerPool.ID,
-		Author:  rbft.peerPool.hostname,
-		Epoch:   rbft.epoch,
-		View:    rbft.view,
+		From:    rbft.peerMgr.selfID,
+		Epoch:   rbft.chainConfig.EpochInfo.Epoch,
+		View:    rbft.chainConfig.View,
 		Payload: payload,
 	}
 
@@ -514,7 +382,7 @@ func (tm *timerManager) getTimer(name string) bool {
 
 // checkNilElems checks if provided struct has nil elements, returns error if provided
 // param is not a struct pointer and returns all nil elements' name if has.
-func checkNilElems(i interface{}) (string, []string, error) {
+func checkNilElems(i any) (string, []string, error) {
 	typ := reflect.TypeOf(i)
 	value := reflect.Indirect(reflect.ValueOf(i))
 

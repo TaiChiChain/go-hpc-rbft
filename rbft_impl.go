@@ -21,51 +21,28 @@ import (
 	"sync"
 	"time"
 
-	"github.com/axiomesh/axiom-bft/common/consensus"
-	"github.com/axiomesh/axiom-bft/common/metrics"
-	"github.com/axiomesh/axiom-bft/external"
-	"github.com/axiomesh/axiom-bft/mempool"
-	"github.com/axiomesh/axiom-bft/types"
-
 	"github.com/gogo/protobuf/proto"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
+
+	"github.com/axiomesh/axiom-bft/common/consensus"
+	"github.com/axiomesh/axiom-bft/common/metrics"
+	"github.com/axiomesh/axiom-bft/mempool"
+	"github.com/axiomesh/axiom-bft/types"
 )
 
 // Config contains the parameters to start a RAFT instance.
-type Config[T any, Constraint consensus.TXConstraint[T]] struct {
-	// ID is the num-identity of the local node. ID cannot be 0.
-	ID uint64
+type Config struct {
+	// Genesis for test
+	GenesisEpochInfo *EpochInfo
 
-	// Hash is the hash of the local node. Hash cannot be null.
-	Hash string
-
-	// Hostname is the hostname of the local node. Hostname cannot be nil.
-	Hostname string
-
-	// EpochInit is the epoch of such node init
-	EpochInit uint64
-
-	// LatestConfig is the state of the latest config batch
-	// we are not sure if it was a stable checkpoint
-	LatestConfig *types.MetaState
-
-	// peers contains the IDs and hashes of all nodes (including self) in the RBFT cluster. It
-	// should be set when starting/restarting a RBFT cluster or after application layer has
-	// finished config change.
-	// It's application's responsibility to ensure a consistent peer list among cluster.
-	Peers []*types.Peer
-
-	IsNew bool
+	// self staking account address
+	SelfAccountAddress string
 
 	// Applied is the latest height index of application service which should be assigned when node restart.
 	Applied uint64
 
-	// K decides how long this checkpoint period is.
-	K uint64
-
-	// LogMultiplier is used to calculate max log size in memory: k*logMultiplier.
-	LogMultiplier uint64
+	AppliedBlockHash string
 
 	// SetSize is the max size of a request set to broadcast among cluster.
 	SetSize int
@@ -82,10 +59,6 @@ type Config[T any, Constraint consensus.TXConstraint[T]] struct {
 	// NullRequestTimeout is the time duration one waits for primary's null request before
 	// send viewChange.
 	NullRequestTimeout time.Duration
-
-	// VCPeriod is the period between automatic viewChanges.
-	// Default value is 0 means close automatic viewChange.
-	VCPeriod uint64
 
 	// VcResendTimeout is the time duration one wait for a viewChange quorum before resending
 	// the same viewChange.
@@ -113,13 +86,6 @@ type Config[T any, Constraint consensus.TXConstraint[T]] struct {
 	// CheckPoolTimeout is the time duration one check for out-of-date requests in request pool cyclically.
 	CheckPoolTimeout time.Duration
 
-	// External is the application helper interfaces which must be implemented by application before
-	// initializing RBFT service.
-	External external.ExternalStack[T, Constraint]
-
-	// RequestPool helps manage the requests, detect and discover duplicate requests.
-	RequestPool mempool.MemPool[T, Constraint]
-
 	// FlowControl indicates whether flow control has been opened.
 	FlowControl bool
 
@@ -138,9 +104,6 @@ type Config[T any, Constraint consensus.TXConstraint[T]] struct {
 	// Logger is the logger used to record logger in RBFT.
 	Logger Logger
 
-	// IsTimed indicates whether generateBatch on time even if there are no tx.
-	IsTimed bool
-
 	// NoTxBatchTimeout is the max time duration before one generating block which packing no tx.
 	NoTxBatchTimeout time.Duration
 
@@ -150,33 +113,23 @@ type Config[T any, Constraint consensus.TXConstraint[T]] struct {
 
 // rbftImpl is the core struct of RBFT service, which handles all functions about consensus.
 type rbftImpl[T any, Constraint consensus.TXConstraint[T]] struct {
-	node *node[T, Constraint]
-
-	f             int    // max number of byzantine nodes we can tolerate
-	N             int    // max number of consensus nodes in the network
-	h             uint64 // low watermark
-	K             uint64 // how long this checkpoint period is
-	logMultiplier uint64 // use this value to calculate log size : k*logMultiplier
-	L             uint64 // log size: k*logMultiplier
-	view          uint64 // current view
-	epoch         uint64 // track node's epoch number
+	node        *node[T, Constraint]
+	chainConfig *ChainConfig
+	external    ExternalStack[T, Constraint] // manage interaction with application layer
 
 	status      *statusManager               // keep all basic status of rbft in this object
 	timerMgr    *timerManager                // manage rbft event timers
 	exec        *executor                    // manage transaction execution
-	storeMgr    *storeManager                // manage memory log storage
+	storeMgr    *storeManager[T, Constraint] // manage memory log storage
 	batchMgr    *batchManager[T, Constraint] // manage request batch related issues
 	recoveryMgr *recoveryManager             // manage recovery issues
 	vcMgr       *vcManager                   // manage viewchange issues
-	peerPool    *peerPool                    // manage node status including route table, the connected peers and so on
+	peerMgr     *peerManager                 // manage node status including route table, the connected peers and so on
 	epochMgr    *epochManager                // manage epoch issues
-	storage     external.Storage             // manage non-volatile storage of consensus log
-
-	external external.ExternalStack[T, Constraint] // manage interaction with application layer
+	storage     Storage                      // manage non-volatile storage of consensus log
 
 	recvChan chan consensusEvent      // channel to receive ordered consensus messages and local events
 	cpChan   chan *types.ServiceState // channel to wait for local checkpoint event
-	confChan chan uint64              // channel to track config checkpoint has been processed successfully.
 	delFlag  chan bool                // channel to stop namespace when there is a non-recoverable error
 	close    chan bool                // channel to close this event process
 
@@ -192,55 +145,39 @@ type rbftImpl[T any, Constraint consensus.TXConstraint[T]] struct {
 
 	wg sync.WaitGroup // make sure the listener has been closed
 
-	config  Config[T, Constraint] // get configuration info
-	metrics *rbftMetrics          // collect all metrics in rbft
-	tracer  trace.Tracer          // record tracing info
-	logger  Logger                // write logger to record some info
+	config  Config       // get configuration info
+	metrics *rbftMetrics // collect all metrics in rbft
+	tracer  trace.Tracer // record tracing info
+	logger  Logger       // write logger to record some info
+
+	isInited bool
 }
 
 var once sync.Once
 
 // newRBFT init the RBFT instance
-func newRBFT[T any, Constraint consensus.TXConstraint[T]](c Config[T, Constraint]) (*rbftImpl[T, Constraint], error) {
+func newRBFT[T any, Constraint consensus.TXConstraint[T]](c Config, external ExternalStack[T, Constraint], requestPool mempool.MemPool[T, Constraint]) (*rbftImpl[T, Constraint], error) {
 	var err error
 
 	// init message event converter
 	once.Do(initMsgEventMap)
 
 	cpChan := make(chan *types.ServiceState)
-	confC := make(chan uint64)
 	recvC := make(chan consensusEvent, 1024)
 	rbft := &rbftImpl[T, Constraint]{
-		K:                    c.K,
-		epoch:                c.EpochInit,
+		chainConfig:          &ChainConfig{},
 		config:               c,
 		logger:               c.Logger,
-		external:             c.External,
-		storage:              c.External,
+		external:             external,
+		storage:              external,
 		recvChan:             recvC,
 		cpChan:               cpChan,
-		confChan:             confC,
 		close:                make(chan bool),
 		delFlag:              c.DelFlag,
 		flowControl:          c.FlowControl,
 		flowControlMaxMem:    c.FlowControlMaxMem,
 		reusableRequestBatch: &consensus.FetchBatchResponse{},
 		tracer:               c.Tracer,
-	}
-
-	if rbft.K == 0 {
-		rbft.K = uint64(DefaultK)
-	}
-
-	N := len(c.Peers)
-	rbft.N = N
-	rbft.f = (rbft.N - 1) / 3
-	rbft.K = c.K
-	rbft.logMultiplier = c.LogMultiplier
-	rbft.L = rbft.logMultiplier * rbft.K
-
-	if c.Peers == nil {
-		return nil, fmt.Errorf("nil peers")
 	}
 
 	// new metrics instance
@@ -253,39 +190,21 @@ func newRBFT[T any, Constraint consensus.TXConstraint[T]](c Config[T, Constraint
 
 	// new timer manager
 	rbft.timerMgr = newTimerMgr(rbft.recvChan, c)
-	rbft.initTimers()
 
 	// new status manager
 	rbft.status = newStatusMgr()
-	rbft.initStatus()
 
 	// new peer pool
-	rbft.peerPool = newPeerPool(c)
+	rbft.peerMgr = newPeerManager(external, c)
 
 	// new executor
 	rbft.exec = newExecutor()
 
 	// new store manager
-	rbft.storeMgr = newStoreMgr(c)
-
-	// mock an initial checkpoint.
-	state := &types.ServiceState{
-		MetaState: &types.MetaState{
-			Height: 0,
-			Digest: "XXX GENESIS",
-		},
-		Epoch: 0,
-	}
-	mockCheckpoint, gErr := rbft.generateSignedCheckpoint(state, false)
-	if gErr != nil {
-		rbft.metrics.unregisterMetrics()
-		rbft.metrics = nil
-		return nil, gErr
-	}
-	rbft.storeMgr.localCheckpoints[0] = mockCheckpoint
+	rbft.storeMgr = newStoreMgr[T, Constraint](c)
 
 	// new batch manager
-	rbft.batchMgr = newBatchManager(c)
+	rbft.batchMgr = newBatchManager(requestPool, c)
 
 	// new recovery manager
 	rbft.recoveryMgr = newRecoveryMgr(c)
@@ -293,59 +212,82 @@ func newRBFT[T any, Constraint consensus.TXConstraint[T]](c Config[T, Constraint
 	// new viewChange manager
 	rbft.vcMgr = newVcManager(c)
 
-	// restore state from consensus database
-	rbft.exec.setLastExec(c.Applied)
-
 	// new epoch manager
-	rbft.epochMgr = newEpochManager(c, rbft.peerPool)
+	rbft.epochMgr = newEpochManager(c, rbft.peerMgr, external)
 
-	// update viewChange seqNo after restore state which may update seqNo
-	rbft.updateViewChangeSeqNo(rbft.exec.lastExec, rbft.K)
-
-	rbft.metrics.idGauge.Set(float64(rbft.peerPool.ID))
-	rbft.metrics.epochGauge.Set(float64(rbft.epoch))
-	rbft.metrics.clusterSizeGauge.Set(float64(rbft.N))
-	rbft.metrics.quorumSizeGauge.Set(float64(rbft.commonCaseQuorum()))
-
-	rbft.logger.Infof("RBFT Max number of validating peers (N) = %v", rbft.N)
-	rbft.logger.Infof("RBFT Max number of failing peers (f) = %v", rbft.f)
-	rbft.logger.Infof("RBFT byzantine flag = %v", rbft.in(byzantine))
-	rbft.logger.Infof("RBFT SignedCheckpoint period (K) = %v", rbft.K)
-	rbft.logger.Infof("RBFT Log multiplier = %v", rbft.logMultiplier)
-	rbft.logger.Infof("RBFT log size (L) = %v", rbft.L)
-	rbft.logger.Infof("RBFT ID: %d", rbft.peerPool.ID)
-	rbft.logger.Infof("RBFT isTimed: %v", rbft.config.IsTimed)
-
+	// use GenesisEpochInfo as default
+	rbft.chainConfig.EpochInfo = c.GenesisEpochInfo
+	rbft.chainConfig.updateDerivedData()
 	return rbft, nil
 }
 
-// start initializes and starts the consensus service
-func (rbft *rbftImpl[T, Constraint]) start() error {
-	err := rbft.batchMgr.requestPool.Start()
-	if err != nil {
-		return err
+func (rbft *rbftImpl[T, Constraint]) init() error {
+	if rbft.isInited {
+		return nil
 	}
+	// restore state from consensus database
+	rbft.exec.setLastExec(rbft.config.Applied)
 
-	// exit pending status after start rbft to avoid missing consensus messages from other nodes.
-	rbft.atomicOff(Pending)
-	rbft.metrics.statusGaugePending.Set(0)
-
-	rbft.logger.Noticef("--------RBFT starting, nodeID: %d--------", rbft.peerPool.ID)
-
+	// load state from storage
 	if rErr := rbft.restoreState(); rErr != nil {
 		rbft.logger.Errorf("Replica restore state failed: %s", rErr)
 		return rErr
 	}
+
+	rbft.initTimers()
+	rbft.initStatus()
+
+	// update viewChange seqNo after restore state which may update seqNo
+	rbft.updateViewChangeSeqNo(rbft.exec.lastExec, rbft.chainConfig.EpochInfo.ConsensusParams.CheckpointPeriod)
+	rbft.metrics.idGauge.Set(float64(rbft.peerMgr.selfID))
+	rbft.metrics.epochGauge.Set(float64(rbft.chainConfig.EpochInfo.Epoch))
+	rbft.metrics.clusterSizeGauge.Set(float64(rbft.chainConfig.N))
+	rbft.metrics.quorumSizeGauge.Set(float64(rbft.commonCaseQuorum()))
+
+	rbft.logger.Infof("RBFT enable wrf = %v", rbft.chainConfig.EpochInfo.ConsensusParams.ProposerElectionType == ProposerElectionTypeWRF)
+	rbft.logger.Infof("RBFT current epoch = %v", rbft.chainConfig.EpochInfo.Epoch)
+	rbft.logger.Infof("RBFT current view = %v", rbft.chainConfig.View)
+	rbft.logger.Infof("RBFT last exec block = %v", rbft.exec.lastExec)
+	rbft.logger.Infof("RBFT Max number of validating peers (N) = %v", rbft.chainConfig.N)
+	rbft.logger.Infof("RBFT Max number of failing peers (f) = %v", rbft.chainConfig.F)
+	rbft.logger.Infof("RBFT byzantine flag = %v", rbft.in(byzantine))
+	rbft.logger.Infof("RBFT SignedCheckpoint period (K) = %v", rbft.chainConfig.EpochInfo.ConsensusParams.CheckpointPeriod)
+	rbft.logger.Infof("RBFT Log multiplier = %v", rbft.chainConfig.EpochInfo.ConsensusParams.HighWatermarkCheckpointPeriod)
+	rbft.logger.Infof("RBFT log size (L) = %v", rbft.chainConfig.L)
+	rbft.logger.Infof("RBFT ID: %d", rbft.peerMgr.selfID)
+	rbft.logger.Infof("RBFT isTimed: %v", rbft.chainConfig.EpochInfo.ConsensusParams.EnableTimedGenEmptyBlock)
+
+	if err := rbft.batchMgr.requestPool.Init(rbft.peerMgr.selfID); err != nil {
+		return err
+	}
+	rbft.isInited = true
+	return nil
+}
+
+// start initializes and starts the consensus service
+func (rbft *rbftImpl[T, Constraint]) start() error {
+	if err := rbft.init(); err != nil {
+		return err
+	}
+
+	if err := rbft.batchMgr.requestPool.Start(); err != nil {
+		return err
+	}
+	// exit pending status after start rbft to avoid missing consensus messages from other nodes.
+	rbft.atomicOff(Pending)
+	rbft.metrics.statusGaugePending.Set(0)
+
+	rbft.logger.Noticef("--------RBFT starting, nodeID: %d--------", rbft.peerMgr.selfID)
 
 	// if the stable-checkpoint recovered from consensus-database is equal to the config-batch-to-check,
 	// current state has already been checked to be stable, and we need not check it again.
 
 	// The checkpoint is nil if the block cannot be recovered from another node for reasons such as archiving.
 
-	localCheckpoint := rbft.storeMgr.localCheckpoints[rbft.h]
+	localCheckpoint := rbft.storeMgr.localCheckpoints[rbft.chainConfig.H]
 	if localCheckpoint != nil {
 		metaS := &types.MetaState{
-			Height: rbft.h,
+			Height: rbft.chainConfig.H,
 			Digest: localCheckpoint.Checkpoint.Digest(),
 		}
 		if rbft.equalMetaState(rbft.epochMgr.configBatchToCheck, metaS) {
@@ -362,7 +304,7 @@ func (rbft *rbftImpl[T, Constraint]) start() error {
 	initRecoveryEvent := &LocalEvent{
 		Service:   RecoveryService,
 		EventType: RecoveryInitEvent,
-		Event:     rbft.view,
+		Event:     rbft.chainConfig.View,
 	}
 	rbft.postMsg(initRecoveryEvent)
 
@@ -370,7 +312,7 @@ func (rbft *rbftImpl[T, Constraint]) start() error {
 }
 
 // stop the consensus service
-func (rbft *rbftImpl[T, Constraint]) stop() [][]byte {
+func (rbft *rbftImpl[T, Constraint]) stop() []*T {
 	rbft.logger.Notice("RBFT stopping...")
 
 	// reset status to pending.
@@ -385,15 +327,7 @@ func (rbft *rbftImpl[T, Constraint]) stop() [][]byte {
 	rbft.logger.Notice("close channel: checkpoint")
 	close(rbft.cpChan)
 
-	// close config channel.
-	select {
-	case <-rbft.confChan:
-	default:
-	}
-	rbft.logger.Notice("close channel: config")
-	close(rbft.confChan)
-
-	remainTxs, err := drainChannel(rbft.recvChan)
+	remainTxs, err := rbft.drainChannel(rbft.recvChan)
 	if err != nil {
 		rbft.logger.Errorf("drain channel error: %s", err)
 	}
@@ -434,7 +368,7 @@ func (rbft *rbftImpl[T, Constraint]) stop() [][]byte {
 func (rbft *rbftImpl[T, Constraint]) step(ctx context.Context, msg *consensus.ConsensusMessage) {
 	if rbft.atomicIn(Pending) {
 		if rbft.atomicIn(Stopped) {
-			rbft.logger.Debugf("Replica %d is stopped, reject every consensus messages", rbft.peerPool.ID)
+			rbft.logger.Debugf("Replica %d is stopped, reject every consensus messages", rbft.peerMgr.selfID)
 			return
 		}
 
@@ -443,15 +377,15 @@ func (rbft *rbftImpl[T, Constraint]) step(ctx context.Context, msg *consensus.Co
 		switch msg.Type {
 		case consensus.Type_VIEW_CHANGE:
 			// don't cache vc with different epoch
-			if msg.Epoch != rbft.epoch {
+			if msg.Epoch != rbft.chainConfig.EpochInfo.Epoch {
 				rbft.logger.Errorf("Replica %d received message from invalid epoch %d, ignore it in "+
-					"pending status", rbft.peerPool.ID, msg.Epoch)
+					"pending status", rbft.peerMgr.selfID, msg.Epoch)
 				return
 			}
 			// don't cache vc from unknown author
-			if _, ok := rbft.peerPool.router[msg.From]; !ok {
+			if _, ok := rbft.peerMgr.nodes[msg.From]; !ok {
 				rbft.logger.Errorf("Replica %d received message from unknown node %d, ignore it in "+
-					"pending status", rbft.peerPool.ID, msg.From)
+					"pending status", rbft.peerMgr.selfID, msg.From)
 				return
 			}
 			vc := &consensus.ViewChange{}
@@ -469,13 +403,13 @@ func (rbft *rbftImpl[T, Constraint]) step(ctx context.Context, msg *consensus.Co
 			idx := vcIdx{v: vcBasis.GetView(), id: vcBasis.GetReplicaId()}
 			rbft.logger.Debugf("Replica %d is in pending status, pre-store the view change message: "+
 				"from replica %d, e:%d, v:%d, h:%d, |C|:%d, |P|:%d, |Q|:%d",
-				rbft.peerPool.ID, vcBasis.GetReplicaId(), msg.Epoch, vcBasis.GetView(), vcBasis.GetH(),
+				rbft.peerMgr.selfID, vcBasis.GetReplicaId(), msg.Epoch, vcBasis.GetView(), vcBasis.GetH(),
 				len(vcBasis.GetCset()), len(vcBasis.GetCset()), len(vcBasis.GetQset()))
 			vc.Timestamp = time.Now().Unix()
 			rbft.vcMgr.viewChangeStore[idx] = vc
 
 		default:
-			rbft.logger.Debugf("Replica %d is in pending status, reject consensus messages", rbft.peerPool.ID)
+			rbft.logger.Debugf("Replica %d is in pending status, reject consensus messages", rbft.peerMgr.selfID)
 		}
 
 		return
@@ -483,7 +417,7 @@ func (rbft *rbftImpl[T, Constraint]) step(ctx context.Context, msg *consensus.Co
 
 	// block consensus progress until sync to epoch change height.
 	if rbft.atomicIn(inEpochSyncing) {
-		rbft.logger.Debugf("Replica %d is in epoch syncing status, reject consensus messages", rbft.peerPool.ID)
+		rbft.logger.Debugf("Replica %d is in epoch syncing status, reject consensus messages", rbft.peerMgr.selfID)
 		return
 	}
 
@@ -495,15 +429,12 @@ func (rbft *rbftImpl[T, Constraint]) step(ctx context.Context, msg *consensus.Co
 }
 
 // postRequests informs RBFT tx set event which is posted from application layer.
-func (rbft *rbftImpl[T, Constraint]) postRequests(requests *consensus.RequestSet) {
+func (rbft *rbftImpl[T, Constraint]) postRequests(requests *RequestSet[T, Constraint]) {
 	if rbft.atomicIn(Pending) {
-		rbft.logger.Debugf("Replica %d is in pending status, reject propose request", rbft.peerPool.ID)
+		rbft.logger.Debugf("Replica %d is in pending status, reject propose request", rbft.peerMgr.selfID)
 		return
 	}
-	if rbft.atomicIn(inEpochSyncing) {
-		rbft.logger.Debugf("Replica %d is in epoch syncing status, reject propose request", rbft.peerPool.ID)
-		return
-	}
+
 	rbft.postMsg(requests)
 }
 
@@ -514,33 +445,15 @@ func (rbft *rbftImpl[T, Constraint]) postBatches(batches []*mempool.RequestHashB
 	}
 }
 
-// postConfState informs RBFT conf state event which is posted from application layer.
-func (rbft *rbftImpl[T, Constraint]) postConfState(cc *types.ConfState) {
-	found := false
-	for _, p := range cc.QuorumRouter.Peers {
-		if p.Hostname == rbft.peerPool.hostname {
-			found = true
-		}
-	}
-	if !found {
-		rbft.logger.Criticalf("%s cannot find self id in quorum routers: %+v", rbft.peerPool.hostname, cc.QuorumRouter.Peers)
-		rbft.atomicOn(Pending)
-		rbft.metrics.statusGaugePending.Set(Pending)
-		return
-	}
-	rbft.peerPool.initPeers(cc.QuorumRouter.Peers)
-	rbft.metrics.idGauge.Set(float64(rbft.peerPool.ID))
-}
-
 // postMsg posts messages to main loop.
-func (rbft *rbftImpl[T, Constraint]) postMsg(msg interface{}) {
+func (rbft *rbftImpl[T, Constraint]) postMsg(msg any) {
 	rbft.recvChan <- msg
 }
 
 // reportStateUpdated informs RBFT stateUpdated event.
 func (rbft *rbftImpl[T, Constraint]) reportStateUpdated(state *types.ServiceState) {
 	if rbft.atomicIn(Pending) {
-		rbft.logger.Debugf("Replica %d is in pending status, reject report state updated", rbft.peerPool.ID)
+		rbft.logger.Debugf("Replica %d is in pending status, reject report state updated", rbft.peerMgr.selfID)
 		return
 	}
 	event := &LocalEvent{
@@ -555,13 +468,13 @@ func (rbft *rbftImpl[T, Constraint]) reportStateUpdated(state *types.ServiceStat
 // reportCheckpoint informs RBFT checkpoint event.
 func (rbft *rbftImpl[T, Constraint]) reportCheckpoint(state *types.ServiceState) {
 	if rbft.atomicIn(Pending) {
-		rbft.logger.Debugf("Replica %d is in pending status, reject report checkpoint", rbft.peerPool.ID)
+		rbft.logger.Debugf("Replica %d is in pending status, reject report checkpoint", rbft.peerMgr.selfID)
 		return
 	}
 
 	height := state.MetaState.Height
 	// report checkpoint of config block height or checkpoint block height.
-	if rbft.readConfigBatchToExecute() == height || height%rbft.K == 0 {
+	if rbft.readConfigBatchToExecute() == height || height%rbft.chainConfig.EpochInfo.ConsensusParams.CheckpointPeriod == 0 {
 		rbft.logger.Debugf("Report checkpoint: {%d, %s} to core", state.MetaState.Height, state.MetaState.Digest)
 		go func() {
 			defer func() {
@@ -574,47 +487,24 @@ func (rbft *rbftImpl[T, Constraint]) reportCheckpoint(state *types.ServiceState)
 	}
 }
 
-// reportStableCheckpointFinished informs RBFT stable checkpoint finish event.
-func (rbft *rbftImpl[T, Constraint]) reportStableCheckpointFinished(height uint64) {
-	if rbft.atomicIn(Pending) {
-		rbft.logger.Debugf("Replica %d is in pending status, reject report stable checkpoint finished", rbft.peerPool.ID)
-		return
-	}
-
-	if rbft.atomicIn(InConfChange) {
-		rbft.logger.Debugf("Report stable checkpoint %d finish to core", height)
-		go func() {
-			defer func() {
-				if r := recover(); r != nil {
-					rbft.logger.Debugf("reject report stable checkpoint for recovered")
-				}
-			}()
-			rbft.confChan <- height
-		}()
-	} else {
-		rbft.logger.Info("Current node isn't in config-change")
-	}
-}
-
 // getStatus returns the current consensus status.
 // NOTE. This function may be invoked by application in another go-routine
 // rather than the main event loop go-routine, so we need to protect
-// safety of `rbft.peerPool.noMap`, `rbft.view` and `rbft.Status`
+// safety of `rbft.peerMgr.noMap`, `rbft.chainConfig.View` and `rbft.Status`
 func (rbft *rbftImpl[T, Constraint]) getStatus() (status NodeStatus) {
-
 	rbft.viewLock.RLock()
-	status.View = rbft.view
+	status.View = rbft.chainConfig.View
 	rbft.viewLock.RUnlock()
 
 	rbft.hLock.RLock()
-	status.H = rbft.h
+	status.H = rbft.chainConfig.H
 	rbft.hLock.RUnlock()
 
 	rbft.epochLock.RLock()
-	status.Epoch = rbft.epoch
+	status.EpochInfo = rbft.chainConfig.EpochInfo.Clone()
 	rbft.epochLock.RUnlock()
 
-	status.ID = rbft.peerPool.ID
+	status.ID = rbft.peerMgr.selfID
 	switch {
 	case rbft.atomicIn(InConfChange):
 		status.Status = InConfChange
@@ -650,6 +540,13 @@ func (rbft *rbftImpl[T, Constraint]) listenEvent() {
 			rbft.logger.Notice("exit RBFT event listener")
 			return
 		case next := <-rbft.recvChan:
+			if _, ok := next.(*RequestSet[T, Constraint]); !ok {
+				if rbft.atomicIn(inEpochSyncing) {
+					rbft.logger.Debugf("Replica %d is in epoch syncing status, reject propose request", rbft.peerMgr.selfID)
+					return
+				}
+			}
+
 			cm, isConsensusMessage := next.(*consensusMessageWrapper)
 			for {
 				select {
@@ -675,8 +572,7 @@ func (rbft *rbftImpl[T, Constraint]) listenEvent() {
 // processEvent process consensus messages and local events cyclically.
 func (rbft *rbftImpl[T, Constraint]) processEvent(ee consensusEvent) consensusEvent {
 	switch e := ee.(type) {
-
-	case *consensus.RequestSet:
+	case *RequestSet[T, Constraint]:
 		// e.Local indicates whether this RequestSet was generated locally or received
 		// from remote nodes.
 		if e.Local {
@@ -688,6 +584,25 @@ func (rbft *rbftImpl[T, Constraint]) processEvent(ee consensusEvent) consensusEv
 		}
 
 		rbft.processReqSetEvent(e)
+
+		return nil
+	case *consensus.RequestSet:
+		// e.Local indicates whether this RequestSet was generated locally or received
+		// from remote nodes.
+		if e.Local {
+			rbft.metrics.incomingLocalTxSets.Add(float64(1))
+			rbft.metrics.incomingLocalTxs.Add(float64(len(e.Requests)))
+		} else {
+			rbft.metrics.incomingRemoteTxSets.Add(float64(1))
+			rbft.metrics.incomingRemoteTxs.Add(float64(len(e.Requests)))
+		}
+
+		var requestSet RequestSet[T, Constraint]
+		if err := requestSet.FromPB(e); err != nil {
+			rbft.logger.Errorf("RequestSet unmarshal error: %v", err)
+			return nil
+		}
+		rbft.processReqSetEvent(&requestSet)
 
 		return nil
 
@@ -707,10 +622,9 @@ func (rbft *rbftImpl[T, Constraint]) processEvent(ee consensusEvent) consensusEv
 }
 
 func (rbft *rbftImpl[T, Constraint]) consensusMessageFilter(ctx context.Context, msg *consensus.ConsensusMessage) consensusEvent {
-
 	// A node in different epoch or in epoch sync will reject normal consensus messages, except:
 	// EpochChangeRequest and EpochChangeProof.
-	if msg.Epoch != rbft.epoch {
+	if msg.Epoch != rbft.chainConfig.EpochInfo.Epoch {
 		return rbft.epochMgr.checkEpoch(msg)
 	}
 
@@ -749,18 +663,17 @@ func (rbft *rbftImpl[T, Constraint]) dispatchCoreRbftMsg(ctx context.Context, e 
 // handleNullRequestEvent triggered by null request timer, primary needs to send a null request
 // and replica needs to send view change
 func (rbft *rbftImpl[T, Constraint]) handleNullRequestTimerEvent() {
-
 	if rbft.atomicIn(InViewChange) {
-		rbft.logger.Debugf("Replica %d try to handle null request timer, but it's in viewChange", rbft.peerPool.ID)
+		rbft.logger.Debugf("Replica %d try to handle null request timer, but it's in viewChange", rbft.peerMgr.selfID)
 		return
 	}
 
-	if !rbft.isPrimary(rbft.peerPool.ID) {
+	if !rbft.isPrimary(rbft.peerMgr.selfID) {
 		// replica expects a null request, but primary never sent one
-		rbft.logger.Warningf("Replica %d null request timer expired, sending viewChange", rbft.peerPool.ID)
+		rbft.logger.Warningf("Replica %d null request timer expired, sending viewChange", rbft.peerMgr.selfID)
 		rbft.sendViewChange()
 	} else {
-		rbft.logger.Infof("Primary %d null request timer expired, sending null request", rbft.peerPool.ID)
+		rbft.logger.Infof("Primary %d null request timer expired, sending null request", rbft.peerMgr.selfID)
 		rbft.sendNullRequest()
 
 		rbft.trySyncState()
@@ -769,15 +682,14 @@ func (rbft *rbftImpl[T, Constraint]) handleNullRequestTimerEvent() {
 
 // sendNullRequest is for primary peer to send null when nullRequestTimer booms
 func (rbft *rbftImpl[T, Constraint]) sendNullRequest() {
-
 	// primary node reject send null request in conf change status.
 	if rbft.atomicIn(InConfChange) {
-		rbft.logger.Infof("Replica %d not send null request in conf change status", rbft.peerPool.ID)
+		rbft.logger.Infof("Replica %d not send null request in conf change status", rbft.peerMgr.selfID)
 		return
 	}
 
 	nullRequest := &consensus.NullRequest{
-		ReplicaId: rbft.peerPool.ID,
+		ReplicaId: rbft.peerMgr.selfID,
 	}
 	payload, err := proto.Marshal(nullRequest)
 	if err != nil {
@@ -788,31 +700,30 @@ func (rbft *rbftImpl[T, Constraint]) sendNullRequest() {
 		Type:    consensus.Type_NULL_REQUEST,
 		Payload: payload,
 	}
-	rbft.peerPool.broadcast(context.TODO(), consensusMsg)
+	rbft.peerMgr.broadcast(context.TODO(), consensusMsg)
 	rbft.nullReqTimerReset()
 }
 
 // recvNullRequest process null request when it come
 func (rbft *rbftImpl[T, Constraint]) recvNullRequest(msg *consensus.NullRequest) consensusEvent {
-
 	if rbft.atomicIn(InViewChange) {
-		rbft.logger.Infof("Replica %d is in viewChange, reject null request from replica %d", rbft.peerPool.ID, msg.ReplicaId)
+		rbft.logger.Infof("Replica %d is in viewChange, reject null request from replica %d", rbft.peerMgr.selfID, msg.ReplicaId)
 		return nil
 	}
 
 	// backup node reject process null request in conf change status.
 	if rbft.atomicIn(InConfChange) {
-		rbft.logger.Infof("Replica %d is in conf change, reject null request from replica %d", rbft.peerPool.ID, msg.ReplicaId)
+		rbft.logger.Infof("Replica %d is in conf change, reject null request from replica %d", rbft.peerMgr.selfID, msg.ReplicaId)
 		return nil
 	}
 
 	// only primary could send a null request
 	if !rbft.isPrimary(msg.ReplicaId) {
-		rbft.logger.Warningf("Replica %d received null request from replica %d who is not primary", rbft.peerPool.ID, msg.ReplicaId)
+		rbft.logger.Warningf("Replica %d received null request from replica %d who is not primary", rbft.peerMgr.selfID, msg.ReplicaId)
 		return nil
 	}
 
-	rbft.logger.Infof("Replica %d received null request from primary %d", rbft.peerPool.ID, msg.ReplicaId)
+	rbft.logger.Infof("Replica %d received null request from primary %d", rbft.peerMgr.selfID, msg.ReplicaId)
 
 	rbft.trySyncState()
 	rbft.nullReqTimerReset()
@@ -820,45 +731,36 @@ func (rbft *rbftImpl[T, Constraint]) recvNullRequest(msg *consensus.NullRequest)
 	return nil
 }
 
-//=============================================================================
+// =============================================================================
 // process request set and batch methods
-//=============================================================================
+// =============================================================================
 
 // processReqSetEvent process received requestSet event, reject txs in following situations:
 // 1. pool is full, reject txs relayed from other nodes
 // 2. node is in config change, add another config tx into txpool
 // 3. node is in skipInProgress, rejects any txs from other nodes
-func (rbft *rbftImpl[T, Constraint]) processReqSetEvent(req *consensus.RequestSet) consensusEvent {
+func (rbft *rbftImpl[T, Constraint]) processReqSetEvent(req *RequestSet[T, Constraint]) consensusEvent {
 	// if pool already full, rejects the tx, unless it's from RPC because of time difference or we have opened flow control
 	if rbft.isPoolFull() && !req.Local && !rbft.flowControl {
 		rbft.rejectRequestSet(req)
 		return nil
 	}
 
-	// if current node is in config change, add another config tx into txpool
-	if rbft.atomicIn(InConfChange) {
-		for _, tx := range req.Requests {
-			if consensus.IsConfigTx[T, Constraint](tx) {
-				rbft.logger.Debugf("Replica %d is in config change, add ctx %s into txpool", rbft.peerPool.ID, requestHash[T, Constraint](tx))
-			}
-		}
-	}
-
 	// if current node is in skipInProgress, it should reject the transactions coming from other nodes, but has the responsibility to keep its own transactions
-	if rbft.in(SkipInProgress) && !req.Local {
-		rbft.rejectRequestSet(req)
-		return nil
-	}
+	//if rbft.in(SkipInProgress) && !req.Local {
+	//	rbft.rejectRequestSet(req)
+	//	return nil
+	//}
 
 	// if current node is in abnormal, add normal txs into txPool without generate batches.
-	if !rbft.isNormal() {
+	if !rbft.isNormal() || rbft.in(SkipInProgress) {
 		_, completionMissingBatchHashes := rbft.batchMgr.requestPool.AddNewRequests(req.Requests, false, req.Local, false)
 		for _, batchHash := range completionMissingBatchHashes {
 			delete(rbft.storeMgr.missingBatchesInFetching, batchHash)
 		}
 	} else {
 		// primary nodes would check if this transaction triggered generating a batch or not
-		if rbft.isPrimary(rbft.peerPool.ID) {
+		if rbft.isPrimary(rbft.peerMgr.selfID) {
 			// start batch timer and stop no tx batch timer when this node receives the first transaction of a batch
 			if !rbft.batchMgr.isBatchTimerActive() {
 				rbft.startBatchTimer()
@@ -882,10 +784,10 @@ func (rbft *rbftImpl[T, Constraint]) processReqSetEvent(req *consensus.RequestSe
 				idx, ok := rbft.storeMgr.missingBatchesInFetching[batchHash]
 				if !ok {
 					rbft.logger.Warningf("Replica %d completion batch with hash %s but not found missing record",
-						rbft.peerPool.ID, batchHash)
+						rbft.peerMgr.selfID, batchHash)
 				} else {
 					rbft.logger.Infof("Replica %d completion batch with hash %s, try to prepare this batch",
-						rbft.peerPool.ID, batchHash)
+						rbft.peerMgr.selfID, batchHash)
 
 					var ctx context.Context
 					if cert, ok := rbft.storeMgr.certStore[idx]; ok {
@@ -909,7 +811,7 @@ func (rbft *rbftImpl[T, Constraint]) processReqSetEvent(req *consensus.RequestSe
 }
 
 // rejectRequestSet rejects tx set and update related metrics.
-func (rbft *rbftImpl[T, Constraint]) rejectRequestSet(req *consensus.RequestSet) {
+func (rbft *rbftImpl[T, Constraint]) rejectRequestSet(req *RequestSet[T, Constraint]) {
 	if req.Local {
 		rbft.metrics.rejectedLocalTxs.Add(float64(len(req.Requests)))
 	} else {
@@ -918,26 +820,25 @@ func (rbft *rbftImpl[T, Constraint]) rejectRequestSet(req *consensus.RequestSet)
 
 	// This feature is currently not supported
 	// recall promise to avoid memory leak.
-	//for _, r := range req.Requests {
+	// for _, r := range req.Requests {
 	//	if r.Promise != nil {
 	//		r.Promise.Recall()
 	//	}
-	//}
+	// }
 }
 
 // processOutOfDateReqs process the out-of-date requests in requestPool, get the remained txs from pool,
 // then broadcast all the remained requests that generate by itself to others
 func (rbft *rbftImpl[T, Constraint]) processOutOfDateReqs() {
-
 	// if rbft is in abnormal, reject process remained reqs
 	if !rbft.isNormal() {
-		rbft.logger.Warningf("Replica %d is in abnormal, reject broadcast remained reqs", rbft.peerPool.ID)
+		rbft.logger.Warningf("Replica %d is in abnormal, reject broadcast remained reqs", rbft.peerMgr.selfID)
 		return
 	}
 
 	reqs, err := rbft.batchMgr.requestPool.FilterOutOfDateRequests()
 	if err != nil {
-		rbft.logger.Warningf("Replica %d get the remained reqs failed, error: %v", rbft.peerPool.ID, err)
+		rbft.logger.Warningf("Replica %d get the remained reqs failed, error: %v", rbft.peerMgr.selfID, err)
 	}
 
 	if !rbft.batchMgr.requestPool.IsPoolFull() {
@@ -946,17 +847,17 @@ func (rbft *rbftImpl[T, Constraint]) processOutOfDateReqs() {
 
 	reqLen := len(reqs)
 	if reqLen == 0 {
-		rbft.logger.Debugf("Replica %d in normal finds 0 remained reqs, need not broadcast to others", rbft.peerPool.ID)
+		rbft.logger.Debugf("Replica %d in normal finds 0 remained reqs, need not broadcast to others", rbft.peerMgr.selfID)
 		return
 	}
 
 	setSize := rbft.config.SetSize
 	rbft.logger.Debugf("Replica %d in normal finds %d remained reqs, broadcast to others split by setSize %d "+
-		"if needed", rbft.peerPool.ID, reqLen, setSize)
+		"if needed", rbft.peerMgr.selfID, reqLen, setSize)
 
 	// not support temporary
 	// limit TransactionSet Max Mem by flowControlMaxMem before re-broadcast reqs
-	//if rbft.flowControl {
+	// if rbft.flowControl {
 	//	var txs []*consensus.FltTransaction
 	//	memLen := 0
 	//	for _, tx := range reqs {
@@ -975,17 +876,17 @@ func (rbft *rbftImpl[T, Constraint]) processOutOfDateReqs() {
 	//		rbft.broadcastReqSet(set)
 	//	}
 	//	return
-	//}
+	// }
 
 	// limit TransactionSet size by setSize before re-broadcast reqs
 	for reqLen > 0 {
 		if reqLen <= setSize {
-			set := &consensus.RequestSet{Requests: reqs}
+			set := &RequestSet[T, Constraint]{Requests: reqs}
 			rbft.broadcastReqSet(set)
 			reqLen = 0
 		} else {
 			bTxs := reqs[0:setSize]
-			set := &consensus.RequestSet{Requests: bTxs}
+			set := &RequestSet[T, Constraint]{Requests: bTxs}
 			rbft.broadcastReqSet(set)
 			reqs = reqs[setSize:]
 			reqLen -= setSize
@@ -996,14 +897,14 @@ func (rbft *rbftImpl[T, Constraint]) processOutOfDateReqs() {
 // processNeedRemoveReqs process the checkPoolRemove timeout requests in requestPool, get the remained reqs from pool,
 // then remove these txs in local pool
 func (rbft *rbftImpl[T, Constraint]) processNeedRemoveReqs() {
-	rbft.logger.Infof("removeTx timer expired, Replica %d start remove tx in local memPool ", rbft.peerPool.ID)
+	rbft.logger.Infof("removeTx timer expired, Replica %d start remove tx in local memPool ", rbft.peerMgr.selfID)
 	reqLen, err := rbft.batchMgr.requestPool.RemoveTimeoutRequests()
 	if err != nil {
-		rbft.logger.Warningf("Replica %d get the remained reqs failed, error: %v", rbft.peerPool.ID, err)
+		rbft.logger.Warningf("Replica %d get the remained reqs failed, error: %v", rbft.peerMgr.selfID, err)
 	}
 
 	if reqLen == 0 {
-		rbft.logger.Infof("Replica %d in normal finds 0 tx to remove", rbft.peerPool.ID)
+		rbft.logger.Infof("Replica %d in normal finds 0 tx to remove", rbft.peerMgr.selfID)
 		return
 	}
 
@@ -1011,31 +912,34 @@ func (rbft *rbftImpl[T, Constraint]) processNeedRemoveReqs() {
 	if !rbft.batchMgr.requestPool.IsPoolFull() {
 		rbft.setNotFull()
 	}
-	rbft.logger.Warningf("Replica %d successful remove %d tx in local memPool ", rbft.peerPool.ID, reqLen)
+	rbft.logger.Warningf("Replica %d successful remove %d tx in local memPool ", rbft.peerMgr.selfID, reqLen)
 }
 
 // recvRequestBatch handle logic after receive request batch
 func (rbft *rbftImpl[T, Constraint]) recvRequestBatch(reqBatch *mempool.RequestHashBatch[T, Constraint]) error {
+	rbft.logger.Debugf("Replica %d received request batch %s", rbft.peerMgr.selfID, reqBatch.BatchHash)
 
-	rbft.logger.Debugf("Replica %d received request batch %s", rbft.peerPool.ID, reqBatch.BatchHash)
-
-	batch := &consensus.RequestBatch{
+	batch := &RequestBatch[T, Constraint]{
 		RequestHashList: reqBatch.TxHashList,
 		RequestList:     reqBatch.TxList,
 		Timestamp:       reqBatch.Timestamp,
+		SeqNo:           rbft.batchMgr.getSeqNo() + 1,
 		LocalList:       reqBatch.LocalList,
 		BatchHash:       reqBatch.BatchHash,
 	}
 
 	// primary node should reject generate batch when there is a config batch in ordering.
-	if rbft.isPrimary(rbft.peerPool.ID) && rbft.isNormal() && !rbft.atomicIn(InConfChange) {
+	if rbft.isPrimary(rbft.peerMgr.selfID) && rbft.isNormal() && !rbft.atomicIn(InConfChange) {
 		// enter config change status once we generate a config batch.
-		if rbft.batchMgr.requestPool.IsConfigBatch(batch.BatchHash) {
-			rbft.logger.Noticef("Primary %d has generated a config batch, start config change", rbft.peerPool.ID)
+		if isConfigBatch(batch.SeqNo, rbft.chainConfig.EpochInfo) {
+			rbft.logger.Noticef("Primary %d has generated a config batch, start config change", rbft.peerMgr.selfID)
 			rbft.atomicOn(InConfChange)
 			rbft.metrics.statusGaugeInConfChange.Set(InConfChange)
 		}
 		rbft.restartBatchTimer()
+		if !rbft.batchMgr.requestPool.HasPendingRequestInPool() {
+			rbft.restartNoTxBatchTimer()
+		}
 		rbft.timerMgr.stopTimer(nullRequestTimer)
 		if len(rbft.batchMgr.cacheBatch) > 0 {
 			rbft.batchMgr.cacheBatch = append(rbft.batchMgr.cacheBatch, batch)
@@ -1045,7 +949,7 @@ func (rbft *rbftImpl[T, Constraint]) recvRequestBatch(reqBatch *mempool.RequestH
 		}
 		rbft.maybeSendPrePrepare(batch, false)
 	} else {
-		rbft.logger.Debugf("Replica %d not try to send prePrepare for request batch %s", rbft.peerPool.ID, reqBatch.BatchHash)
+		rbft.logger.Debugf("Replica %d not try to send prePrepare for request batch %s", rbft.peerMgr.selfID, reqBatch.BatchHash)
 		_ = rbft.batchMgr.requestPool.RestoreOneBatch(reqBatch.BatchHash)
 	}
 
@@ -1056,10 +960,9 @@ func (rbft *rbftImpl[T, Constraint]) recvRequestBatch(reqBatch *mempool.RequestH
 // normal case: pre-prepare, prepare, commit methods
 // =============================================================================
 // sendPrePrepare send prePrepare message.
-func (rbft *rbftImpl[T, Constraint]) sendPrePrepare(seqNo uint64, digest string, reqBatch *consensus.RequestBatch) {
-
+func (rbft *rbftImpl[T, Constraint]) sendPrePrepare(seqNo uint64, digest string, reqBatch *RequestBatch[T, Constraint]) {
 	rbft.logger.Debugf("Primary %d sending prePrepare for view=%d/seqNo=%d/digest=%s, "+
-		"batch size: %d, timestamp: %d", rbft.peerPool.ID, rbft.view, seqNo, digest, len(reqBatch.RequestHashList), reqBatch.Timestamp)
+		"batch size: %d, timestamp: %d", rbft.peerMgr.selfID, rbft.chainConfig.View, seqNo, digest, len(reqBatch.RequestHashList), reqBatch.Timestamp)
 
 	ctx, span := rbft.tracer.Start(context.Background(), "sendPrePrepare")
 	span.SetAttributes(attribute.Int64("seqNo", int64(seqNo)), attribute.String("digest", digest))
@@ -1071,15 +974,15 @@ func (rbft *rbftImpl[T, Constraint]) sendPrePrepare(seqNo uint64, digest string,
 	}
 
 	preprepare := &consensus.PrePrepare{
-		View:           rbft.view,
+		View:           rbft.chainConfig.View,
 		SequenceNumber: seqNo,
 		BatchDigest:    digest,
 		HashBatch:      hashBatch,
-		ReplicaId:      rbft.peerPool.ID,
+		ReplicaId:      rbft.peerMgr.selfID,
 	}
 
-	cert := rbft.storeMgr.getCert(rbft.view, seqNo, digest)
-	cert.isConfig = rbft.batchMgr.requestPool.IsConfigBatch(reqBatch.BatchHash)
+	cert := rbft.storeMgr.getCert(rbft.chainConfig.View, seqNo, digest)
+	cert.isConfig = isConfigBatch(reqBatch.SeqNo, rbft.chainConfig.EpochInfo)
 	cert.prePrepare = preprepare
 	cert.prePrepareCtx = ctx
 	rbft.persistQSet(preprepare)
@@ -1100,7 +1003,7 @@ func (rbft *rbftImpl[T, Constraint]) sendPrePrepare(seqNo uint64, digest string,
 		Type:    consensus.Type_PRE_PREPARE,
 		Payload: payload,
 	}
-	rbft.peerPool.broadcast(ctx, consensusMsg)
+	rbft.peerMgr.broadcast(ctx, consensusMsg)
 
 	// set primary's seqNo to current batch seqNo
 	rbft.batchMgr.setSeqNo(seqNo)
@@ -1111,12 +1014,11 @@ func (rbft *rbftImpl[T, Constraint]) sendPrePrepare(seqNo uint64, digest string,
 
 // recvPrePrepare process logic for PrePrepare msg.
 func (rbft *rbftImpl[T, Constraint]) recvPrePrepare(ctx context.Context, preprep *consensus.PrePrepare) error {
-
 	ctx, span := rbft.tracer.Start(ctx, "recvPrePrepare")
 	defer span.End()
 
 	rbft.logger.Debugf("Replica %d received prePrepare from replica %d for view=%d/seqNo=%d, digest=%s ",
-		rbft.peerPool.ID, preprep.ReplicaId, preprep.View, preprep.SequenceNumber, preprep.BatchDigest)
+		rbft.peerMgr.selfID, preprep.ReplicaId, preprep.View, preprep.SequenceNumber, preprep.BatchDigest)
 
 	if !rbft.isPrePrepareLegal(preprep) {
 		return nil
@@ -1126,35 +1028,35 @@ func (rbft *rbftImpl[T, Constraint]) recvPrePrepare(ctx context.Context, preprep
 	if ok {
 		if digest != preprep.BatchDigest {
 			rbft.logger.Warningf("Replica %d found same view/seqNo but different digest, received: %s, stored: %s",
-				rbft.peerPool.ID, preprep.BatchDigest, digest)
+				rbft.peerMgr.selfID, preprep.BatchDigest, digest)
 			rbft.sendViewChange()
 			return nil
 		}
 	}
 
 	if rbft.beyondRange(preprep.SequenceNumber) {
-		rbft.logger.Debugf("Replica %d received a pre-prepare out of high-watermark", rbft.peerPool.ID)
+		rbft.logger.Debugf("Replica %d received a pre-prepare out of high-watermark", rbft.peerMgr.selfID)
 		rbft.softStartHighWatermarkTimer("replica received a pre-prepare out of range")
 	}
 
 	if preprep.BatchDigest == "" {
 		if len(preprep.HashBatch.RequestHashList) != 0 {
 			rbft.logger.Warningf("Replica %d received a prePrepare with an empty digest but batch is "+
-				"not empty", rbft.peerPool.ID)
+				"not empty", rbft.peerMgr.selfID)
 			rbft.sendViewChange()
 			return nil
 		}
 	} else {
 		if len(preprep.HashBatch.DeDuplicateRequestHashList) != 0 {
 			rbft.logger.Noticef("Replica %d finds %d duplicate txs with digest %s, detailed: %+v",
-				rbft.peerPool.ID, len(preprep.HashBatch.DeDuplicateRequestHashList), preprep.HashBatch.DeDuplicateRequestHashList)
+				rbft.peerMgr.selfID, len(preprep.HashBatch.DeDuplicateRequestHashList), preprep.HashBatch.DeDuplicateRequestHashList)
 		}
 		// check if the digest sent from primary is really the hash of txHashList, if not, don't
 		// send prepare for this prePrepare
 		batchDigest := calculateMD5Hash(preprep.HashBatch.RequestHashList, preprep.HashBatch.Timestamp)
 		if batchDigest != preprep.BatchDigest {
 			rbft.logger.Warningf("Replica %d received a prePrepare with a wrong batch digest, calculated: %s "+
-				"primary calculated: %s, send viewChange", rbft.peerPool.ID, batchDigest, preprep.BatchDigest)
+				"primary calculated: %s, send viewChange", rbft.peerMgr.selfID, batchDigest, preprep.BatchDigest)
 			rbft.sendViewChange()
 			return nil
 		}
@@ -1187,7 +1089,7 @@ func (rbft *rbftImpl[T, Constraint]) recvPrePrepare(ctx context.Context, preprep
 
 	rbft.persistQSet(preprep)
 
-	if !rbft.isPrimary(rbft.peerPool.ID) && !cert.sentPrepare {
+	if !rbft.isPrimary(rbft.peerMgr.selfID) && !cert.sentPrepare {
 		return rbft.findNextPrepareBatch(ctx, preprep.View, preprep.SequenceNumber, preprep.BatchDigest)
 	}
 
@@ -1202,12 +1104,12 @@ func (rbft *rbftImpl[T, Constraint]) sendPrepare(ctx context.Context, v uint64, 
 	cert := rbft.storeMgr.getCert(v, n, d)
 	cert.sentPrepare = true
 
-	rbft.logger.Debugf("Replica %d sending prepare for view=%d/seqNo=%d", rbft.peerPool.ID, v, n)
+	rbft.logger.Debugf("Replica %d sending prepare for view=%d/seqNo=%d", rbft.peerMgr.selfID, v, n)
 	prep := &consensus.Prepare{
 		View:           v,
 		SequenceNumber: n,
 		BatchDigest:    d,
-		ReplicaId:      rbft.peerPool.ID,
+		ReplicaId:      rbft.peerMgr.selfID,
 	}
 
 	payload, err := proto.Marshal(prep)
@@ -1219,7 +1121,7 @@ func (rbft *rbftImpl[T, Constraint]) sendPrepare(ctx context.Context, v uint64, 
 		Type:    consensus.Type_PREPARE,
 		Payload: payload,
 	}
-	rbft.peerPool.broadcast(ctx, consensusMsg)
+	rbft.peerMgr.broadcast(ctx, consensusMsg)
 
 	// send to itself
 	return rbft.recvPrepare(ctx, prep)
@@ -1231,7 +1133,7 @@ func (rbft *rbftImpl[T, Constraint]) recvPrepare(ctx context.Context, prep *cons
 	defer span.End()
 
 	rbft.logger.Debugf("Replica %d received prepare from replica %d for view=%d/seqNo=%d",
-		rbft.peerPool.ID, prep.ReplicaId, prep.View, prep.SequenceNumber)
+		rbft.peerMgr.selfID, prep.ReplicaId, prep.View, prep.SequenceNumber)
 
 	if !rbft.isPrepareLegal(prep) {
 		return nil
@@ -1243,12 +1145,12 @@ func (rbft *rbftImpl[T, Constraint]) recvPrepare(ctx context.Context, prep *cons
 	if ok {
 		if prep.SequenceNumber <= rbft.exec.lastExec {
 			rbft.logger.Debugf("Replica %d received duplicate prepare from replica %d, view=%d/seqNo=%d, self lastExec=%d",
-				rbft.peerPool.ID, prep.ReplicaId, prep.View, prep.SequenceNumber, rbft.exec.lastExec)
+				rbft.peerMgr.selfID, prep.ReplicaId, prep.View, prep.SequenceNumber, rbft.exec.lastExec)
 			return nil
 		}
 		// this is abnormal in consensus case
 		rbft.logger.Infof("Replica %d ignore duplicate prepare from replica %d, view=%d/seqNo=%d",
-			rbft.peerPool.ID, prep.ReplicaId, prep.View, prep.SequenceNumber)
+			rbft.peerMgr.selfID, prep.ReplicaId, prep.View, prep.SequenceNumber)
 		return nil
 	}
 
@@ -1261,13 +1163,13 @@ func (rbft *rbftImpl[T, Constraint]) recvPrepare(ctx context.Context, prep *cons
 // primary and replica would send commit.
 func (rbft *rbftImpl[T, Constraint]) maybeSendCommit(ctx context.Context, v uint64, n uint64, d string) error {
 	if rbft.in(SkipInProgress) {
-		rbft.logger.Debugf("Replica %d do not try to send commit because it's in stateUpdate", rbft.peerPool.ID)
+		rbft.logger.Debugf("Replica %d do not try to send commit because it's in stateUpdate", rbft.peerMgr.selfID)
 		return nil
 	}
 
 	cert := rbft.storeMgr.getCert(v, n, d)
 	if cert == nil {
-		rbft.logger.Errorf("Replica %d can't get the cert for the view=%d/seqNo=%d/digest=%s", rbft.peerPool.ID, v, n, d)
+		rbft.logger.Errorf("Replica %d can't get the cert for the view=%d/seqNo=%d/digest=%s", rbft.peerMgr.selfID, v, n, d)
 		return nil
 	}
 
@@ -1275,13 +1177,13 @@ func (rbft *rbftImpl[T, Constraint]) maybeSendCommit(ctx context.Context, v uint
 		return nil
 	}
 
-	if !rbft.isPrimary(rbft.peerPool.ID) && !cert.sentPrepare {
-		rbft.logger.Debugf("Replica %d cert hasn't sent prepare, cancel maybeSendCommit", rbft.peerPool.ID)
+	if !rbft.isPrimary(rbft.peerMgr.selfID) && !cert.sentPrepare {
+		rbft.logger.Debugf("Replica %d cert hasn't sent prepare, cancel maybeSendCommit", rbft.peerMgr.selfID)
 		return nil
 	}
 
 	if cert.sentCommit {
-		rbft.logger.Debugf("Replica %d cert is committed, cancel maybeSendCommit", rbft.peerPool.ID)
+		rbft.logger.Debugf("Replica %d cert is committed, cancel maybeSendCommit", rbft.peerMgr.selfID)
 		return nil
 	}
 
@@ -1301,12 +1203,12 @@ func (rbft *rbftImpl[T, Constraint]) sendCommit(ctx context.Context, v uint64, n
 	cert := rbft.storeMgr.getCert(v, n, d)
 	cert.sentCommit = true
 
-	rbft.logger.Debugf("Replica %d sending commit for view=%d/seqNo=%d", rbft.peerPool.ID, v, n)
+	rbft.logger.Debugf("Replica %d sending commit for view=%d/seqNo=%d", rbft.peerMgr.selfID, v, n)
 	commit := &consensus.Commit{
 		View:           v,
 		SequenceNumber: n,
 		BatchDigest:    d,
-		ReplicaId:      rbft.peerPool.ID,
+		ReplicaId:      rbft.peerMgr.selfID,
 	}
 
 	rbft.persistPSet(v, n, d)
@@ -1320,7 +1222,7 @@ func (rbft *rbftImpl[T, Constraint]) sendCommit(ctx context.Context, v uint64, n
 		Type:    consensus.Type_COMMIT,
 		Payload: payload,
 	}
-	rbft.peerPool.broadcast(ctx, consensusMsg)
+	rbft.peerMgr.broadcast(ctx, consensusMsg)
 	return rbft.recvCommit(ctx, commit)
 }
 
@@ -1330,7 +1232,7 @@ func (rbft *rbftImpl[T, Constraint]) recvCommit(ctx context.Context, commit *con
 	defer span.End()
 
 	rbft.logger.Debugf("Replica %d received commit from replica %d for view=%d/seqNo=%d",
-		rbft.peerPool.ID, commit.ReplicaId, commit.View, commit.SequenceNumber)
+		rbft.peerMgr.selfID, commit.ReplicaId, commit.View, commit.SequenceNumber)
 
 	if !rbft.isCommitLegal(commit) {
 		return nil
@@ -1344,14 +1246,14 @@ func (rbft *rbftImpl[T, Constraint]) recvCommit(ctx context.Context, commit *con
 		if commit.SequenceNumber <= rbft.exec.lastExec {
 			// ignore duplicate commit with seqNo <= lastExec as this commit is not useful forever.
 			rbft.logger.Debugf("Replica %d received duplicate commit from replica %d, view=%d/seqNo=%d "+
-				"but current lastExec is %d, ignore it...", rbft.peerPool.ID, commit.ReplicaId, commit.View, commit.SequenceNumber,
+				"but current lastExec is %d, ignore it...", rbft.peerMgr.selfID, commit.ReplicaId, commit.View, commit.SequenceNumber,
 				rbft.exec.lastExec)
 			return nil
 		}
 		// we can simply accept all commit messages whose seqNo is larger than our lastExec as we
 		// haven't executed this batch, we can ensure that we will only execute this batch once.
 		rbft.logger.Debugf("Replica %d accept duplicate commit from replica %d, view=%d/seqNo=%d "+
-			"current lastExec is %d", rbft.peerPool.ID, commit.ReplicaId, commit.View, commit.SequenceNumber, rbft.exec.lastExec)
+			"current lastExec is %d", rbft.peerMgr.selfID, commit.ReplicaId, commit.View, commit.SequenceNumber, rbft.exec.lastExec)
 	}
 
 	cert.commit[*commit] = true
@@ -1370,12 +1272,12 @@ func (rbft *rbftImpl[T, Constraint]) recvCommit(ctx context.Context, commit *con
 			// reset last new view timeout after commit one block successfully.
 			rbft.vcMgr.lastNewViewTimeout = rbft.timerMgr.getTimeoutValue(newViewTimer)
 			if commit.SequenceNumber == rbft.vcMgr.viewChangeSeqNo {
-				rbft.logger.Warningf("Replica %d cycling view for seqNo=%d", rbft.peerPool.ID, commit.SequenceNumber)
+				rbft.logger.Warningf("Replica %d cycling view for seqNo=%d", rbft.peerMgr.selfID, commit.SequenceNumber)
 				rbft.sendViewChange()
 			}
 		} else {
 			rbft.logger.Debugf("Replica %d committed for seqNo: %d, but sentExecute: %v",
-				rbft.peerPool.ID, commit.SequenceNumber, cert.sentExecute)
+				rbft.peerMgr.selfID, commit.SequenceNumber, cert.sentExecute)
 		}
 	}
 	return nil
@@ -1389,7 +1291,7 @@ func (rbft *rbftImpl[T, Constraint]) fetchMissingTxs(ctx context.Context, prePre
 	}
 
 	rbft.logger.Debugf("Replica %d try to fetch missing txs for view=%d/seqNo=%d/digest=%s from primary %d",
-		rbft.peerPool.ID, prePrep.View, prePrep.SequenceNumber, prePrep.BatchDigest, prePrep.ReplicaId)
+		rbft.peerMgr.selfID, prePrep.View, prePrep.SequenceNumber, prePrep.BatchDigest, prePrep.ReplicaId)
 
 	ctx, span := rbft.tracer.Start(ctx, "fetchMissingTxs")
 	defer span.End()
@@ -1399,7 +1301,7 @@ func (rbft *rbftImpl[T, Constraint]) fetchMissingTxs(ctx context.Context, prePre
 		SequenceNumber:       prePrep.SequenceNumber,
 		BatchDigest:          prePrep.BatchDigest,
 		MissingRequestHashes: missingTxHashes,
-		ReplicaId:            rbft.peerPool.ID,
+		ReplicaId:            rbft.peerMgr.selfID,
 	}
 
 	payload, err := proto.Marshal(fetch)
@@ -1417,14 +1319,13 @@ func (rbft *rbftImpl[T, Constraint]) fetchMissingTxs(ctx context.Context, prePre
 		n: prePrep.SequenceNumber,
 		d: prePrep.BatchDigest,
 	}
-	rbft.peerPool.unicast(ctx, consensusMsg, prePrep.ReplicaId)
-	return
+	rbft.peerMgr.unicast(ctx, consensusMsg, prePrep.ReplicaId)
 }
 
 // recvFetchMissingRequest returns txs to a node which didn't receive some txs and ask primary for them.
 func (rbft *rbftImpl[T, Constraint]) recvFetchMissingRequest(ctx context.Context, fetch *consensus.FetchMissingRequest) error {
 	rbft.logger.Debugf("Primary %d received fetchMissing request for view=%d/seqNo=%d/digest=%s "+
-		"from replica %d", rbft.peerPool.ID, fetch.View, fetch.SequenceNumber, fetch.BatchDigest, fetch.ReplicaId)
+		"from replica %d", rbft.peerMgr.selfID, fetch.View, fetch.SequenceNumber, fetch.BatchDigest, fetch.ReplicaId)
 
 	ctx, span := rbft.tracer.Start(ctx, "recvFetchMissingRequest")
 	defer span.End()
@@ -1437,21 +1338,29 @@ func (rbft *rbftImpl[T, Constraint]) recvFetchMissingRequest(ctx context.Context
 		for i, hash := range fetch.MissingRequestHashes {
 			if i >= batchLen || batch.RequestHashList[i] != hash {
 				rbft.logger.Errorf("Primary %d finds mismatch requests hash when return "+
-					"fetch missing requests", rbft.peerPool.ID)
+					"fetch missing requests", rbft.peerMgr.selfID)
 				return nil
 			}
-			requests[i] = batch.RequestList[i]
+			requests[i], err = Constraint(batch.RequestList[i]).RbftMarshal()
+			if err != nil {
+				rbft.logger.Errorf("Tx marshal Error: %s", err)
+				return nil
+			}
 		}
 	} else {
-		var missingTxs map[uint64][]byte
+		var missingTxs map[uint64]*T
 		missingTxs, err = rbft.batchMgr.requestPool.SendMissingRequests(fetch.BatchDigest, fetch.MissingRequestHashes)
 		if err != nil {
 			rbft.logger.Warningf("Primary %d cannot find the digest %s, missing tx hashes: %+v, err: %s",
-				rbft.peerPool.ID, fetch.BatchDigest, fetch.MissingRequestHashes, err)
+				rbft.peerMgr.selfID, fetch.BatchDigest, fetch.MissingRequestHashes, err)
 			return nil
 		}
 		for i, tx := range missingTxs {
-			requests[i] = tx
+			requests[i], err = Constraint(tx).RbftMarshal()
+			if err != nil {
+				rbft.logger.Errorf("Tx marshal Error: %s", err)
+				return nil
+			}
 		}
 	}
 
@@ -1461,7 +1370,7 @@ func (rbft *rbftImpl[T, Constraint]) recvFetchMissingRequest(ctx context.Context
 		BatchDigest:          fetch.BatchDigest,
 		MissingRequestHashes: fetch.MissingRequestHashes,
 		MissingRequests:      requests,
-		ReplicaId:            rbft.peerPool.ID,
+		ReplicaId:            rbft.peerMgr.selfID,
 	}
 
 	payload, err := proto.Marshal(re)
@@ -1474,7 +1383,7 @@ func (rbft *rbftImpl[T, Constraint]) recvFetchMissingRequest(ctx context.Context
 		Payload: payload,
 	}
 	rbft.metrics.returnFetchMissingTxsCounter.With("node", strconv.Itoa(int(fetch.ReplicaId))).Add(float64(1))
-	rbft.peerPool.unicast(ctx, consensusMsg, fetch.ReplicaId)
+	rbft.peerMgr.unicast(ctx, consensusMsg, fetch.ReplicaId)
 
 	return nil
 }
@@ -1482,60 +1391,69 @@ func (rbft *rbftImpl[T, Constraint]) recvFetchMissingRequest(ctx context.Context
 // recvFetchMissingResponse processes SendMissingTxs from primary.
 // Add these transaction txs to requestPool and see if it has correct transaction txs.
 func (rbft *rbftImpl[T, Constraint]) recvFetchMissingResponse(ctx context.Context, re *consensus.FetchMissingResponse) consensusEvent {
-
 	ctx, span := rbft.tracer.Start(ctx, "recvFetchMissingResponse")
 	defer span.End()
 
 	if _, ok := rbft.storeMgr.missingBatchesInFetching[re.BatchDigest]; !ok {
 		rbft.logger.Debugf("Replica %d ignore fetchMissingResponse with batch hash %s",
-			rbft.peerPool.ID, re.BatchDigest)
+			rbft.peerMgr.selfID, re.BatchDigest)
 		return nil
 	}
 
 	rbft.logger.Debugf("Replica %d received fetchMissingResponse for view=%d/seqNo=%d/digest=%s from replica %d",
-		rbft.peerPool.ID, re.View, re.SequenceNumber, re.BatchDigest, re.ReplicaId)
+		rbft.peerMgr.selfID, re.View, re.SequenceNumber, re.BatchDigest, re.ReplicaId)
 
 	if re.SequenceNumber < rbft.exec.lastExec {
 		rbft.logger.Debugf("Replica %d ignore fetchMissingResponse with lower seqNo %d than "+
-			"lastExec %d", rbft.peerPool.ID, re.SequenceNumber, rbft.exec.lastExec)
+			"lastExec %d", rbft.peerMgr.selfID, re.SequenceNumber, rbft.exec.lastExec)
 		return nil
 	}
 
 	if len(re.MissingRequests) != len(re.MissingRequestHashes) {
-		rbft.logger.Warningf("Replica %d received mismatch length fetchMissingResponse %v", rbft.peerPool.ID, re)
+		rbft.logger.Warningf("Replica %d received mismatch length fetchMissingResponse %v", rbft.peerMgr.selfID, re)
 		return nil
 	}
 
 	if !rbft.inV(re.View) {
 		rbft.logger.Debugf("Replica %d received fetchMissingResponse which has a different view=%d, "+
-			"expected view=%d, ignore it", rbft.peerPool.ID, re.View, rbft.view)
+			"expected view=%d, ignore it", rbft.peerMgr.selfID, re.View, rbft.chainConfig.View)
 		return nil
 	}
 
 	if !rbft.isPrimary(re.ReplicaId) {
 		rbft.logger.Warningf("Replica %d received fetchMissingResponse from replica %d which is not "+
-			"primary, ignore it", rbft.peerPool.ID, re.ReplicaId)
+			"primary, ignore it", rbft.peerMgr.selfID, re.ReplicaId)
 		return nil
 	}
 
 	cert := rbft.storeMgr.getCert(re.View, re.SequenceNumber, re.BatchDigest)
 	if cert.sentCommit {
 		rbft.logger.Debugf("Replica %d received fetchMissingResponse which has been committed with "+
-			"cert view=%d/seqNo=%d/digest=%s, ignore it", rbft.peerPool.ID, re.View, re.SequenceNumber, re.BatchDigest)
+			"cert view=%d/seqNo=%d/digest=%s, ignore it", rbft.peerMgr.selfID, re.View, re.SequenceNumber, re.BatchDigest)
 		return nil
 	}
 	if cert.prePrepare == nil {
 		rbft.logger.Warningf("Replica %d had not received a prePrepare before for view=%d/seqNo=%d",
-			rbft.peerPool.ID, re.View, re.SequenceNumber)
+			rbft.peerMgr.selfID, re.View, re.SequenceNumber)
 		return nil
 	}
 
-	err := rbft.batchMgr.requestPool.ReceiveMissingRequests(re.BatchDigest, re.MissingRequests)
+	requests := make(map[uint64]*T)
+	for i, reqRaw := range re.MissingRequests {
+		var req T
+		if err := Constraint(&req).RbftUnmarshal(reqRaw); err != nil {
+			rbft.logger.Errorf("Tx unmarshal Error: %s", err)
+			return nil
+		}
+		requests[i] = &req
+	}
+
+	err := rbft.batchMgr.requestPool.ReceiveMissingRequests(re.BatchDigest, requests)
 	if err != nil {
 		// there is something wrong with primary for it propose a transaction with mismatched hash,
 		// so that we should send view-change directly to expect a new leader.
 		rbft.logger.Warningf("Replica %d find something wrong with fetchMissingResponse, error: %v",
-			rbft.peerPool.ID, err)
+			rbft.peerMgr.selfID, err)
 		return rbft.sendViewChange()
 	}
 
@@ -1548,13 +1466,13 @@ func (rbft *rbftImpl[T, Constraint]) recvFetchMissingResponse(ctx context.Contex
 	return nil
 }
 
-//=============================================================================
+// =============================================================================
 // execute transactions
-//=============================================================================
+// =============================================================================
 
 // commitPendingBlocks commit all available transactions by order
 func (rbft *rbftImpl[T, Constraint]) commitPendingBlocks() {
-	rbft.logger.Debugf("Replica %d attempting to commitTransactions", rbft.peerPool.ID)
+	rbft.logger.Debugf("Replica %d attempting to commitTransactions", rbft.peerMgr.selfID)
 
 	for hasTxToExec := true; hasTxToExec; {
 		if find, idx, cert := rbft.findNextCommitBatch(); find {
@@ -1562,25 +1480,36 @@ func (rbft *rbftImpl[T, Constraint]) commitPendingBlocks() {
 			rbft.persistCSet(idx.v, idx.n, idx.d)
 			// stop new view timer after one batch has been call executed
 			rbft.stopNewViewTimer()
-			if ok := rbft.isPrimary(rbft.peerPool.ID); ok {
+			if ok := rbft.isPrimary(rbft.peerMgr.selfID); ok {
 				rbft.softRestartBatchTimer()
 			}
 
+			var proposerAccount string
+			if cert != nil && cert.prePrepare != nil {
+				proposer := rbft.peerMgr.nodes[cert.prePrepare.ReplicaId]
+				if proposer != nil {
+					proposerAccount = proposer.AccountAddress
+				} else {
+					rbft.logger.Warningf("Replica %d did not find the proposer in the epoch", rbft.peerMgr.selfID)
+				}
+			}
+
 			if idx.d == "" {
-				txList := make([][]byte, 0)
+				txList := make([]*T, 0)
 				localList := make([]bool, 0)
 				rbft.metrics.committedEmptyBlockNumber.Add(float64(1))
 				rbft.metrics.txsPerBlock.Observe(float64(0))
 				rbft.logger.Noticef("======== Replica %d Call execute a no-nop, epoch=%d/view=%d/seqNo=%d",
-					rbft.peerPool.ID, rbft.epoch, idx.v, idx.n)
-				rbft.external.Execute(txList, localList, idx.n, 0)
+					rbft.peerMgr.selfID, rbft.chainConfig.EpochInfo.Epoch, idx.v, idx.n)
+
+				rbft.external.Execute(txList, localList, idx.n, 0, proposerAccount)
 			} else {
 				// find batch in batchStore rather than outstandingBatch as after viewChange
 				// we may clear outstandingBatch and save all batches in batchStore.
 				// kick out de-duplicate txs if needed.
 				if cert.isConfig {
 					rbft.logger.Debugf("Replica %d found a config batch, set config batch number to %d",
-						rbft.peerPool.ID, idx.n)
+						rbft.peerMgr.selfID, idx.n)
 					rbft.setConfigBatchToExecute(idx.n)
 					rbft.metrics.committedConfigBlockNumber.Add(float64(1))
 				}
@@ -1590,8 +1519,8 @@ func (rbft *rbftImpl[T, Constraint]) commitPendingBlocks() {
 				batchToCommit := time.Duration(time.Now().Unix() - cert.prePrepare.HashBatch.Timestamp).Seconds()
 				rbft.metrics.batchToCommitDuration.Observe(batchToCommit)
 				rbft.logger.Noticef("======== Replica %d Call execute, epoch=%d/view=%d/seqNo=%d/txCount=%d/digest=%s",
-					rbft.peerPool.ID, rbft.epoch, idx.v, idx.n, len(txList), idx.d)
-				rbft.external.Execute(txList, localList, idx.n, cert.prePrepare.HashBatch.Timestamp)
+					rbft.peerMgr.selfID, rbft.chainConfig.EpochInfo.Epoch, idx.v, idx.n, len(txList), idx.d)
+				rbft.external.Execute(txList, localList, idx.n, cert.prePrepare.HashBatch.Timestamp, proposerAccount)
 			}
 			delete(rbft.storeMgr.outstandingReqBatches, idx.d)
 			rbft.metrics.outstandingBatchesGauge.Set(float64(len(rbft.storeMgr.outstandingReqBatches)))
@@ -1607,9 +1536,9 @@ func (rbft *rbftImpl[T, Constraint]) commitPendingBlocks() {
 }
 
 // filterExecutableTxs flatten txs into txs and kick out duplicate txs with hash included in deDuplicateTxHashes.
-func (rbft *rbftImpl[T, Constraint]) filterExecutableTxs(digest string, deDuplicateRequestHashes []string) ([][]byte, []bool) {
+func (rbft *rbftImpl[T, Constraint]) filterExecutableTxs(digest string, deDuplicateRequestHashes []string) ([]*T, []bool) {
 	var (
-		txList, executableTxs          [][]byte
+		txList, executableTxs          []*T
 		localList, executableLocalList []bool
 	)
 	txList = rbft.storeMgr.batchStore[digest].RequestList
@@ -1619,9 +1548,9 @@ func (rbft *rbftImpl[T, Constraint]) filterExecutableTxs(digest string, deDuplic
 		dupHashes[dupHash] = true
 	}
 	for i, request := range txList {
-		reqHash := requestHash[T, Constraint](request)
+		reqHash := Constraint(request).RbftGetTxHash()
 		if dupHashes[reqHash] {
-			rbft.logger.Noticef("Replica %d kick out de-duplicate request %s before execute batch %s", rbft.peerPool.ID, reqHash, digest)
+			rbft.logger.Noticef("Replica %d kick out de-duplicate request %s before execute batch %s", rbft.peerMgr.selfID, reqHash, digest)
 			continue
 		}
 		executableTxs = append(executableTxs, request)
@@ -1632,29 +1561,28 @@ func (rbft *rbftImpl[T, Constraint]) filterExecutableTxs(digest string, deDuplic
 
 // findNextCommitBatch find next msgID which is able to commit.
 func (rbft *rbftImpl[T, Constraint]) findNextCommitBatch() (find bool, idx msgID, cert *msgCert) {
-
 	for idx = range rbft.storeMgr.committedCert {
 		cert = rbft.storeMgr.certStore[idx]
 
 		if cert == nil || cert.prePrepare == nil {
-			rbft.logger.Debugf("Replica %d already checkpoint for view=%d/seqNo=%d", rbft.peerPool.ID, idx.v, idx.n)
+			rbft.logger.Debugf("Replica %d already checkpoint for view=%d/seqNo=%d", rbft.peerMgr.selfID, idx.v, idx.n)
 			continue
 		}
 
 		// check if already executed
 		if cert.sentExecute {
-			rbft.logger.Debugf("Replica %d already execute for view=%d/seqNo=%d", rbft.peerPool.ID, idx.v, idx.n)
+			rbft.logger.Debugf("Replica %d already execute for view=%d/seqNo=%d", rbft.peerMgr.selfID, idx.v, idx.n)
 			continue
 		}
 
 		if idx.n != rbft.exec.lastExec+1 {
-			rbft.logger.Debugf("Replica %d expects to execute seq=%d, but get seq=%d, ignore it", rbft.peerPool.ID, rbft.exec.lastExec+1, idx.n)
+			rbft.logger.Debugf("Replica %d expects to execute seq=%d, but get seq=%d, ignore it", rbft.peerMgr.selfID, rbft.exec.lastExec+1, idx.n)
 			continue
 		}
 
 		// skipInProgress == true, then this replica is in viewchange, not reply or execute
 		if rbft.in(SkipInProgress) {
-			rbft.logger.Warningf("Replica %d currently picking a starting point to resume, will not execute", rbft.peerPool.ID)
+			rbft.logger.Warningf("Replica %d currently picking a starting point to resume, will not execute", rbft.peerMgr.selfID)
 			continue
 		}
 
@@ -1666,7 +1594,7 @@ func (rbft *rbftImpl[T, Constraint]) findNextCommitBatch() (find bool, idx msgID
 		if idx.d != "" {
 			_, ok := rbft.storeMgr.batchStore[idx.d]
 			if !ok {
-				rbft.logger.Warningf("Replica %d cannot find corresponding batch %s in batchStore", rbft.peerPool.ID, idx.d)
+				rbft.logger.Warningf("Replica %d cannot find corresponding batch %s in batchStore", rbft.peerMgr.selfID, idx.d)
 				continue
 			}
 		}
@@ -1681,7 +1609,7 @@ func (rbft *rbftImpl[T, Constraint]) findNextCommitBatch() (find bool, idx msgID
 // afterCommitBlock processes logic after commit block, update lastExec,
 // and generate checkpoint when lastExec % K == 0
 func (rbft *rbftImpl[T, Constraint]) afterCommitBlock(idx msgID, isConfig bool) {
-	rbft.logger.Debugf("Replica %d finished execution %d, trying next", rbft.peerPool.ID, idx.n)
+	rbft.logger.Debugf("Replica %d finished execution %d, trying next", rbft.peerMgr.selfID, idx.n)
 	rbft.exec.setLastExec(idx.n)
 	delete(rbft.storeMgr.committedCert, idx)
 
@@ -1702,13 +1630,12 @@ func (rbft *rbftImpl[T, Constraint]) afterCommitBlock(idx msgID, isConfig bool) 
 		if state.MetaState.Height == rbft.exec.lastExec {
 			rbft.logger.Debugf("Call the checkpoint for config batch, seqNo=%d", rbft.exec.lastExec)
 			rbft.epochMgr.configBatchToCheck = state.MetaState
-			rbft.checkpoint(state, isConfig)
+			rbft.checkpoint(state, true)
 		} else {
 			// reqBatch call execute but have not done with execute
 			rbft.logger.Errorf("Fail to call the checkpoint, seqNo=%d", rbft.exec.lastExec)
 		}
-
-	} else if rbft.exec.lastExec%rbft.K == 0 {
+	} else if rbft.exec.lastExec%rbft.chainConfig.EpochInfo.ConsensusParams.CheckpointPeriod == 0 {
 		state, ok := <-rbft.cpChan
 		if !ok {
 			rbft.logger.Info("checkpoint channel closed")
@@ -1717,7 +1644,7 @@ func (rbft *rbftImpl[T, Constraint]) afterCommitBlock(idx msgID, isConfig bool) 
 
 		if state.MetaState.Height == rbft.exec.lastExec {
 			rbft.logger.Debugf("Call the checkpoint for normal, seqNo=%d", rbft.exec.lastExec)
-			rbft.checkpoint(state, isConfig)
+			rbft.checkpoint(state, false)
 		} else {
 			// reqBatch call execute but have not done with execute
 			rbft.logger.Errorf("Fail to call the checkpoint, seqNo=%d", rbft.exec.lastExec)
@@ -1725,22 +1652,21 @@ func (rbft *rbftImpl[T, Constraint]) afterCommitBlock(idx msgID, isConfig bool) 
 	}
 }
 
-//=============================================================================
+// =============================================================================
 // gc: checkpoint issues
-//=============================================================================
+// =============================================================================
 
 // checkpoint generate a checkpoint and broadcast it to outer.
 func (rbft *rbftImpl[T, Constraint]) checkpoint(state *types.ServiceState, isConfig bool) {
-
 	digest := state.MetaState.Digest
 	seqNo := state.MetaState.Height
 
 	rbft.logger.Infof("Replica %d sending checkpoint for view=%d/seqNo=%d and digest=%s",
-		rbft.peerPool.ID, rbft.view, seqNo, digest)
+		rbft.peerMgr.selfID, rbft.chainConfig.View, seqNo, digest)
 
 	signedCheckpoint, err := rbft.generateSignedCheckpoint(state, isConfig)
 	if err != nil {
-		rbft.logger.Errorf("Replica %d generate signed checkpoint error: %s", rbft.peerPool.ID, err)
+		rbft.logger.Errorf("Replica %d generate signed checkpoint error: %s", rbft.peerMgr.selfID, err)
 		rbft.stopNamespace()
 		return
 	}
@@ -1754,9 +1680,9 @@ func (rbft *rbftImpl[T, Constraint]) checkpoint(state *types.ServiceState, isCon
 	} else {
 		// if our lastExec is equal to high watermark, it means there is something wrong with checkpoint procedure, so that
 		// we need to start a high-watermark timer for checkpoint, and trigger view-change when high-watermark timer expired
-		if rbft.exec.lastExec == rbft.h+rbft.L {
+		if rbft.exec.lastExec == rbft.chainConfig.H+rbft.chainConfig.L {
 			rbft.logger.Warningf("Replica %d try to send checkpoint equal to high watermark, "+
-				"there may be something wrong with checkpoint", rbft.peerPool.ID)
+				"there may be something wrong with checkpoint", rbft.peerMgr.selfID)
 			rbft.softStartHighWatermarkTimer("replica send checkpoint equal to high-watermark")
 		}
 	}
@@ -1770,9 +1696,9 @@ func (rbft *rbftImpl[T, Constraint]) checkpoint(state *types.ServiceState, isCon
 		Type:    consensus.Type_SIGNED_CHECKPOINT,
 		Payload: payload,
 	}
-	rbft.peerPool.broadcast(context.TODO(), consensusMsg)
+	rbft.peerMgr.broadcast(context.TODO(), consensusMsg)
 	rbft.logger.Trace(consensus.TagNameCheckpoint, consensus.TagStageStart, consensus.TagContentCheckpoint{
-		Node:   rbft.peerPool.hostname,
+		Node:   rbft.peerMgr.selfID,
 		Height: seqNo,
 		Config: isConfig,
 	})
@@ -1782,23 +1708,23 @@ func (rbft *rbftImpl[T, Constraint]) checkpoint(state *types.ServiceState, isCon
 
 // recvCheckpoint processes logic after receive checkpoint.
 func (rbft *rbftImpl[T, Constraint]) recvCheckpoint(signedCheckpoint *consensus.SignedCheckpoint, local bool) consensusEvent {
-	if signedCheckpoint.Checkpoint.Epoch < rbft.epoch {
+	if signedCheckpoint.Checkpoint.Epoch < rbft.chainConfig.EpochInfo.Epoch {
 		rbft.logger.Debugf("Replica %d received checkpoint from expired epoch %d, current epoch %d, ignore it.",
-			rbft.peerPool.ID, signedCheckpoint.Checkpoint.Epoch, rbft.epoch)
+			rbft.peerMgr.selfID, signedCheckpoint.Checkpoint.Epoch, rbft.chainConfig.EpochInfo.Epoch)
 		return nil
 	}
 
 	checkpointHeight := signedCheckpoint.Checkpoint.Height()
 	checkpointDigest := signedCheckpoint.Checkpoint.Digest()
-	rbft.logger.Debugf("Replica %d received checkpoint from replica %s, seqNo %d, digest %s",
-		rbft.peerPool.ID, signedCheckpoint.GetAuthor(), checkpointHeight, checkpointDigest)
+	rbft.logger.Debugf("Replica %d received checkpoint from replica %d, seqNo %d, digest %s",
+		rbft.peerMgr.selfID, signedCheckpoint.GetAuthor(), checkpointHeight, checkpointDigest)
 
 	// verify signature of remote checkpoint.
 	if !local {
 		vErr := rbft.verifySignedCheckpoint(signedCheckpoint)
 		if vErr != nil {
-			rbft.logger.Errorf("Replica %d verify signature of checkpoint from %s error: %s",
-				rbft.peerPool.ID, signedCheckpoint.GetAuthor(), vErr)
+			rbft.logger.Errorf("Replica %d verify signature of checkpoint from %d error: %s",
+				rbft.peerMgr.selfID, signedCheckpoint.GetAuthor(), vErr)
 			return nil
 		}
 	}
@@ -1806,31 +1732,31 @@ func (rbft *rbftImpl[T, Constraint]) recvCheckpoint(signedCheckpoint *consensus.
 	rbft.logger.Trace(consensus.TagNameCheckpoint, consensus.TagStageReceive, consensus.TagContentCheckpoint{
 		Node:   signedCheckpoint.GetAuthor(),
 		Height: signedCheckpoint.GetCheckpoint().Height(),
-		Config: signedCheckpoint.GetCheckpoint().Reconfiguration(),
+		Config: signedCheckpoint.GetCheckpoint().NeedUpdateEpoch,
 	})
 
 	if rbft.weakCheckpointSetOutOfRange(signedCheckpoint) {
 		if rbft.atomicIn(StateTransferring) {
-			rbft.logger.Debugf("Replica %d keep trying state transfer", rbft.peerPool.ID)
+			rbft.logger.Debugf("Replica %d keep trying state transfer", rbft.peerMgr.selfID)
 			return nil
 		}
 		// TODO(DH): do we need ?
 		rbft.initRecovery()
 		// try state transfer immediately when found lagging for the first time.
-		rbft.logger.Debugf("Replica %d try state transfer after found high target", rbft.peerPool.ID)
+		rbft.logger.Debugf("Replica %d try state transfer after found high target", rbft.peerMgr.selfID)
 		rbft.tryStateTransfer()
 		return nil
 	}
 
 	legal, matchingCheckpoints := rbft.compareCheckpointWithWeakSet(signedCheckpoint)
 	if !legal {
-		rbft.logger.Debugf("Replica %d ignore illegal checkpoint from replica %s, seqNo=%d",
-			rbft.peerPool.ID, signedCheckpoint.GetAuthor(), checkpointHeight)
+		rbft.logger.Debugf("Replica %d ignore illegal checkpoint from replica %d, seqNo=%d",
+			rbft.peerMgr.selfID, signedCheckpoint.GetAuthor(), checkpointHeight)
 		return nil
 	}
 
 	rbft.logger.Debugf("Replica %d found %d matching checkpoints for seqNo %d, digest %s",
-		rbft.peerPool.ID, len(matchingCheckpoints), checkpointHeight, checkpointDigest)
+		rbft.peerMgr.selfID, len(matchingCheckpoints), checkpointHeight, checkpointDigest)
 
 	if len(matchingCheckpoints) < rbft.commonCaseQuorum() {
 		// We do not have a quorum yet
@@ -1842,7 +1768,7 @@ func (rbft *rbftImpl[T, Constraint]) recvCheckpoint(signedCheckpoint *consensus.
 	_, ok := rbft.storeMgr.localCheckpoints[checkpointHeight]
 	if !ok {
 		rbft.logger.Debugf("Replica %d found checkpoint quorum for seqNo %d, digest %s, but it has not "+
-			"reached this checkpoint itself yet", rbft.peerPool.ID, checkpointHeight, checkpointDigest)
+			"reached this checkpoint itself yet", rbft.peerMgr.selfID, checkpointHeight, checkpointDigest)
 
 		// update transferring target for state update, in order to trigger another state-update instance at the
 		// moment the previous one has finished.
@@ -1852,7 +1778,7 @@ func (rbft *rbftImpl[T, Constraint]) recvCheckpoint(signedCheckpoint *consensus.
 	}
 
 	// the checkpoint is trigger by config batch
-	if signedCheckpoint.Checkpoint.Reconfiguration() {
+	if signedCheckpoint.Checkpoint.NeedUpdateEpoch {
 		return rbft.finishConfigCheckpoint(checkpointHeight, checkpointDigest, matchingCheckpoints)
 	}
 
@@ -1863,7 +1789,7 @@ func (rbft *rbftImpl[T, Constraint]) finishConfigCheckpoint(checkpointHeight uin
 	matchingCheckpoints []*consensus.SignedCheckpoint) consensusEvent {
 	// only process config checkpoint in ConfChange status.
 	if !rbft.atomicIn(InConfChange) {
-		rbft.logger.Warningf("Replica %d isn't in config-change when finishConfigCheckpoint", rbft.peerPool.ID)
+		rbft.logger.Warningf("Replica %d isn't in config-change when finishConfigCheckpoint", rbft.peerMgr.selfID)
 		return nil
 	}
 
@@ -1871,14 +1797,10 @@ func (rbft *rbftImpl[T, Constraint]) finishConfigCheckpoint(checkpointHeight uin
 	rbft.stopFetchCheckpointTimer()
 
 	rbft.logger.Infof("Replica %d found config checkpoint quorum for seqNo %d, digest %s",
-		rbft.peerPool.ID, checkpointHeight, checkpointDigest)
+		rbft.peerMgr.selfID, checkpointHeight, checkpointDigest)
 
 	// sync config checkpoint with ledger.
-	success := rbft.syncConfigCheckpoint(checkpointHeight, matchingCheckpoints)
-	if !success {
-		rbft.logger.Warningf("Replica %d failed to sync config checkpoint", rbft.peerPool.ID)
-		return nil
-	}
+	rbft.syncConfigCheckpoint(checkpointHeight, matchingCheckpoints)
 
 	// sync epoch with ledger.
 	rbft.syncEpoch()
@@ -1890,15 +1812,15 @@ func (rbft *rbftImpl[T, Constraint]) finishConfigCheckpoint(checkpointHeight uin
 	rbft.maybeSetNormal()
 	finishMsg := fmt.Sprintf("======== Replica %d finished config change, "+
 		"primary=%d, epoch=%d/n=%d/f=%d/view=%d/h=%d/lastExec=%d",
-		rbft.peerPool.ID, rbft.primaryID(rbft.view), rbft.epoch, rbft.N, rbft.f, rbft.view, rbft.h, rbft.exec.lastExec)
+		rbft.peerMgr.selfID, rbft.chainConfig.PrimaryID, rbft.chainConfig.EpochInfo.Epoch, rbft.chainConfig.N, rbft.chainConfig.F, rbft.chainConfig.View, rbft.chainConfig.H, rbft.exec.lastExec)
 	rbft.external.SendFilterEvent(types.InformTypeFilterFinishConfigChange, finishMsg)
 	rbft.logger.Trace(consensus.TagNameCheckpoint, consensus.TagStageFinish, consensus.TagContentCheckpoint{
-		Node:   rbft.peerPool.hostname,
+		Node:   rbft.peerMgr.selfID,
 		Height: checkpointHeight,
 		Config: true,
 	})
 
-	rbft.logger.Debugf("Replica %d sending view change again because of epoch change", rbft.peerPool.ID)
+	rbft.logger.Debugf("Replica %d sending view change again because of epoch change", rbft.peerMgr.selfID)
 	return rbft.initRecovery()
 }
 
@@ -1908,21 +1830,45 @@ func (rbft *rbftImpl[T, Constraint]) finishNormalCheckpoint(checkpointHeight uin
 	rbft.stopHighWatermarkTimer()
 
 	rbft.logger.Infof("Replica %d found normal checkpoint quorum for seqNo %d, digest %s",
-		rbft.peerPool.ID, checkpointHeight, checkpointDigest)
+		rbft.peerMgr.selfID, checkpointHeight, checkpointDigest)
 
 	rbft.moveWatermarks(checkpointHeight, false)
-	rbft.logger.Infof("Replica %d post stable checkpoint event for seqNo %d after "+
-		"executed to the height with the same digest", rbft.peerPool.ID, rbft.h)
+
+	if rbft.chainConfig.EpochInfo.ConsensusParams.ProposerElectionType == ProposerElectionTypeWRF {
+		// update view after checkpoint
+		rbft.setView(rbft.chainConfig.View + uint64(1))
+
+		// persist new view
+		nv := &consensus.NewView{
+			View:      rbft.chainConfig.View,
+			ReplicaId: rbft.peerMgr.selfID,
+		}
+		sig, sErr := rbft.signNewView(nv)
+		if sErr != nil {
+			rbft.logger.Warningf("Replica %d sign new view failed: %s", rbft.peerMgr.selfID, sErr)
+			return nil
+		}
+		nv.Signature = sig
+		rbft.persistNewView(nv)
+	}
+
+	// rbft.batchMgr.setSeqNo(rbft.exec.lastExec)
+	rbft.logger.Infof("Replica %d post stable checkpoint event for seqNo %d after executed to the height with the same digest, update to new view: %d, new primary ID: %d", rbft.peerMgr.selfID, rbft.chainConfig.H, rbft.chainConfig.View, rbft.chainConfig.PrimaryID)
+	rbft.nullReqTimerReset()
+	rbft.restartBatchTimer()
+	if !rbft.batchMgr.requestPool.HasPendingRequestInPool() {
+		rbft.restartNoTxBatchTimer()
+	}
 	rbft.external.SendFilterEvent(types.InformTypeFilterStableCheckpoint, matchingCheckpoints)
 	rbft.logger.Trace(consensus.TagNameCheckpoint, consensus.TagStageFinish, consensus.TagContentCheckpoint{
-		Node:   rbft.peerPool.hostname,
+		Node:   rbft.peerMgr.selfID,
 		Height: checkpointHeight,
 		Config: false,
 	})
 
 	// make sure node is in normal status before try to batch, as we may reach stable
 	// checkpoint in vc.
-	if rbft.isNormal() && rbft.isPrimary(rbft.peerPool.ID) {
+	if rbft.isNormal() && rbft.isPrimary(rbft.peerMgr.selfID) {
 		// for primary, we can try to resubmit transactions after stable checkpoint as we
 		// may block pre-prepare before because of high watermark limit.
 		rbft.primaryResubmitTransactions()
@@ -1935,7 +1881,7 @@ func (rbft *rbftImpl[T, Constraint]) finishNormalCheckpoint(checkpointHeight uin
 // will trigger recovery, but if we have already executed blocks larger than these checkpoints,
 // we would like to start high-watermark timer in order to get the latest stable checkpoint.
 func (rbft *rbftImpl[T, Constraint]) weakCheckpointSetOutOfRange(signedCheckpoint *consensus.SignedCheckpoint) bool {
-	H := rbft.h + rbft.L
+	H := rbft.chainConfig.H + rbft.chainConfig.L
 	checkpointHeight := signedCheckpoint.Checkpoint.Height()
 
 	// Track the last observed checkpoint sequence number if it exceeds our high watermark,
@@ -1947,8 +1893,8 @@ func (rbft *rbftImpl[T, Constraint]) weakCheckpointSetOutOfRange(signedCheckpoin
 		// We do not track the highest one, as a byzantine node could pick an arbitrarily high sequence number
 		// and even if it recovered to be non-byzantine, we would still believe it to be far ahead
 		rbft.storeMgr.higherCheckpoints[signedCheckpoint.GetAuthor()] = signedCheckpoint
-		rbft.logger.Debugf("Replica %d received a checkpoint out of range from replica %s, seq %d",
-			rbft.peerPool.ID, signedCheckpoint.GetAuthor(), checkpointHeight)
+		rbft.logger.Debugf("Replica %d received a checkpoint out of range from replica %d, seq %d",
+			rbft.peerMgr.selfID, signedCheckpoint.GetAuthor(), checkpointHeight)
 
 		// If f+1 other replicas have reported checkpoints that were (at one time) outside our watermarks
 		// we need to check to see if we have fallen behind.
@@ -1984,12 +1930,12 @@ func (rbft *rbftImpl[T, Constraint]) weakCheckpointSetOutOfRange(signedCheckpoin
 				return false
 			}
 			rbft.logger.Debugf("Replica %d is out of date, f+1 nodes agree checkpoints "+
-				"out of our high water mark, %d vs %d", rbft.peerPool.ID, highestWeakCertMeta.Height, H)
+				"out of our high water mark, %d vs %d", rbft.peerMgr.selfID, highestWeakCertMeta.Height, H)
 
 			// we have executed to the target height, only need to start a high watermark timer.
 			if rbft.exec.lastExec >= highestWeakCertMeta.Height {
 				rbft.logger.Infof("Replica %d has already executed block %d larger than target's "+
-					"seqNo %d", rbft.peerPool.ID, rbft.exec.lastExec, highestWeakCertMeta.Height)
+					"seqNo %d", rbft.peerMgr.selfID, rbft.exec.lastExec, highestWeakCertMeta.Height)
 				rbft.softStartHighWatermarkTimer("replica received f+1 checkpoints out of range but " +
 					"we have already executed")
 				return false
@@ -2007,18 +1953,17 @@ func (rbft *rbftImpl[T, Constraint]) weakCheckpointSetOutOfRange(signedCheckpoin
 
 // moveWatermarks move low watermark h to n, and clear all message whose seqNo is smaller than h.
 func (rbft *rbftImpl[T, Constraint]) moveWatermarks(n uint64, newEpoch bool) {
-
 	h := n
 
-	if rbft.h > n {
-		rbft.logger.Criticalf("Replica %d moveWaterMarks but rbft.h(h=%d)>n(n=%d)", rbft.peerPool.ID, rbft.h, n)
+	if rbft.chainConfig.H > n {
+		rbft.logger.Criticalf("Replica %d moveWaterMarks but rbft.h(h=%d)>n(n=%d)", rbft.peerMgr.selfID, rbft.chainConfig.H, n)
 		return
 	}
 
 	for idx := range rbft.storeMgr.certStore {
 		if idx.n <= h {
 			rbft.logger.Debugf("Replica %d cleaning quorum certificate for view=%d/seqNo=%d",
-				rbft.peerPool.ID, idx.v, idx.n)
+				rbft.peerMgr.selfID, idx.v, idx.n)
 			delete(rbft.storeMgr.certStore, idx)
 			delete(rbft.storeMgr.outstandingReqBatches, idx.d)
 			delete(rbft.storeMgr.committedCert, idx)
@@ -2032,11 +1977,11 @@ func (rbft *rbftImpl[T, Constraint]) moveWatermarks(n uint64, newEpoch bool) {
 	// replicas may need to fetch those batches if they are lack of some txs
 	// in those batches.
 	var target uint64
-	pos := n / rbft.K * rbft.K
-	if pos <= rbft.K {
+	pos := n / rbft.chainConfig.EpochInfo.ConsensusParams.CheckpointPeriod * rbft.chainConfig.EpochInfo.ConsensusParams.CheckpointPeriod
+	if pos <= rbft.chainConfig.EpochInfo.ConsensusParams.CheckpointPeriod {
 		target = 0
 	} else {
-		target = pos - rbft.K
+		target = pos - rbft.chainConfig.EpochInfo.ConsensusParams.CheckpointPeriod
 	}
 
 	// clean batches every K interval
@@ -2057,8 +2002,8 @@ func (rbft *rbftImpl[T, Constraint]) moveWatermarks(n uint64, newEpoch bool) {
 
 	for cID, digest := range rbft.storeMgr.checkpointStore {
 		if cID.sequence <= h {
-			rbft.logger.Debugf("Replica %d cleaning checkpoint message from replica %s, seqNo %d, digest %s",
-				rbft.peerPool.ID, cID.author, cID.sequence, digest)
+			rbft.logger.Debugf("Replica %d cleaning checkpoint message from replica %d, seqNo %d, digest %s",
+				rbft.peerMgr.selfID, cID.author, cID.sequence, digest)
 			delete(rbft.storeMgr.checkpointStore, cID)
 		}
 	}
@@ -2066,14 +2011,19 @@ func (rbft *rbftImpl[T, Constraint]) moveWatermarks(n uint64, newEpoch bool) {
 	// save local checkpoint to help remote lagging nodes recover.
 	for seqNo, signedCheckpoint := range rbft.storeMgr.localCheckpoints {
 		if seqNo < h {
+			rbft.logger.Debugf("Replica %d remove localCheckpoints, seqNo: %d",
+				rbft.peerMgr.selfID, seqNo)
 			delete(rbft.storeMgr.localCheckpoints, seqNo)
 			rbft.persistDelCheckpoint(seqNo)
 		} else {
 			if newEpoch {
+				rbft.logger.Debugf("Replica %d resign checkpoint, seqNo: %d",
+					rbft.peerMgr.selfID, seqNo)
+
 				// NOTE! re-sign checkpoint in case cert has been replaced after turn into a higher epoch.
 				newSig, sErr := rbft.signCheckpoint(signedCheckpoint.Checkpoint)
 				if sErr != nil {
-					rbft.logger.Errorf("Replica %d sign checkpoint error: %s", rbft.peerPool.ID, sErr)
+					rbft.logger.Errorf("Replica %d sign checkpoint error: %s", rbft.peerMgr.selfID, sErr)
 					rbft.stopNamespace()
 					return
 				}
@@ -2081,6 +2031,8 @@ func (rbft *rbftImpl[T, Constraint]) moveWatermarks(n uint64, newEpoch bool) {
 			}
 		}
 	}
+	rbft.logger.Debugf("Replica %d finished clean checkpoint, remain number: %d",
+		rbft.peerMgr.selfID, len(rbft.storeMgr.localCheckpoints))
 
 	for idx := range rbft.vcMgr.qlist {
 		if idx.n <= h {
@@ -2101,31 +2053,31 @@ func (rbft *rbftImpl[T, Constraint]) moveWatermarks(n uint64, newEpoch bool) {
 	}
 
 	rbft.hLock.RLock()
-	rbft.h = h
+	rbft.chainConfig.H = h
 	rbft.persistH(h)
 	rbft.hLock.RUnlock()
 
-	rbft.logger.Infof("Replica %d updated low water mark to %d", rbft.peerPool.ID, rbft.h)
+	rbft.logger.Infof("Replica %d updated low water mark to %d", rbft.peerMgr.selfID, rbft.chainConfig.H)
 }
 
 // updateHighStateTarget updates high state target
 func (rbft *rbftImpl[T, Constraint]) updateHighStateTarget(target *types.MetaState, checkpointSet []*consensus.SignedCheckpoint, epochChanges ...*consensus.QuorumCheckpoint) {
 	if target == nil {
-		rbft.logger.Warningf("Replica %d received a nil target", rbft.peerPool.ID)
+		rbft.logger.Warningf("Replica %d received a nil target", rbft.peerMgr.selfID)
 		return
 	}
 
 	if rbft.storeMgr.highStateTarget != nil && rbft.storeMgr.highStateTarget.metaState.Height >= target.Height {
 		rbft.logger.Infof("Replica %d not updating state target to seqNo %d, has target for seqNo %d",
-			rbft.peerPool.ID, target.Height, rbft.storeMgr.highStateTarget.metaState.Height)
+			rbft.peerMgr.selfID, target.Height, rbft.storeMgr.highStateTarget.metaState.Height)
 		return
 	}
 
 	if rbft.atomicIn(StateTransferring) {
 		rbft.logger.Noticef("Replica %d has found high-target expired while transferring, "+
-			"update target to %d", rbft.peerPool.ID, target.Height)
+			"update target to %d", rbft.peerMgr.selfID, target.Height)
 	} else {
-		rbft.logger.Noticef("Replica %d updating state target to seqNo %d digest %s", rbft.peerPool.ID,
+		rbft.logger.Noticef("Replica %d updating state target to seqNo %d digest %s", rbft.peerMgr.selfID,
 			target.Height, target.Digest)
 	}
 
@@ -2139,7 +2091,7 @@ func (rbft *rbftImpl[T, Constraint]) updateHighStateTarget(target *types.MetaSta
 // tryStateTransfer sets system abnormal and stateTransferring, then skips to target
 func (rbft *rbftImpl[T, Constraint]) tryStateTransfer() {
 	if !rbft.in(SkipInProgress) {
-		rbft.logger.Debugf("Replica %d is out of sync, pending tryStateTransfer", rbft.peerPool.ID)
+		rbft.logger.Debugf("Replica %d is out of sync, pending tryStateTransfer", rbft.peerMgr.selfID)
 		rbft.on(SkipInProgress)
 	}
 
@@ -2147,13 +2099,13 @@ func (rbft *rbftImpl[T, Constraint]) tryStateTransfer() {
 
 	if rbft.atomicIn(StateTransferring) {
 		rbft.logger.Debugf("Replica %d is currently mid tryStateTransfer, it must wait for this "+
-			"tryStateTransfer to complete before initiating a new one", rbft.peerPool.ID)
+			"tryStateTransfer to complete before initiating a new one", rbft.peerMgr.selfID)
 		return
 	}
 
 	// if high state target is nil, we could not state update
 	if rbft.storeMgr.highStateTarget == nil {
-		rbft.logger.Debugf("Replica %d has no targets to attempt tryStateTransfer to, delaying", rbft.peerPool.ID)
+		rbft.logger.Debugf("Replica %d has no targets to attempt tryStateTransfer to, delaying", rbft.peerMgr.selfID)
 		return
 	}
 	target := rbft.storeMgr.highStateTarget
@@ -2182,7 +2134,7 @@ func (rbft *rbftImpl[T, Constraint]) tryStateTransfer() {
 	for idx := range rbft.storeMgr.certStore {
 		if idx.n <= target.metaState.Height {
 			rbft.logger.Debugf("Replica %d clean cert with seqNo %d <= target %d, "+
-				"digest=%s, before state update", rbft.peerPool.ID, idx.n, target.metaState.Height, idx.d)
+				"digest=%s, before state update", rbft.peerMgr.selfID, idx.n, target.metaState.Height, idx.d)
 			delete(rbft.storeMgr.certStore, idx)
 			delete(rbft.storeMgr.outstandingReqBatches, idx.d)
 			delete(rbft.storeMgr.committedCert, idx)
@@ -2192,7 +2144,7 @@ func (rbft *rbftImpl[T, Constraint]) tryStateTransfer() {
 	}
 	rbft.metrics.outstandingBatchesGauge.Set(float64(len(rbft.storeMgr.outstandingReqBatches)))
 
-	rbft.logger.Noticef("Replica %d try state update to %d", rbft.peerPool.ID, target.metaState.Height)
+	rbft.logger.Noticef("Replica %d try state update to %d", rbft.peerMgr.selfID, target.metaState.Height)
 
 	// attempts to synchronize state to a particular target, implicitly calls rollback if needed
 	rbft.metrics.stateUpdateCounter.Add(float64(1))
@@ -2216,11 +2168,11 @@ func (rbft *rbftImpl[T, Constraint]) recvStateUpdatedEvent(ss *types.ServiceStat
 
 	// high state target nil warning
 	if rbft.storeMgr.highStateTarget == nil {
-		rbft.logger.Warningf("Replica %d has no state targets, cannot resume tryStateTransfer yet", rbft.peerPool.ID)
+		rbft.logger.Warningf("Replica %d has no state targets, cannot resume tryStateTransfer yet", rbft.peerMgr.selfID)
 	} else if seqNo < rbft.storeMgr.highStateTarget.metaState.Height {
 		// If state transfer did not complete successfully, or if it did not reach the highest target, try again.
 		rbft.logger.Warningf("Replica %d recovered to seqNo %d but our high-target has moved to %d, "+
-			"keep on state transferring", rbft.peerPool.ID, seqNo, rbft.storeMgr.highStateTarget.metaState.Height)
+			"keep on state transferring", rbft.peerMgr.selfID, seqNo, rbft.storeMgr.highStateTarget.metaState.Height)
 		rbft.atomicOff(StateTransferring)
 		rbft.metrics.statusGaugeStateTransferring.Set(0)
 		rbft.exec.setLastExec(seqNo)
@@ -2228,7 +2180,7 @@ func (rbft *rbftImpl[T, Constraint]) recvStateUpdatedEvent(ss *types.ServiceStat
 		return nil
 	} else if seqNo > rbft.storeMgr.highStateTarget.metaState.Height {
 		rbft.logger.Errorf("Replica %d recovered to seqNo %d which is higher than high-target %d",
-			rbft.peerPool.ID, seqNo, rbft.storeMgr.highStateTarget.metaState.Height)
+			rbft.peerMgr.selfID, seqNo, rbft.storeMgr.highStateTarget.metaState.Height)
 		rbft.stopNamespace()
 		return nil
 	}
@@ -2247,7 +2199,7 @@ func (rbft *rbftImpl[T, Constraint]) recvStateUpdatedEvent(ss *types.ServiceStat
 
 	// 2. reset commit state after cut down block.
 	if seqNo < rbft.exec.lastExec {
-		rbft.logger.Debugf("Replica %d reset commit state after cut down blocks", rbft.peerPool.ID)
+		rbft.logger.Debugf("Replica %d reset commit state after cut down blocks", rbft.peerMgr.selfID)
 		// rebuild committedCert cache
 		rbft.storeMgr.committedCert = make(map[msgID]string)
 
@@ -2256,7 +2208,7 @@ func (rbft *rbftImpl[T, Constraint]) recvStateUpdatedEvent(ss *types.ServiceStat
 			if idx.n > seqNo {
 				cert.sentExecute = false
 				rbft.logger.Debugf("reset cert %v", idx)
-				if idx.v == rbft.view && rbft.committed(idx.v, idx.n, idx.d) && cert.sentCommit && !cert.sentExecute {
+				if idx.v == rbft.chainConfig.View && rbft.committed(idx.v, idx.n, idx.d) && cert.sentCommit && !cert.sentExecute {
 					rbft.storeMgr.committedCert[idx] = idx.d
 				}
 			}
@@ -2264,7 +2216,7 @@ func (rbft *rbftImpl[T, Constraint]) recvStateUpdatedEvent(ss *types.ServiceStat
 	}
 
 	// 3. finished state update
-	finishMsg := fmt.Sprintf("======== Replica %d finished stateUpdate, height: %d", rbft.peerPool.ID, seqNo)
+	finishMsg := fmt.Sprintf("======== Replica %d finished stateUpdate, height: %d", rbft.peerMgr.selfID, seqNo)
 	rbft.logger.Noticef(finishMsg)
 	rbft.external.SendFilterEvent(types.InformTypeFilterFinishStateUpdate, finishMsg)
 	rbft.exec.setLastExec(seqNo)
@@ -2276,20 +2228,20 @@ func (rbft *rbftImpl[T, Constraint]) recvStateUpdatedEvent(ss *types.ServiceStat
 	rbft.maybeSetNormal()
 
 	// 4. process epoch-info
-	epochChanged := ss.Epoch != rbft.epoch
+	epochChanged := ss.Epoch != rbft.chainConfig.EpochInfo.Epoch
 	if epochChanged {
-		rbft.logger.Infof("epoch changed from %d to %d", rbft.epoch, ss.Epoch)
+		rbft.logger.Infof("epoch changed from %d to %d", rbft.chainConfig.EpochInfo.Epoch, ss.Epoch)
 		rbft.turnIntoEpoch()
-		rbft.logger.Noticef("======== Replica %d updated epoch, epoch=%d.", rbft.peerPool.ID, rbft.epoch)
+		rbft.logger.Noticef("======== Replica %d updated epoch, epoch=%d.", rbft.peerMgr.selfID, rbft.chainConfig.EpochInfo.Epoch)
 		rbft.atomicOff(inEpochSyncing)
 	}
 
 	// 5. sign and cache local checkpoint.
 	// NOTE! generate checkpoint and move watermark when epochChanged or reach checkpoint height.
-	if epochChanged || seqNo%rbft.config.K == 0 {
+	if epochChanged || seqNo%rbft.chainConfig.EpochInfo.ConsensusParams.CheckpointPeriod == 0 {
 		checkpointSet := rbft.storeMgr.highStateTarget.checkpointSet
 		if len(checkpointSet) == 0 {
-			rbft.logger.Warningf("Replica %d found an empty checkpoint set", rbft.peerPool.ID)
+			rbft.logger.Warningf("Replica %d found an empty checkpoint set", rbft.peerMgr.selfID)
 			rbft.stopNamespace()
 			return nil
 		}
@@ -2299,47 +2251,48 @@ func (rbft *rbftImpl[T, Constraint]) recvStateUpdatedEvent(ss *types.ServiceStat
 		checkpoint := checkpointSet[0].Checkpoint
 		signature, sErr := rbft.signCheckpoint(checkpoint)
 		if sErr != nil {
-			rbft.logger.Errorf("Replica %d generate signed checkpoint error: %s", rbft.peerPool.ID, sErr)
+			rbft.logger.Errorf("Replica %d generate signed checkpoint error: %s", rbft.peerMgr.selfID, sErr)
 			rbft.stopNamespace()
 			return nil
 		}
 		signedCheckpoint := &consensus.SignedCheckpoint{
-			Author:     rbft.peerPool.hostname,
+			Author:     rbft.peerMgr.selfID,
 			Checkpoint: checkpoint,
 			Signature:  signature,
 		}
 		rbft.storeMgr.saveCheckpoint(seqNo, signedCheckpoint)
+		rbft.chainConfig.LastCheckpointExecBlockHash = digest
 		rbft.persistCheckpoint(seqNo, []byte(digest))
 		rbft.moveWatermarks(seqNo, epochChanged)
 	}
 
 	// 6. process recovery.
 	if epochChanged {
-		rbft.logger.Debugf("Replica %d sending view change after sync chain because of epoch change", rbft.peerPool.ID)
+		rbft.logger.Debugf("Replica %d sending view change after sync chain because of epoch change", rbft.peerMgr.selfID)
 		// trigger another round of recovery after epoch change to find correct view-number
 		return rbft.initRecovery()
 	}
 
 	if rbft.atomicIn(InViewChange) {
-		if rbft.isPrimary(rbft.peerPool.ID) {
+		if rbft.isPrimary(rbft.peerMgr.selfID) {
 			// view may not be changed after state-update, current node mistakes itself for primary
 			// so send view change to step into the new view
-			rbft.logger.Debugf("Primary %d send view-change after state update", rbft.peerPool.ID)
+			rbft.logger.Debugf("Primary %d send view-change after state update", rbft.peerMgr.selfID)
 			return rbft.sendViewChange()
 		}
 
 		// check if we have new view for current view, if so(vc then sync chain), directly finish view change.
 		// if not(sync chain then vc), trigger recovery to find correct view-number
-		nv, ok := rbft.vcMgr.newViewStore[rbft.view]
+		nv, ok := rbft.vcMgr.newViewStore[rbft.chainConfig.View]
 		if ok {
 			rbft.persistNewView(nv)
-			rbft.logger.Infof("Replica %d persist view=%d after sync chain", rbft.peerPool.ID, rbft.view)
+			rbft.logger.Infof("Replica %d persist view=%d after sync chain", rbft.peerMgr.selfID, rbft.chainConfig.View)
 			return &LocalEvent{
 				Service:   ViewChangeService,
 				EventType: ViewChangeDoneEvent,
 			}
 		}
-		rbft.logger.Debugf("Replica %d sending view change after sync chain because of miss new view", rbft.peerPool.ID)
+		rbft.logger.Debugf("Replica %d sending view change after sync chain because of miss new view", rbft.peerMgr.selfID)
 		// trigger another round of recovery after sync chain to find correct view-number
 		return rbft.initRecovery()
 	}

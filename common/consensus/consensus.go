@@ -9,10 +9,6 @@ type TXConstraint[T any] interface {
 type Transactions = []RbftTransaction
 
 func DecodeTx[T any, Constraint TXConstraint[T]](raw []byte) (*T, error) {
-	return decodeTx[T, Constraint](raw)
-}
-
-func decodeTx[T any, Constraint TXConstraint[T]](raw []byte) (*T, error) {
 	var t T
 	if err := Constraint(&t).RbftUnmarshal(raw); err != nil {
 		return nil, err
@@ -23,7 +19,7 @@ func decodeTx[T any, Constraint TXConstraint[T]](raw []byte) (*T, error) {
 func DecodeTxs[T any, Constraint TXConstraint[T]](rawTxs [][]byte) ([]*T, error) {
 	var txs []*T
 	for _, rawTx := range rawTxs {
-		tx, err := decodeTx[T, Constraint](rawTx)
+		tx, err := DecodeTx[T, Constraint](rawTx)
 		if err != nil {
 			return nil, err
 		}
@@ -32,34 +28,14 @@ func DecodeTxs[T any, Constraint TXConstraint[T]](rawTxs [][]byte) ([]*T, error)
 	return txs, nil
 }
 
-// IsConfigTx returns if this tx is corresponding with a config tx.
-func IsConfigTx[T any, Constraint TXConstraint[T]](txData []byte) bool {
-	tx, err := DecodeTx[T, Constraint](txData)
-	if err != nil {
-		panic(err)
+func EncodeTxs[T any, Constraint TXConstraint[T]](txs []*T) ([][]byte, error) {
+	var rawTxs [][]byte
+	for _, rawTx := range txs {
+		tx, err := Constraint(rawTx).RbftMarshal()
+		if err != nil {
+			return nil, err
+		}
+		rawTxs = append(rawTxs, tx)
 	}
-	return Constraint(tx).RbftIsConfigTx()
-}
-
-func GetAccount[T any, Constraint TXConstraint[T]](txData []byte) (string, error) {
-	tx, err := DecodeTx[T, Constraint](txData)
-	if err != nil {
-		return "", err
-	}
-	return Constraint(tx).RbftGetFrom(), nil
-}
-
-func GetTxHash[T any, Constraint TXConstraint[T]](txData []byte) (string, error) {
-	tx, err := DecodeTx[T, Constraint](txData)
-	if err != nil {
-		return "", err
-	}
-	return Constraint(tx).RbftGetTxHash(), nil
-}
-func GetNonce[T any, Constraint TXConstraint[T]](txData []byte) (uint64, error) {
-	tx, err := DecodeTx[T, Constraint](txData)
-	if err != nil {
-		return 0, err
-	}
-	return Constraint(tx).RbftGetNonce(), nil
+	return rawTxs, nil
 }

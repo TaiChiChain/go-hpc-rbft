@@ -4,26 +4,35 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
+
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/common/metrics/disabled"
-	mempoolmock "github.com/axiomesh/axiom-bft/mempool/mock"
-	mockexternal "github.com/axiomesh/axiom-bft/mock/mock_external"
-
-	"github.com/golang/mock/gomock"
-	"github.com/stretchr/testify/assert"
 )
 
-func newStorageTestNode[T any, Constraint consensus.TXConstraint[T]](ctrl *gomock.Controller) (*storeManager, Config[T, Constraint]) {
-	pool := mempoolmock.NewMockMinimalMemPool[T, Constraint](ctrl)
+func newStorageTestNode[T any, Constraint consensus.TXConstraint[T]](ctrl *gomock.Controller) (*storeManager[T, Constraint], Config) {
 	log := newRawLogger()
-	external := mockexternal.NewMockMinimalExternal[T, Constraint](ctrl)
 
-	conf := Config[T, Constraint]{
-		ID:                      2,
-		Hash:                    "hash-node2",
-		Peers:                   peerSet,
-		K:                       10,
-		LogMultiplier:           4,
+	conf := Config{
+		SelfAccountAddress: "node2",
+		GenesisEpochInfo: &EpochInfo{
+			Version:                   1,
+			Epoch:                     1,
+			EpochPeriod:               1000,
+			CandidateSet:              []*NodeInfo{},
+			ValidatorSet:              peerSet,
+			StartBlock:                1,
+			P2PBootstrapNodeAddresses: []string{},
+			ConsensusParams: &ConsensusParams{
+				CheckpointPeriod:              10,
+				HighWatermarkCheckpointPeriod: 4,
+				MaxValidatorNum:               10,
+				BlockMaxTxNum:                 500,
+				NotActiveWeight:               1,
+				ExcludeView:                   10,
+			},
+		},
 		SetSize:                 25,
 		SetTimeout:              100 * time.Millisecond,
 		BatchTimeout:            500 * time.Millisecond,
@@ -38,23 +47,18 @@ func newStorageTestNode[T any, Constraint consensus.TXConstraint[T]](ctrl *gomoc
 		CheckPoolTimeout:        3 * time.Minute,
 
 		Logger:      log,
-		External:    external,
-		RequestPool: pool,
 		MetricsProv: &disabled.Provider{},
 		DelFlag:     make(chan bool),
-
-		EpochInit:    uint64(0),
-		LatestConfig: nil,
 	}
 
-	return newStoreMgr(conf), conf
+	return newStoreMgr[T, Constraint](conf), conf
 }
 
 func TestStoreMgr_getCert(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
+	// defer ctrl.Finish()
 
-	s, _ := newStorageTestNode[consensus.FltTransaction](ctrl)
+	s, _ := newStorageTestNode[consensus.FltTransaction, *consensus.FltTransaction](ctrl)
 
 	var retCert *msgCert
 	// get default cert
@@ -90,9 +94,9 @@ func TestStoreMgr_getCert(t *testing.T) {
 
 func TestStoreMgr_existedDigest(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	//defer ctrl.Finish()
+	// defer ctrl.Finish()
 
-	s, _ := newStorageTestNode[consensus.FltTransaction](ctrl)
+	s, _ := newStorageTestNode[consensus.FltTransaction, *consensus.FltTransaction](ctrl)
 
 	msgIDTmp := msgID{
 		v: 1,

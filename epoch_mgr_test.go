@@ -3,15 +3,14 @@ package rbft
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/types"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func TestEpoch_fetchCheckpoint_and_recv(t *testing.T) {
-
-	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 
 	rbfts[0].epochMgr.configBatchToCheck = &types.MetaState{
 		Height: 10,
@@ -28,16 +27,15 @@ func TestEpoch_fetchCheckpoint_and_recv(t *testing.T) {
 }
 
 func TestEpoch_recvFetchCheckpoint_SendBackNormal(t *testing.T) {
-
-	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	fetch := &consensus.FetchCheckpoint{
 		ReplicaId:      2,
 		SequenceNumber: uint64(12),
 	}
 	signedC := &consensus.SignedCheckpoint{
-		Author: rbfts[0].peerPool.hostname,
+		Author: rbfts[0].peerMgr.selfID,
 		Checkpoint: &consensus.Checkpoint{
-			Epoch: rbfts[0].epoch,
+			Epoch: rbfts[0].chainConfig.EpochInfo.Epoch,
 			ExecuteState: &consensus.Checkpoint_ExecuteState{
 				Height: uint64(12),
 				Digest: "block-number-12",
@@ -52,17 +50,16 @@ func TestEpoch_recvFetchCheckpoint_SendBackNormal(t *testing.T) {
 }
 
 func TestEpoch_recvFetchCheckpoint_SendBackStableCheckpoint(t *testing.T) {
-
-	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	fetch := &consensus.FetchCheckpoint{
 		ReplicaId:      2,
 		SequenceNumber: uint64(12),
 	}
-	rbfts[0].h = uint64(50)
+	rbfts[0].chainConfig.H = uint64(50)
 	signedC := &consensus.SignedCheckpoint{
-		Author: rbfts[0].peerPool.hostname,
+		Author: rbfts[0].peerMgr.selfID,
 		Checkpoint: &consensus.Checkpoint{
-			Epoch: rbfts[0].epoch,
+			Epoch: rbfts[0].chainConfig.EpochInfo.Epoch,
 			ExecuteState: &consensus.Checkpoint_ExecuteState{
 				Height: uint64(50),
 				Digest: "block-number-50",

@@ -19,38 +19,48 @@ import (
 	"sync"
 
 	"github.com/axiomesh/axiom-bft/common/consensus"
+	"github.com/axiomesh/axiom-bft/mempool"
 	"github.com/axiomesh/axiom-bft/types"
 )
 
 // Node represents a node in a RBFT cluster.
+//
+//go:generate mockgen -destination ./mock_node.go -package rbft -source ./node.go -typed
 type Node[T any, Constraint consensus.TXConstraint[T]] interface {
+	// Init a RBFT node state.
+	Init() error
+
 	// Start starts a RBFT node instance.
 	Start() error
+
 	// Stop performs any necessary termination of the Node.
-	Stop() [][]byte
+	Stop() []*T
+
 	// Propose proposes requests to RBFT core, requests are ensured to be eventually
 	// submitted to all non-fault nodes unless current node crash down.
-	Propose(requests *consensus.RequestSet) error
+	Propose(requests []*T, local bool) error
+
 	// Step advances the state machine using the given message.
 	Step(ctx context.Context, msg *consensus.ConsensusMessage)
-	// ApplyConfChange applies config change to the local node.
-	ApplyConfChange(cc *types.ConfState)
+
 	// Status returns the current node status of the RBFT state machine.
 	Status() NodeStatus
+
 	// GetUncommittedTransactions returns uncommitted txs
-	GetUncommittedTransactions(maxsize uint64) [][]byte
+	GetUncommittedTransactions(maxsize uint64) []*T
+
 	// ServiceInbound receives and records modifications from application service.
 	ServiceInbound
 
-	External
+	External[T, Constraint]
 }
 
-type External interface {
+type External[T any, Constraint consensus.TXConstraint[T]] interface {
 	// GetPendingNonceByAccount will return the latest pending nonce of a given account
 	GetPendingNonceByAccount(account string) uint64
 
 	// GetPendingTxByHash will return the tx by tx hash
-	GetPendingTxByHash(hash string) []byte
+	GetPendingTxByHash(hash string) *T
 }
 
 // ServiceInbound receives and records modifications from application service which includes two events:
@@ -71,9 +81,6 @@ type ServiceInbound interface {
 	// Users must ReportStateUpdated after RBFT core invoked StateUpdate request no matter this request was
 	// finished successfully or not, otherwise, RBFT core will enter abnormal status infinitely.
 	ReportStateUpdated(state *types.ServiceState)
-
-	// ReportStableCheckpointFinished reports stable checkpoint event has been processed successfully.
-	ReportStableCheckpointFinished(height uint64)
 }
 
 // node implements the Node interface and track application service synchronously to help RBFT core
@@ -84,34 +91,40 @@ type node[T any, Constraint consensus.TXConstraint[T]] struct {
 
 	// stateLock is used to ensure mutually exclusive access of currentState.
 	stateLock sync.RWMutex
+
 	// currentState maintains the current application service state.
 	currentState *types.ServiceState
 
-	config Config[T, Constraint]
+	config Config
 	logger Logger
 }
 
 // NewNode initializes a Node service.
-func NewNode[T any, Constraint consensus.TXConstraint[T]](conf Config[T, Constraint]) (Node[T, Constraint], error) {
-	return newNode[T, Constraint](conf)
+func NewNode[T any, Constraint consensus.TXConstraint[T]](c Config, external ExternalStack[T, Constraint], requestPool mempool.MemPool[T, Constraint]) (Node[T, Constraint], error) {
+	return newNode[T, Constraint](c, external, requestPool)
 }
 
 // newNode help to initialize a Node service.
-func newNode[T any, Constraint consensus.TXConstraint[T]](conf Config[T, Constraint]) (*node[T, Constraint], error) {
-	rbft, err := newRBFT[T, Constraint](conf)
+func newNode[T any, Constraint consensus.TXConstraint[T]](c Config, external ExternalStack[T, Constraint], requestPool mempool.MemPool[T, Constraint]) (*node[T, Constraint], error) {
+	rbft, err := newRBFT[T, Constraint](c, external, requestPool)
 	if err != nil {
 		return nil, err
 	}
 
 	n := &node[T, Constraint]{
 		rbft:   rbft,
-		config: conf,
-		logger: conf.Logger,
+		config: c,
+		logger: c.Logger,
 	}
 
 	rbft.node = n
 
 	return n, nil
+}
+
+// Start init Node state.
+func (n *node[T, Constraint]) Init() error {
+	return n.rbft.init()
 }
 
 // Start starts a Node instance.
@@ -125,7 +138,7 @@ func (n *node[T, Constraint]) Start() error {
 }
 
 // Stop stops a Node instance.
-func (n *node[T, Constraint]) Stop() [][]byte {
+func (n *node[T, Constraint]) Stop() []*T {
 	// stop RBFT core.
 	remainTxs := n.rbft.stop()
 
@@ -138,8 +151,11 @@ func (n *node[T, Constraint]) Stop() [][]byte {
 
 // Propose proposes requests to RBFT core, requests are ensured to be eventually
 // submitted to all non-fault nodes unless current node crash down.
-func (n *node[T, Constraint]) Propose(requests *consensus.RequestSet) error {
-	n.rbft.postRequests(requests)
+func (n *node[T, Constraint]) Propose(requests []*T, local bool) error {
+	n.rbft.postRequests(&RequestSet[T, Constraint]{
+		Requests: requests,
+		Local:    local,
+	})
 
 	return nil
 }
@@ -147,11 +163,6 @@ func (n *node[T, Constraint]) Propose(requests *consensus.RequestSet) error {
 // Step advances the state machine using the given message.
 func (n *node[T, Constraint]) Step(ctx context.Context, msg *consensus.ConsensusMessage) {
 	n.rbft.step(ctx, msg)
-}
-
-// ApplyConfChange applies config change to the local node.
-func (n *node[T, Constraint]) ApplyConfChange(cc *types.ConfState) {
-	n.rbft.postConfState(cc)
 }
 
 // ReportExecuted reports to RBFT core that application service has finished height one batch with
@@ -195,21 +206,15 @@ func (n *node[T, Constraint]) ReportStateUpdated(state *types.ServiceState) {
 	n.rbft.reportStateUpdated(state)
 }
 
-// ReportStableCheckpointFinished reports stable checkpoint event has been processed successfully.
-func (n *node[T, Constraint]) ReportStableCheckpointFinished(height uint64) {
-	n.logger.Noticef("process stable checkpoint finished, height: %d", height)
-	n.rbft.reportStableCheckpointFinished(height)
-}
-
 // Status returns the current node status of the RBFT state machine.
 func (n *node[T, Constraint]) Status() NodeStatus {
 	return n.rbft.getStatus()
 }
 
-func (n *node[T, Constraint]) GetUncommittedTransactions(maxsize uint64) [][]byte {
+func (n *node[T, Constraint]) GetUncommittedTransactions(maxsize uint64) []*T {
 	// get hash of transactions that had committed
 	var digestList []string
-	committedHeight := n.rbft.h
+	committedHeight := n.rbft.chainConfig.H
 	for digest, batch := range n.rbft.storeMgr.batchStore {
 		if batch.SeqNo <= committedHeight {
 			digestList = append(digestList, digest)
@@ -243,10 +248,10 @@ func (n *node[T, Constraint]) GetPendingNonceByAccount(account string) uint64 {
 	return <-getNonceReq.ch
 }
 
-func (n *node[T, Constraint]) GetPendingTxByHash(hash string) []byte {
-	getTxReq := &ReqTxMsg{
+func (n *node[T, Constraint]) GetPendingTxByHash(hash string) *T {
+	getTxReq := &ReqTxMsg[T, Constraint]{
 		hash: hash,
-		ch:   make(chan []byte),
+		ch:   make(chan *T),
 	}
 	localEvent := &MiscEvent{
 		EventType: ReqTxEvent,

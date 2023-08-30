@@ -17,8 +17,9 @@ package rbft
 import (
 	"context"
 
-	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/gogo/protobuf/proto"
+
+	"github.com/axiomesh/axiom-bft/common/consensus"
 )
 
 /**
@@ -33,7 +34,7 @@ type recoveryManager struct {
 }
 
 // newRecoveryMgr news an instance of recoveryManager
-func newRecoveryMgr[T any, Constraint consensus.TXConstraint[T]](c Config[T, Constraint]) *recoveryManager {
+func newRecoveryMgr(c Config) *recoveryManager {
 	rm := &recoveryManager{
 		syncRspStore: make(map[uint64]*consensus.SyncStateResponse),
 		logger:       c.Logger,
@@ -58,12 +59,11 @@ func (rbft *rbftImpl[T, Constraint]) dispatchRecoveryMsg(e consensusEvent) conse
 
 // fetchRecoveryPQC always fetches PQC info after recovery done to fetch PQC info after target checkpoint
 func (rbft *rbftImpl[T, Constraint]) fetchRecoveryPQC() consensusEvent {
-
-	rbft.logger.Debugf("Replica %d fetch PQC", rbft.peerPool.ID)
+	rbft.logger.Debugf("Replica %d fetch PQC", rbft.peerMgr.selfID)
 
 	fetch := &consensus.FetchPQCRequest{
-		H:         rbft.h,
-		ReplicaId: rbft.peerPool.ID,
+		H:         rbft.chainConfig.H,
+		ReplicaId: rbft.peerMgr.selfID,
 	}
 	payload, err := proto.Marshal(fetch)
 	if err != nil {
@@ -75,19 +75,18 @@ func (rbft *rbftImpl[T, Constraint]) fetchRecoveryPQC() consensusEvent {
 		Payload: payload,
 	}
 
-	rbft.peerPool.broadcast(context.TODO(), conMsg)
+	rbft.peerMgr.broadcast(context.TODO(), conMsg)
 
 	return nil
 }
 
 // recvFetchPQCRequest returns all PQC info we have sent before to the sender
 func (rbft *rbftImpl[T, Constraint]) recvFetchPQCRequest(fetch *consensus.FetchPQCRequest) consensusEvent {
-
-	rbft.logger.Debugf("Replica %d received fetchPQCRequest from replica %d", rbft.peerPool.ID, fetch.ReplicaId)
+	rbft.logger.Debugf("Replica %d received fetchPQCRequest from replica %d", rbft.peerMgr.selfID, fetch.ReplicaId)
 
 	remoteH := fetch.H
-	if remoteH >= rbft.h+rbft.L {
-		rbft.logger.Warningf("Replica %d received fetchPQCRequest, but its rbft.h ≥ highwatermark", rbft.peerPool.ID)
+	if remoteH >= rbft.chainConfig.H+rbft.chainConfig.L {
+		rbft.logger.Warningf("Replica %d received fetchPQCRequest, but its rbft.h ≥ highwatermark", rbft.peerMgr.selfID)
 		return nil
 	}
 
@@ -98,22 +97,22 @@ func (rbft *rbftImpl[T, Constraint]) recvFetchPQCRequest(fetch *consensus.FetchP
 	// replica just send all PQC info we had sent before
 	for idx, cert := range rbft.storeMgr.certStore {
 		// send all PQC that n > remoteH in current view, help remote node to advance.
-		if idx.n > remoteH && idx.v == rbft.view {
+		if idx.n > remoteH && idx.v == rbft.chainConfig.View {
 			// only response with messages we have sent.
 			if cert.prePrepare == nil {
 				rbft.logger.Warningf("Replica %d in finds nil prePrepare for view=%d/seqNo=%d",
-					rbft.peerPool.ID, idx.v, idx.n)
-			} else if cert.prePrepare.ReplicaId == rbft.peerPool.ID {
+					rbft.peerMgr.selfID, idx.v, idx.n)
+			} else if cert.prePrepare.ReplicaId == rbft.peerMgr.selfID {
 				prePres = append(prePres, cert.prePrepare)
 			}
 			for pre := range cert.prepare {
-				if pre.ReplicaId == rbft.peerPool.ID {
+				if pre.ReplicaId == rbft.peerMgr.selfID {
 					prepare := pre
 					pres = append(pres, &prepare)
 				}
 			}
 			for cmt := range cert.commit {
-				if cmt.ReplicaId == rbft.peerPool.ID {
+				if cmt.ReplicaId == rbft.peerMgr.selfID {
 					commit := cmt
 					cmts = append(cmts, &commit)
 				}
@@ -122,7 +121,7 @@ func (rbft *rbftImpl[T, Constraint]) recvFetchPQCRequest(fetch *consensus.FetchP
 	}
 
 	pqcResponse := &consensus.FetchPQCResponse{
-		ReplicaId: rbft.peerPool.ID,
+		ReplicaId: rbft.peerMgr.selfID,
 	}
 
 	if prePres != nil {
@@ -144,9 +143,9 @@ func (rbft *rbftImpl[T, Constraint]) recvFetchPQCRequest(fetch *consensus.FetchP
 		Type:    consensus.Type_FETCH_PQC_RESPONSE,
 		Payload: payload,
 	}
-	rbft.peerPool.unicast(context.TODO(), consensusMsg, fetch.ReplicaId)
+	rbft.peerMgr.unicast(context.TODO(), consensusMsg, fetch.ReplicaId)
 
-	rbft.logger.Debugf("Replica %d send PQC response to %d, detailed: %+v", rbft.peerPool.ID,
+	rbft.logger.Debugf("Replica %d send PQC response to %d, detailed: %+v", rbft.peerMgr.selfID,
 		fetch.ReplicaId, pqcResponse)
 
 	return nil
@@ -155,10 +154,10 @@ func (rbft *rbftImpl[T, Constraint]) recvFetchPQCRequest(fetch *consensus.FetchP
 // recvFetchPQCResponse re-processes all the PQC received from others
 func (rbft *rbftImpl[T, Constraint]) recvFetchPQCResponse(PQCInfo *consensus.FetchPQCResponse) consensusEvent {
 	rbft.logger.Debugf("Replica %d received fetchPQCResponse from replica %d, return_pqc %v",
-		rbft.peerPool.ID, PQCInfo.ReplicaId, PQCInfo)
+		rbft.peerMgr.selfID, PQCInfo.ReplicaId, PQCInfo)
 
 	// post all the PQC
-	if !rbft.isPrimary(rbft.peerPool.ID) {
+	if !rbft.isPrimary(rbft.peerMgr.selfID) {
 		for _, preprep := range PQCInfo.GetPrepreSet() {
 			_ = rbft.recvPrePrepare(context.TODO(), preprep)
 		}
@@ -177,13 +176,12 @@ func (rbft *rbftImpl[T, Constraint]) recvFetchPQCResponse(PQCInfo *consensus.Fet
 // we only need to sync state when primary is sending null request which means system is in
 // normal status and there are no requests in process.
 func (rbft *rbftImpl[T, Constraint]) trySyncState() {
-
 	if !rbft.in(NeedSyncState) {
 		if !rbft.isNormal() {
-			rbft.logger.Debugf("Replica %d not try to sync state as we are in abnormal now", rbft.peerPool.ID)
+			rbft.logger.Debugf("Replica %d not try to sync state as we are in abnormal now", rbft.peerMgr.selfID)
 			return
 		}
-		rbft.logger.Infof("Replica %d need to start sync state progress after %v", rbft.peerPool.ID, rbft.timerMgr.getTimeoutValue(syncStateRestartTimer))
+		rbft.logger.Infof("Replica %d need to start sync state progress after %v", rbft.peerMgr.selfID, rbft.timerMgr.getTimeoutValue(syncStateRestartTimer))
 		rbft.on(NeedSyncState)
 
 		event := &LocalEvent{
@@ -199,15 +197,14 @@ func (rbft *rbftImpl[T, Constraint]) trySyncState() {
 // initSyncState prepares to sync state.
 // if we are in syncState, which means last syncState progress hasn't finished, reject a new syncState request
 func (rbft *rbftImpl[T, Constraint]) initSyncState() consensusEvent {
-
 	if rbft.in(InSyncState) {
-		rbft.logger.Warningf("Replica %d try to send syncState, but it's already in sync state", rbft.peerPool.ID)
+		rbft.logger.Warningf("Replica %d try to send syncState, but it's already in sync state", rbft.peerMgr.selfID)
 		return nil
 	}
 
 	rbft.on(InSyncState)
 
-	rbft.logger.Debugf("Replica %d now init sync state", rbft.peerPool.ID)
+	rbft.logger.Debugf("Replica %d now init sync state", rbft.peerMgr.selfID)
 
 	event := &LocalEvent{
 		Service:   RecoveryService,
@@ -223,7 +220,7 @@ func (rbft *rbftImpl[T, Constraint]) initSyncState() consensusEvent {
 
 	// broadcast sync state message to others.
 	syncStateMsg := &consensus.SyncState{
-		ReplicaId: rbft.peerPool.ID,
+		ReplicaId: rbft.peerMgr.selfID,
 	}
 	payload, err := proto.Marshal(syncStateMsg)
 	if err != nil {
@@ -234,24 +231,24 @@ func (rbft *rbftImpl[T, Constraint]) initSyncState() consensusEvent {
 		Type:    consensus.Type_SYNC_STATE,
 		Payload: payload,
 	}
-	rbft.peerPool.broadcast(context.TODO(), msg)
+	rbft.peerMgr.broadcast(context.TODO(), msg)
 
 	// post the sync state response message event to myself
 	state := rbft.node.getCurrentState()
 	if state == nil {
-		rbft.logger.Warningf("Replica %d has a nil node state", rbft.peerPool.ID)
+		rbft.logger.Warningf("Replica %d has a nil node state", rbft.peerMgr.selfID)
 		return nil
 	}
 
-	signedCheckpoint, sErr := rbft.generateSignedCheckpoint(state, rbft.external.IsConfigBlock(state.MetaState.Height))
+	signedCheckpoint, sErr := rbft.generateSignedCheckpoint(state, isConfigBatch(state.MetaState.Height, rbft.chainConfig.EpochInfo))
 	if sErr != nil {
-		rbft.logger.Errorf("Replica %d generate checkpoint error: %s", rbft.peerPool.ID, sErr)
+		rbft.logger.Errorf("Replica %d generate checkpoint error: %s", rbft.peerMgr.selfID, sErr)
 		rbft.stopNamespace()
 		return nil
 	}
 	syncStateRsp := &consensus.SyncStateResponse{
-		ReplicaId:        rbft.peerPool.ID,
-		View:             rbft.view,
+		ReplicaId:        rbft.peerMgr.selfID,
+		View:             rbft.chainConfig.View,
 		SignedCheckpoint: signedCheckpoint,
 	}
 	rbft.recvSyncStateResponse(syncStateRsp, true)
@@ -259,29 +256,29 @@ func (rbft *rbftImpl[T, Constraint]) initSyncState() consensusEvent {
 }
 
 func (rbft *rbftImpl[T, Constraint]) recvSyncState(sync *consensus.SyncState) consensusEvent {
-	rbft.logger.Debugf("Replica %d received sync state from replica %d", rbft.peerPool.ID, sync.ReplicaId)
+	rbft.logger.Debugf("Replica %d received sync state from replica %d", rbft.peerMgr.selfID, sync.ReplicaId)
 
 	if !rbft.isNormal() {
-		rbft.logger.Debugf("Replica %d is in abnormal, don't send sync state response", rbft.peerPool.ID)
+		rbft.logger.Debugf("Replica %d is in abnormal, don't send sync state response", rbft.peerMgr.selfID)
 		return nil
 	}
 
 	// for normal case, send current state
 	state := rbft.node.getCurrentState()
 	if state == nil {
-		rbft.logger.Warningf("Replica %d has a nil state", rbft.peerPool.ID)
+		rbft.logger.Warningf("Replica %d has a nil state", rbft.peerMgr.selfID)
 		return nil
 	}
-	signedCheckpoint, sErr := rbft.generateSignedCheckpoint(state, rbft.external.IsConfigBlock(state.MetaState.Height))
+	signedCheckpoint, sErr := rbft.generateSignedCheckpoint(state, isConfigBatch(state.MetaState.Height, rbft.chainConfig.EpochInfo))
 	if sErr != nil {
-		rbft.logger.Errorf("Replica %d generate checkpoint error: %s", rbft.peerPool.ID, sErr)
+		rbft.logger.Errorf("Replica %d generate checkpoint error: %s", rbft.peerMgr.selfID, sErr)
 		rbft.stopNamespace()
 		return nil
 	}
 
 	syncStateRsp := &consensus.SyncStateResponse{
-		ReplicaId:        rbft.peerPool.ID,
-		View:             rbft.view,
+		ReplicaId:        rbft.peerMgr.selfID,
+		View:             rbft.chainConfig.View,
 		SignedCheckpoint: signedCheckpoint,
 	}
 
@@ -294,20 +291,20 @@ func (rbft *rbftImpl[T, Constraint]) recvSyncState(sync *consensus.SyncState) co
 		Type:    consensus.Type_SYNC_STATE_RESPONSE,
 		Payload: payload,
 	}
-	rbft.peerPool.unicast(context.TODO(), consensusMsg, sync.ReplicaId)
+	rbft.peerMgr.unicast(context.TODO(), consensusMsg, sync.ReplicaId)
 	rbft.logger.Debugf("Replica %d send sync state response to replica %d: view=%d, checkpoint=%+v",
-		rbft.peerPool.ID, sync.ReplicaId, rbft.view, signedCheckpoint.GetCheckpoint())
+		rbft.peerMgr.selfID, sync.ReplicaId, rbft.chainConfig.View, signedCheckpoint.GetCheckpoint())
 	return nil
 }
 
 func (rbft *rbftImpl[T, Constraint]) recvSyncStateResponse(rsp *consensus.SyncStateResponse, local bool) consensusEvent {
 	if !rbft.in(InSyncState) {
-		rbft.logger.Debugf("Replica %d is not in sync state, ignore it...", rbft.peerPool.ID)
+		rbft.logger.Debugf("Replica %d is not in sync state, ignore it...", rbft.peerMgr.selfID)
 		return nil
 	}
 
 	if rsp.GetSignedCheckpoint() == nil || rsp.GetSignedCheckpoint().GetCheckpoint() == nil {
-		rbft.logger.Errorf("Replica %d reject sync state response with nil checkpoint info", rbft.peerPool.ID)
+		rbft.logger.Errorf("Replica %d reject sync state response with nil checkpoint info", rbft.peerMgr.selfID)
 		return nil
 	}
 	// verify signature of remote checkpoint.
@@ -315,14 +312,14 @@ func (rbft *rbftImpl[T, Constraint]) recvSyncStateResponse(rsp *consensus.SyncSt
 		vErr := rbft.verifySignedCheckpoint(rsp.GetSignedCheckpoint())
 		if vErr != nil {
 			rbft.logger.Errorf("Replica %d verify signature of checkpoint from %d error: %s",
-				rbft.peerPool.ID, rsp.ReplicaId, vErr)
+				rbft.peerMgr.selfID, rsp.ReplicaId, vErr)
 			return nil
 		}
 	}
 
 	checkpoint := rsp.GetSignedCheckpoint().GetCheckpoint()
 	rbft.logger.Debugf("Replica %d now received sync state response from replica %d: view=%d, checkpoint=%+v",
-		rbft.peerPool.ID, rsp.ReplicaId, rsp.View, checkpoint)
+		rbft.peerMgr.selfID, rsp.ReplicaId, rsp.View, checkpoint)
 
 	if oldRsp, ok := rbft.recoveryMgr.syncRspStore[rsp.ReplicaId]; ok {
 		if oldRsp.GetSignedCheckpoint().GetCheckpoint().Height() > checkpoint.Height() {
@@ -349,8 +346,7 @@ func (rbft *rbftImpl[T, Constraint]) recvSyncStateResponse(rsp *consensus.SyncSt
 // restartSyncState restart syncState immediately, only can be invoked after sync state
 // restart timer expired.
 func (rbft *rbftImpl[T, Constraint]) restartSyncState() consensusEvent {
-
-	rbft.logger.Debugf("Replica %d now restart sync state", rbft.peerPool.ID)
+	rbft.logger.Debugf("Replica %d now restart sync state", rbft.peerMgr.selfID)
 
 	rbft.recoveryMgr.syncRspStore = make(map[uint64]*consensus.SyncStateResponse)
 
@@ -367,7 +363,7 @@ func (rbft *rbftImpl[T, Constraint]) restartSyncState() consensusEvent {
 
 // exitSyncState exit syncState immediately.
 func (rbft *rbftImpl[T, Constraint]) exitSyncState() {
-	rbft.logger.Debugf("Replica %d now exit sync state", rbft.peerPool.ID)
+	rbft.logger.Debugf("Replica %d now exit sync state", rbft.peerMgr.selfID)
 	rbft.off(InSyncState)
 	rbft.off(NeedSyncState)
 	rbft.timerMgr.stopTimer(syncStateRspTimer)

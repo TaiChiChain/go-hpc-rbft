@@ -9,14 +9,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/google/btree"
+
+	"github.com/axiomesh/axiom-bft/common/consensus"
 )
 
 // Mempool contains all currently known transactions.
 type mempoolImpl[T any, Constraint consensus.TXConstraint[T]] struct {
 	logger              Logger
-	localID             uint64
+	selfID              uint64
 	batchSize           uint64
 	isTimed             bool
 	txStore             *transactionStore[T, Constraint] // store all transactions info
@@ -24,7 +25,6 @@ type mempoolImpl[T any, Constraint consensus.TXConstraint[T]] struct {
 	toleranceRemoveTime time.Duration
 	poolSize            uint64
 	getAccountNonce     GetAccountNonceFunc
-	pendingMu           sync.Mutex
 }
 
 // AddNewRequests adds transactions into txPool.
@@ -36,21 +36,15 @@ type mempoolImpl[T any, Constraint consensus.TXConstraint[T]] struct {
 // with committed txs on ledger.
 // Also, when we receive a tx locally, we need to check if these txs are out-of-date
 // time by time.
-func (mpi *mempoolImpl[T, Constraint]) AddNewRequests(txs [][]byte, isPrimary, local, isReplace bool) ([]*RequestHashBatch[T, Constraint], []string) {
+func (mpi *mempoolImpl[T, Constraint]) AddNewRequests(txs []*T, isPrimary, local, isReplace bool) ([]*RequestHashBatch[T, Constraint], []string) {
 	return mpi.addNewRequests(txs, isPrimary, local, isReplace)
 }
 
-func (mpi *mempoolImpl[T, Constraint]) addNewRequests(txs [][]byte, isPrimary, local, isReplace bool) ([]*RequestHashBatch[T, Constraint], []string) {
-	var hasConfigTx bool
+func (mpi *mempoolImpl[T, Constraint]) addNewRequests(txs []*T, isPrimary, local, isReplace bool) ([]*RequestHashBatch[T, Constraint], []string) {
 	completionMissingBatchHashes := make([]string, 0)
 	existTxsHash := make(map[string]struct{})
 	validTxs := make(map[string][]*mempoolTransaction[T, Constraint])
-	decodeTxs, err := consensus.DecodeTxs[T, Constraint](txs)
-	if err != nil {
-		mpi.logger.Errorf("Decode txs failed", "err", err)
-		return nil, nil
-	}
-	for _, tx := range decodeTxs {
+	for _, tx := range txs {
 		txAccount := Constraint(tx).RbftGetFrom()
 		txHash := Constraint(tx).RbftGetTxHash()
 		txNonce := Constraint(tx).RbftGetNonce()
@@ -64,13 +58,14 @@ func (mpi *mempoolImpl[T, Constraint]) addNewRequests(txs [][]byte, isPrimary, l
 				if txPointer := mpi.txStore.txHashMap[txHash]; txPointer != nil {
 					continue
 				}
-				mpi.logger.Warningf("Receive missing transaction [account: %s, nonce: %d, hash: %s] from primary, we will replace the old transaction", txAccount, txNonce, txHash)
+				//mpi.logger.Warningf("Receive missing transaction [account: %s, nonce: %d, hash: %s] from primary, we will replace the old transaction", txAccount, txNonce, txHash)
 				mpi.replaceTx(tx)
 				continue
 			}
 		}
 		if txPointer := mpi.txStore.txHashMap[txHash]; txPointer != nil {
-			mpi.logger.Debugf("Transaction [account: %s, nonce: %d, hash: %s] has already existed in txHashMap", txAccount, txNonce, txHash)
+			// because simultaneous broadcast and active pull may be repeated
+			//mpi.logger.Debugf("Transaction [account: %s, nonce: %d, hash: %s] has already existed in txHashMap", txAccount, txNonce, txHash)
 			continue
 		}
 		_, ok := validTxs[txAccount]
@@ -85,11 +80,6 @@ func (mpi *mempoolImpl[T, Constraint]) addNewRequests(txs [][]byte, isPrimary, l
 			arrivedTime: now,
 		}
 		validTxs[txAccount] = append(validTxs[txAccount], txItem)
-
-		// check if there is config tx
-		if Constraint(tx).RbftIsConfigTx() {
-			hasConfigTx = true
-		}
 
 		// for replica, add validTxs to nonBatchedTxs and check if the missing transactions and batches are fetched
 		if !isPrimary {
@@ -116,18 +106,8 @@ func (mpi *mempoolImpl[T, Constraint]) addNewRequests(txs [][]byte, isPrimary, l
 
 	// if no timedBlock, generator batch by block size
 	if isPrimary {
-		var batches []*RequestHashBatch[T, Constraint]
 		if mpi.txStore.priorityNonBatchSize >= mpi.batchSize {
-			batches, err = mpi.generateRequestBatch()
-			if err != nil {
-				mpi.logger.Errorf("Generate batch failed, err: %s", err.Error())
-				return nil, nil
-			}
-			return batches, nil
-		}
-		if hasConfigTx {
-			mpi.logger.Debug("Receive config tx, we will generate a batch")
-			batches, err = mpi.generateRequestBatch()
+			batches, err := mpi.generateRequestBatch()
 			if err != nil {
 				mpi.logger.Errorf("Generate batch failed, err: %s", err.Error())
 				return nil, nil
@@ -139,25 +119,10 @@ func (mpi *mempoolImpl[T, Constraint]) addNewRequests(txs [][]byte, isPrimary, l
 	return nil, completionMissingBatchHashes
 }
 
-// IsConfigBatch check if such batch is config-change batch or not
-func (mpi *mempoolImpl[T, Constraint]) IsConfigBatch(batchHash string) bool {
-	if batch, ok := mpi.txStore.batchesCache[batchHash]; ok {
-		if len(batch.TxList) == 1 {
-			tx, err := consensus.DecodeTx[T, Constraint](batch.TxList[0])
-			if err != nil {
-				mpi.logger.Errorf("Decode tx failed", "err", err)
-				return false
-			}
-			return Constraint(tx).RbftIsConfigTx()
-		}
-	}
-	return false
-}
-
 // GetUncommittedTransactions returns the uncommitted transactions.
 // not used
-func (mpi *mempoolImpl[T, Constraint]) GetUncommittedTransactions(maxsize uint64) [][]byte {
-	return [][]byte{}
+func (mpi *mempoolImpl[T, Constraint]) GetUncommittedTransactions(maxsize uint64) []*T {
+	return []*T{}
 }
 
 // Start start metrics
@@ -168,14 +133,11 @@ func (mpi *mempoolImpl[T, Constraint]) Start() error {
 
 // Stop stop metrics
 // TODO(lrx): add metrics
-func (mpi *mempoolImpl[T, Constraint]) Stop() {
-	return
-}
+func (mpi *mempoolImpl[T, Constraint]) Stop() {}
 
 // newMempoolImpl returns the mempool instance.
 func newMempoolImpl[T any, Constraint consensus.TXConstraint[T]](config Config) *mempoolImpl[T, Constraint] {
 	mpi := &mempoolImpl[T, Constraint]{
-		localID:         config.ID,
 		logger:          config.Logger,
 		getAccountNonce: config.GetAccountNonce,
 		isTimed:         config.IsTimed,
@@ -210,12 +172,17 @@ func newMempoolImpl[T any, Constraint consensus.TXConstraint[T]](config Config) 
 	return mpi
 }
 
+func (mpi *mempoolImpl[T, Constraint]) Init(selfID uint64) error {
+	mpi.selfID = selfID
+	return nil
+}
+
 // GetPendingNonceByAccount returns the latest pending nonce of the account in mempool
 func (mpi *mempoolImpl[T, Constraint]) GetPendingNonceByAccount(account string) uint64 {
 	return mpi.txStore.nonceCache.getPendingNonce(account)
 }
 
-func (mpi *mempoolImpl[T, Constraint]) GetPendingTxByHash(hash string) []byte {
+func (mpi *mempoolImpl[T, Constraint]) GetPendingTxByHash(hash string) *T {
 	key, ok := mpi.txStore.txHashMap[hash]
 	if !ok {
 		return nil
@@ -231,12 +198,7 @@ func (mpi *mempoolImpl[T, Constraint]) GetPendingTxByHash(hash string) []byte {
 		return nil
 	}
 
-	txData, err := Constraint(item.rawTx).RbftMarshal()
-	if err != nil {
-		mpi.logger.Errorf("Marshal tx failed, err: %s", err.Error())
-		return nil
-	}
-	return txData
+	return item.rawTx
 }
 
 // GenerateRequestBatch generates a transaction batch and post it
@@ -280,7 +242,7 @@ func (mpi *mempoolImpl[T, Constraint]) RestoreOneBatch(hash string) error {
 		}
 		// check if the given tx exist in priorityIndex
 		poolTx := mpi.txStore.getPoolTxByTxnPointer(ptr.account, ptr.nonce)
-		key := &orderedIndexKey{poolTx.getRawTimestamp(), ptr.account, ptr.nonce}
+		key := &orderedIndexKey{time: poolTx.getRawTimestamp(), account: ptr.account, nonce: ptr.nonce}
 		if tx := mpi.txStore.priorityIndex.data.Get(key); tx == nil {
 			return fmt.Errorf("can't find tx %s from priorityIndex", hash)
 		}
@@ -309,7 +271,6 @@ func (mpi *mempoolImpl[T, Constraint]) RemoveBatches(hashList []string) {
 		delete(mpi.txStore.batchesCache, batchHash)
 		dirtyAccounts := make(map[string]bool)
 		for _, txHash := range batch.TxHashList {
-			txPointer := mpi.txStore.txHashMap[txHash]
 			txPointer, ok := mpi.txStore.txHashMap[txHash]
 			if !ok {
 				mpi.logger.Warningf("Remove transaction %s failed, Can't find it from txHashMap", txHash)
@@ -393,16 +354,11 @@ func (mpi *mempoolImpl[T, Constraint]) RemoveBatches(hashList []string) {
 //  5. If this node get all transactions from pool, generate a batch and return its
 //     transactions without error
 func (mpi *mempoolImpl[T, Constraint]) GetRequestsByHashList(batchHash string, timestamp int64, hashList []string,
-	deDuplicateTxHashes []string) (txs [][]byte, localList []bool, missingTxsHash map[uint64]string, err error) {
-
+	deDuplicateTxHashes []string) (txs []*T, localList []bool, missingTxsHash map[uint64]string, err error) {
 	if batch, ok := mpi.txStore.batchesCache[batchHash]; ok {
 		// If replica already has this batch, directly return tx list
 		mpi.logger.Debugf("Batch %s is already in batchesCache", batchHash)
 
-		// If it's a config-change batch, replica turn into config-change mode
-		if batch.IsConfBatch() {
-			mpi.logger.Infof("Replica found a config-change batch, batchHash: %s", batchHash)
-		}
 		txs = batch.TxList
 		localList = batch.LocalList
 		missingTxsHash = nil
@@ -427,8 +383,8 @@ func (mpi *mempoolImpl[T, Constraint]) GetRequestsByHashList(batchHash string, t
 	missingTxsHash = make(map[uint64]string)
 	var hasMissing bool
 	for index, txHash := range hashList {
-		var txPointer *txnPointer
-		if txPointer, _ = mpi.txStore.txHashMap[txHash]; txPointer == nil {
+		txPointer := mpi.txStore.txHashMap[txHash]
+		if txPointer == nil {
 			mpi.logger.Debugf("Can't find tx by hash: %s from memPool", txHash)
 			missingTxsHash[uint64(index)] = txHash
 			hasMissing = true
@@ -456,13 +412,7 @@ func (mpi *mempoolImpl[T, Constraint]) GetRequestsByHashList(batchHash string, t
 		}
 
 		if !hasMissing {
-			// todo(lrx): modify []byte to *T
-			txData, err := Constraint(poolTx.rawTx).RbftMarshal()
-			if err != nil {
-				mpi.logger.Errorf("Transaction %s marshal failed: %s", txHash, err)
-				return nil, nil, nil, err
-			}
-			txs = append(txs, txData)
+			txs = append(txs, poolTx.rawTx)
 			localList = append(localList, poolTx.local)
 		}
 	}
@@ -474,7 +424,7 @@ func (mpi *mempoolImpl[T, Constraint]) GetRequestsByHashList(batchHash string, t
 		return
 	}
 	for _, txHash := range hashList {
-		txPointer, _ := mpi.txStore.txHashMap[txHash]
+		txPointer := mpi.txStore.txHashMap[txHash]
 		mpi.txStore.batchedTxs[*txPointer] = true
 	}
 	// store the batch to cache
@@ -508,10 +458,9 @@ func (mpi *mempoolImpl[T, Constraint]) HasPendingRequestInPool() bool {
 }
 
 func (mpi *mempoolImpl[T, Constraint]) SendMissingRequests(batchHash string, missingHashList map[uint64]string) (
-	txs map[uint64][]byte, err error) {
-
+	txs map[uint64]*T, err error) {
 	for _, txHash := range missingHashList {
-		if txPointer, _ := mpi.txStore.txHashMap[txHash]; txPointer == nil {
+		if txPointer := mpi.txStore.txHashMap[txHash]; txPointer == nil {
 			return nil, fmt.Errorf("transaction %s doesn't exist in txHashMap", txHash)
 		}
 	}
@@ -521,7 +470,7 @@ func (mpi *mempoolImpl[T, Constraint]) SendMissingRequests(batchHash string, mis
 		return nil, fmt.Errorf("batch %s doesn't exist in batchedCache", batchHash)
 	}
 	targetBatchLen := uint64(len(targetBatch.TxList))
-	txs = make(map[uint64][]byte)
+	txs = make(map[uint64]*T)
 	for index, txHash := range missingHashList {
 		if index >= targetBatchLen || targetBatch.TxHashList[index] != txHash {
 			return nil, fmt.Errorf("find invalid transaction, index: %d, targetHash: %s", index, txHash)
@@ -531,7 +480,7 @@ func (mpi *mempoolImpl[T, Constraint]) SendMissingRequests(batchHash string, mis
 	return
 }
 
-func (mpi *mempoolImpl[T, Constraint]) ReceiveMissingRequests(batchHash string, txs map[uint64][]byte) error {
+func (mpi *mempoolImpl[T, Constraint]) ReceiveMissingRequests(batchHash string, txs map[uint64]*T) error {
 	mpi.logger.Debugf("Replica received %d missingTxs, batch hash: %s", len(txs), batchHash)
 	if _, ok := mpi.txStore.missingBatch[batchHash]; !ok {
 		mpi.logger.Debugf("Can't find batch %s from missingBatch", batchHash)
@@ -542,17 +491,14 @@ func (mpi *mempoolImpl[T, Constraint]) ReceiveMissingRequests(batchHash string, 
 		return fmt.Errorf("receive unmatched fetching txn response, expect "+
 			"length: %d, received length: %d", expectLen, len(txs))
 	}
-	validTxn := make([][]byte, 0)
+	validTxn := make([]*T, 0)
 	targetBatch := mpi.txStore.missingBatch[batchHash]
-	for index, txData := range txs {
-		txHash, err := consensus.GetTxHash[T, Constraint](txData)
-		if err != nil {
-			return fmt.Errorf("get hash of tx %d failed: %s", index, err)
-		}
+	for index, tx := range txs {
+		txHash := Constraint(tx).RbftGetTxHash()
 		if txHash != targetBatch[index] {
 			return errors.New("find a hash mismatch tx")
 		}
-		validTxn = append(validTxn, txData)
+		validTxn = append(validTxn, tx)
 	}
 	mpi.AddNewRequests(validTxn, false, false, true)
 	delete(mpi.txStore.missingBatch, batchHash)
@@ -562,7 +508,6 @@ func (mpi *mempoolImpl[T, Constraint]) ReceiveMissingRequests(batchHash string, 
 // ReConstructBatchByOrder reconstruct batch from empty txPool by order, must be called after RestorePool.
 func (mpi *mempoolImpl[T, Constraint]) ReConstructBatchByOrder(oldBatch *RequestHashBatch[T, Constraint]) (
 	deDuplicateTxHashes []string, err error) {
-
 	// check if there exists duplicate batch hash.
 	if _, ok := mpi.txStore.batchesCache[oldBatch.BatchHash]; ok {
 		mpi.logger.Warningf("When re-construct batch, batch %s already exists", oldBatch.BatchHash)
@@ -578,12 +523,7 @@ func (mpi *mempoolImpl[T, Constraint]) ReConstructBatchByOrder(oldBatch *Request
 	}
 
 	for i, tx := range oldBatch.TxList {
-		txHash, err1 := consensus.GetTxHash[T, Constraint](tx)
-		if err1 != nil {
-			mpi.logger.Warningf("Batch is invalid because the hash of the %dth transaction cannot be calculated.", i)
-			err = errors.New("invalid batch: hash of transaction cannot be calculated")
-			return
-		}
+		txHash := Constraint(tx).RbftGetTxHash()
 		if txHash != oldBatch.TxHashList[i] {
 			mpi.logger.Warningf("Batch is invalid because the hash %s in txHashList does not match "+
 				"the calculated hash %s of the corresponding transaction.", oldBatch.TxHashList[i], txHash)
@@ -614,13 +554,7 @@ func (mpi *mempoolImpl[T, Constraint]) ReConstructBatchByOrder(oldBatch *Request
 
 	// There may be some duplicate transactions which are batched in different batches during vc, for those txs,
 	// we only accept them in the first batch containing them and de-duplicate them in following batches.
-	for _, rawTx := range oldBatch.TxList {
-		tx, err1 := consensus.DecodeTx[T, Constraint](rawTx)
-		if err1 != nil {
-			mpi.logger.Warningf("Batch is invalid because the transaction cannot be decoded.")
-			err = errors.New("invalid batch: transaction cannot be decoded")
-			return
-		}
+	for _, tx := range oldBatch.TxList {
 		ptr := &txnPointer{
 			account: Constraint(tx).RbftGetFrom(),
 			nonce:   Constraint(tx).RbftGetNonce(),
@@ -651,22 +585,14 @@ func (mpi *mempoolImpl[T, Constraint]) RestorePool() {
 	var (
 		account string
 		nonce   uint64
-		err     error
 	)
 	// record the smallest nonce of each account
 	rollbackTxsNonce := make(map[string]uint64)
 	for _, batch := range mpi.txStore.batchesCache {
 		for _, tx := range batch.TxList {
-			account, err = consensus.GetAccount[T, Constraint](tx)
-			if err != nil {
-				mpi.logger.Warningf("Get tx account error when restore pool")
-				continue
-			}
-			nonce, err = consensus.GetNonce[T, Constraint](tx)
-			if err != nil {
-				mpi.logger.Warningf("Get tx nonce error when restore pool")
-				continue
-			}
+			account = Constraint(tx).RbftGetFrom()
+			nonce = Constraint(tx).RbftGetNonce()
+
 			if _, ok := rollbackTxsNonce[account]; !ok {
 				rollbackTxsNonce[account] = nonce
 			} else if nonce < rollbackTxsNonce[account] {
@@ -682,7 +608,7 @@ func (mpi *mempoolImpl[T, Constraint]) RestorePool() {
 		mpi.txStore.nonceCache.setPendingNonce(acc, non)
 	}
 
-	//resubmit these txs to mempool.
+	// resubmit these txs to mempool.
 	for batchDigest, batch := range mpi.txStore.batchesCache {
 		mpi.logger.Debugf("Put batch %s back to pool with %d txs", batchDigest, len(batch.TxList))
 		mpi.AddNewRequests(batch.TxList, false, false, true)
@@ -699,7 +625,7 @@ func (mpi *mempoolImpl[T, Constraint]) RestorePool() {
 }
 
 // FilterOutOfDateRequests get the remained local txs in TTLIndex and broadcast to other vp peers by tolerance time.
-func (mpi *mempoolImpl[T, Constraint]) FilterOutOfDateRequests() ([][]byte, error) {
+func (mpi *mempoolImpl[T, Constraint]) FilterOutOfDateRequests() ([]*T, error) {
 	now := time.Now().Unix()
 	var forward []*mempoolTransaction[T, Constraint]
 	mpi.txStore.localTTLIndex.data.Ascend(func(a btree.Item) bool {
@@ -711,7 +637,7 @@ func (mpi *mempoolImpl[T, Constraint]) FilterOutOfDateRequests() ([][]byte, erro
 		}
 		if float64(now-poolTx.lifeTime) > mpi.toleranceTime.Seconds() {
 			// for those batched txs, we don't need to forward temporarily.
-			if _, ok := mpi.txStore.batchedTxs[txnPointer{orderedKey.account, orderedKey.nonce}]; !ok {
+			if _, ok := mpi.txStore.batchedTxs[txnPointer{account: orderedKey.account, nonce: orderedKey.nonce}]; !ok {
 				forward = append(forward, poolTx)
 			}
 		} else {
@@ -719,18 +645,12 @@ func (mpi *mempoolImpl[T, Constraint]) FilterOutOfDateRequests() ([][]byte, erro
 		}
 		return true
 	})
-	result := make([][]byte, len(forward))
+	result := make([]*T, len(forward))
 	// update pool tx's timestamp to now for next forwarding check.
 	for i, poolTx := range forward {
 		// update localTTLIndex
 		mpi.txStore.localTTLIndex.updateTTLIndex(poolTx.lifeTime, poolTx.getAccount(), poolTx.getNonce(), now)
-
-		// todo(lrx): modify []byte to *T
-		txData, err := Constraint(poolTx.rawTx).RbftMarshal()
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal tx: %v", err)
-		}
-		result[i] = txData
+		result[i] = poolTx.rawTx
 		// update mempool tx in allTxs
 		poolTx.lifeTime = now
 	}
@@ -754,7 +674,7 @@ func (mpi *mempoolImpl[T, Constraint]) RemoveTimeoutRequests() (uint64, error) {
 		if float64(now-poolTx.arrivedTime) > mpi.toleranceRemoveTime.Seconds() {
 			mpi.logger.Debugf("handle orderedKey[account:%s, nonce:%d]", poolTx.getAccount(), poolTx.getNonce())
 			// for those batched txs, we don't need to removedTxs temporarily.
-			if _, ok := mpi.txStore.batchedTxs[txnPointer{orderedKey.account, orderedKey.nonce}]; ok {
+			if _, ok := mpi.txStore.batchedTxs[txnPointer{account: orderedKey.account, nonce: orderedKey.nonce}]; ok {
 				mpi.logger.Debugf("find tx[account: %s, nonce:%d] from batchedTxs, ignore remove request",
 					orderedKey.account, orderedKey.nonce)
 				return true
@@ -840,14 +760,14 @@ func (mpi *mempoolImpl[T, Constraint]) processDirtyAccount(dirtyAccounts map[str
 
 			// insert ready txs into priorityIndex
 			for _, poolTx := range readyTxs {
-				mpi.txStore.priorityIndex.insertByOrderedQueueKey(poolTx.arrivedTime, poolTx.getAccount(), poolTx.getNonce())
-				//mpi.logger.Debugf("insert ready tx[account: %s, nonce: %d] into priorityIndex", poolTx.getAccount(), poolTx.getNonce())
+				mpi.txStore.priorityIndex.insertByOrderedQueueKey(poolTx.getRawTimestamp(), poolTx.getAccount(), poolTx.getNonce())
+				// mpi.logger.Debugf("insert ready tx[account: %s, nonce: %d] into priorityIndex", poolTx.getAccount(), poolTx.getNonce())
 			}
 			mpi.increasePriorityNonBatchSize(uint64(len(readyTxs)))
 
 			// insert non-ready txs into parkingLotIndex
 			for _, poolTx := range nonReadyTxs {
-				mpi.txStore.parkingLotIndex.insertByOrderedQueueKey(poolTx.arrivedTime, poolTx.getAccount(), poolTx.getNonce())
+				mpi.txStore.parkingLotIndex.insertByOrderedQueueKey(poolTx.getRawTimestamp(), poolTx.getAccount(), poolTx.getNonce())
 			}
 		}
 	}
@@ -856,7 +776,6 @@ func (mpi *mempoolImpl[T, Constraint]) processDirtyAccount(dirtyAccounts map[str
 // generateRequestBatch fetches next block of transactions for consensus,
 // batchedTx are all txs sent to consensus but were not committed yet, mempool should filter out such txs.
 func (mpi *mempoolImpl[T, Constraint]) generateRequestBatch() ([]*RequestHashBatch[T, Constraint], error) {
-
 	if !mpi.isTimed && !mpi.HasPendingRequestInPool() {
 		mpi.logger.Debug("Mempool is empty")
 		return nil, nil
@@ -875,13 +794,13 @@ func (mpi *mempoolImpl[T, Constraint]) generateRequestBatch() ([]*RequestHashBat
 		tx := a.(*orderedIndexKey)
 		// if tx has existed in bathedTxs
 		// TODO (YH): refactor batchedTxs to seen (all the transactions that have been executed) to track all txs batched in ledger.
-		if _, ok := mpi.txStore.batchedTxs[txnPointer{tx.account, tx.nonce}]; ok {
+		if _, ok := mpi.txStore.batchedTxs[txnPointer{account: tx.account, nonce: tx.nonce}]; ok {
 			return true
 		}
 		txSeq := tx.nonce
-		//mpi.logger.Debugf("memPool txNonce:%s-%d", tx.account, tx.nonce)
+		// mpi.logger.Debugf("memPool txNonce:%s-%d", tx.account, tx.nonce)
 		commitNonce := mpi.txStore.nonceCache.getCommitNonce(tx.account)
-		//mpi.logger.Debugf("ledger txNonce:%s-%d", tx.account, commitNonce)
+		// mpi.logger.Debugf("ledger txNonce:%s-%d", tx.account, commitNonce)
 		var seenPrevious bool
 		if txSeq >= 1 {
 			_, seenPrevious = mpi.txStore.batchedTxs[txnPointer{account: tx.account, nonce: txSeq - 1}]
@@ -931,7 +850,7 @@ func (mpi *mempoolImpl[T, Constraint]) generateRequestBatch() ([]*RequestHashBat
 	// convert transaction pointers to real values
 	hashList := make([]string, len(result))
 	localList := make([]bool, len(result))
-	txList := make([][]byte, len(result))
+	txList := make([]*T, len(result))
 	for i, v := range result {
 		poolTx := mpi.txStore.getPoolTxByTxnPointer(v.account, v.nonce)
 		if poolTx == nil {
@@ -939,12 +858,7 @@ func (mpi *mempoolImpl[T, Constraint]) generateRequestBatch() ([]*RequestHashBat
 		}
 		hashList[i] = poolTx.getHash()
 
-		// todo(lrx): modify []byte to *T
-		txData, err := Constraint(poolTx.rawTx).RbftMarshal()
-		if err != nil {
-			return nil, fmt.Errorf("marshal tx error: %v", err)
-		}
-		txList[i] = txData
+		txList[i] = poolTx.rawTx
 		localList[i] = poolTx.local
 	}
 
@@ -996,13 +910,13 @@ func (mpi *mempoolImpl[T, Constraint]) replaceTx(tx *T) {
 	// remove old tx from txHashMap、priorityIndex、parkingLotIndex、localTTLIndex and removeTTLIndex
 	if oldPoolTx != nil {
 		delete(mpi.txStore.txHashMap, oldPoolTx.getHash())
-		mpi.txStore.priorityIndex.removeByOrderedQueueKey(oldPoolTx.arrivedTime, oldPoolTx.getAccount(), oldPoolTx.getNonce())
-		mpi.txStore.parkingLotIndex.removeByOrderedQueueKey(oldPoolTx.arrivedTime, oldPoolTx.getAccount(), oldPoolTx.getNonce())
+		mpi.txStore.priorityIndex.removeByOrderedQueueKey(oldPoolTx.getRawTimestamp(), oldPoolTx.getAccount(), oldPoolTx.getNonce())
+		mpi.txStore.parkingLotIndex.removeByOrderedQueueKey(oldPoolTx.getRawTimestamp(), oldPoolTx.getAccount(), oldPoolTx.getNonce())
 		mpi.txStore.localTTLIndex.removeByTTLIndexByKey(oldPoolTx, Rebroadcast)
 		mpi.txStore.removeTTLIndex.removeByTTLIndexByKey(oldPoolTx, Remove)
 	}
 	// insert new tx received from remote vp
-	mpi.txStore.priorityIndex.insertByOrderedQueueKey(newPoolTx.arrivedTime, newPoolTx.getAccount(), newPoolTx.getNonce())
+	mpi.txStore.priorityIndex.insertByOrderedQueueKey(newPoolTx.getRawTimestamp(), newPoolTx.getAccount(), newPoolTx.getNonce())
 }
 
 // getBatchHash calculate hash of a RequestHashBatch

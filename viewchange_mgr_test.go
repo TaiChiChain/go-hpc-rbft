@@ -3,28 +3,24 @@ package rbft
 import (
 	"testing"
 
-	"github.com/axiomesh/axiom-bft/common/consensus"
-	"github.com/axiomesh/axiom-bft/types"
-
 	"github.com/gogo/protobuf/proto"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/axiomesh/axiom-bft/common/consensus"
 )
 
 func TestVC_FullProcess(t *testing.T) {
-
-	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	unlockCluster(rbfts)
 	// init recovery to stable view 1, primary is node2
 	clusterInitRecovery(t, nodes, rbfts, -1)
-	assert.Equal(t, uint64(1), rbfts[1].view)
-	assert.Equal(t, uint64(1), rbfts[2].view)
-	assert.Equal(t, uint64(1), rbfts[3].view)
+	assert.Equal(t, uint64(1), rbfts[1].chainConfig.View)
+	assert.Equal(t, uint64(1), rbfts[2].chainConfig.View)
+	assert.Equal(t, uint64(1), rbfts[3].chainConfig.View)
 
 	tx := newTx()
-	txBytes, err := tx.Marshal()
-	assert.Nil(t, err)
 	// node3 cache some txs.
-	rbfts[2].batchMgr.requestPool.AddNewRequests([][]byte{txBytes}, false, true, false)
+	rbfts[2].batchMgr.requestPool.AddNewRequests([]*consensus.FltTransaction{tx}, false, true, false)
 
 	// replica 1 send vc
 	rbfts[0].sendViewChange()
@@ -59,9 +55,9 @@ func TestVC_FullProcess(t *testing.T) {
 	// new backup nodes process new view.
 	rbfts[1].processEvent(nv)
 	rbfts[3].processEvent(nv)
-	assert.Equal(t, uint64(2), rbfts[1].view)
-	assert.Equal(t, uint64(2), rbfts[2].view)
-	assert.Equal(t, uint64(2), rbfts[3].view)
+	assert.Equal(t, uint64(2), rbfts[1].chainConfig.View)
+	assert.Equal(t, uint64(2), rbfts[2].chainConfig.View)
+	assert.Equal(t, uint64(2), rbfts[3].chainConfig.View)
 
 	assert.NotEqual(t, consensus.Type_PRE_PREPARE, nodes[2].broadcastMessageCache.Type)
 	rbfts[2].handleViewChangeEvent(doneEvent)
@@ -69,15 +65,14 @@ func TestVC_FullProcess(t *testing.T) {
 }
 
 func TestVC_recvViewChange_FromPrimary(t *testing.T) {
-
-	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	unlockCluster(rbfts)
 	// init recovery to stable view 1, primary is node2
 	clusterInitRecovery(t, nodes, rbfts, -1)
 
 	// primary node2 send vc.
 	rbfts[1].sendViewChange()
-	assert.Equal(t, uint64(2), rbfts[1].view)
+	assert.Equal(t, uint64(2), rbfts[1].chainConfig.View)
 
 	vcPayload := nodes[1].broadcastMessageCache.Payload
 	vc := &consensus.ViewChange{}
@@ -87,12 +82,11 @@ func TestVC_recvViewChange_FromPrimary(t *testing.T) {
 	rbfts[2].recvViewChange(vc, unMarshalVcBasis(vc), false)
 	assert.Equal(t, consensus.Type_VIEW_CHANGE, nodes[2].broadcastMessageCache.Type)
 
-	assert.Equal(t, uint64(2), rbfts[2].view)
+	assert.Equal(t, uint64(2), rbfts[2].chainConfig.View)
 }
 
 func TestVC_recvViewChange_Quorum(t *testing.T) {
-
-	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	unlockCluster(rbfts)
 	// init recovery to stable view 1, primary is node2
 	clusterInitRecovery(t, nodes, rbfts, -1)
@@ -119,8 +113,7 @@ func TestVC_recvViewChange_Quorum(t *testing.T) {
 }
 
 func TestVC_fetchRequestBatches(t *testing.T) {
-
-	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	unlockCluster(rbfts)
 	// init recovery to stable view 1, primary is node2
 	clusterInitRecovery(t, nodes, rbfts, -1)
@@ -131,8 +124,7 @@ func TestVC_fetchRequestBatches(t *testing.T) {
 }
 
 func TestVC_recvFetchRequestBatch(t *testing.T) {
-
-	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	unlockCluster(rbfts)
 	// init recovery to stable view 1, primary is node2
 	clusterInitRecovery(t, nodes, rbfts, -1)
@@ -146,15 +138,14 @@ func TestVC_recvFetchRequestBatch(t *testing.T) {
 	assert.Nil(t, ret1)
 	assert.Nil(t, nodes[1].unicastMessageCache)
 
-	rbfts[1].storeMgr.batchStore["lost-batch"] = &consensus.RequestBatch{}
+	rbfts[1].storeMgr.batchStore["lost-batch"] = &RequestBatch[consensus.FltTransaction, *consensus.FltTransaction]{}
 	ret2 := rbfts[1].processEvent(fr)
 	assert.Nil(t, ret2)
 	assert.Equal(t, consensus.Type_FETCH_BATCH_RESPONSE, nodes[1].unicastMessageCache.Type)
 }
 
 func TestVC_recvFetchBatchResponse_AfterViewChanged(t *testing.T) {
-
-	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	unlockCluster(rbfts)
 	// init recovery to stable view 1, primary is node2
 	clusterInitRecovery(t, nodes, rbfts, -1)
@@ -193,18 +184,18 @@ func TestVC_recvFetchBatchResponse_AfterViewChanged(t *testing.T) {
 
 	// construct a fetch request batch response
 	tx := newTx()
-	txBytes, err := tx.Marshal()
-	assert.Nil(t, err)
-	batch := &consensus.RequestBatch{
+	batch := &RequestBatch[consensus.FltTransaction, *consensus.FltTransaction]{
 		RequestHashList: []string{"tx-hash"},
-		RequestList:     [][]byte{txBytes},
+		RequestList:     []*consensus.FltTransaction{tx},
 		SeqNo:           uint64(1),
 		LocalList:       []bool{true},
 		BatchHash:       "lost-batch",
 	}
+	pbBatch, err := batch.ToPB()
+	assert.Nil(t, err)
 	sr := &consensus.FetchBatchResponse{
 		ReplicaId:   uint64(2),
-		Batch:       batch,
+		Batch:       pbBatch,
 		BatchDigest: batch.BatchHash,
 	}
 
@@ -227,8 +218,7 @@ func TestVC_recvFetchBatchResponse_AfterViewChanged(t *testing.T) {
 }
 
 func TestVC_processNewView_AfterViewChanged_PrimaryNormal(t *testing.T) {
-
-	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	unlockCluster(rbfts)
 	// init recovery to stable view 1, primary is node2
 	clusterInitRecovery(t, nodes, rbfts, -1)
@@ -236,9 +226,7 @@ func TestVC_processNewView_AfterViewChanged_PrimaryNormal(t *testing.T) {
 	// mock primary node2 cached some txs.
 	nodes[1].broadcastMessageCache = nil
 	tx := newTx()
-	txBytes, err := tx.Marshal()
-	assert.Nil(t, err)
-	rbfts[1].batchMgr.requestPool.AddNewRequests([][]byte{txBytes}, false, true, false)
+	rbfts[1].batchMgr.requestPool.AddNewRequests([]*consensus.FltTransaction{tx}, false, true, false)
 	batch := rbfts[1].batchMgr.requestPool.GenerateRequestBatch()
 
 	// a message list
@@ -250,7 +238,7 @@ func TestVC_processNewView_AfterViewChanged_PrimaryNormal(t *testing.T) {
 
 	rbfts[1].putBackRequestBatches(msgList)
 
-	batch3 := &consensus.RequestBatch{
+	batch3 := &RequestBatch[consensus.FltTransaction, *consensus.FltTransaction]{
 		RequestHashList: batch[0].TxHashList,
 		RequestList:     batch[0].TxList,
 		Timestamp:       batch[0].Timestamp,
@@ -265,17 +253,14 @@ func TestVC_processNewView_AfterViewChanged_PrimaryNormal(t *testing.T) {
 }
 
 func TestVC_processNewView_AfterViewChanged_ReplicaNormal(t *testing.T) {
-
-	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	unlockCluster(rbfts)
 	// init recovery to stable view 1, primary is node2
 	clusterInitRecovery(t, nodes, rbfts, -1)
 
 	// mock backup node1 cached some txs.
 	tx := newTx()
-	txBytes, err := tx.Marshal()
-	assert.Nil(t, err)
-	rbfts[0].batchMgr.requestPool.AddNewRequests([][]byte{txBytes}, false, true, false)
+	rbfts[0].batchMgr.requestPool.AddNewRequests([]*consensus.FltTransaction{tx}, false, true, false)
 	batch := rbfts[0].batchMgr.requestPool.GenerateRequestBatch()
 
 	// a message list
@@ -287,7 +272,7 @@ func TestVC_processNewView_AfterViewChanged_ReplicaNormal(t *testing.T) {
 
 	rbfts[0].putBackRequestBatches(msgList)
 
-	batch3 := &consensus.RequestBatch{
+	batch3 := &RequestBatch[consensus.FltTransaction, *consensus.FltTransaction]{
 		RequestHashList: batch[0].TxHashList,
 		RequestList:     batch[0].TxList,
 		Timestamp:       batch[0].Timestamp,
@@ -303,183 +288,11 @@ func TestVC_processNewView_AfterViewChanged_ReplicaNormal(t *testing.T) {
 	assert.Equal(t, consensus.Type_COMMIT, nodes[0].broadcastMessageCache.Type)
 }
 
-func TestVC_processNewView_AfterViewChanged_LargerConfig(t *testing.T) {
-
-	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
-
-	tx := newTx()
-	txBytes, err := tx.Marshal()
-	assert.Nil(t, err)
-	rbfts[0].batchMgr.requestPool.AddNewRequests([][]byte{txBytes}, true, true, false)
-	batch := rbfts[0].batchMgr.requestPool.GenerateRequestBatch()[0]
-
-	ctx := newCTX(defaultValidatorSet)
-	ctxBytes, err := ctx.Marshal()
-	assert.Nil(t, err)
-
-	batch1, _ := rbfts[0].batchMgr.requestPool.AddNewRequests([][]byte{ctxBytes}, true, true, false)
-	configBatch := batch1[0]
-
-	// a message list
-	msgList := []*consensus.Vc_PQ{
-		{SequenceNumber: 0, BatchDigest: "XXX GENESIS"},
-		{SequenceNumber: 1, BatchDigest: ""},
-		{SequenceNumber: 2, BatchDigest: ""},
-		{SequenceNumber: 3, BatchDigest: batch.BatchHash},
-		{SequenceNumber: 4, BatchDigest: configBatch.BatchHash},
-	}
-
-	rbfts[0].putBackRequestBatches(msgList)
-
-	requestBatch := &consensus.RequestBatch{
-		RequestHashList: batch.TxHashList,
-		RequestList:     batch.TxList,
-		Timestamp:       batch.Timestamp,
-		LocalList:       batch.LocalList,
-		BatchHash:       batch.BatchHash,
-		SeqNo:           uint64(3),
-	}
-	rbfts[0].storeMgr.batchStore[batch.BatchHash] = requestBatch
-
-	configRequestBatch := &consensus.RequestBatch{
-		RequestHashList: configBatch.TxHashList,
-		RequestList:     configBatch.TxList,
-		Timestamp:       configBatch.Timestamp,
-		LocalList:       configBatch.LocalList,
-		BatchHash:       configBatch.BatchHash,
-		SeqNo:           uint64(4),
-	}
-	rbfts[0].storeMgr.batchStore[configBatch.BatchHash] = configRequestBatch
-
-	rbfts[0].setView(uint64(1))
-	rbfts[0].exec.setLastExec(uint64(5))
-	rbfts[0].processNewView(msgList)
-	assert.Equal(t, uint64(5), rbfts[0].batchMgr.seqNo)
-	assert.Equal(t, consensus.Type_COMMIT, nodes[0].broadcastMessageCache.Type)
-}
-
-func TestVC_processNewView_AfterViewChanged_LowerConfig(t *testing.T) {
-
-	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
-
-	tx := newTx()
-	txBytes, err := tx.Marshal()
-	assert.Nil(t, err)
-	rbfts[0].batchMgr.requestPool.AddNewRequests([][]byte{txBytes}, true, true, false)
-	batch := rbfts[0].batchMgr.requestPool.GenerateRequestBatch()[0]
-
-	ctx := newCTX(defaultValidatorSet)
-	ctxBytes, err := ctx.Marshal()
-	assert.Nil(t, err)
-	batch1, _ := rbfts[0].batchMgr.requestPool.AddNewRequests([][]byte{ctxBytes}, true, true, false)
-	configBatch := batch1[0]
-
-	// a message list
-	msgList := []*consensus.Vc_PQ{
-		{SequenceNumber: 0, BatchDigest: "XXX GENESIS"},
-		{SequenceNumber: 1, BatchDigest: ""},
-		{SequenceNumber: 2, BatchDigest: ""},
-		{SequenceNumber: 3, BatchDigest: batch.BatchHash},
-		{SequenceNumber: 4, BatchDigest: configBatch.BatchHash},
-	}
-
-	rbfts[0].putBackRequestBatches(msgList)
-
-	requestBatch := &consensus.RequestBatch{
-		RequestHashList: batch.TxHashList,
-		RequestList:     batch.TxList,
-		Timestamp:       batch.Timestamp,
-		LocalList:       batch.LocalList,
-		BatchHash:       batch.BatchHash,
-		SeqNo:           uint64(3),
-	}
-	rbfts[0].storeMgr.batchStore[batch.BatchHash] = requestBatch
-
-	configRequestBatch := &consensus.RequestBatch{
-		RequestHashList: configBatch.TxHashList,
-		RequestList:     configBatch.TxList,
-		Timestamp:       configBatch.Timestamp,
-		LocalList:       configBatch.LocalList,
-		BatchHash:       configBatch.BatchHash,
-		SeqNo:           uint64(4),
-	}
-	rbfts[0].storeMgr.batchStore[configBatch.BatchHash] = configRequestBatch
-
-	rbfts[0].setView(uint64(2))
-	rbfts[0].exec.setLastExec(uint64(3))
-	rbfts[0].processNewView(msgList)
-	assert.Equal(t, uint64(4), rbfts[0].batchMgr.seqNo)
-	assert.Equal(t, consensus.Type_PREPARE, nodes[0].broadcastMessageCache.Type)
-}
-
-func TestVC_processNewView_AfterViewChanged_EqualConfig(t *testing.T) {
-
-	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
-
-	tx := newTx()
-	txBytes, err := tx.Marshal()
-	assert.Nil(t, err)
-	rbfts[0].batchMgr.requestPool.AddNewRequests([][]byte{txBytes}, true, true, false)
-	batch := rbfts[0].batchMgr.requestPool.GenerateRequestBatch()[0]
-
-	ctx := newCTX(defaultValidatorSet)
-	ctxBytes, err := ctx.Marshal()
-	assert.Nil(t, err)
-	batch1, _ := rbfts[0].batchMgr.requestPool.AddNewRequests([][]byte{ctxBytes}, true, true, false)
-	configBatch := batch1[0]
-
-	// a message list
-	msgList := []*consensus.Vc_PQ{
-		{SequenceNumber: 0, BatchDigest: "XXX GENESIS"},
-		{SequenceNumber: 1, BatchDigest: ""},
-		{SequenceNumber: 2, BatchDigest: ""},
-		{SequenceNumber: 3, BatchDigest: batch.BatchHash},
-		{SequenceNumber: 4, BatchDigest: configBatch.BatchHash},
-	}
-
-	rbfts[0].putBackRequestBatches(msgList)
-
-	requestBatch := &consensus.RequestBatch{
-		RequestHashList: batch.TxHashList,
-		RequestList:     batch.TxList,
-		Timestamp:       batch.Timestamp,
-		LocalList:       batch.LocalList,
-		BatchHash:       batch.BatchHash,
-		SeqNo:           uint64(3),
-	}
-	rbfts[0].storeMgr.batchStore[batch.BatchHash] = requestBatch
-
-	configRequestBatch := &consensus.RequestBatch{
-		RequestHashList: configBatch.TxHashList,
-		RequestList:     configBatch.TxList,
-		Timestamp:       configBatch.Timestamp,
-		LocalList:       configBatch.LocalList,
-		BatchHash:       configBatch.BatchHash,
-		SeqNo:           uint64(4),
-	}
-	rbfts[0].storeMgr.batchStore[configBatch.BatchHash] = configRequestBatch
-
-	rbfts[0].setView(uint64(3))
-	rbfts[0].exec.setLastExec(uint64(4))
-	rbfts[0].node.ReportExecuted(&types.ServiceState{
-		MetaState: &types.MetaState{
-			Height: 4,
-			Digest: "digest-4",
-		},
-	})
-	rbfts[0].processNewView(msgList)
-	assert.Equal(t, uint64(4), rbfts[0].batchMgr.seqNo)
-	assert.Equal(t, consensus.Type_COMMIT, nodes[0].broadcastMessageCache.Type)
-}
-
 func TestVC_fetchMissingReqBatchIfNeeded(t *testing.T) {
-
-	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	_, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 
 	tx := newTx()
-	txBytes, err := tx.Marshal()
-	assert.Nil(t, err)
-	rbfts[0].batchMgr.requestPool.AddNewRequests([][]byte{txBytes}, false, true, false)
+	rbfts[0].batchMgr.requestPool.AddNewRequests([]*consensus.FltTransaction{tx}, false, true, false)
 	batch := rbfts[0].batchMgr.requestPool.GenerateRequestBatch()
 
 	// a message list
@@ -491,7 +304,7 @@ func TestVC_fetchMissingReqBatchIfNeeded(t *testing.T) {
 
 	rbfts[0].putBackRequestBatches(msgList)
 
-	batch3 := &consensus.RequestBatch{
+	batch3 := &RequestBatch[consensus.FltTransaction, *consensus.FltTransaction]{
 		RequestHashList: batch[0].TxHashList,
 		RequestList:     batch[0].TxList,
 		Timestamp:       batch[0].Timestamp,
@@ -510,8 +323,7 @@ func TestVC_fetchMissingReqBatchIfNeeded(t *testing.T) {
 }
 
 func TestVC_correctViewChange(t *testing.T) {
-
-	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 
 	rbfts[2].sendViewChange()
 	vcPayload := nodes[2].broadcastMessageCache.Payload
@@ -555,11 +367,10 @@ func TestVC_correctViewChange(t *testing.T) {
 }
 
 func TestVC_assignSequenceNumbers(t *testing.T) {
+	_, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 
-	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
-
-	//Quorum = 3
-	//oneQuorum = 2
+	// Quorum = 3
+	// oneQuorum = 2
 	C := &consensus.SignedCheckpoint{
 		Checkpoint: &consensus.Checkpoint{
 			ExecuteState: &consensus.Checkpoint_ExecuteState{

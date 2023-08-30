@@ -1,8 +1,9 @@
 package mempool
 
 import (
-	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/google/btree"
+
+	"github.com/axiomesh/axiom-bft/common/consensus"
 )
 
 const (
@@ -88,7 +89,7 @@ func (idx *btreeIndex[T, Constraint]) removeByOrderedQueueKey(timestamp int64, a
 func (idx *btreeIndex[T, Constraint]) removeByOrderedQueueKeys(poolTxs map[string][]*mempoolTransaction[T, Constraint]) {
 	for _, list := range poolTxs {
 		for _, poolTx := range list {
-			idx.removeByOrderedQueueKey(poolTx.arrivedTime, poolTx.getAccount(), poolTx.getNonce())
+			idx.removeByOrderedQueueKey(poolTx.getRawTimestamp(), poolTx.getAccount(), poolTx.getNonce())
 		}
 	}
 }
@@ -108,8 +109,8 @@ func (idx *btreeIndex[T, Constraint]) insertByTTLIndexKey(poolTx *mempoolTransac
 }
 
 func (idx *btreeIndex[T, Constraint]) updateTTLIndex(oldTimestamp int64, account string, nonce uint64, newTimestamp int64) {
-	oldOrderedKey := &orderedIndexKey{oldTimestamp, account, nonce}
-	newOrderedKey := &orderedIndexKey{newTimestamp, account, nonce}
+	oldOrderedKey := &orderedIndexKey{time: oldTimestamp, account: account, nonce: nonce}
+	newOrderedKey := &orderedIndexKey{time: newTimestamp, account: account, nonce: nonce}
 	idx.data.Delete(oldOrderedKey)
 	idx.data.ReplaceOrInsert(newOrderedKey)
 }

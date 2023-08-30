@@ -1,8 +1,9 @@
-package mempoolmock
+package mempool
 
 import (
+	"go.uber.org/mock/gomock"
+
 	"github.com/axiomesh/axiom-bft/common/consensus"
-	"github.com/golang/mock/gomock"
 )
 
 // NewMockMinimalMemPool returns a minimal implement of MockMemPool which accepts
@@ -25,7 +26,6 @@ func NewMockMinimalMemPool[T any, Constraint consensus.TXConstraint[T]](ctrl *go
 	mock.EXPECT().RestorePool().Return().AnyTimes()
 	mock.EXPECT().ReConstructBatchByOrder(gomock.Any()).Return(nil, nil).AnyTimes()
 	mock.EXPECT().Reset(gomock.Any()).Return().AnyTimes()
-	mock.EXPECT().IsConfigBatch(gomock.Any()).Return(false).AnyTimes()
 	mock.EXPECT().Stop().AnyTimes()
 	mock.EXPECT().Start().Return(nil).AnyTimes()
 	return mock

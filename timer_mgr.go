@@ -18,8 +18,6 @@ import (
 	"strconv"
 	"sync"
 	"time"
-
-	"github.com/axiomesh/axiom-bft/common/consensus"
 )
 
 // titleTimer manages timer with the same timer name, which, we allow different timer with the same timer name, such as:
@@ -30,12 +28,15 @@ type titleTimer struct {
 	isActive  sync.Map      // track all the timers with this timerName if it is active now
 }
 
-func (tt *titleTimer) store(key, value interface{}) {
+func (tt *titleTimer) store(key, value any) {
 	tt.isActive.Store(key, value)
 }
 
-func (tt *titleTimer) delete(key interface{}) {
-	tt.isActive.Delete(key)
+func (tt *titleTimer) delete(key any) {
+	afterTimer, ok := tt.isActive.LoadAndDelete(key)
+	if ok {
+		afterTimer.(*time.Timer).Stop()
+	}
 }
 
 func (tt *titleTimer) has(key string) bool {
@@ -45,7 +46,7 @@ func (tt *titleTimer) has(key string) bool {
 
 func (tt *titleTimer) count() int {
 	length := 0
-	tt.isActive.Range(func(_, _ interface{}) bool {
+	tt.isActive.Range(func(_, _ any) bool {
 		length++
 		return true
 	})
@@ -53,8 +54,9 @@ func (tt *titleTimer) count() int {
 }
 
 func (tt *titleTimer) clear() {
-	tt.isActive.Range(func(key, _ interface{}) bool {
+	tt.isActive.Range(func(key, afterTimer any) bool {
 		tt.isActive.Delete(key)
+		afterTimer.(*time.Timer).Stop()
 		return true
 	})
 }
@@ -67,7 +69,7 @@ type timerManager struct {
 }
 
 // newTimerMgr news an instance of timerManager.
-func newTimerMgr[T any, Constraint consensus.TXConstraint[T]](eventC chan consensusEvent, c Config[T, Constraint]) *timerManager {
+func newTimerMgr(eventC chan consensusEvent, c Config) *timerManager {
 	tm := &timerManager{
 		tTimers:   make(map[string]*titleTimer),
 		eventChan: eventC,
@@ -152,14 +154,14 @@ func (tm *timerManager) softStartTimerWithNewTT(name string, timeout time.Durati
 func (tm *timerManager) createTimer(name string, timeout time.Duration, event *LocalEvent) (key string) {
 	timestamp := time.Now().Unix()
 	key = strconv.FormatInt(timestamp, 10)
-	tm.tTimers[name].store(key, true)
-
 	send := func() {
 		if tm.tTimers[name].has(key) {
 			tm.eventChan <- event
 		}
 	}
-	time.AfterFunc(timeout, send)
+	afterTimer := time.AfterFunc(timeout, send)
+	tm.tTimers[name].store(key, afterTimer)
+
 	return key
 }
 
@@ -235,7 +237,7 @@ func (rbft *rbftImpl[T, Constraint]) initTimers() {
 	// requestTimer, the high-watermark timer should be at least K*requestTimer. but checkpoint message should be sent
 	// after executed, we have to take the latency of executor into thought. so that we would like to set high-watermark
 	// timer 2*k*requestTimer
-	k := rbft.config.K
+	k := rbft.chainConfig.EpochInfo.ConsensusParams.CheckpointPeriod
 	if k <= uint64(0) {
 		k = DefaultK
 	}
@@ -317,18 +319,17 @@ func (tm *timerManager) makeSyncStateTimeoutLegal() {
 // 3) replica is trying to send checkpoint equal to high-watermark
 // 4) replica received f+1 checkpoints out of range, but it has already executed blocks larger than these checkpoints
 func (rbft *rbftImpl[T, Constraint]) softStartHighWatermarkTimer(reason string) {
-
-	rbft.logger.Debugf("Replica %d soft start high-watermark timer, current low-watermark is %d, reason: %s", rbft.peerPool.ID, rbft.h, reason)
+	rbft.logger.Debugf("Replica %d soft start high-watermark timer, current low-watermark is %d, reason: %s", rbft.peerMgr.selfID, rbft.chainConfig.H, reason)
 
 	event := &LocalEvent{
 		Service:   CoreRbftService,
 		EventType: CoreHighWatermarkEvent,
-		Event:     rbft.h,
+		Event:     rbft.chainConfig.H,
 	}
 
 	hasStarted, _ := rbft.timerMgr.softStartTimerWithNewTT(highWatermarkTimer, rbft.timerMgr.getTimeoutValue(highWatermarkTimer), event)
 	if hasStarted {
-		rbft.logger.Debugf("Replica %d has started new view timer before", rbft.peerPool.ID)
+		rbft.logger.Debugf("Replica %d has started new view timer before", rbft.peerMgr.selfID)
 	} else {
 		rbft.highWatermarkTimerReason = reason
 	}
@@ -336,7 +337,7 @@ func (rbft *rbftImpl[T, Constraint]) softStartHighWatermarkTimer(reason string) 
 
 // stopHighWatermarkTimer stops a high-watermark timer
 func (rbft *rbftImpl[T, Constraint]) stopHighWatermarkTimer() {
-	rbft.logger.Debugf("Replica %d stop high-watermark timer", rbft.peerPool.ID)
+	rbft.logger.Debugf("Replica %d stop high-watermark timer", rbft.peerMgr.selfID)
 	rbft.timerMgr.stopTimer(highWatermarkTimer)
 }
 
@@ -354,7 +355,7 @@ func (rbft *rbftImpl[T, Constraint]) stopFetchCheckpointTimer() {
 }
 
 func (rbft *rbftImpl[T, Constraint]) startFetchViewTimer() {
-	rbft.logger.Debugf("Replica %d start a fetchView timer", rbft.peerPool.ID)
+	rbft.logger.Debugf("Replica %d start a fetchView timer", rbft.peerMgr.selfID)
 	event := &LocalEvent{
 		Service:   ViewChangeService,
 		EventType: FetchViewEvent,
@@ -364,6 +365,6 @@ func (rbft *rbftImpl[T, Constraint]) startFetchViewTimer() {
 }
 
 func (rbft *rbftImpl[T, Constraint]) stopFetchViewTimer() {
-	rbft.logger.Debugf("Replica %d stop a running fetchView timer", rbft.peerPool.ID)
+	rbft.logger.Debugf("Replica %d stop a running fetchView timer", rbft.peerMgr.selfID)
 	rbft.timerMgr.stopTimer(fetchViewTimer)
 }

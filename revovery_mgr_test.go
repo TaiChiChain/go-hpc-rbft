@@ -3,25 +3,24 @@ package rbft
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/types"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func TestRecovery_ClusterInitRecovery(t *testing.T) {
-	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	unlockCluster(rbfts)
 	clusterInitRecovery(t, nodes, rbfts, -1)
 
 	for index := range rbfts {
-		assert.EqualValues(t, 1, rbfts[index].view)
+		assert.EqualValues(t, 1, rbfts[index].chainConfig.View)
 	}
 }
 
 func TestRecovery_ReplicaSingleRecovery(t *testing.T) {
-
-	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	unlockCluster(rbfts)
 	clusterInitRecovery(t, nodes, rbfts, 3)
 
@@ -35,7 +34,7 @@ func TestRecovery_ReplicaSingleRecovery(t *testing.T) {
 	rbfts[3].sendViewChange(true)
 	vcNode4 := nodes[3].broadcastMessageCache
 	assert.Equal(t, consensus.Type_VIEW_CHANGE, vcNode4.Type)
-	assert.Equal(t, uint64(1), rbfts[3].view)
+	assert.Equal(t, uint64(1), rbfts[3].chainConfig.View)
 
 	// normal nodes response.
 	fetchViewRsp := make([]*consensusMessageWrapper, 4)
@@ -86,8 +85,7 @@ func TestRecovery_ReplicaSingleRecovery(t *testing.T) {
 }
 
 func TestRecovery_Disconnect_ClusterRecovery(t *testing.T) {
-
-	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	unlockCluster(rbfts)
 	// init recovery to stable view 1, primary is node2
 	clusterInitRecovery(t, nodes, rbfts, -1)
@@ -98,19 +96,19 @@ func TestRecovery_Disconnect_ClusterRecovery(t *testing.T) {
 	rbfts[0].sendViewChange()
 	vcNode1 := nodes[0].broadcastMessageCache
 	assert.Equal(t, consensus.Type_VIEW_CHANGE, vcNode1.Type)
-	assert.Equal(t, uint64(2), rbfts[0].view)
+	assert.Equal(t, uint64(2), rbfts[0].chainConfig.View)
 
 	// node3 try vc.
 	rbfts[2].sendViewChange()
 	vcNode3 := nodes[2].broadcastMessageCache
 	assert.Equal(t, consensus.Type_VIEW_CHANGE, vcNode3.Type)
-	assert.Equal(t, uint64(2), rbfts[2].view)
+	assert.Equal(t, uint64(2), rbfts[2].chainConfig.View)
 
 	// node4 try vc.
 	rbfts[3].sendViewChange()
 	vcNode4 := nodes[3].broadcastMessageCache
 	assert.Equal(t, consensus.Type_VIEW_CHANGE, vcNode4.Type)
-	assert.Equal(t, uint64(2), rbfts[3].view)
+	assert.Equal(t, uint64(2), rbfts[3].chainConfig.View)
 
 	// node1 received vc from node3, node4, trigger vc quorum
 	rbfts[0].processEvent(vcNode4)
@@ -129,12 +127,12 @@ func TestRecovery_Disconnect_ClusterRecovery(t *testing.T) {
 	event := &LocalEvent{
 		Service:   ViewChangeService,
 		EventType: ViewChangeTimerEvent,
-		Event:     nextDemandNewView(rbfts[0].view),
+		Event:     nextDemandNewView(rbfts[0].chainConfig.View),
 	}
 	rbfts[0].processEvent(event)
 	vcNode1 = nodes[0].broadcastMessageCache
 	assert.Equal(t, consensus.Type_VIEW_CHANGE, vcNode1.Type)
-	assert.Equal(t, uint64(3), rbfts[0].view)
+	assert.Equal(t, uint64(3), rbfts[0].chainConfig.View)
 
 	// node3 received vc from node1 with higher view, try fetch view after fetch view timer expired.
 	rbfts[2].processEvent(vcNode1)
@@ -146,7 +144,7 @@ func TestRecovery_Disconnect_ClusterRecovery(t *testing.T) {
 	rbfts[2].processEvent(event)
 	fetchViewNode3 := nodes[2].unicastMessageCache
 	assert.Equal(t, consensus.Type_FETCH_VIEW, fetchViewNode3.Type)
-	assert.Equal(t, uint64(2), rbfts[2].view)
+	assert.Equal(t, uint64(2), rbfts[2].chainConfig.View)
 
 	// node4 received vc from node1 with higher view, try fetch view after fetch view timer expired.
 	rbfts[3].processEvent(vcNode1)
@@ -158,7 +156,7 @@ func TestRecovery_Disconnect_ClusterRecovery(t *testing.T) {
 	rbfts[3].processEvent(event)
 	fetchViewNode4 := nodes[3].unicastMessageCache
 	assert.Equal(t, consensus.Type_FETCH_VIEW, fetchViewNode4.Type)
-	assert.Equal(t, uint64(2), rbfts[3].view)
+	assert.Equal(t, uint64(2), rbfts[3].chainConfig.View)
 
 	// node1 received fetch view from node3 and node4, response QuorumViewChange
 	rbfts[0].processEvent(fetchViewNode3)
@@ -170,7 +168,7 @@ func TestRecovery_Disconnect_ClusterRecovery(t *testing.T) {
 	rbfts[2].processEvent(fetchViewNode3Response)
 	newView3 := nodes[2].broadcastMessageCache
 	assert.Equal(t, consensus.Type_NEW_VIEW, newView3.Type)
-	assert.Equal(t, uint64(2), rbfts[2].view)
+	assert.Equal(t, uint64(2), rbfts[2].chainConfig.View)
 	assert.Equal(t, true, rbfts[2].isNormal())
 
 	// node4 process QuorumViewChange and enter view change quorum status.
@@ -184,13 +182,12 @@ func TestRecovery_Disconnect_ClusterRecovery(t *testing.T) {
 	}
 	assert.Equal(t, vcDoneNode4.(*LocalEvent).EventType, vcDoneEvent.EventType)
 	rbfts[3].processEvent(vcDoneEvent)
-	assert.Equal(t, uint64(2), rbfts[3].view)
+	assert.Equal(t, uint64(2), rbfts[3].chainConfig.View)
 	assert.Equal(t, true, rbfts[3].isNormal())
 }
 
 func TestRecovery_PrimaryRecovery(t *testing.T) {
-
-	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	unlockCluster(rbfts)
 	clusterInitRecovery(t, nodes, rbfts, -1)
 
@@ -213,8 +210,7 @@ func TestRecovery_PrimaryRecovery(t *testing.T) {
 }
 
 func TestRecovery_NormalCheckpointFailing_Recovery(t *testing.T) {
-
-	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	unlockCluster(rbfts)
 	clusterInitRecovery(t, nodes, rbfts, -1)
 
@@ -238,7 +234,7 @@ func TestRecovery_NormalCheckpointFailing_Recovery(t *testing.T) {
 	rbfts[3].sendViewChange(true)
 	vcNode4 := nodes[3].broadcastMessageCache
 	assert.Equal(t, consensus.Type_VIEW_CHANGE, vcNode4.Type)
-	assert.Equal(t, uint64(2), rbfts[3].view)
+	assert.Equal(t, uint64(2), rbfts[3].chainConfig.View)
 
 	// normal nodes response.
 	fetchViewRsp := make([]*consensusMessageWrapper, 4)
@@ -267,7 +263,7 @@ func TestRecovery_NormalCheckpointFailing_Recovery(t *testing.T) {
 
 	// node4 finish recovery.
 	recoveryDone := rbfts[3].processEvent(event)
-	assert.Equal(t, uint64(10), rbfts[3].h)
+	assert.Equal(t, uint64(10), rbfts[3].chainConfig.H)
 	assert.Equal(t, uint64(10), rbfts[3].exec.lastExec)
 
 	recoveryVCDoneEvent := &LocalEvent{
@@ -303,8 +299,7 @@ func TestRecovery_NormalCheckpointFailing_Recovery(t *testing.T) {
 }
 
 func TestRecovery_SyncStateToStateUpdate(t *testing.T) {
-
-	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	unlockCluster(rbfts)
 
 	tx := newTx()
@@ -347,8 +342,7 @@ func TestRecovery_SyncStateToStateUpdate(t *testing.T) {
 }
 
 func TestRecovery_ReplicaSyncStateToRecovery(t *testing.T) {
-
-	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	unlockCluster(rbfts)
 
 	tx := newTx()
@@ -379,8 +373,7 @@ func TestRecovery_ReplicaSyncStateToRecovery(t *testing.T) {
 }
 
 func TestRecovery_PrimarySyncStateToRecovery(t *testing.T) {
-
-	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	unlockCluster(rbfts)
 
 	tx := newTx()

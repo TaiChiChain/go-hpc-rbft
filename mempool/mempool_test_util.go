@@ -22,7 +22,6 @@ func mockMempoolImpl[T any, Constraint consensus.TXConstraint[T]]() *mempoolImpl
 // NewMockMempoolConfig returns the default test config
 func NewMockMempoolConfig() Config {
 	poolConfig := Config{
-		ID:            1,
 		BatchSize:     DefaultTestBatchSize,
 		PoolSize:      DefaultPoolSize,
 		Logger:        NewRawLogger(),
@@ -45,7 +44,7 @@ func newMockFltTx(from string, nonce int64) consensus.FltTransaction {
 }
 
 // ConstructTxByAccountAndNonce constructs a tx by given account and nonce.
-func ConstructTxByAccountAndNonce(account string, nonce uint64) consensus.FltTransaction {
+func ConstructTxByAccountAndNonce(account string, nonce uint64) *consensus.FltTransaction {
 	from := make([]byte, 0)
 	strLen := len(account)
 	for i := 0; i < 20; i++ {
@@ -53,7 +52,7 @@ func ConstructTxByAccountAndNonce(account string, nonce uint64) consensus.FltTra
 	}
 	fromStr := hex.EncodeToString(from)
 	tx := newMockFltTx(fromStr, int64(nonce))
-	return tx
+	return &tx
 }
 
 func NewRawLogger() Logger {

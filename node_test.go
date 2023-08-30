@@ -5,16 +5,15 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/axiomesh/axiom-bft/common/consensus"
-	"github.com/axiomesh/axiom-bft/types"
-
 	"github.com/gogo/protobuf/proto"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/axiomesh/axiom-bft/common/consensus"
+	"github.com/axiomesh/axiom-bft/types"
 )
 
 func TestNode_Start(t *testing.T) {
-
-	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	_, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	n := rbfts[0].node
 	n.rbft.atomicOn(Pending)
 
@@ -30,8 +29,7 @@ func TestNode_Start(t *testing.T) {
 }
 
 func TestNode_Stop(t *testing.T) {
-
-	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	_, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	n := rbfts[0].node
 	n.currentState = &types.ServiceState{
 		MetaState: &types.MetaState{
@@ -47,16 +45,8 @@ func TestNode_Stop(t *testing.T) {
 	go func() {
 		for i := 1; i < 100; i++ {
 			tx1 := newTx()
-			txBytes1, err := tx1.Marshal()
-			assert.Nil(t, err)
 			tx2 := newTx()
-			txBytes2, err := tx2.Marshal()
-			assert.Nil(t, err)
-			txs := &consensus.RequestSet{
-				Requests: [][]byte{txBytes1, txBytes2},
-				Local:    true,
-			}
-			_ = n.Propose(txs)
+			_ = n.Propose([]*consensus.FltTransaction{tx1, tx2}, true)
 		}
 		wg.Done()
 	}()
@@ -76,32 +66,28 @@ func TestNode_Stop(t *testing.T) {
 }
 
 func TestNode_Propose(t *testing.T) {
-
-	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	_, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	unlockCluster(rbfts)
 
 	n := rbfts[0].node
 	tx1 := newTx()
-	txBytes1, err := tx1.Marshal()
-	assert.Nil(t, err)
-	requestsTmp := &consensus.RequestSet{
-		Requests: [][]byte{txBytes1},
+	requestsTmp := &RequestSet[consensus.FltTransaction, *consensus.FltTransaction]{
+		Requests: []*consensus.FltTransaction{tx1},
 		Local:    true,
 	}
-	_ = n.Propose(requestsTmp)
+	_ = n.Propose([]*consensus.FltTransaction{tx1}, true)
 	obj := <-n.rbft.recvChan
 	assert.Equal(t, requestsTmp, obj)
 }
 
 func TestNode_Step(t *testing.T) {
-
-	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	_, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	n := rbfts[0].node
 
 	// Post a Type_NULL_REQUEST Msg
 	// Type/Payload
 	nullRequest := &consensus.NullRequest{
-		ReplicaId: n.rbft.peerPool.ID,
+		ReplicaId: n.rbft.peerMgr.selfID,
 	}
 	payload, _ := proto.Marshal(nullRequest)
 	msgTmp := &consensus.ConsensusMessage{
@@ -115,20 +101,8 @@ func TestNode_Step(t *testing.T) {
 	}()
 }
 
-func TestNode_ApplyConfChange(t *testing.T) {
-
-	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
-	n := rbfts[0].node
-
-	r := &types.Router{Peers: peerSet}
-	cc := &types.ConfState{QuorumRouter: r}
-	n.ApplyConfChange(cc)
-	assert.Equal(t, len(peerSet), len(n.rbft.peerPool.router))
-}
-
 func TestNode_ReportExecuted(t *testing.T) {
-
-	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	_, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	n := rbfts[0].node
 
 	state1 := &types.ServiceState{
@@ -174,8 +148,7 @@ func TestNode_ReportExecuted(t *testing.T) {
 }
 
 func TestNode_ReportStateUpdated(t *testing.T) {
-
-	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	_, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	n := rbfts[0].node
 
 	state := &types.ServiceState{
@@ -207,8 +180,7 @@ func TestNode_ReportStateUpdated(t *testing.T) {
 }
 
 func TestNode_getCurrentState(t *testing.T) {
-
-	_, rbfts := newBasicClusterInstance[consensus.FltTransaction]()
+	_, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	n := rbfts[0].node
 
 	n.currentState = &types.ServiceState{

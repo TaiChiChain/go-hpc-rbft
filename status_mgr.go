@@ -46,11 +46,11 @@ const (
 
 // NodeStatus reflects the internal consensus status.
 type NodeStatus struct {
-	ID     uint64
-	View   uint64
-	Epoch  uint64
-	H      uint64
-	Status StatusType
+	ID        uint64
+	View      uint64
+	EpochInfo *EpochInfo
+	H         uint64
+	Status    StatusType
 }
 
 type statusManager struct {
@@ -165,15 +165,6 @@ func (rbft *rbftImpl[T, Constraint]) in(pos uint32) bool {
 	return rbft.status.hasBit(pos)
 }
 
-// InOne checks the result of several status computed with each other using '||'
-func (rbft *rbftImpl[T, Constraint]) inOne(poss ...uint32) bool {
-	var rs = false
-	for _, pos := range poss {
-		rs = rs || rbft.in(pos)
-	}
-	return rs
-}
-
 // ==================================================
 // Status Tools
 // ==================================================
@@ -190,7 +181,7 @@ func (rbft *rbftImpl[T, Constraint]) maybeSetNormal() {
 		rbft.startCheckPoolTimer()
 		rbft.startCheckPoolRemoveTimer()
 	} else {
-		rbft.logger.Debugf("Replica %d not set normal as it's still in abnormal now.", rbft.peerPool.ID)
+		rbft.logger.Debugf("Replica %d not set normal as it's still in abnormal now.", rbft.peerMgr.selfID)
 	}
 }
 
@@ -199,7 +190,7 @@ func (rbft *rbftImpl[T, Constraint]) maybeSetNormal() {
 func (rbft *rbftImpl[T, Constraint]) setAbNormal() {
 	rbft.exitSyncState()
 	rbft.stopCheckPoolTimer()
-	if rbft.isPrimary(rbft.peerPool.ID) {
+	if rbft.isPrimary(rbft.peerMgr.selfID) {
 		rbft.logger.Debug("Old primary stop batch timer before enter abnormal status")
 		rbft.stopBatchTimer()
 	}
