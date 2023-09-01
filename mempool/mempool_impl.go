@@ -44,12 +44,19 @@ func (mpi *mempoolImpl[T, Constraint]) addNewRequests(txs []*T, isPrimary, local
 	completionMissingBatchHashes := make([]string, 0)
 	existTxsHash := make(map[string]struct{})
 	validTxs := make(map[string][]*mempoolTransaction[T, Constraint])
+
+	currentSeqNoList := make(map[string]uint64, 0)
 	for _, tx := range txs {
 		txAccount := Constraint(tx).RbftGetFrom()
 		txHash := Constraint(tx).RbftGetTxHash()
 		txNonce := Constraint(tx).RbftGetNonce()
+
 		// currentSeqNo means the current wanted nonce of the account
-		currentSeqNo := mpi.txStore.nonceCache.getPendingNonce(txAccount)
+		currentSeqNo, ok := currentSeqNoList[txAccount]
+		if !ok {
+			currentSeqNo = mpi.txStore.nonceCache.getPendingNonce(txAccount)
+			currentSeqNoList[txAccount] = currentSeqNo
+		}
 		if txNonce < currentSeqNo {
 			if !isReplace {
 				mpi.logger.Warningf("Receive transaction [account: %s, nonce: %d, hash: %s], but we required %d", txAccount, txNonce, txHash, currentSeqNo)
@@ -68,7 +75,13 @@ func (mpi *mempoolImpl[T, Constraint]) addNewRequests(txs []*T, isPrimary, local
 			//mpi.logger.Debugf("Transaction [account: %s, nonce: %d, hash: %s] has already existed in txHashMap", txAccount, txNonce, txHash)
 			continue
 		}
-		_, ok := validTxs[txAccount]
+
+		// update currentSeqNoList
+		if txNonce == currentSeqNo {
+			currentSeqNoList[txAccount]++
+		}
+
+		_, ok = validTxs[txAccount]
 		if !ok {
 			validTxs[txAccount] = make([]*mempoolTransaction[T, Constraint], 0)
 		}
