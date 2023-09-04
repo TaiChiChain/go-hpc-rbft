@@ -1850,10 +1850,11 @@ func (rbft *rbftImpl[T, Constraint]) finishNormalCheckpoint(checkpointHeight uin
 		}
 		nv.Signature = sig
 		rbft.persistNewView(nv)
+
+		// Slave -> Primary： need update self seqNo(because only primary will update)
+		rbft.batchMgr.setSeqNo(checkpointHeight)
 	}
 
-	// Slave -> Primary： need update self seqNo(because only primary will update)
-	rbft.batchMgr.setSeqNo(checkpointHeight)
 	rbft.logger.Infof("Replica %d post stable checkpoint event for seqNo %d after executed to the height with the same digest, update to new view: %d, new primary ID: %d", rbft.peerMgr.selfID, rbft.chainConfig.H, rbft.chainConfig.View, rbft.chainConfig.PrimaryID)
 	rbft.nullReqTimerReset()
 	rbft.restartBatchTimer()
