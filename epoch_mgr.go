@@ -178,6 +178,7 @@ func (rbft *rbftImpl[T, Constraint]) setEpochInfo(epochInfo *EpochInfo) {
 	rbft.epochLock.Lock()
 	rbft.chainConfig.EpochInfo = epochInfo
 	rbft.epochMgr.epoch = epochInfo.Epoch
+	rbft.chainConfig.updateDerivedData()
 	rbft.epochLock.Unlock()
 	rbft.metrics.epochGauge.Set(float64(epochInfo.Epoch))
 }

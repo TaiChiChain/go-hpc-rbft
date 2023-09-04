@@ -304,7 +304,7 @@ func (rbft *rbftImpl[T, Constraint]) recvViewChange(vc *consensus.ViewChange, vc
 	replicas := make(map[uint64]bool)
 	minView := uint64(0)
 	for idx, remoteVC := range rbft.vcMgr.viewChangeStore {
-		if remoteVC.Timestamp+int64(rbft.timerMgr.getTimeoutValue(cleanViewChangeTimer)) < time.Now().Unix() {
+		if remoteVC.Timestamp+int64(rbft.timerMgr.getTimeoutValue(cleanViewChangeTimer).Seconds()) < time.Now().Unix() {
 			rbft.logger.Debugf("Replica %d drop an out-of-time viewChange message from replica %d",
 				rbft.peerMgr.selfID, idx.id)
 			delete(rbft.vcMgr.viewChangeStore, idx)
