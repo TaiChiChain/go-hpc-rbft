@@ -153,8 +153,15 @@ func (rbft *rbftImpl[T, Constraint]) recvFetchPQCRequest(fetch *consensus.FetchP
 
 // recvFetchPQCResponse re-processes all the PQC received from others
 func (rbft *rbftImpl[T, Constraint]) recvFetchPQCResponse(PQCInfo *consensus.FetchPQCResponse) consensusEvent {
-	rbft.logger.Debugf("Replica %d received fetchPQCResponse from replica %d, return_pqc %v",
-		rbft.peerMgr.selfID, PQCInfo.ReplicaId, PQCInfo)
+	var view, sequenceNumber uint64
+	var batchDigest string
+	if len(PQCInfo.PrepreSet) != 0 {
+		view = PQCInfo.PrepreSet[0].View
+		sequenceNumber = PQCInfo.PrepreSet[0].SequenceNumber
+		batchDigest = PQCInfo.PrepreSet[0].BatchDigest
+	}
+	rbft.logger.Debugf("Replica %d received fetchPQCResponse from replica %d, return_pqc {view:%d,seq:%d,digest:%s}",
+		rbft.peerMgr.selfID, PQCInfo.ReplicaId, view, sequenceNumber, batchDigest)
 
 	// post all the PQC
 	if !rbft.isPrimary(rbft.peerMgr.selfID) {
