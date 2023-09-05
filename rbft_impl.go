@@ -157,7 +157,13 @@ var once sync.Once
 
 // newRBFT init the RBFT instance
 func newRBFT[T any, Constraint consensus.TXConstraint[T]](c Config, external ExternalStack[T, Constraint], requestPool mempool.MemPool[T, Constraint]) (*rbftImpl[T, Constraint], error) {
-	var err error
+	err := c.GenesisEpochInfo.Check()
+	if err != nil {
+		return nil, err
+	}
+	if c.GenesisEpochInfo.Epoch != 1 || c.GenesisEpochInfo.StartBlock != 1 {
+		return nil, fmt.Errorf("epoch info error: genesis epoch and start_block must be 1, but get epoch: %d, start_block: %d", c.GenesisEpochInfo.Epoch, c.GenesisEpochInfo.StartBlock)
+	}
 
 	// init message event converter
 	once.Do(initMsgEventMap)
@@ -753,7 +759,7 @@ func (rbft *rbftImpl[T, Constraint]) processReqSetEvent(req *RequestSet[T, Const
 	//}
 
 	// if current node is in abnormal, add normal txs into txPool without generate batches.
-	if !rbft.isNormal() || rbft.in(SkipInProgress) {
+	if !rbft.isNormal() || rbft.in(SkipInProgress) || rbft.in(InRecovery) {
 		_, completionMissingBatchHashes := rbft.batchMgr.requestPool.AddNewRequests(req.Requests, false, req.Local, false)
 		for _, batchHash := range completionMissingBatchHashes {
 			delete(rbft.storeMgr.missingBatchesInFetching, batchHash)
@@ -1853,9 +1859,11 @@ func (rbft *rbftImpl[T, Constraint]) finishNormalCheckpoint(checkpointHeight uin
 
 		// Slave -> Primary： need update self seqNo(because only primary will update)
 		rbft.batchMgr.setSeqNo(checkpointHeight)
+		rbft.logger.Infof("Replica %d post stable checkpoint event for seqNo %d after executed to the height with the same digest, update to new view: %d, new primary ID: %d", rbft.peerMgr.selfID, rbft.chainConfig.H, rbft.chainConfig.View, rbft.chainConfig.PrimaryID)
+	} else {
+		rbft.logger.Infof("Replica %d post stable checkpoint event for seqNo %d after executed to the height with the same digest", rbft.peerMgr.selfID, rbft.chainConfig.H)
 	}
 
-	rbft.logger.Infof("Replica %d post stable checkpoint event for seqNo %d after executed to the height with the same digest, update to new view: %d, new primary ID: %d", rbft.peerMgr.selfID, rbft.chainConfig.H, rbft.chainConfig.View, rbft.chainConfig.PrimaryID)
 	rbft.nullReqTimerReset()
 	rbft.restartBatchTimer()
 	if !rbft.batchMgr.requestPool.HasPendingRequestInPool() {
