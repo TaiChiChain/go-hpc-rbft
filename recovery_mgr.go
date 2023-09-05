@@ -145,8 +145,15 @@ func (rbft *rbftImpl[T, Constraint]) recvFetchPQCRequest(fetch *consensus.FetchP
 	}
 	rbft.peerMgr.unicast(context.TODO(), consensusMsg, fetch.ReplicaId)
 
-	rbft.logger.Debugf("Replica %d send PQC response to %d, detailed: %+v", rbft.peerMgr.selfID,
-		fetch.ReplicaId, pqcResponse)
+	var view, sequenceNumber uint64
+	var batchDigest string
+	if len(pqcResponse.PrepreSet) != 0 {
+		view = pqcResponse.PrepreSet[0].View
+		sequenceNumber = pqcResponse.PrepreSet[0].SequenceNumber
+		batchDigest = pqcResponse.PrepreSet[0].BatchDigest
+	}
+	rbft.logger.Debugf("Replica %d send PQC response to %d, detailed: {view:%d,seq:%d,digest:%s}", rbft.peerMgr.selfID,
+		fetch.ReplicaId, view, sequenceNumber, batchDigest)
 
 	return nil
 }

@@ -4,6 +4,8 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"math/big"
 	"sort"
 
@@ -131,6 +133,56 @@ func (e *EpochInfo) Clone() *EpochInfo {
 			}
 		}),
 	}
+}
+
+func (e *EpochInfo) Check() error {
+	if e.ConsensusParams.CheckpointPeriod == 0 {
+		return errors.New("epoch info error: checkpoint_period cannot be 0")
+	} else if e.ConsensusParams.CheckpointPeriod == 1 {
+		if e.ConsensusParams.ProposerElectionType == ProposerElectionTypeWRF && e.ConsensusParams.HighWatermarkCheckpointPeriod != 2 {
+			return errors.New("epoch info error: when enable wrf and checkpoint_period is 1, high_watermark_checkpoint_period must be 2")
+		}
+	} else {
+		if e.ConsensusParams.ProposerElectionType == ProposerElectionTypeWRF && e.ConsensusParams.HighWatermarkCheckpointPeriod != 1 {
+			return errors.New("epoch info error: when enable wrf and checkpoint_period is greater than 1, high_watermark_checkpoint_period must be 1")
+		}
+	}
+
+	if e.EpochPeriod == 0 {
+		return errors.New("epoch info error: epoch_period cannot be 0")
+	} else if e.EpochPeriod%e.ConsensusParams.CheckpointPeriod != 0 {
+		return errors.New("epoch info error: epoch_period must be an integral multiple of checkpoint_period")
+	}
+
+	if e.ConsensusParams.HighWatermarkCheckpointPeriod == 0 {
+		return errors.New("epoch info error: high_watermark_checkpoint_period cannot be 0")
+	}
+
+	if e.ConsensusParams.MaxValidatorNum == 0 {
+		return errors.New("epoch info error: max_validator_num cannot be 0")
+	}
+
+	if e.ConsensusParams.BlockMaxTxNum == 0 {
+		return errors.New("epoch info error: block_max_tx_num cannot be 0")
+	}
+
+	if e.ConsensusParams.ExcludeView == 0 {
+		return errors.New("epoch info error: exclude_view cannot be 0")
+	}
+
+	if len(e.P2PBootstrapNodeAddresses) == 0 {
+		return errors.New("epoch info error: p2p_bootstrap_node_addresses cannot be empty")
+	}
+
+	if len(e.ValidatorSet) < 4 {
+		return errors.New("epoch info error: validator_set need at least 4")
+	}
+
+	if e.ConsensusParams.ProposerElectionType != ProposerElectionTypeWRF && e.ConsensusParams.ProposerElectionType != ProposerElectionTypeRotating {
+		return fmt.Errorf("epoch info error: unsupported proposer_election_type: %d", e.ConsensusParams.ProposerElectionType)
+	}
+
+	return nil
 }
 
 func (e *EpochInfo) Marshal() ([]byte, error) {
