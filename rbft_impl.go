@@ -405,7 +405,7 @@ func (rbft *rbftImpl[T, Constraint]) step(ctx context.Context, msg *consensus.Co
 				"from replica %d, e:%d, v:%d, h:%d, |C|:%d, |P|:%d, |Q|:%d",
 				rbft.peerMgr.selfID, vcBasis.GetReplicaId(), msg.Epoch, vcBasis.GetView(), vcBasis.GetH(),
 				len(vcBasis.GetCset()), len(vcBasis.GetCset()), len(vcBasis.GetQset()))
-			vc.Timestamp = time.Now().Unix()
+			vc.Timestamp = time.Now().UnixNano()
 			rbft.vcMgr.viewChangeStore[idx] = vc
 
 		default:
@@ -770,7 +770,7 @@ func (rbft *rbftImpl[T, Constraint]) processReqSetEvent(req *RequestSet[T, Const
 			// If these transactions trigger generating a batch, stop batch timer
 			if len(batches) != 0 {
 				rbft.stopBatchTimer()
-				now := time.Now().Unix()
+				now := time.Now().UnixNano()
 				if rbft.batchMgr.lastBatchTime != 0 {
 					interval := time.Duration(now - rbft.batchMgr.lastBatchTime).Seconds()
 					rbft.metrics.batchInterval.Observe(interval)
@@ -987,7 +987,7 @@ func (rbft *rbftImpl[T, Constraint]) sendPrePrepare(seqNo uint64, digest string,
 	cert.prePrepareCtx = ctx
 	rbft.persistQSet(preprepare)
 	if metrics.EnableExpensive() {
-		cert.prePreparedTime = time.Now().Unix()
+		cert.prePreparedTime = time.Now().UnixNano()
 		duration := time.Duration(cert.prePreparedTime - reqBatch.Timestamp).Seconds()
 		rbft.metrics.batchToPrePrepared.Observe(duration)
 	}
@@ -1073,7 +1073,7 @@ func (rbft *rbftImpl[T, Constraint]) recvPrePrepare(ctx context.Context, preprep
 	cert.prePrepareCtx = ctx
 	rbft.storeMgr.seqMap[preprep.SequenceNumber] = preprep.BatchDigest
 	if metrics.EnableExpensive() {
-		cert.prePreparedTime = time.Now().Unix()
+		cert.prePreparedTime = time.Now().UnixNano()
 		duration := time.Duration(cert.prePreparedTime - preprep.HashBatch.Timestamp).Seconds()
 		rbft.metrics.batchToPrePrepared.Observe(duration)
 	}
@@ -1188,7 +1188,7 @@ func (rbft *rbftImpl[T, Constraint]) maybeSendCommit(ctx context.Context, v uint
 	}
 
 	if metrics.EnableExpensive() {
-		cert.preparedTime = time.Now().Unix()
+		cert.preparedTime = time.Now().UnixNano()
 		duration := time.Duration(cert.preparedTime - cert.prePreparedTime).Seconds()
 		rbft.metrics.prePreparedToPrepared.Observe(duration)
 	}
@@ -1261,7 +1261,7 @@ func (rbft *rbftImpl[T, Constraint]) recvCommit(ctx context.Context, commit *con
 	if rbft.committed(commit.View, commit.SequenceNumber, commit.BatchDigest) {
 		idx := msgID{v: commit.View, n: commit.SequenceNumber, d: commit.BatchDigest}
 		if metrics.EnableExpensive() {
-			cert.committedTime = time.Now().Unix()
+			cert.committedTime = time.Now().UnixNano()
 			duration := time.Duration(cert.committedTime - cert.preparedTime).Seconds()
 			rbft.metrics.preparedToCommitted.Observe(duration)
 		}
@@ -1516,7 +1516,7 @@ func (rbft *rbftImpl[T, Constraint]) commitPendingBlocks() {
 				txList, localList := rbft.filterExecutableTxs(idx.d, cert.prePrepare.HashBatch.DeDuplicateRequestHashList)
 				rbft.metrics.committedTxs.Add(float64(len(txList)))
 				rbft.metrics.txsPerBlock.Observe(float64(len(txList)))
-				batchToCommit := time.Duration(time.Now().Unix() - cert.prePrepare.HashBatch.Timestamp).Seconds()
+				batchToCommit := time.Duration(time.Now().UnixNano() - cert.prePrepare.HashBatch.Timestamp).Seconds()
 				rbft.metrics.batchToCommitDuration.Observe(batchToCommit)
 				rbft.logger.Noticef("======== Replica %d Call execute, epoch=%d/view=%d/seqNo=%d/txCount=%d/digest=%s",
 					rbft.peerMgr.selfID, rbft.chainConfig.EpochInfo.Epoch, idx.v, idx.n, len(txList), idx.d)

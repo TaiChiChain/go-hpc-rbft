@@ -85,7 +85,7 @@ func (mpi *mempoolImpl[T, Constraint]) addNewRequests(txs []*T, isPrimary, local
 		if !ok {
 			validTxs[txAccount] = make([]*mempoolTransaction[T, Constraint], 0)
 		}
-		now := time.Now().Unix()
+		now := time.Now().UnixNano()
 		txItem := &mempoolTransaction[T, Constraint]{
 			rawTx:       tx,
 			local:       local,
@@ -328,11 +328,11 @@ func (mpi *mempoolImpl[T, Constraint]) RemoveBatches(hashList []string) {
 				}(removedTxs)
 				go func(ready map[string][]*mempoolTransaction[T, Constraint]) {
 					defer wg.Done()
-					mpi.txStore.localTTLIndex.removeByTTLIndexByKeys(removedTxs, Rebroadcast)
+					mpi.txStore.localTTLIndex.removeByOrderedQueueKeys(removedTxs)
 				}(removedTxs)
 				go func(ready map[string][]*mempoolTransaction[T, Constraint]) {
 					defer wg.Done()
-					mpi.txStore.removeTTLIndex.removeByTTLIndexByKeys(removedTxs, Remove)
+					mpi.txStore.removeTTLIndex.removeByOrderedQueueKeys(removedTxs)
 				}(removedTxs)
 				wg.Wait()
 			}
@@ -639,7 +639,7 @@ func (mpi *mempoolImpl[T, Constraint]) RestorePool() {
 
 // FilterOutOfDateRequests get the remained local txs in TTLIndex and broadcast to other vp peers by tolerance time.
 func (mpi *mempoolImpl[T, Constraint]) FilterOutOfDateRequests() ([]*T, error) {
-	now := time.Now().Unix()
+	now := time.Now().UnixNano()
 	var forward []*mempoolTransaction[T, Constraint]
 	mpi.txStore.localTTLIndex.data.Ascend(func(a btree.Item) bool {
 		orderedKey := a.(*orderedIndexKey)
@@ -648,7 +648,7 @@ func (mpi *mempoolImpl[T, Constraint]) FilterOutOfDateRequests() ([]*T, error) {
 			mpi.logger.Error("Get nil poolTx from txStore")
 			return true
 		}
-		if float64(now-poolTx.lifeTime) > mpi.toleranceTime.Seconds() {
+		if now-poolTx.lifeTime > mpi.toleranceTime.Nanoseconds() {
 			// for those batched txs, we don't need to forward temporarily.
 			if _, ok := mpi.txStore.batchedTxs[txnPointer{account: orderedKey.account, nonce: orderedKey.nonce}]; !ok {
 				forward = append(forward, poolTx)
@@ -662,7 +662,7 @@ func (mpi *mempoolImpl[T, Constraint]) FilterOutOfDateRequests() ([]*T, error) {
 	// update pool tx's timestamp to now for next forwarding check.
 	for i, poolTx := range forward {
 		// update localTTLIndex
-		mpi.txStore.localTTLIndex.updateTTLIndex(poolTx.lifeTime, poolTx.getAccount(), poolTx.getNonce(), now)
+		mpi.txStore.localTTLIndex.updateIndex(poolTx, now)
 		result[i] = poolTx.rawTx
 		// update mempool tx in allTxs
 		poolTx.lifeTime = now
@@ -672,27 +672,28 @@ func (mpi *mempoolImpl[T, Constraint]) FilterOutOfDateRequests() ([]*T, error) {
 
 // RemoveTimeoutRequests remove the remained local txs in timeoutIndex and removeTxs in memPool by tolerance time.
 func (mpi *mempoolImpl[T, Constraint]) RemoveTimeoutRequests() (uint64, error) {
-	now := time.Now().Unix()
+	now := time.Now().UnixNano()
 	removedTxs := make(map[string][]*mempoolTransaction[T, Constraint])
 	var count uint64
 	var index int
 	mpi.txStore.removeTTLIndex.data.Ascend(func(a btree.Item) bool {
 		index++
-		orderedKey := a.(*orderedIndexKey)
-		poolTx := mpi.txStore.getPoolTxByTxnPointer(orderedKey.account, orderedKey.nonce)
+		removeKey := a.(*orderedIndexKey)
+		poolTx := mpi.txStore.getPoolTxByTxnPointer(removeKey.account, removeKey.nonce)
 		if poolTx == nil {
-			mpi.logger.Errorf("Get nil poolTx from txStore:[account:%s, nonce:%d]", orderedKey.account, orderedKey.nonce)
+			mpi.logger.Errorf("Get nil poolTx from txStore:[account:%s, nonce:%d]", removeKey.account, removeKey.nonce)
 			return true
 		}
-		if float64(now-poolTx.arrivedTime) > mpi.toleranceRemoveTime.Seconds() {
+		if now-poolTx.arrivedTime > mpi.toleranceRemoveTime.Nanoseconds() {
 			mpi.logger.Debugf("handle orderedKey[account:%s, nonce:%d]", poolTx.getAccount(), poolTx.getNonce())
 			// for those batched txs, we don't need to removedTxs temporarily.
-			if _, ok := mpi.txStore.batchedTxs[txnPointer{account: orderedKey.account, nonce: orderedKey.nonce}]; ok {
+			if _, ok := mpi.txStore.batchedTxs[txnPointer{account: removeKey.account, nonce: removeKey.nonce}]; ok {
 				mpi.logger.Debugf("find tx[account: %s, nonce:%d] from batchedTxs, ignore remove request",
-					orderedKey.account, orderedKey.nonce)
+					removeKey.account, removeKey.nonce)
 				return true
 			}
 
+			orderedKey := &orderedIndexKey{time: poolTx.getRawTimestamp(), account: poolTx.getAccount(), nonce: poolTx.getNonce()}
 			if tx := mpi.txStore.priorityIndex.data.Get(orderedKey); tx != nil {
 				mpi.logger.Debugf("find tx[account: %s, nonce:%d] from priorityIndex, ignore remove request",
 					orderedKey.account, orderedKey.nonce)
@@ -736,11 +737,11 @@ func (mpi *mempoolImpl[T, Constraint]) RemoveTimeoutRequests() (uint64, error) {
 			}(removedTxs)
 			go func(ready map[string][]*mempoolTransaction[T, Constraint]) {
 				defer wg.Done()
-				mpi.txStore.localTTLIndex.removeByTTLIndexByKeys(ready, Rebroadcast)
+				mpi.txStore.localTTLIndex.removeByOrderedQueueKeys(ready)
 			}(removedTxs)
 			go func(ready map[string][]*mempoolTransaction[T, Constraint]) {
 				defer wg.Done()
-				mpi.txStore.removeTTLIndex.removeByTTLIndexByKeys(ready, Remove)
+				mpi.txStore.removeTTLIndex.removeByOrderedQueueKeys(ready)
 			}(removedTxs)
 			wg.Wait()
 		}
@@ -773,14 +774,14 @@ func (mpi *mempoolImpl[T, Constraint]) processDirtyAccount(dirtyAccounts map[str
 
 			// insert ready txs into priorityIndex
 			for _, poolTx := range readyTxs {
-				mpi.txStore.priorityIndex.insertByOrderedQueueKey(poolTx.getRawTimestamp(), poolTx.getAccount(), poolTx.getNonce())
+				mpi.txStore.priorityIndex.insertByOrderedQueueKey(poolTx)
 				// mpi.logger.Debugf("insert ready tx[account: %s, nonce: %d] into priorityIndex", poolTx.getAccount(), poolTx.getNonce())
 			}
 			mpi.increasePriorityNonBatchSize(uint64(len(readyTxs)))
 
 			// insert non-ready txs into parkingLotIndex
 			for _, poolTx := range nonReadyTxs {
-				mpi.txStore.parkingLotIndex.insertByOrderedQueueKey(poolTx.getRawTimestamp(), poolTx.getAccount(), poolTx.getNonce())
+				mpi.txStore.parkingLotIndex.insertByOrderedQueueKey(poolTx)
 			}
 		}
 	}
@@ -879,7 +880,7 @@ func (mpi *mempoolImpl[T, Constraint]) generateRequestBatch() ([]*RequestHashBat
 		TxHashList: hashList,
 		TxList:     txList,
 		LocalList:  localList,
-		Timestamp:  time.Now().Unix(),
+		Timestamp:  time.Now().UnixNano(),
 	}
 	batchHash := getBatchHash[T, Constraint](txBatch)
 	txBatch.BatchHash = batchHash
@@ -911,7 +912,7 @@ func (mpi *mempoolImpl[T, Constraint]) replaceTx(tx *T) {
 		mpi.txStore.allTxs[account] = list
 	}
 	list.index.insertBySortedNonceKey(txNonce)
-	now := time.Now().Unix()
+	now := time.Now().UnixNano()
 	newPoolTx := &mempoolTransaction[T, Constraint]{
 		local:       false,
 		rawTx:       tx,
@@ -923,13 +924,13 @@ func (mpi *mempoolImpl[T, Constraint]) replaceTx(tx *T) {
 	// remove old tx from txHashMap、priorityIndex、parkingLotIndex、localTTLIndex and removeTTLIndex
 	if oldPoolTx != nil {
 		delete(mpi.txStore.txHashMap, oldPoolTx.getHash())
-		mpi.txStore.priorityIndex.removeByOrderedQueueKey(oldPoolTx.getRawTimestamp(), oldPoolTx.getAccount(), oldPoolTx.getNonce())
-		mpi.txStore.parkingLotIndex.removeByOrderedQueueKey(oldPoolTx.getRawTimestamp(), oldPoolTx.getAccount(), oldPoolTx.getNonce())
-		mpi.txStore.localTTLIndex.removeByTTLIndexByKey(oldPoolTx, Rebroadcast)
-		mpi.txStore.removeTTLIndex.removeByTTLIndexByKey(oldPoolTx, Remove)
+		mpi.txStore.priorityIndex.removeByOrderedQueueKey(oldPoolTx)
+		mpi.txStore.parkingLotIndex.removeByOrderedQueueKey(oldPoolTx)
+		mpi.txStore.removeTTLIndex.removeByOrderedQueueKey(oldPoolTx)
+		mpi.txStore.localTTLIndex.removeByOrderedQueueKey(oldPoolTx)
 	}
 	// insert new tx received from remote vp
-	mpi.txStore.priorityIndex.insertByOrderedQueueKey(newPoolTx.getRawTimestamp(), newPoolTx.getAccount(), newPoolTx.getNonce())
+	mpi.txStore.priorityIndex.insertByOrderedQueueKey(newPoolTx)
 }
 
 // getBatchHash calculate hash of a RequestHashBatch

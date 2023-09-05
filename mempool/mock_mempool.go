@@ -347,6 +347,44 @@ func (c *MemPoolHasPendingRequestInPoolCall[T, Constraint]) DoAndReturn(f func()
 	return c
 }
 
+// Init mocks base method.
+func (m *MockMemPool[T, Constraint]) Init(selfID uint64) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Init", selfID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Init indicates an expected call of Init.
+func (mr *MockMemPoolMockRecorder[T, Constraint]) Init(selfID any) *MemPoolInitCall[T, Constraint] {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Init", reflect.TypeOf((*MockMemPool[T, Constraint])(nil).Init), selfID)
+	return &MemPoolInitCall[T, Constraint]{Call: call}
+}
+
+// MemPoolInitCall wrap *gomock.Call
+type MemPoolInitCall[T any, Constraint consensus.TXConstraint[T]] struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MemPoolInitCall[T, Constraint]) Return(arg0 error) *MemPoolInitCall[T, Constraint] {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MemPoolInitCall[T, Constraint]) Do(f func(uint64) error) *MemPoolInitCall[T, Constraint] {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MemPoolInitCall[T, Constraint]) DoAndReturn(f func(uint64) error) *MemPoolInitCall[T, Constraint] {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // IsPoolFull mocks base method.
 func (m *MockMemPool[T, Constraint]) IsPoolFull() bool {
 	m.ctrl.T.Helper()

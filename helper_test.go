@@ -272,7 +272,7 @@ func TestRBFT_startTimerIfOutstandingRequests(t *testing.T) {
 	requestBatchTmp := &RequestBatch[consensus.FltTransaction, *consensus.FltTransaction]{
 		RequestHashList: []string{"request hash list", "request hash list"},
 		RequestList:     []*consensus.FltTransaction{tx},
-		Timestamp:       time.Now().Unix(),
+		Timestamp:       time.Now().UnixNano(),
 		SeqNo:           2,
 		LocalList:       []bool{true, true},
 		BatchHash:       "hash",

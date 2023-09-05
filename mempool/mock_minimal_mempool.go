@@ -28,5 +28,6 @@ func NewMockMinimalMemPool[T any, Constraint consensus.TXConstraint[T]](ctrl *go
 	mock.EXPECT().Reset(gomock.Any()).Return().AnyTimes()
 	mock.EXPECT().Stop().AnyTimes()
 	mock.EXPECT().Start().Return(nil).AnyTimes()
+	mock.EXPECT().Init(gomock.Any()).AnyTimes()
 	return mock
 }

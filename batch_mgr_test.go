@@ -28,7 +28,7 @@ func TestBatchMgr_maybeSendPrePrepare(t *testing.T) {
 	batchTmp41 := &RequestBatch[consensus.FltTransaction, *consensus.FltTransaction]{
 		RequestHashList: []string{"tx-hash-41"},
 		RequestList:     []*consensus.FltTransaction{txx41},
-		Timestamp:       time.Now().Unix(),
+		Timestamp:       time.Now().UnixNano(),
 		LocalList:       []bool{true},
 		BatchHash:       "test digest 41",
 	}
@@ -36,7 +36,7 @@ func TestBatchMgr_maybeSendPrePrepare(t *testing.T) {
 	batchTmp42 := &RequestBatch[consensus.FltTransaction, *consensus.FltTransaction]{
 		RequestHashList: []string{"tx-hash-42"},
 		RequestList:     []*consensus.FltTransaction{tx42},
-		Timestamp:       time.Now().Unix(),
+		Timestamp:       time.Now().UnixNano(),
 		LocalList:       []bool{true},
 		BatchHash:       "test digest 42",
 	}

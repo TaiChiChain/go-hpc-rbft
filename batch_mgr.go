@@ -26,11 +26,11 @@ import (
 // 1. requestPool which manages all transactions received from client or rpc layer
 // 2. batch events timer management
 type batchManager[T any, Constraint consensus.TXConstraint[T]] struct {
-	seqNo                uint64                    // track the prePrepare batch seqNo
+	seqNo                uint64                         // track the prePrepare batch seqNo
 	cacheBatch           []*RequestBatch[T, Constraint] // cache batches wait for prePreparing
-	batchTimerActive     bool                      // track the batch timer event, true means there exists an undergoing batch timer event
-	noTxBatchTimerActive bool                      // track the batch timer event, true means there exists an undergoing batch timer event
-	lastBatchTime        int64                     // track last batch time [only used by primary], reset when become primary.
+	batchTimerActive     bool                           // track the batch timer event, true means there exists an undergoing batch timer event
+	noTxBatchTimerActive bool                           // track the batch timer event, true means there exists an undergoing batch timer event
+	lastBatchTime        int64                          // track last batch time [only used by primary], reset when become primary.
 	requestPool          mempool.MemPool[T, Constraint]
 }
 

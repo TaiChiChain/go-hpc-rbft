@@ -369,7 +369,7 @@ func TestRBFT_processOutOfDateReqs(t *testing.T) {
 	}
 	rbfts[1].batchMgr.requestPool.AddNewRequests(batch, false, true, false)
 	// sleep to trigger txpool tolerance time.
-	time.Sleep(1 * time.Second)
+	time.Sleep(1 * time.Millisecond)
 	rbfts[1].processOutOfDateReqs()
 	assert.Equal(t, false, rbfts[1].isPoolFull())
 
@@ -378,7 +378,7 @@ func TestRBFT_processOutOfDateReqs(t *testing.T) {
 	// rbfts[1].flowControlMaxMem = 3 * batch[0].Size()
 	rbfts[1].batchMgr.requestPool.AddNewRequests(batch, false, true, false)
 	// sleep to trigger txpool tolerance time.
-	time.Sleep(1 * time.Second)
+	time.Sleep(1 * time.Millisecond)
 	rbfts[1].processOutOfDateReqs()
 	assert.Equal(t, false, rbfts[1].isPoolFull())
 }

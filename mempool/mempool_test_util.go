@@ -39,7 +39,7 @@ func newMockFltTx(from string, nonce int64) consensus.FltTransaction {
 		From:      []byte(from),
 		Value:     []byte(string(rune(rand.Int()))),
 		Nonce:     nonce,
-		Timestamp: time.Now().Unix(),
+		Timestamp: time.Now().UnixNano(),
 	}
 }
 

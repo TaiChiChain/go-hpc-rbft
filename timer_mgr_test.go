@@ -48,9 +48,10 @@ func TestTimerMgr_store(t *testing.T) {
 		timeout:   5,
 		isActive:  sync.Map{},
 	}
-	tt.store("key1", "value1")
+	value1 := time.AfterFunc(5*time.Second, func() {})
+	tt.store("key1", value1)
 	v, _ := tt.isActive.Load("key1")
-	assert.Equal(t, "value1", v)
+	assert.Equal(t, value1, v)
 }
 
 func TestTimerMgr_delete(t *testing.T) {
@@ -59,7 +60,10 @@ func TestTimerMgr_delete(t *testing.T) {
 		timeout:   5,
 		isActive:  sync.Map{},
 	}
-	tt.store("key1", "value1")
+
+	value1 := time.AfterFunc(5*time.Second, func() {})
+
+	tt.store("key1", value1)
 	tt.delete("key1")
 	v, _ := tt.isActive.Load("key1")
 	assert.Equal(t, nil, v)
@@ -71,7 +75,9 @@ func TestTimerMgr_count(t *testing.T) {
 		timeout:   5,
 		isActive:  sync.Map{},
 	}
-	tt.store("key1", "value1")
+	value1 := time.AfterFunc(5*time.Second, func() {})
+
+	tt.store("key1", value1)
 	assert.Equal(t, 1, tt.count())
 }
 
@@ -86,7 +92,10 @@ func TestTimerMgr_stopTimer(t *testing.T) {
 		timeout:   5,
 		isActive:  sync.Map{},
 	}
-	tt.store("key1", "value1")
+
+	value1 := time.AfterFunc(5*time.Second, func() {})
+
+	tt.store("key1", value1)
 	timeMgr.tTimers["test1"] = &tt
 
 	timeMgr.stopTimer("null timerMgr")
@@ -107,8 +116,10 @@ func TestTimerMgr_stopOneTimer(t *testing.T) {
 		timeout:   5,
 		isActive:  sync.Map{},
 	}
-	tt.store("key1", "value1")
-	tt.store("key2", "value2")
+	value1 := time.AfterFunc(5*time.Second, func() {})
+	value2 := time.AfterFunc(2*time.Second, func() {})
+	tt.store("key1", value1)
+	tt.store("key2", value2)
 	timeMgr.tTimers["test1"] = &tt
 
 	timeMgr.stopOneTimer("null timerMgr", "key1")
@@ -129,8 +140,11 @@ func TestTimerMgr_getTimeoutValue(t *testing.T) {
 		timeout:   5,
 		isActive:  sync.Map{},
 	}
-	tt.store("key1", "value1")
-	tt.store("key2", "value2")
+
+	value1 := time.AfterFunc(5*time.Second, func() {})
+	value2 := time.AfterFunc(2*time.Second, func() {})
+	tt.store("key1", value1)
+	tt.store("key2", value2)
 	timeMgr.tTimers["test1"] = &tt
 
 	assert.Equal(t, time.Duration(0), timeMgr.getTimeoutValue("null timerMgr"))
@@ -148,8 +162,11 @@ func TestTimerMgr_setTimeoutValue(t *testing.T) {
 		timeout:   5,
 		isActive:  sync.Map{},
 	}
-	tt.store("key1", "value1")
-	tt.store("key2", "value2")
+
+	value1 := time.AfterFunc(5*time.Second, func() {})
+	value2 := time.AfterFunc(2*time.Second, func() {})
+	tt.store("key1", value1)
+	tt.store("key2", value2)
 	timeMgr.tTimers["test1"] = &tt
 
 	timeMgr.setTimeoutValue("null", time.Duration(10))
