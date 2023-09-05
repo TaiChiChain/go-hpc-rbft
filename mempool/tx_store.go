@@ -43,10 +43,10 @@ func newTransactionStore[T any, Constraint consensus.TXConstraint[T]](f GetAccou
 		batchedTxs:           make(map[txnPointer]bool),
 		missingBatch:         make(map[string]map[uint64]string),
 		batchesCache:         make(map[string]*RequestHashBatch[T, Constraint]),
-		parkingLotIndex:      newBtreeIndex[T, Constraint](),
-		priorityIndex:        newBtreeIndex[T, Constraint](),
-		localTTLIndex:        newBtreeIndex[T, Constraint](),
-		removeTTLIndex:       newBtreeIndex[T, Constraint](),
+		parkingLotIndex:      newBtreeIndex[T, Constraint](Ordered),
+		priorityIndex:        newBtreeIndex[T, Constraint](Ordered),
+		localTTLIndex:        newBtreeIndex[T, Constraint](Rebroadcast),
+		removeTTLIndex:       newBtreeIndex[T, Constraint](Remove),
 		nonceCache:           newNonceCache(f),
 	}
 }
@@ -70,10 +70,10 @@ func (txStore *transactionStore[T, Constraint]) insertTxs(txItems map[string][]*
 			txList.items[txItem.getNonce()] = txItem
 			txList.index.insertBySortedNonceKey(txItem.getNonce())
 			if isLocal {
-				txStore.localTTLIndex.insertByTTLIndexKey(txItem, Rebroadcast)
+				txStore.localTTLIndex.insertByOrderedQueueKey(txItem)
 			}
 			// record the tx arrived timestamp
-			txStore.removeTTLIndex.insertByTTLIndexKey(txItem, Remove)
+			txStore.removeTTLIndex.insertByOrderedQueueKey(txItem)
 		}
 		dirtyAccounts[account] = true
 	}
@@ -96,7 +96,7 @@ type txSortedMap[T any, Constraint consensus.TXConstraint[T]] struct {
 func newTxSortedMap[T any, Constraint consensus.TXConstraint[T]]() *txSortedMap[T, Constraint] {
 	return &txSortedMap[T, Constraint]{
 		items: make(map[uint64]*mempoolTransaction[T, Constraint]),
-		index: newBtreeIndex[T, Constraint](),
+		index: newBtreeIndex[T, Constraint](SortNonce),
 	}
 }
 

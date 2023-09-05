@@ -287,7 +287,7 @@ func (rbft *rbftImpl[T, Constraint]) recvViewChange(vc *consensus.ViewChange, vc
 		}
 	}
 
-	vc.Timestamp = time.Now().Unix()
+	vc.Timestamp = time.Now().UnixNano()
 	// store vc to viewChangeStore
 	rbft.vcMgr.viewChangeStore[vcIdx{v: targetView, id: remoteReplicaID}] = vc
 
@@ -304,7 +304,7 @@ func (rbft *rbftImpl[T, Constraint]) recvViewChange(vc *consensus.ViewChange, vc
 	replicas := make(map[uint64]bool)
 	minView := uint64(0)
 	for idx, remoteVC := range rbft.vcMgr.viewChangeStore {
-		if remoteVC.Timestamp+int64(rbft.timerMgr.getTimeoutValue(cleanViewChangeTimer).Seconds()) < time.Now().Unix() {
+		if remoteVC.Timestamp+int64(rbft.timerMgr.getTimeoutValue(cleanViewChangeTimer)) < time.Now().UnixNano() {
 			rbft.logger.Debugf("Replica %d drop an out-of-time viewChange message from replica %d",
 				rbft.peerMgr.selfID, idx.id)
 			delete(rbft.vcMgr.viewChangeStore, idx)
@@ -1600,7 +1600,7 @@ func (rbft *rbftImpl[T, Constraint]) processNewView(msgList []*consensus.Vc_PQ) 
 		cert.prePrepareCtx = context.Background()
 		rbft.persistQSet(prePrep)
 		if metrics.EnableExpensive() {
-			cert.prePreparedTime = time.Now().Unix()
+			cert.prePreparedTime = time.Now().UnixNano()
 			duration := time.Duration(cert.prePreparedTime - prePrep.HashBatch.Timestamp).Seconds()
 			rbft.metrics.batchToPrePrepared.Observe(duration)
 		}

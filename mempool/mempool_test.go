@@ -58,7 +58,7 @@ func TestAddNewRequests(t *testing.T) {
 	ast.True(poolTx.arrivedTime == oldTimeStamp)
 
 	// replace different tx with same nonce
-	time.Sleep(2 * time.Second)
+	time.Sleep(2 * time.Millisecond)
 	tx11 := ConstructTxByAccountAndNonce("account1", uint64(0))
 	ast.NotEqual(tx1.RbftGetTxHash(), tx11.RbftGetTxHash())
 	batch, _ = pool.AddNewRequests([]*consensus.FltTransaction{tx11}, true, false, true)
@@ -89,16 +89,37 @@ func constructAllTxs[T any, Constraint consensus.TXConstraint[T]](txs []*T) map[
 func TestFilterOutOfDateRequests(t *testing.T) {
 	ast := assert.New(t)
 	pool := mockMempoolImpl[consensus.FltTransaction, *consensus.FltTransaction]()
-	poolTx2 := ConstructTxByAccountAndNonce("account2", 1)
-	time.Sleep(1 * time.Second)
-	poolTx1 := ConstructTxByAccountAndNonce("account1", 0)
-	time.Sleep(1 * time.Second)
-	poolTx3 := ConstructTxByAccountAndNonce("account3", 2)
-	pool.txStore.localTTLIndex.insertByOrderedQueueKey(poolTx1.RbftGetTimeStamp(), poolTx1.RbftGetFrom(), poolTx1.RbftGetNonce())
-	pool.txStore.localTTLIndex.insertByOrderedQueueKey(poolTx2.RbftGetTimeStamp(), poolTx2.RbftGetFrom(), poolTx2.RbftGetNonce())
-	pool.txStore.localTTLIndex.insertByOrderedQueueKey(poolTx3.RbftGetTimeStamp(), poolTx3.RbftGetFrom(), poolTx3.RbftGetNonce())
+	tx2 := ConstructTxByAccountAndNonce("account2", 1)
+	time.Sleep(1 * time.Millisecond)
+	tx1 := ConstructTxByAccountAndNonce("account1", 0)
+	time.Sleep(1 * time.Millisecond)
+	tx3 := ConstructTxByAccountAndNonce("account3", 2)
 
-	txs := []*consensus.FltTransaction{poolTx1, poolTx2, poolTx3}
+	poolTx1 := &mempoolTransaction[consensus.FltTransaction, *consensus.FltTransaction]{
+		rawTx:       tx1,
+		local:       true,
+		lifeTime:    tx1.RbftGetTimeStamp(),
+		arrivedTime: time.Now().UnixNano(),
+	}
+
+	poolTx2 := &mempoolTransaction[consensus.FltTransaction, *consensus.FltTransaction]{
+		rawTx:       tx2,
+		local:       true,
+		lifeTime:    tx2.RbftGetTimeStamp(),
+		arrivedTime: time.Now().UnixNano(),
+	}
+
+	poolTx3 := &mempoolTransaction[consensus.FltTransaction, *consensus.FltTransaction]{
+		rawTx:       tx3,
+		local:       true,
+		lifeTime:    tx3.RbftGetTimeStamp(),
+		arrivedTime: time.Now().UnixNano(),
+	}
+	pool.txStore.localTTLIndex.insertByOrderedQueueKey(poolTx1)
+	pool.txStore.localTTLIndex.insertByOrderedQueueKey(poolTx2)
+	pool.txStore.localTTLIndex.insertByOrderedQueueKey(poolTx3)
+
+	txs := []*consensus.FltTransaction{tx1, tx2, tx3}
 	pool.txStore.allTxs = constructAllTxs[consensus.FltTransaction, *consensus.FltTransaction](txs)
 
 	pool.toleranceTime = 1 * time.Second
@@ -113,16 +134,16 @@ func TestFilterOutOfDateRequests(t *testing.T) {
 	ast.Equal(uint64(0), actNonce, "poolTx1")
 	actNonce = reqs[2].RbftGetNonce()
 	ast.Equal(uint64(2), actNonce, "poolTx3")
-	tx1NewTimestamp := pool.txStore.allTxs[poolTx1.RbftGetFrom()].items[0].lifeTime
-	tx2NewTimestamp := pool.txStore.allTxs[poolTx2.RbftGetFrom()].items[1].lifeTime
-	tx3NewTimestamp := pool.txStore.allTxs[poolTx3.RbftGetFrom()].items[2].lifeTime
-	ast.NotEqual(poolTx1.RbftGetTimeStamp(), tx1NewTimestamp, "has update the timestamp of poolTx1")
-	ast.NotEqual(poolTx2.RbftGetTimeStamp(), tx2NewTimestamp, "has update the timestamp of poolTx2")
-	ast.NotEqual(poolTx3.RbftGetTimeStamp(), tx3NewTimestamp, "has update the timestamp of poolTx3")
+	tx1NewTimestamp := pool.txStore.allTxs[tx1.RbftGetFrom()].items[0].lifeTime
+	tx2NewTimestamp := pool.txStore.allTxs[tx2.RbftGetFrom()].items[1].lifeTime
+	tx3NewTimestamp := pool.txStore.allTxs[tx3.RbftGetFrom()].items[2].lifeTime
+	ast.NotEqual(tx1.RbftGetTimeStamp(), tx1NewTimestamp, "has update the timestamp of poolTx1")
+	ast.NotEqual(tx2.RbftGetTimeStamp(), tx2NewTimestamp, "has update the timestamp of poolTx2")
+	ast.NotEqual(tx3.RbftGetTimeStamp(), tx3NewTimestamp, "has update the timestamp of poolTx3")
 	ast.Equal(tx1NewTimestamp, tx2NewTimestamp)
 	ast.Equal(tx2NewTimestamp, tx3NewTimestamp)
 
-	pool.txStore.batchedTxs[txnPointer{account: poolTx2.RbftGetFrom(), nonce: uint64(1)}] = true
+	pool.txStore.batchedTxs[txnPointer{account: tx2.RbftGetFrom(), nonce: uint64(1)}] = true
 	time.Sleep(2 * time.Second)
 	reqs, _ = pool.FilterOutOfDateRequests()
 	ast.Equal(2, len(reqs))
@@ -130,8 +151,8 @@ func TestFilterOutOfDateRequests(t *testing.T) {
 	actNonce3 := reqs[1].RbftGetNonce()
 	ast.Equal(uint64(0), actNonce1, "poolTx1")
 	ast.Equal(uint64(2), actNonce3, "poolTx3")
-	ast.NotEqual(poolTx1.RbftGetTimeStamp(), tx1NewTimestamp, "has update the timestamp of poolTx1")
-	ast.NotEqual(poolTx3.RbftGetTimeStamp(), tx3NewTimestamp, "has update the timestamp of poolTx3")
+	ast.NotEqual(tx1.RbftGetTimeStamp(), tx1NewTimestamp, "has update the timestamp of poolTx1")
+	ast.NotEqual(tx3.RbftGetTimeStamp(), tx3NewTimestamp, "has update the timestamp of poolTx3")
 }
 
 func TestReset(t *testing.T) {
@@ -318,7 +339,7 @@ func TestReceiveMissingRequests(t *testing.T) {
 		TxList:     []*consensus.FltTransaction{tx1, tx2, tx3, tx4},
 		TxHashList: txHashList,
 		LocalList:  []bool{true},
-		Timestamp:  time.Now().Unix(),
+		Timestamp:  time.Now().UnixNano(),
 	}
 	batchDigest := getBatchHash(newBatch)
 	txs := make(map[uint64]*consensus.FltTransaction, 0)
@@ -361,7 +382,7 @@ func TestReceiveMissingRequests(t *testing.T) {
 		TxList:     []*consensus.FltTransaction{tx5, tx6, tx7, tx8},
 		TxHashList: txHashList,
 		LocalList:  []bool{true},
-		Timestamp:  time.Now().Unix(),
+		Timestamp:  time.Now().UnixNano(),
 	}
 	batchDigest = getBatchHash(newBatch)
 
@@ -393,7 +414,7 @@ func TestSendMissingRequests(t *testing.T) {
 		TxList:     []*consensus.FltTransaction{tx1, tx2},
 		TxHashList: txHashList,
 		LocalList:  []bool{true},
-		Timestamp:  time.Now().Unix(),
+		Timestamp:  time.Now().UnixNano(),
 	}
 	batchDigest := getBatchHash[consensus.FltTransaction, *consensus.FltTransaction](newBatch)
 	newBatch.BatchHash = batchDigest
@@ -612,13 +633,11 @@ func TestRestoreOneBatch(t *testing.T) {
 	ast.Equal(true, ok)
 	poolTx := list.items[tx1.RbftGetNonce()]
 	ast.NotNil(poolTx)
-	pool.txStore.priorityIndex.removeByOrderedQueueKey(poolTx.getRawTimestamp(),
-		poolTx.getAccount(), poolTx.getNonce())
+	pool.txStore.priorityIndex.removeByOrderedQueueKey(poolTx)
 	err = pool.RestoreOneBatch(batches[0].BatchHash)
 	ast.NotNil(err, "can't find tx from priorityIndex")
 
-	pool.txStore.priorityIndex.insertByOrderedQueueKey(poolTx.getRawTimestamp(),
-		poolTx.getAccount(), poolTx.getNonce())
+	pool.txStore.priorityIndex.insertByOrderedQueueKey(poolTx)
 	err = pool.RestoreOneBatch(batches[0].BatchHash)
 	ast.Nil(err)
 	ast.Equal(0, len(pool.txStore.batchedTxs))

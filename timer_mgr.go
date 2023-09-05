@@ -152,7 +152,7 @@ func (tm *timerManager) softStartTimerWithNewTT(name string, timeout time.Durati
 
 // createTimer creates a goroutine and waits for timeout. Then check if the timer is active. If so, send event.
 func (tm *timerManager) createTimer(name string, timeout time.Duration, event *LocalEvent) (key string) {
-	timestamp := time.Now().Unix()
+	timestamp := time.Now().UnixNano()
 	key = strconv.FormatInt(timestamp, 10)
 	send := func() {
 		if tm.tTimers[name].has(key) {

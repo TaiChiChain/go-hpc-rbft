@@ -344,7 +344,7 @@ func newTx() *consensus.FltTransaction {
 		From:      []byte(from),
 		Value:     []byte(string(rune(rand.Int()))),
 		Nonce:     0,
-		Timestamp: time.Now().Unix(),
+		Timestamp: time.Now().UnixNano(),
 	}
 }
 

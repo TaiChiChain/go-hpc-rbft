@@ -7,11 +7,11 @@ import (
 )
 
 const (
-	Rebroadcast TTLIndexKeyType = "Rebroadcast" // indicates that the transaction latest arrived in memPool and rebroadcast to other vps.
-	Remove      TTLIndexKeyType = "Remove"
+	Ordered = iota
+	SortNonce
+	Remove
+	Rebroadcast
 )
-
-type TTLIndexKeyType string
 
 // the key of priorityIndex and parkingLotIndex.
 type orderedIndexKey struct {
@@ -58,12 +58,26 @@ func makeSortedNonceKey(nonce uint64) *sortedNonceKey {
 
 type btreeIndex[T any, Constraint consensus.TXConstraint[T]] struct {
 	data *btree.BTree
+	typ  int
 }
 
-func newBtreeIndex[T any, Constraint consensus.TXConstraint[T]]() *btreeIndex[T, Constraint] {
+func newBtreeIndex[T any, Constraint consensus.TXConstraint[T]](typ int) *btreeIndex[T, Constraint] {
 	return &btreeIndex[T, Constraint]{
 		data: btree.New(btreeDegree),
+		typ:  typ,
 	}
+}
+
+func (idx *btreeIndex[T, Constraint]) getTimestamp(poolTx *mempoolTransaction[T, Constraint]) int64 {
+	switch idx.typ {
+	case Ordered:
+		return poolTx.getRawTimestamp()
+	case Rebroadcast:
+		return poolTx.lifeTime
+	case Remove:
+		return poolTx.arrivedTime
+	}
+	return 0
 }
 
 func (idx *btreeIndex[T, Constraint]) insertBySortedNonceKey(nonce uint64) {
@@ -78,18 +92,18 @@ func (idx *btreeIndex[T, Constraint]) removeBySortedNonceKeys(txs map[string][]*
 	}
 }
 
-func (idx *btreeIndex[T, Constraint]) insertByOrderedQueueKey(timestamp int64, account string, nonce uint64) {
-	idx.data.ReplaceOrInsert(makeOrderedIndexKey(timestamp, account, nonce))
+func (idx *btreeIndex[T, Constraint]) insertByOrderedQueueKey(poolTx *mempoolTransaction[T, Constraint]) {
+	idx.data.ReplaceOrInsert(makeOrderedIndexKey(idx.getTimestamp(poolTx), poolTx.getAccount(), poolTx.getNonce()))
 }
 
-func (idx *btreeIndex[T, Constraint]) removeByOrderedQueueKey(timestamp int64, account string, nonce uint64) {
-	idx.data.Delete(makeOrderedIndexKey(timestamp, account, nonce))
+func (idx *btreeIndex[T, Constraint]) removeByOrderedQueueKey(poolTx *mempoolTransaction[T, Constraint]) {
+	idx.data.Delete(makeOrderedIndexKey(idx.getTimestamp(poolTx), poolTx.getAccount(), poolTx.getNonce()))
 }
 
 func (idx *btreeIndex[T, Constraint]) removeByOrderedQueueKeys(poolTxs map[string][]*mempoolTransaction[T, Constraint]) {
 	for _, list := range poolTxs {
 		for _, poolTx := range list {
-			idx.removeByOrderedQueueKey(poolTx.getRawTimestamp(), poolTx.getAccount(), poolTx.getNonce())
+			idx.removeByOrderedQueueKey(poolTx)
 		}
 	}
 }
@@ -99,35 +113,9 @@ func (idx *btreeIndex[T, Constraint]) size() int {
 	return idx.data.Len()
 }
 
-func (idx *btreeIndex[T, Constraint]) insertByTTLIndexKey(poolTx *mempoolTransaction[T, Constraint], typ TTLIndexKeyType) {
-	switch typ {
-	case Remove:
-		idx.data.ReplaceOrInsert(makeOrderedIndexKey(poolTx.arrivedTime, poolTx.getAccount(), poolTx.getNonce()))
-	case Rebroadcast:
-		idx.data.ReplaceOrInsert(makeOrderedIndexKey(poolTx.lifeTime, poolTx.getAccount(), poolTx.getNonce()))
-	}
-}
-
-func (idx *btreeIndex[T, Constraint]) updateTTLIndex(oldTimestamp int64, account string, nonce uint64, newTimestamp int64) {
-	oldOrderedKey := &orderedIndexKey{time: oldTimestamp, account: account, nonce: nonce}
-	newOrderedKey := &orderedIndexKey{time: newTimestamp, account: account, nonce: nonce}
+func (idx *btreeIndex[T, Constraint]) updateIndex(oldPoolTx *mempoolTransaction[T, Constraint], newTimestamp int64) {
+	oldOrderedKey := &orderedIndexKey{time: idx.getTimestamp(oldPoolTx), account: oldPoolTx.getAccount(), nonce: oldPoolTx.getNonce()}
+	newOrderedKey := &orderedIndexKey{time: newTimestamp, account: oldPoolTx.getAccount(), nonce: oldPoolTx.getNonce()}
 	idx.data.Delete(oldOrderedKey)
 	idx.data.ReplaceOrInsert(newOrderedKey)
-}
-
-func (idx *btreeIndex[T, Constraint]) removeByTTLIndexByKeys(poolTxs map[string][]*mempoolTransaction[T, Constraint], typ TTLIndexKeyType) {
-	for _, list := range poolTxs {
-		for _, poolTx := range list {
-			idx.removeByTTLIndexByKey(poolTx, typ)
-		}
-	}
-}
-
-func (idx *btreeIndex[T, Constraint]) removeByTTLIndexByKey(poolTx *mempoolTransaction[T, Constraint], typ TTLIndexKeyType) {
-	switch typ {
-	case Remove:
-		idx.data.Delete(makeOrderedIndexKey(poolTx.arrivedTime, poolTx.getAccount(), poolTx.getNonce()))
-	case Rebroadcast:
-		idx.data.Delete(makeOrderedIndexKey(poolTx.lifeTime, poolTx.getAccount(), poolTx.getNonce()))
-	}
 }

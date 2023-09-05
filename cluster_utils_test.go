@@ -183,7 +183,7 @@ func (tf *testFramework[T, Constraint]) setN(num int) {
 }
 
 func newBasicClusterInstance[T any, Constraint consensus.TXConstraint[T]]() ([]*testNode[T, Constraint], []*rbftImpl[T, Constraint]) {
-	tf := newTestFramework[T, Constraint](4, false)
+	tf := newTestFramework[T, Constraint](4)
 	var rbfts []*rbftImpl[T, Constraint]
 	var nodes []*testNode[T, Constraint]
 	for _, tn := range tf.TestNode {
