@@ -10,7 +10,7 @@ import (
 
 type transactionStore[T any, Constraint consensus.TXConstraint[T]] struct {
 	// track all valid tx hashes cached in mempool
-	txHashMap map[string]*txnPointer
+	txHashMap map[string]*txPointer
 
 	// track all valid tx, mapping user' account to all related transactions.
 	allTxs map[string]*txSortedMap[T, Constraint]
@@ -26,7 +26,7 @@ type transactionStore[T any, Constraint consensus.TXConstraint[T]] struct {
 	priorityIndex *btreeIndex[T, Constraint]
 
 	// cache all the batched txs which haven't executed.
-	batchedTxs map[txnPointer]bool
+	batchedTxs map[txPointer]bool
 
 	// cache all batches created by current primary in order, removed after they are been executed.
 	batchesCache map[string]*RequestHashBatch[T, Constraint]
@@ -49,9 +49,9 @@ type transactionStore[T any, Constraint consensus.TXConstraint[T]] struct {
 func newTransactionStore[T any, Constraint consensus.TXConstraint[T]](f GetAccountNonceFunc) *transactionStore[T, Constraint] {
 	return &transactionStore[T, Constraint]{
 		priorityNonBatchSize: 0,
-		txHashMap:            make(map[string]*txnPointer),
+		txHashMap:            make(map[string]*txPointer),
 		allTxs:               make(map[string]*txSortedMap[T, Constraint]),
-		batchedTxs:           make(map[txnPointer]bool),
+		batchedTxs:           make(map[txPointer]bool),
 		missingBatch:         make(map[string]map[uint64]string),
 		batchesCache:         make(map[string]*RequestHashBatch[T, Constraint]),
 		parkingLotIndex:      newBtreeIndex[T, Constraint](Ordered),
@@ -62,16 +62,28 @@ func newTransactionStore[T any, Constraint consensus.TXConstraint[T]](f GetAccou
 	}
 }
 
+func (txStore *transactionStore[T, Constraint]) insertPoolTx(txHash string, pointer *txPointer) {
+	txStore.txHashMap[txHash] = pointer
+	poolTxNum.Inc()
+}
+
+func (txStore *transactionStore[T, Constraint]) deletePoolTx(txHash string) {
+	if _, ok := txStore.txHashMap[txHash]; ok {
+		delete(txStore.txHashMap, txHash)
+		poolTxNum.Dec()
+	}
+}
+
 func (txStore *transactionStore[T, Constraint]) insertTxs(txItems map[string][]*mempoolTransaction[T, Constraint], isLocal bool) map[string]bool {
 	dirtyAccounts := make(map[string]bool)
 	for account, list := range txItems {
 		for _, txItem := range list {
 			txHash := txItem.getHash()
-			txPointer := &txnPointer{
+			pointer := &txPointer{
 				account: account,
 				nonce:   txItem.getNonce(),
 			}
-			txStore.txHashMap[txHash] = txPointer
+			txStore.txHashMap[txHash] = pointer
 			txList, ok := txStore.allTxs[account]
 			if !ok {
 				// if this is new account to send tx, create a new txSortedMap

@@ -385,7 +385,7 @@ func (rbft *rbftImpl[T, Constraint]) compareWholeStates(states wholeStates) cons
 	}
 
 	// we can find the quorum nodeState with the same view, judge if the response.view equals to the
-	// current view, if so, trigger recovery view change to recover view.
+	// current view, if not, trigger recovery view change to recover view.
 	if canFind {
 		// trigger recovery view change if current view is incorrect.
 		if rbft.chainConfig.View != quorumResp.view {
