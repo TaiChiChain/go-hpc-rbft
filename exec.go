@@ -177,8 +177,10 @@ func (rbft *rbftImpl[T, Constraint]) handleCoreRbftEvent(e *LocalEvent) consensu
 
 		if rbft.batchMgr.requestPool.HasPendingRequestInPool() {
 			// call requestPool module to generate a tx batch
-			batches := rbft.batchMgr.requestPool.GenerateRequestBatch()
-			rbft.postBatches(batches)
+			if rbft.inPrimaryTerm() {
+				batches := rbft.batchMgr.requestPool.GenerateRequestBatch()
+				rbft.postBatches(batches)
+			}
 		}
 		return nil
 
@@ -215,8 +217,10 @@ func (rbft *rbftImpl[T, Constraint]) handleCoreRbftEvent(e *LocalEvent) consensu
 		rbft.stopNoTxBatchTimer()
 
 		// call requestPool module to generate a tx batch
-		batches := rbft.batchMgr.requestPool.GenerateRequestBatch()
-		rbft.postBatches(batches)
+		if rbft.inPrimaryTerm() {
+			batches := rbft.batchMgr.requestPool.GenerateRequestBatch()
+			rbft.postBatches(batches)
+		}
 
 		return nil
 

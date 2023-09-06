@@ -81,6 +81,14 @@ func (rbft *rbftImpl[T, Constraint]) beyondRange(n uint64) bool {
 	return n > rbft.chainConfig.H+rbft.chainConfig.L
 }
 
+// inPrimaryTerm check is in primary term, only true can generate batch and send prePrepare
+func (rbft *rbftImpl[T, Constraint]) inPrimaryTerm() bool {
+	if !rbft.chainConfig.isWRF() {
+		return true
+	}
+	return rbft.batchMgr.seqNo < rbft.chainConfig.H+rbft.chainConfig.EpochInfo.ConsensusParams.CheckpointPeriod
+}
+
 // cleanAllBatchAndCert cleans all outstandingReqBatches and committedCert
 func (rbft *rbftImpl[T, Constraint]) cleanOutstandingAndCert() {
 	rbft.storeMgr.outstandingReqBatches = make(map[string]*RequestBatch[T, Constraint])

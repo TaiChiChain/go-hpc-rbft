@@ -2,7 +2,6 @@ package rbft
 
 import (
 	"context"
-	"errors"
 	"testing"
 	"time"
 
@@ -32,7 +31,7 @@ func newMockRbft[T any, Constraint consensus.TXConstraint[T]](t *testing.T, ctrl
 			CandidateSet:              []*NodeInfo{},
 			ValidatorSet:              peerSet,
 			StartBlock:                1,
-			P2PBootstrapNodeAddresses: []string{},
+			P2PBootstrapNodeAddresses: []string{"1"},
 			ConsensusParams: &ConsensusParams{
 				CheckpointPeriod:              10,
 				HighWatermarkCheckpointPeriod: 4,
@@ -60,7 +59,10 @@ func newMockRbft[T any, Constraint consensus.TXConstraint[T]](t *testing.T, ctrl
 		MetricsProv: &disabled.Provider{},
 		DelFlag:     make(chan bool),
 	}
-	rbft, _ := newRBFT[T, Constraint](conf, external, pool)
+	rbft, err := newRBFT[T, Constraint](conf, external, pool, true)
+	if err != nil {
+		panic(err)
+	}
 	return rbft
 }
 
@@ -77,15 +79,13 @@ func TestRBFT_newRBFT(t *testing.T) {
 
 	// Nil Peers
 	rbft.config.GenesisEpochInfo.ValidatorSet = []*NodeInfo{}
-	rbft2, err := newRBFT(rbft.config, rbft.external, rbft.batchMgr.requestPool)
-	assert.Nil(t, err)
-	err = rbft2.init()
-	assert.Equal(t, errors.New("nil peers"), err)
+	_, err = newRBFT(rbft.config, rbft.external, rbft.batchMgr.requestPool, true)
+	assert.Error(t, err)
 
 	// Is a New Node
 	rbft.config.GenesisEpochInfo.ValidatorSet = peerSet
 	rbft.config.SelfAccountAddress = "node4"
-	rbft, _ = newRBFT(rbft.config, rbft.external, rbft.batchMgr.requestPool)
+	rbft, _ = newRBFT(rbft.config, rbft.external, rbft.batchMgr.requestPool, true)
 	assert.Equal(t, 4, rbft.chainConfig.N)
 }
 
@@ -103,7 +103,7 @@ func TestRBFT_consensusMessageFilter(t *testing.T) {
 	rbfts[1].consensusMessageFilter(context.TODO(), sync.ConsensusMessage)
 
 	tx := newTx()
-	rbfts[0].batchMgr.requestPool.AddNewRequests([]*consensus.FltTransaction{tx}, false, true, false)
+	rbfts[0].batchMgr.requestPool.AddNewRequests([]*consensus.FltTransaction{tx}, false, true, false, true)
 	batchTimerEvent := &LocalEvent{
 		Service:   CoreRbftService,
 		EventType: CoreBatchTimerEvent,
@@ -352,7 +352,7 @@ func TestRBFT_start_cache_message(t *testing.T) {
 func TestRBFT_processOutOfDateReqs(t *testing.T) {
 	_, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	tx := newTx()
-	rbfts[1].batchMgr.requestPool.AddNewRequests([]*consensus.FltTransaction{tx}, false, true, false)
+	rbfts[1].batchMgr.requestPool.AddNewRequests([]*consensus.FltTransaction{tx}, false, true, false, true)
 	rbfts[1].setFull()
 	rbfts[1].processOutOfDateReqs()
 	assert.Equal(t, true, rbfts[1].isPoolFull())
@@ -367,7 +367,7 @@ func TestRBFT_processOutOfDateReqs(t *testing.T) {
 		tx := newTx()
 		batch[i] = tx
 	}
-	rbfts[1].batchMgr.requestPool.AddNewRequests(batch, false, true, false)
+	rbfts[1].batchMgr.requestPool.AddNewRequests(batch, false, true, false, true)
 	// sleep to trigger txpool tolerance time.
 	time.Sleep(1 * time.Millisecond)
 	rbfts[1].processOutOfDateReqs()
@@ -376,7 +376,7 @@ func TestRBFT_processOutOfDateReqs(t *testing.T) {
 	// split according to set mem size when broadcast.
 	rbfts[1].flowControl = true
 	// rbfts[1].flowControlMaxMem = 3 * batch[0].Size()
-	rbfts[1].batchMgr.requestPool.AddNewRequests(batch, false, true, false)
+	rbfts[1].batchMgr.requestPool.AddNewRequests(batch, false, true, false, true)
 	// sleep to trigger txpool tolerance time.
 	time.Sleep(1 * time.Millisecond)
 	rbfts[1].processOutOfDateReqs()

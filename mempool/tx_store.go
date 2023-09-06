@@ -3,33 +3,44 @@ package mempool
 import (
 	"sync"
 
-	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/google/btree"
+
+	"github.com/axiomesh/axiom-bft/common/consensus"
 )
 
 type transactionStore[T any, Constraint consensus.TXConstraint[T]] struct {
 	// track all valid tx hashes cached in mempool
 	txHashMap map[string]*txnPointer
+
 	// track all valid tx, mapping user' account to all related transactions.
 	allTxs map[string]*txSortedMap[T, Constraint]
+
 	// track the commit nonce and pending nonce of each account.
 	nonceCache *nonceCache
+
 	// keeps track of "non-ready" txs (txs that can't be included in next block)
 	// only used to help remove some txs if pool is full.
 	parkingLotIndex *btreeIndex[T, Constraint]
+
 	// keeps track of "ready" txs
 	priorityIndex *btreeIndex[T, Constraint]
+
 	// cache all the batched txs which haven't executed.
 	batchedTxs map[txnPointer]bool
+
 	// cache all batches created by current primary in order, removed after they are been executed.
 	batchesCache map[string]*RequestHashBatch[T, Constraint]
+
 	// trace the missing transaction
 	missingBatch map[string]map[uint64]string
+
 	// track the non-batch priority transaction.
 	priorityNonBatchSize uint64
+
 	// localTTLIndex based on the tolerance time to track all the remained txs
 	// that generate by itself and rebroadcast to other vps.
 	localTTLIndex *btreeIndex[T, Constraint]
+
 	// removeTTLIndex based on the remove tolerance time to track all the remained txs
 	// that arrived in memPool and remove these txs from memPoll cache in case these exist too long.
 	removeTTLIndex *btreeIndex[T, Constraint]
@@ -144,9 +155,11 @@ func (m *txSortedMap[T, Constraint]) forward(commitNonce uint64) map[string][]*m
 type nonceCache struct {
 	// commitNonces records each account's latest committed nonce in ledger.
 	commitNonces map[string]uint64
+
 	// pendingNonces records each account's latest nonce which has been included in
 	// priority queue. Invariant: pendingNonces[account] >= commitNonces[account]
-	pendingNonces   map[string]uint64
+	pendingNonces map[string]uint64
+
 	pendingMu       sync.RWMutex
 	commitMu        sync.Mutex
 	getAccountNonce GetAccountNonceFunc

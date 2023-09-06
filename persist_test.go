@@ -32,7 +32,7 @@ func newPersistTestReplica[T any, Constraint consensus.TXConstraint[T]](ctrl *go
 			CandidateSet:              []*NodeInfo{},
 			ValidatorSet:              peerSet,
 			StartBlock:                1,
-			P2PBootstrapNodeAddresses: []string{},
+			P2PBootstrapNodeAddresses: []string{"1"},
 			ConsensusParams: &ConsensusParams{
 				CheckpointPeriod:              10,
 				HighWatermarkCheckpointPeriod: 4,
@@ -63,7 +63,10 @@ func newPersistTestReplica[T any, Constraint consensus.TXConstraint[T]](ctrl *go
 	ext.EXPECT().GetEpochInfo(gomock.Any()).Return(conf.GenesisEpochInfo, nil).AnyTimes()
 	ext.EXPECT().GetCurrentEpochInfo().Return(conf.GenesisEpochInfo, nil).AnyTimes()
 
-	node, _ := newNode[T, Constraint](conf, ext, pool)
+	node, err := newNode[T, Constraint](conf, ext, pool, true)
+	if err != nil {
+		panic(err)
+	}
 	return node, ext
 }
 

@@ -101,12 +101,12 @@ type node[T any, Constraint consensus.TXConstraint[T]] struct {
 
 // NewNode initializes a Node service.
 func NewNode[T any, Constraint consensus.TXConstraint[T]](c Config, external ExternalStack[T, Constraint], requestPool mempool.MemPool[T, Constraint]) (Node[T, Constraint], error) {
-	return newNode[T, Constraint](c, external, requestPool)
+	return newNode[T, Constraint](c, external, requestPool, false)
 }
 
 // newNode help to initialize a Node service.
-func newNode[T any, Constraint consensus.TXConstraint[T]](c Config, external ExternalStack[T, Constraint], requestPool mempool.MemPool[T, Constraint]) (*node[T, Constraint], error) {
-	rbft, err := newRBFT[T, Constraint](c, external, requestPool)
+func newNode[T any, Constraint consensus.TXConstraint[T]](c Config, external ExternalStack[T, Constraint], requestPool mempool.MemPool[T, Constraint], isTest bool) (*node[T, Constraint], error) {
+	rbft, err := newRBFT[T, Constraint](c, external, requestPool, isTest)
 	if err != nil {
 		return nil, err
 	}

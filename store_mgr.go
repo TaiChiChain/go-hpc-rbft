@@ -15,6 +15,10 @@
 package rbft
 
 import (
+	"context"
+
+	"github.com/samber/lo"
+
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/types"
 )
@@ -68,6 +72,15 @@ type storeManager[T any, Constraint consensus.TXConstraint[T]] struct {
 
 	// track all non-repeating checkpoints including self and others
 	checkpointStore map[chkptID]*consensus.SignedCheckpoint
+
+	// higher view -> cache msg
+	wrfHighViewMsgCache map[uint64]*wrfHighViewCacheMsg
+}
+
+type wrfHighViewCacheMsg struct {
+	prePrepares []*consensus.PrePrepare
+	prepares    []*consensus.Prepare
+	commits     []*consensus.Commit
 }
 
 type stateUpdateTarget struct {
@@ -87,6 +100,7 @@ func newStoreMgr[T any, Constraint consensus.TXConstraint[T]](c Config) *storeMa
 		localCheckpoints:         make(map[uint64]*consensus.SignedCheckpoint),
 		higherCheckpoints:        make(map[uint64]*consensus.SignedCheckpoint),
 		checkpointStore:          make(map[chkptID]*consensus.SignedCheckpoint),
+		wrfHighViewMsgCache:      make(map[uint64]*wrfHighViewCacheMsg),
 		certStore:                make(map[msgID]*msgCert),
 		committedCert:            make(map[msgID]string),
 		seqMap:                   make(map[uint64]string),
@@ -160,6 +174,22 @@ func (rbft *rbftImpl[T, Constraint]) isPrePrepareLegal(preprep *consensus.PrePre
 		return false
 	}
 
+	if !rbft.inWV(preprep.View, preprep.SequenceNumber) {
+		if preprep.SequenceNumber != rbft.chainConfig.H && !rbft.in(SkipInProgress) {
+			if !rbft.chainConfig.isWRF() {
+				rbft.logger.Warningf("Replica %d received prePrepare with a different view or sequence "+
+					"number outside watermarks: prePrep.View %d, expected.View %d, seqNo %d, low water mark %d",
+					rbft.peerMgr.selfID, preprep.View, rbft.chainConfig.View, preprep.SequenceNumber, rbft.chainConfig.H)
+			}
+		} else {
+			// This is perfectly normal
+			rbft.logger.Debugf("Replica %d received prePrepare with a different view or sequence "+
+				"number outside watermarks: preprep.View %d, expected.View %d, seqNo %d, low water mark %d",
+				rbft.peerMgr.selfID, preprep.View, rbft.chainConfig.View, preprep.SequenceNumber, rbft.chainConfig.H)
+		}
+		return false
+	}
+
 	// replica rejects prePrepare sent from non-primary.
 	if !rbft.isPrimary(preprep.ReplicaId) {
 		rbft.logger.Warningf("Replica %d received prePrepare from non-primary: got %d, should be %d",
@@ -170,20 +200,6 @@ func (rbft *rbftImpl[T, Constraint]) isPrePrepareLegal(preprep *consensus.PrePre
 	// primary reject prePrepare sent from itself.
 	if rbft.isPrimary(rbft.peerMgr.selfID) {
 		rbft.logger.Warningf("Primary %d reject prePrepare sent from itself", rbft.peerMgr.selfID)
-		return false
-	}
-
-	if !rbft.inWV(preprep.View, preprep.SequenceNumber) {
-		if preprep.SequenceNumber != rbft.chainConfig.H && !rbft.in(SkipInProgress) {
-			rbft.logger.Warningf("Replica %d received prePrepare with a different view or sequence "+
-				"number outside watermarks: prePrep.View %d, expected.View %d, seqNo %d, low water mark %d",
-				rbft.peerMgr.selfID, preprep.View, rbft.chainConfig.View, preprep.SequenceNumber, rbft.chainConfig.H)
-		} else {
-			// This is perfectly normal
-			rbft.logger.Debugf("Replica %d received prePrepare with a different view or sequence "+
-				"number outside watermarks: preprep.View %d, expected.View %d, seqNo %d, low water mark %d",
-				rbft.peerMgr.selfID, preprep.View, rbft.chainConfig.View, preprep.SequenceNumber, rbft.chainConfig.H)
-		}
 		return false
 	}
 
@@ -200,23 +216,25 @@ func (rbft *rbftImpl[T, Constraint]) isPrePrepareLegal(preprep *consensus.PrePre
 // isPrepareLegal firstly checks if current status can receive prepare or not, then checks prepare message itself is
 // legal or not
 func (rbft *rbftImpl[T, Constraint]) isPrepareLegal(prep *consensus.Prepare) bool {
-	// if we receive prepare from primary, which means primary behavior as a byzantine, we don't send view change here,
-	// because in this case, replicas will eventually find primary abnormal in other cases.
-	if rbft.isPrimary(prep.ReplicaId) {
-		rbft.logger.Debugf("Replica %d received prepare from primary, ignore it", rbft.peerMgr.selfID)
-		return false
-	}
-
 	if !rbft.inWV(prep.View, prep.SequenceNumber) {
 		if prep.SequenceNumber != rbft.chainConfig.H && !rbft.in(SkipInProgress) {
-			rbft.logger.Warningf("Replica %d ignore prepare from replica %d for view=%d/seqNo=%d: not inWv, in view: %d, h: %d",
-				rbft.peerMgr.selfID, prep.ReplicaId, prep.View, prep.SequenceNumber, rbft.chainConfig.View, rbft.chainConfig.H)
+			if !rbft.chainConfig.isWRF() {
+				rbft.logger.Warningf("Replica %d ignore prepare from replica %d for view=%d/seqNo=%d: not inWv, in view: %d, h: %d",
+					rbft.peerMgr.selfID, prep.ReplicaId, prep.View, prep.SequenceNumber, rbft.chainConfig.View, rbft.chainConfig.H)
+			}
 		} else {
 			// This is perfectly normal
 			rbft.logger.Debugf("Replica %d ignore prepare from replica %d for view=%d/seqNo=%d: not inWv, in view: %d, h: %d",
 				rbft.peerMgr.selfID, prep.ReplicaId, prep.View, prep.SequenceNumber, rbft.chainConfig.View, rbft.chainConfig.H)
 		}
 
+		return false
+	}
+
+	// if we receive prepare from primary, which means primary behavior as a byzantine, we don't send view change here,
+	// because in this case, replicas will eventually find primary abnormal in other cases.
+	if rbft.isPrimary(prep.ReplicaId) {
+		rbft.logger.Debugf("Replica %d received prepare from primary, ignore it", rbft.peerMgr.selfID)
 		return false
 	}
 	return true
@@ -226,8 +244,10 @@ func (rbft *rbftImpl[T, Constraint]) isPrepareLegal(prep *consensus.Prepare) boo
 func (rbft *rbftImpl[T, Constraint]) isCommitLegal(commit *consensus.Commit) bool {
 	if !rbft.inWV(commit.View, commit.SequenceNumber) {
 		if commit.SequenceNumber != rbft.chainConfig.H && !rbft.in(SkipInProgress) {
-			rbft.logger.Warningf("Replica %d ignore commit from replica %d for view=%d/seqNo=%d: not inWv, in view: %d, h: %d",
-				rbft.peerMgr.selfID, commit.ReplicaId, commit.View, commit.SequenceNumber, rbft.chainConfig.View, rbft.chainConfig.H)
+			if !rbft.chainConfig.isWRF() {
+				rbft.logger.Warningf("Replica %d ignore commit from replica %d for view=%d/seqNo=%d: not inWv, in view: %d, h: %d",
+					rbft.peerMgr.selfID, commit.ReplicaId, commit.View, commit.SequenceNumber, rbft.chainConfig.View, rbft.chainConfig.H)
+			}
 		} else {
 			// This is perfectly normal
 			rbft.logger.Debugf("Replica %d ignore commit from replica %d for view=%d/seqNo=%d: not inWv, in view: %d, h: %d",
@@ -236,4 +256,45 @@ func (rbft *rbftImpl[T, Constraint]) isCommitLegal(commit *consensus.Commit) boo
 		return false
 	}
 	return true
+}
+
+func (rbft *rbftImpl[T, Constraint]) getWRFHighViewMsgCache(view uint64) *wrfHighViewCacheMsg {
+	cacheMsg, ok := rbft.storeMgr.wrfHighViewMsgCache[view]
+	if ok {
+		return cacheMsg
+	}
+	cacheMsg = &wrfHighViewCacheMsg{}
+	rbft.storeMgr.wrfHighViewMsgCache[view] = cacheMsg
+	return cacheMsg
+}
+
+func (rbft *rbftImpl[T, Constraint]) processWRFHighViewMsgs() {
+	//	clean and process current view msgs
+	for view, cacheMsg := range rbft.storeMgr.wrfHighViewMsgCache {
+		if view < rbft.chainConfig.View {
+			rbft.logger.Debugf("Replica %d clean lower view cached msgs, for view %d, current view %d",
+				rbft.peerMgr.selfID, view, rbft.chainConfig.View)
+			delete(rbft.storeMgr.wrfHighViewMsgCache, view)
+		} else if view == rbft.chainConfig.View {
+			ctx := context.Background()
+			lo.ForEach(cacheMsg.prePrepares, func(item *consensus.PrePrepare, index int) {
+				rbft.logger.Debugf("Replica %d resubmit prePrepare from replica %d, "+
+					"receive view %d, current view %d, seqNo %d, low water mark %d",
+					rbft.peerMgr.selfID, item.ReplicaId, item.View, rbft.chainConfig.View, item.SequenceNumber, rbft.chainConfig.H)
+				_ = rbft.recvPrePrepare(ctx, item)
+			})
+			lo.ForEach(cacheMsg.prepares, func(item *consensus.Prepare, index int) {
+				rbft.logger.Debugf("Replica %d resubmit prepare from replica %d, "+
+					"receive view %d, current view %d, seqNo %d, low water mark %d",
+					rbft.peerMgr.selfID, item.ReplicaId, item.View, rbft.chainConfig.View, item.SequenceNumber, rbft.chainConfig.H)
+				_ = rbft.recvPrepare(ctx, item)
+			})
+			lo.ForEach(cacheMsg.commits, func(item *consensus.Commit, index int) {
+				rbft.logger.Debugf("Replica %d resubmit commit from replica %d, "+
+					"receive view %d, current view %d, seqNo %d, low water mark %d",
+					rbft.peerMgr.selfID, item.ReplicaId, item.View, rbft.chainConfig.View, item.SequenceNumber, rbft.chainConfig.H)
+				_ = rbft.recvCommit(ctx, item)
+			})
+		}
+	}
 }

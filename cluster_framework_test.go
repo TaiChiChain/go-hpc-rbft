@@ -234,8 +234,8 @@ func (tf *testFramework[T, Constraint]) newNodeConfig(
 			EpochPeriod:               1000,
 			CandidateSet:              []*NodeInfo{},
 			ValidatorSet:              peerSet,
-			StartBlock:                1,
-			P2PBootstrapNodeAddresses: []string{},
+			StartBlock:                0,
+			P2PBootstrapNodeAddresses: []string{"1"},
 			ConsensusParams: &ConsensusParams{
 				CheckpointPeriod:              10,
 				HighWatermarkCheckpointPeriod: 4,
@@ -298,7 +298,10 @@ func (tf *testFramework[T, Constraint]) newTestNode(id uint64, p2pNodeID string,
 	}
 	pool := mempool.NewMempool[T, Constraint](confMemPool)
 	conf := tf.newNodeConfig(p2pNodeID, log, 1)
-	n, _ := newNode[T, Constraint](conf, ext, pool)
+	n, err := newNode[T, Constraint](conf, ext, pool, true)
+	if err != nil {
+		panic(err)
+	}
 	// init new view.
 	n.rbft.vcMgr.latestNewView = initialNewView
 	tn := &testNode[T, Constraint]{
