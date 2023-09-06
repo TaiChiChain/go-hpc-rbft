@@ -138,14 +138,6 @@ func (e *EpochInfo) Clone() *EpochInfo {
 func (e *EpochInfo) Check() error {
 	if e.ConsensusParams.CheckpointPeriod == 0 {
 		return errors.New("epoch info error: checkpoint_period cannot be 0")
-	} else if e.ConsensusParams.CheckpointPeriod == 1 {
-		if e.ConsensusParams.ProposerElectionType == ProposerElectionTypeWRF && e.ConsensusParams.HighWatermarkCheckpointPeriod != 2 {
-			return errors.New("epoch info error: when enable wrf and checkpoint_period is 1, high_watermark_checkpoint_period must be 2")
-		}
-	} else {
-		if e.ConsensusParams.ProposerElectionType == ProposerElectionTypeWRF && e.ConsensusParams.HighWatermarkCheckpointPeriod != 1 {
-			return errors.New("epoch info error: when enable wrf and checkpoint_period is greater than 1, high_watermark_checkpoint_period must be 1")
-		}
 	}
 
 	if e.EpochPeriod == 0 {
@@ -218,6 +210,10 @@ type ChainConfig struct {
 
 	// Proposer node id of the current View period.
 	PrimaryID uint64
+}
+
+func (c *ChainConfig) isWRF() bool {
+	return c.EpochInfo.ConsensusParams.ProposerElectionType == ProposerElectionTypeWRF
 }
 
 func (c *ChainConfig) updateDerivedData() {

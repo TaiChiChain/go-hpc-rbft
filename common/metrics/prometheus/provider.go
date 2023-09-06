@@ -17,9 +17,10 @@ package prometheus
 import (
 	"strings"
 
-	"github.com/axiomesh/axiom-bft/common/metrics"
 	prom "github.com/prometheus/client_golang/prometheus"
 	promHttp "github.com/prometheus/client_golang/prometheus/promhttp"
+
+	"github.com/axiomesh/axiom-bft/common/metrics"
 )
 
 // the separator of name prefix, should be unified with Prometheus server.

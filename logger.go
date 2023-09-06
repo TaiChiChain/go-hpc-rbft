@@ -16,23 +16,23 @@ package rbft
 
 // Logger is the RBFT logger interface which managers logger output.
 type Logger interface {
-	Debug(v ...interface{})
-	Debugf(format string, v ...interface{})
+	Debug(v ...any)
+	Debugf(format string, v ...any)
 
-	Info(v ...interface{})
-	Infof(format string, v ...interface{})
+	Info(v ...any)
+	Infof(format string, v ...any)
 
-	Notice(v ...interface{})
-	Noticef(format string, v ...interface{})
+	Notice(v ...any)
+	Noticef(format string, v ...any)
 
-	Warning(v ...interface{})
-	Warningf(format string, v ...interface{})
+	Warning(v ...any)
+	Warningf(format string, v ...any)
 
-	Error(v ...interface{})
-	Errorf(format string, v ...interface{})
+	Error(v ...any)
+	Errorf(format string, v ...any)
 
-	Critical(v ...interface{})
-	Criticalf(format string, v ...interface{})
+	Critical(v ...any)
+	Criticalf(format string, v ...any)
 
-	Trace(name, stage string, content interface{})
+	Trace(name, stage string, content any)
 }

@@ -37,14 +37,19 @@ func EnableExpensive() bool {
 type Provider interface {
 	// SubProvider creates a new instance of Provider with given suffix.
 	SubProvider(suffix string) Provider
+
 	// SetNamespace set given Namespace to a provider.
 	SetNamespace(namespace string)
+
 	// NewCounter creates a new instance of a Counter.
 	NewCounter(CounterOpts) (Counter, error)
+
 	// NewGauge creates a new instance of a Gauge.
 	NewGauge(GaugeOpts) (Gauge, error)
+
 	// NewHistogram creates a new instance of a Histogram.
 	NewHistogram(HistogramOpts) (Histogram, error)
+
 	// NewSummary creates a new instance of a Summary.
 	NewSummary(SummaryOpts) (Summary, error)
 }
@@ -70,6 +75,7 @@ type CounterOpts struct {
 	// components with an appropriate separator. Only Name is mandatory, the
 	// others merely help structuring the name.
 	Namespace string
+
 	Subsystem string
 	Name      string
 
@@ -106,6 +112,7 @@ type GaugeOpts struct {
 	// components with an appropriate separator. Only Name is mandatory, the
 	// others merely help structuring the name.
 	Namespace string
+
 	Subsystem string
 	Name      string
 
@@ -141,6 +148,7 @@ type HistogramOpts struct {
 	// components with an appropriate separator. Only Name is mandatory, the
 	// others merely help structuring the name.
 	Namespace string
+
 	Subsystem string
 	Name      string
 
@@ -180,6 +188,7 @@ type SummaryOpts struct {
 	// components with an appropriate separator. Only Name is mandatory, the
 	// others merely help structuring the name.
 	Namespace string
+
 	Subsystem string
 	Name      string
 

@@ -82,7 +82,7 @@ func hash(tx *FltTransaction) []byte {
 		copy(h32[TimeLength:], tx.Signature[len(tx.Signature)-24:])
 		return h32[:]
 	}
-	res, jerr := json.Marshal([]interface{}{
+	res, jerr := json.Marshal([]any{
 		tx.From,
 		tx.To,
 		tx.Value,

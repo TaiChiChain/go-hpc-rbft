@@ -39,18 +39,18 @@ func (m *MockMemPool[T, Constraint]) EXPECT() *MockMemPoolMockRecorder[T, Constr
 }
 
 // AddNewRequests mocks base method.
-func (m *MockMemPool[T, Constraint]) AddNewRequests(txs []*T, isPrimary, local, isReplace bool) ([]*RequestHashBatch[T, Constraint], []string) {
+func (m *MockMemPool[T, Constraint]) AddNewRequests(txs []*T, isPrimary, local, isReplace, needGenerateBatch bool) ([]*RequestHashBatch[T, Constraint], []string) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AddNewRequests", txs, isPrimary, local, isReplace)
+	ret := m.ctrl.Call(m, "AddNewRequests", txs, isPrimary, local, isReplace, needGenerateBatch)
 	ret0, _ := ret[0].([]*RequestHashBatch[T, Constraint])
 	ret1, _ := ret[1].([]string)
 	return ret0, ret1
 }
 
 // AddNewRequests indicates an expected call of AddNewRequests.
-func (mr *MockMemPoolMockRecorder[T, Constraint]) AddNewRequests(txs, isPrimary, local, isReplace any) *MemPoolAddNewRequestsCall[T, Constraint] {
+func (mr *MockMemPoolMockRecorder[T, Constraint]) AddNewRequests(txs, isPrimary, local, isReplace, needGenerateBatch any) *MemPoolAddNewRequestsCall[T, Constraint] {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddNewRequests", reflect.TypeOf((*MockMemPool[T, Constraint])(nil).AddNewRequests), txs, isPrimary, local, isReplace)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddNewRequests", reflect.TypeOf((*MockMemPool[T, Constraint])(nil).AddNewRequests), txs, isPrimary, local, isReplace, needGenerateBatch)
 	return &MemPoolAddNewRequestsCall[T, Constraint]{Call: call}
 }
 
@@ -66,13 +66,13 @@ func (c *MemPoolAddNewRequestsCall[T, Constraint]) Return(arg0 []*RequestHashBat
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MemPoolAddNewRequestsCall[T, Constraint]) Do(f func([]*T, bool, bool, bool) ([]*RequestHashBatch[T, Constraint], []string)) *MemPoolAddNewRequestsCall[T, Constraint] {
+func (c *MemPoolAddNewRequestsCall[T, Constraint]) Do(f func([]*T, bool, bool, bool, bool) ([]*RequestHashBatch[T, Constraint], []string)) *MemPoolAddNewRequestsCall[T, Constraint] {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MemPoolAddNewRequestsCall[T, Constraint]) DoAndReturn(f func([]*T, bool, bool, bool) ([]*RequestHashBatch[T, Constraint], []string)) *MemPoolAddNewRequestsCall[T, Constraint] {
+func (c *MemPoolAddNewRequestsCall[T, Constraint]) DoAndReturn(f func([]*T, bool, bool, bool, bool) ([]*RequestHashBatch[T, Constraint], []string)) *MemPoolAddNewRequestsCall[T, Constraint] {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

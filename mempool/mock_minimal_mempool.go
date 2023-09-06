@@ -14,7 +14,7 @@ import (
 func NewMockMinimalMemPool[T any, Constraint consensus.TXConstraint[T]](ctrl *gomock.Controller) *MockMemPool[T, Constraint] {
 	mock := NewMockMemPool[T, Constraint](ctrl)
 	mock.EXPECT().GenerateRequestBatch().Return(nil).AnyTimes()
-	mock.EXPECT().AddNewRequests(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+	mock.EXPECT().AddNewRequests(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
 	mock.EXPECT().RemoveBatches(gomock.Any()).Return().AnyTimes()
 	mock.EXPECT().IsPoolFull().Return(false).AnyTimes()
 	mock.EXPECT().HasPendingRequestInPool().Return(false).AnyTimes()

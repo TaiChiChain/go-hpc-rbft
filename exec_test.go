@@ -32,7 +32,7 @@ func TestExec_handleCoreRbftEvent_batchTimerEvent(t *testing.T) {
 
 	tx := newTx()
 
-	rbfts[0].batchMgr.requestPool.AddNewRequests([]*consensus.FltTransaction{tx}, false, true, false)
+	rbfts[0].batchMgr.requestPool.AddNewRequests([]*consensus.FltTransaction{tx}, false, true, false, true)
 	reqBatch := rbfts[0].batchMgr.requestPool.GenerateRequestBatch()
 	batch := &RequestBatch[consensus.FltTransaction, *consensus.FltTransaction]{
 		RequestHashList: reqBatch[0].TxHashList,

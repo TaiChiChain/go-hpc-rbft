@@ -27,7 +27,7 @@ func TestAddNewRequests(t *testing.T) {
 	tx4 := ConstructTxByAccountAndNonce("account2", uint64(1))
 	tx5 := ConstructTxByAccountAndNonce("account2", uint64(2))
 
-	batch, completionMissingBatchHashes := pool.AddNewRequests([]*consensus.FltTransaction{tx1, tx2, tx3, tx4, tx5}, true, true, false)
+	batch, completionMissingBatchHashes := pool.AddNewRequests([]*consensus.FltTransaction{tx1, tx2, tx3, tx4, tx5}, true, true, false, true)
 	ast.Equal(1, len(batch))
 	ast.Equal(0, len(completionMissingBatchHashes))
 	ast.Equal(4, len(batch[0].TxList))
@@ -49,7 +49,7 @@ func TestAddNewRequests(t *testing.T) {
 	oldTimeStamp := oldPoolTx.arrivedTime
 
 	time.Sleep(50 * time.Millisecond)
-	batch, _ = pool.AddNewRequests([]*consensus.FltTransaction{tx1}, true, true, true)
+	batch, _ = pool.AddNewRequests([]*consensus.FltTransaction{tx1}, true, true, true, true)
 	ast.Nil(batch)
 	// replace same tx, needn't update
 	poolTx := pool.txStore.getPoolTxByTxnPointer(tx1.RbftGetFrom(), uint64(0))
@@ -61,7 +61,7 @@ func TestAddNewRequests(t *testing.T) {
 	time.Sleep(2 * time.Millisecond)
 	tx11 := ConstructTxByAccountAndNonce("account1", uint64(0))
 	ast.NotEqual(tx1.RbftGetTxHash(), tx11.RbftGetTxHash())
-	batch, _ = pool.AddNewRequests([]*consensus.FltTransaction{tx11}, true, false, true)
+	batch, _ = pool.AddNewRequests([]*consensus.FltTransaction{tx11}, true, false, true, true)
 	ast.Nil(batch)
 	ast.Nil(pool.txStore.txHashMap[tx1.RbftGetTxHash()])
 	poolTx = pool.txStore.getPoolTxByTxnPointer(tx1.RbftGetFrom(), uint64(0))
@@ -71,6 +71,15 @@ func TestAddNewRequests(t *testing.T) {
 	ast.Equal(5, pool.txStore.priorityIndex.size())
 	// tx11 is not local
 	ast.Equal(4, pool.txStore.localTTLIndex.size(), "tx1 will be remove")
+
+	tx1 = ConstructTxByAccountAndNonce("1account1", uint64(0))
+	tx2 = ConstructTxByAccountAndNonce("1account1", uint64(1))
+	tx3 = ConstructTxByAccountAndNonce("1account2", uint64(0))
+	tx4 = ConstructTxByAccountAndNonce("1account2", uint64(1))
+	tx5 = ConstructTxByAccountAndNonce("1account2", uint64(2))
+	batch, completionMissingBatchHashes = pool.AddNewRequests([]*consensus.FltTransaction{tx1, tx2, tx3, tx4, tx5}, true, true, false, false)
+	ast.Equal(0, len(batch))
+	ast.Equal(0, len(completionMissingBatchHashes))
 }
 
 func constructAllTxs[T any, Constraint consensus.TXConstraint[T]](txs []*T) map[string]*txSortedMap[T, Constraint] {
@@ -189,7 +198,7 @@ func TestGenerateRequestBatch(t *testing.T) {
 	tx1 := ConstructTxByAccountAndNonce("account1", uint64(0))
 	tx4 := ConstructTxByAccountAndNonce("account2", uint64(1))
 
-	batches, _ := pool.AddNewRequests([]*consensus.FltTransaction{tx1, tx2, tx4}, true, true, false)
+	batches, _ := pool.AddNewRequests([]*consensus.FltTransaction{tx1, tx2, tx4}, true, true, false, true)
 	ast.Equal(0, len(batches))
 	ast.Equal(0, len(pool.txStore.batchesCache))
 	ast.Equal(0, len(pool.txStore.batchedTxs))
@@ -204,7 +213,7 @@ func TestGenerateRequestBatch(t *testing.T) {
 	ast.Equal(uint64(0), pool.txStore.nonceCache.getPendingNonce(tx3.RbftGetFrom()), "account2 lack nonce 0, so don't update pending nonce")
 	ast.Equal(uint64(0), pool.txStore.nonceCache.getCommitNonce(tx3.RbftGetFrom()))
 
-	batches, _ = pool.AddNewRequests([]*consensus.FltTransaction{tx3}, true, true, false)
+	batches, _ = pool.AddNewRequests([]*consensus.FltTransaction{tx3}, true, true, false, true)
 	ast.Equal(1, len(batches))
 	ast.Equal(4, len(batches[0].TxList))
 	// sorted by <timestamp, account, nonce>
@@ -222,7 +231,7 @@ func TestGenerateRequestBatch(t *testing.T) {
 	ast.Equal(uint64(0), pool.txStore.nonceCache.getCommitNonce(tx3.RbftGetFrom()))
 
 	tx5 := ConstructTxByAccountAndNonce("account2", uint64(2))
-	batch, _ := pool.AddNewRequests([]*consensus.FltTransaction{tx5}, true, true, false)
+	batch, _ := pool.AddNewRequests([]*consensus.FltTransaction{tx5}, true, true, false, true)
 	ast.Equal(0, len(batch))
 	batches = pool.GenerateRequestBatch()
 	ast.Equal(1, len(batches))
@@ -261,7 +270,7 @@ func TestRestorePool(t *testing.T) {
 	tx4 := ConstructTxByAccountAndNonce("account2", uint64(1))
 	tx5 := ConstructTxByAccountAndNonce("account2", uint64(2))
 	ast.Equal(false, pool.isTimed)
-	batch, _ := pool.AddNewRequests([]*consensus.FltTransaction{tx1, tx2, tx3, tx4, tx5}, true, true, false)
+	batch, _ := pool.AddNewRequests([]*consensus.FltTransaction{tx1, tx2, tx3, tx4, tx5}, true, true, false, true)
 	ast.Equal(1, len(batch))
 	ast.Equal(4, len(pool.txStore.batchedTxs))
 	ast.Equal(5, len(pool.txStore.txHashMap))
@@ -290,7 +299,7 @@ func TestReConstructBatchByOrder(t *testing.T) {
 	tx4 := ConstructTxByAccountAndNonce("account2", uint64(1))
 	tx5 := ConstructTxByAccountAndNonce("account2", uint64(2))
 
-	batch, _ := pool.AddNewRequests([]*consensus.FltTransaction{tx1, tx2, tx3, tx4, tx5}, true, true, false)
+	batch, _ := pool.AddNewRequests([]*consensus.FltTransaction{tx1, tx2, tx3, tx4, tx5}, true, true, false, true)
 	_, err := pool.ReConstructBatchByOrder(batch[0])
 	ast.Contains(err.Error(), "invalid batch", "already exists in bathedCache")
 
@@ -394,7 +403,7 @@ func TestReceiveMissingRequests(t *testing.T) {
 
 	pool.txStore.missingBatch[batchDigest] = missingHashList
 
-	batch, completionMissingBatchHashes := pool.AddNewRequests([]*consensus.FltTransaction{tx5, tx6, tx7, tx8}, false, true, false)
+	batch, completionMissingBatchHashes := pool.AddNewRequests([]*consensus.FltTransaction{tx5, tx6, tx7, tx8}, false, true, false, true)
 	ast.Equal(0, len(batch))
 	ast.Equal(1, len(completionMissingBatchHashes))
 	ast.Equal(batchDigest, completionMissingBatchHashes[0])
@@ -419,7 +428,7 @@ func TestSendMissingRequests(t *testing.T) {
 	batchDigest := getBatchHash[consensus.FltTransaction, *consensus.FltTransaction](newBatch)
 	newBatch.BatchHash = batchDigest
 
-	pool.AddNewRequests([]*consensus.FltTransaction{tx1, tx2, tx3}, false, true, false)
+	pool.AddNewRequests([]*consensus.FltTransaction{tx1, tx2, tx3}, false, true, false, true)
 	missingHashList := make(map[uint64]string)
 	missingHashList[0] = "hash1"
 	_, err := pool.SendMissingRequests(batchDigest, missingHashList)
@@ -454,7 +463,7 @@ func TestGetRequestsByHashList(t *testing.T) {
 	tx4 := ConstructTxByAccountAndNonce("account2", uint64(1))
 	tx5 := ConstructTxByAccountAndNonce("account2", uint64(3))
 
-	batches, _ := pool.AddNewRequests([]*consensus.FltTransaction{tx1, tx2, tx3, tx4, tx5}, true, true, false)
+	batches, _ := pool.AddNewRequests([]*consensus.FltTransaction{tx1, tx2, tx3, tx4, tx5}, true, true, false, true)
 	ast.Equal(1, len(batches))
 	ast.Equal(4, len(pool.txStore.batchedTxs))
 	ast.Equal(1, len(pool.txStore.batchesCache))
@@ -530,7 +539,7 @@ func TestRemoveBatches(t *testing.T) {
 	tx4 := ConstructTxByAccountAndNonce("account2", uint64(0))
 	tx5 := ConstructTxByAccountAndNonce("account1", uint64(3))
 
-	batches, _ := pool.AddNewRequests([]*consensus.FltTransaction{tx1, tx2, tx4, tx3, tx5}, true, true, false)
+	batches, _ := pool.AddNewRequests([]*consensus.FltTransaction{tx1, tx2, tx4, tx3, tx5}, true, true, false, true)
 	ast.Equal(1, len(batches))
 
 	pool.RemoveBatches([]string{batches[0].BatchHash})
@@ -560,7 +569,7 @@ func TestRemoveTimeoutRequests(t *testing.T) {
 	tx5 := ConstructTxByAccountAndNonce("Alice", uint64(3))
 	tx6 := ConstructTxByAccountAndNonce("Bob", uint64(3))
 
-	pool.AddNewRequests([]*consensus.FltTransaction{tx1, tx2, tx3, tx4, tx5, tx6}, true, true, false)
+	pool.AddNewRequests([]*consensus.FltTransaction{tx1, tx2, tx3, tx4, tx5, tx6}, true, true, false, true)
 	batches := pool.GenerateRequestBatch()
 	ast.Equal(1, len(batches))
 	for _, batch := range batches {
@@ -604,10 +613,10 @@ func TestRestoreOneBatch(t *testing.T) {
 	tx3 := ConstructTxByAccountAndNonce("account2", uint64(0))
 	tx4 := ConstructTxByAccountAndNonce("account2", uint64(1))
 
-	batches, _ := pool.AddNewRequests([]*consensus.FltTransaction{tx1, tx2, tx4}, true, true, false)
+	batches, _ := pool.AddNewRequests([]*consensus.FltTransaction{tx1, tx2, tx4}, true, true, false, true)
 	ast.Equal(0, len(batches))
 
-	batches, _ = pool.AddNewRequests([]*consensus.FltTransaction{tx3}, true, true, false)
+	batches, _ = pool.AddNewRequests([]*consensus.FltTransaction{tx3}, true, true, false, true)
 	ast.Equal(1, len(batches))
 	ast.Equal(4, len(pool.txStore.batchedTxs))
 	ast.Equal(1, len(pool.txStore.batchesCache))
@@ -657,7 +666,7 @@ func TestIsPoolFull(t *testing.T) {
 	tx2 := ConstructTxByAccountAndNonce("account1", uint64(1))
 	tx3 := ConstructTxByAccountAndNonce("account2", uint64(0))
 
-	pool.AddNewRequests([]*consensus.FltTransaction{tx1, tx2, tx3}, false, true, false)
+	pool.AddNewRequests([]*consensus.FltTransaction{tx1, tx2, tx3}, false, true, false, true)
 	isFull := pool.IsPoolFull()
 	pending := pool.HasPendingRequestInPool()
 	ast.Equal(true, isFull)
@@ -706,7 +715,7 @@ func TestGetPendingTxByHash(t *testing.T) {
 	pool := mockMempoolImpl[consensus.FltTransaction, *consensus.FltTransaction]()
 	tx1 := ConstructTxByAccountAndNonce("account1", uint64(0))
 
-	pool.AddNewRequests([]*consensus.FltTransaction{tx1}, false, true, false)
+	pool.AddNewRequests([]*consensus.FltTransaction{tx1}, false, true, false, true)
 
 	tx := pool.GetPendingTxByHash(tx1.RbftGetTxHash())
 	ast.Equal(tx1.RbftGetTxHash(), tx.RbftGetTxHash())

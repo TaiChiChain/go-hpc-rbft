@@ -20,7 +20,7 @@ func TestVC_FullProcess(t *testing.T) {
 
 	tx := newTx()
 	// node3 cache some txs.
-	rbfts[2].batchMgr.requestPool.AddNewRequests([]*consensus.FltTransaction{tx}, false, true, false)
+	rbfts[2].batchMgr.requestPool.AddNewRequests([]*consensus.FltTransaction{tx}, false, true, false, true)
 
 	// replica 1 send vc
 	rbfts[0].sendViewChange()
@@ -226,7 +226,7 @@ func TestVC_processNewView_AfterViewChanged_PrimaryNormal(t *testing.T) {
 	// mock primary node2 cached some txs.
 	nodes[1].broadcastMessageCache = nil
 	tx := newTx()
-	rbfts[1].batchMgr.requestPool.AddNewRequests([]*consensus.FltTransaction{tx}, false, true, false)
+	rbfts[1].batchMgr.requestPool.AddNewRequests([]*consensus.FltTransaction{tx}, false, true, false, true)
 	batch := rbfts[1].batchMgr.requestPool.GenerateRequestBatch()
 
 	// a message list
@@ -260,7 +260,7 @@ func TestVC_processNewView_AfterViewChanged_ReplicaNormal(t *testing.T) {
 
 	// mock backup node1 cached some txs.
 	tx := newTx()
-	rbfts[0].batchMgr.requestPool.AddNewRequests([]*consensus.FltTransaction{tx}, false, true, false)
+	rbfts[0].batchMgr.requestPool.AddNewRequests([]*consensus.FltTransaction{tx}, false, true, false, true)
 	batch := rbfts[0].batchMgr.requestPool.GenerateRequestBatch()
 
 	// a message list
@@ -292,7 +292,7 @@ func TestVC_fetchMissingReqBatchIfNeeded(t *testing.T) {
 	_, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 
 	tx := newTx()
-	rbfts[0].batchMgr.requestPool.AddNewRequests([]*consensus.FltTransaction{tx}, false, true, false)
+	rbfts[0].batchMgr.requestPool.AddNewRequests([]*consensus.FltTransaction{tx}, false, true, false, true)
 	batch := rbfts[0].batchMgr.requestPool.GenerateRequestBatch()
 
 	// a message list

@@ -9,28 +9,40 @@ type rbftMetrics struct {
 	// ========================== metrics related to basic RBFT info ==========================
 	// track the current node ID.
 	idGauge metrics.Gauge
+
 	// track the current epoch number.
 	epochGauge metrics.Gauge
+
 	// track the current view number.
 	viewGauge metrics.Gauge
+
 	// track the current cluster size.
 	clusterSizeGauge metrics.Gauge
+
 	// track the current quorum size.
 	quorumSizeGauge metrics.Gauge
+
 	// track if current node is in normal.
 	statusGaugeInNormal metrics.Gauge
+
 	// track if current node is in conf change.
 	statusGaugeInConfChange metrics.Gauge
+
 	// track if current node is in view change.
 	statusGaugeInViewChange metrics.Gauge
+
 	// track if current node is in recovery.
 	statusGaugeInRecovery metrics.Gauge
+
 	// track if current node is in state transferring.
 	statusGaugeStateTransferring metrics.Gauge
+
 	// track if current node is pool full.
 	statusGaugePoolFull metrics.Gauge
+
 	// track if current node is in pending.
 	statusGaugePending metrics.Gauge
+
 	// track if current node is in inconsistent.
 	statusGaugeInconsistent metrics.Gauge
 
@@ -39,20 +51,26 @@ type rbftMetrics struct {
 	// Notice! this number may be smaller than chain height because we may go around
 	// consensus and state update if we are fell behind.
 	committedBlockNumber metrics.Counter
+
 	// monitor the totally committed config block number by RBFT.
 	committedConfigBlockNumber metrics.Counter
+
 	// monitor the totally committed empty block number by RBFT.
 	committedEmptyBlockNumber metrics.Counter
+
 	// monitor the totally committed tx number by RBFT.
 	committedTxs metrics.Counter
+
 	// monitor the tx number in each committed block.
 	txsPerBlock metrics.Summary
 
 	// ========================== metrics related to batch duration info ==========================
 	// monitor the batch generation interval for primary.
 	batchInterval metrics.Summary
+
 	// monitor the batch persist time.
 	batchPersistDuration metrics.Summary
+
 	// monitor the time from batch[primary] to commit.
 	// may be negative due to the time difference between primary and replica.
 	batchToCommitDuration metrics.Summary
@@ -61,9 +79,11 @@ type rbftMetrics struct {
 	// monitor the batch number in batchStore, including the batches that cached to help
 	// other lagging nodes to fetch.
 	batchesGauge metrics.Gauge
+
 	// monitor the batch number in outstandingReqBatches, including the batches that have
 	// started consensus but not finished.
 	outstandingBatchesGauge metrics.Gauge
+
 	// monitor the batch number in cacheBatches, including the batches that have been
 	// batched by primary but cannot start consensus due to high watermark limit.
 	// [primary only]
@@ -72,26 +92,34 @@ type rbftMetrics struct {
 	// ========================== metrics related to fell behind info ==========================
 	// monitor the state update times.
 	stateUpdateCounter metrics.Counter
+
 	// monitor the times of fetch missing txs which is caused by missing txs before commit.
 	fetchMissingTxsCounter metrics.Counter
+
 	// monitor the times of return fetch missing txs which is caused by backup node missing
 	// txs before commit.
 	returnFetchMissingTxsCounter metrics.Counter
+
 	// monitor the times of fetch request batch which is caused by missing batches after vc.
 	fetchRequestBatchCounter metrics.Counter
 
 	// ========================== metrics related to txs/txSets info ==========================
 	// monitor part of incoming tx sets, including tx sets from API and relayed from NVP.
 	incomingLocalTxSets metrics.Counter
+
 	// monitor part of incoming txs, including txs from API and relayed from other NVP.
 	incomingLocalTxs metrics.Counter
+
 	// monitor part of rejected txs due to consensus abnormal status, including txs from
 	// API and relayed from other NVP.
 	rejectedLocalTxs metrics.Counter
+
 	// monitor part of incoming tx sets, including tx sets relayed from other VP.
 	incomingRemoteTxSets metrics.Counter
+
 	// monitor part of incoming txs, including txs relayed from other VP.
 	incomingRemoteTxs metrics.Counter
+
 	// monitor part of rejected txs due to consensus abnormal status, including txs relayed
 	// from other VP.
 	rejectedRemoteTxs metrics.Counter
@@ -99,8 +127,10 @@ type rbftMetrics struct {
 	// ========================== metrics related to consensus progress time ==========================
 	// monitor the duration from batch to prePrepared
 	batchToPrePrepared metrics.Summary
+
 	// monitor the duration from prePrepared to prepared
 	prePreparedToPrepared metrics.Summary
+
 	// monitor the duration from prepared to committed
 	preparedToCommitted metrics.Summary
 }

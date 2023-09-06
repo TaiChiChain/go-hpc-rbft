@@ -24,7 +24,7 @@ func newTestStatusNode[T any, Constraint consensus.TXConstraint[T]](ctrl *gomock
 			CandidateSet:              []*NodeInfo{},
 			ValidatorSet:              peerSet,
 			StartBlock:                1,
-			P2PBootstrapNodeAddresses: []string{},
+			P2PBootstrapNodeAddresses: []string{"1"},
 			ConsensusParams: &ConsensusParams{
 				CheckpointPeriod:              10,
 				HighWatermarkCheckpointPeriod: 4,
@@ -39,7 +39,7 @@ func newTestStatusNode[T any, Constraint consensus.TXConstraint[T]](ctrl *gomock
 		DelFlag:     make(chan bool),
 	}
 
-	rbft, err := newRBFT[T, Constraint](conf, external, pool)
+	rbft, err := newRBFT[T, Constraint](conf, external, pool, true)
 	if err != nil {
 		panic(err)
 	}

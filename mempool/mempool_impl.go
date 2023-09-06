@@ -36,11 +36,11 @@ type mempoolImpl[T any, Constraint consensus.TXConstraint[T]] struct {
 // with committed txs on ledger.
 // Also, when we receive a tx locally, we need to check if these txs are out-of-date
 // time by time.
-func (mpi *mempoolImpl[T, Constraint]) AddNewRequests(txs []*T, isPrimary, local, isReplace bool) ([]*RequestHashBatch[T, Constraint], []string) {
-	return mpi.addNewRequests(txs, isPrimary, local, isReplace)
+func (mpi *mempoolImpl[T, Constraint]) AddNewRequests(txs []*T, isPrimary, local, isReplace bool, needGenerateBatch bool) ([]*RequestHashBatch[T, Constraint], []string) {
+	return mpi.addNewRequests(txs, isPrimary, local, isReplace, needGenerateBatch)
 }
 
-func (mpi *mempoolImpl[T, Constraint]) addNewRequests(txs []*T, isPrimary, local, isReplace bool) ([]*RequestHashBatch[T, Constraint], []string) {
+func (mpi *mempoolImpl[T, Constraint]) addNewRequests(txs []*T, isPrimary, local, isReplace bool, needGenerateBatch bool) ([]*RequestHashBatch[T, Constraint], []string) {
 	completionMissingBatchHashes := make([]string, 0)
 	existTxsHash := make(map[string]struct{})
 	validTxs := make(map[string][]*mempoolTransaction[T, Constraint])
@@ -65,14 +65,14 @@ func (mpi *mempoolImpl[T, Constraint]) addNewRequests(txs []*T, isPrimary, local
 				if txPointer := mpi.txStore.txHashMap[txHash]; txPointer != nil {
 					continue
 				}
-				//mpi.logger.Warningf("Receive missing transaction [account: %s, nonce: %d, hash: %s] from primary, we will replace the old transaction", txAccount, txNonce, txHash)
+				// mpi.logger.Warningf("Receive missing transaction [account: %s, nonce: %d, hash: %s] from primary, we will replace the old transaction", txAccount, txNonce, txHash)
 				mpi.replaceTx(tx)
 				continue
 			}
 		}
 		if txPointer := mpi.txStore.txHashMap[txHash]; txPointer != nil {
 			// because simultaneous broadcast and active pull may be repeated
-			//mpi.logger.Debugf("Transaction [account: %s, nonce: %d, hash: %s] has already existed in txHashMap", txAccount, txNonce, txHash)
+			// mpi.logger.Debugf("Transaction [account: %s, nonce: %d, hash: %s] has already existed in txHashMap", txAccount, txNonce, txHash)
 			continue
 		}
 
@@ -118,7 +118,7 @@ func (mpi *mempoolImpl[T, Constraint]) addNewRequests(txs []*T, isPrimary, local
 	mpi.processDirtyAccount(dirtyAccounts)
 
 	// if no timedBlock, generator batch by block size
-	if isPrimary {
+	if isPrimary && needGenerateBatch {
 		if mpi.txStore.priorityNonBatchSize >= mpi.batchSize {
 			batches, err := mpi.generateRequestBatch()
 			if err != nil {
@@ -513,7 +513,7 @@ func (mpi *mempoolImpl[T, Constraint]) ReceiveMissingRequests(batchHash string, 
 		}
 		validTxn = append(validTxn, tx)
 	}
-	mpi.AddNewRequests(validTxn, false, false, true)
+	mpi.AddNewRequests(validTxn, false, false, true, false)
 	delete(mpi.txStore.missingBatch, batchHash)
 	return nil
 }
@@ -624,7 +624,7 @@ func (mpi *mempoolImpl[T, Constraint]) RestorePool() {
 	// resubmit these txs to mempool.
 	for batchDigest, batch := range mpi.txStore.batchesCache {
 		mpi.logger.Debugf("Put batch %s back to pool with %d txs", batchDigest, len(batch.TxList))
-		mpi.AddNewRequests(batch.TxList, false, false, true)
+		mpi.AddNewRequests(batch.TxList, false, false, true, false)
 		delete(mpi.txStore.batchesCache, batchDigest)
 	}
 

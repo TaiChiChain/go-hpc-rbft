@@ -538,10 +538,10 @@ func (rbft *rbftImpl[T, Constraint]) restoreState() error {
 	// mock an initial checkpoint.
 	state := &types.ServiceState{
 		MetaState: &types.MetaState{
-			Height: 0,
-			Digest: "XXX GENESIS",
+			Height: rbft.config.GenesisEpochInfo.StartBlock,
+			Digest: "GENESIS",
 		},
-		Epoch: 0,
+		Epoch: rbft.config.GenesisEpochInfo.Epoch,
 	}
 	mockCheckpoint, gErr := rbft.generateSignedCheckpoint(state, false)
 	if gErr != nil {
@@ -549,7 +549,7 @@ func (rbft *rbftImpl[T, Constraint]) restoreState() error {
 		rbft.metrics = nil
 		return gErr
 	}
-	rbft.storeMgr.localCheckpoints[0] = mockCheckpoint
+	rbft.storeMgr.localCheckpoints[state.MetaState.Height] = mockCheckpoint
 
 	chkpts, err := rbft.storage.ReadStateSet("chkpt.")
 	if err == nil {

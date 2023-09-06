@@ -220,11 +220,21 @@ func (rbft *rbftImpl[T, Constraint]) maybeSendPrePrepare(batch *RequestBatch[T, 
 
 	nextSeqNo = rbft.batchMgr.getSeqNo() + 1
 	// restrict the speed of sending prePrepare.
-	if rbft.beyondRange(nextSeqNo) {
+	if rbft.beyondRange(nextSeqNo) || !rbft.inPrimaryTerm() {
 		batchHash := "<nil>"
 		if batch != nil {
 			batchHash = batch.BatchHash
 		}
+		if !rbft.inPrimaryTerm() {
+			rbft.logger.Debugf("Replica %d is primary, not sending prePrepare for request batch %s because "+
+				"next seqNo is out of high watermark %d, restore the batch", rbft.peerMgr.selfID, batchHash, rbft.chainConfig.H+rbft.chainConfig.L, findCache)
+
+			if err := rbft.batchMgr.requestPool.RestoreOneBatch(batch.BatchHash); err != nil {
+				rbft.logger.Debugf("Replica %d is primary, restore the batch failed: %s", rbft.peerMgr.selfID, err.Error())
+			}
+			return
+		}
+
 		rbft.logger.Debugf("Replica %d is primary, not sending prePrepare for request batch %s because "+
 			"next seqNo is out of high watermark %d, while findCache is %t", rbft.peerMgr.selfID, batchHash, rbft.chainConfig.H+rbft.chainConfig.L, findCache)
 
@@ -272,6 +282,7 @@ func (rbft *rbftImpl[T, Constraint]) maybeSendPrePrepare(batch *RequestBatch[T, 
 
 	if rbft.sendInW(nextSeqNo+1) && len(rbft.batchMgr.cacheBatch) > 0 {
 		rbft.restartBatchTimer()
+		rbft.stopNoTxBatchTimer()
 		if !rbft.batchMgr.requestPool.HasPendingRequestInPool() {
 			rbft.restartNoTxBatchTimer()
 		}
@@ -377,6 +388,7 @@ func (rbft *rbftImpl[T, Constraint]) primaryResubmitTransactions() {
 		// try cached batches first if any.
 		if len(rbft.batchMgr.cacheBatch) > 0 {
 			rbft.restartBatchTimer()
+			rbft.stopNoTxBatchTimer()
 			if !rbft.batchMgr.requestPool.HasPendingRequestInPool() {
 				rbft.restartNoTxBatchTimer()
 			}
@@ -391,8 +403,12 @@ func (rbft *rbftImpl[T, Constraint]) primaryResubmitTransactions() {
 				return
 			}
 
-			batches := rbft.batchMgr.requestPool.GenerateRequestBatch()
-			rbft.postBatches(batches)
+			if rbft.inPrimaryTerm() {
+				batches := rbft.batchMgr.requestPool.GenerateRequestBatch()
+				rbft.postBatches(batches)
+			} else {
+				break
+			}
 
 			// if we have just generated a config batch, we need to break resubmit
 			if rbft.atomicIn(InConfChange) {

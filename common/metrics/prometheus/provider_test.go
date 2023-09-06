@@ -16,15 +16,16 @@ package prometheus
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/axiomesh/axiom-bft/common/metrics"
 	prom "github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/axiomesh/axiom-bft/common/metrics"
 )
 
 func Test_Duplicate_Register(t *testing.T) {
@@ -42,7 +43,7 @@ func Test_Duplicate_Register(t *testing.T) {
 	g0.Set(1)
 	resp, err := client.Get(fmt.Sprintf("http://%s/metrics", server.Listener.Addr().String()))
 	assert.Nil(t, err)
-	bytes, err := ioutil.ReadAll(resp.Body)
+	bytes, err := io.ReadAll(resp.Body)
 	assert.Nil(t, err)
 	assert.Contains(t, string(bytes), `test_gauge 1`)
 
@@ -60,7 +61,7 @@ func Test_Duplicate_Register(t *testing.T) {
 	g2.Set(2)
 	resp, err = client.Get(fmt.Sprintf("http://%s/metrics", server.Listener.Addr().String()))
 	assert.Nil(t, err)
-	bytes, err = ioutil.ReadAll(resp.Body)
+	bytes, err = io.ReadAll(resp.Body)
 	assert.Nil(t, err)
 	assert.Contains(t, string(bytes), `test_gauge 2`)
 }
@@ -96,7 +97,7 @@ func Test_Counter(t *testing.T) {
 
 	resp, err := client.Get(fmt.Sprintf("http://%s/metrics", server.Listener.Addr().String()))
 	assert.Nil(t, err)
-	bytes, err := ioutil.ReadAll(resp.Body)
+	bytes, err := io.ReadAll(resp.Body)
 	assert.Nil(t, err)
 
 	assert.Contains(t, string(bytes), `# HELP flato_consensus_test_tx test tx number`)
@@ -121,7 +122,7 @@ func Test_Gauge(t *testing.T) {
 
 	resp, err := client.Get(fmt.Sprintf("http://%s/metrics", server.Listener.Addr().String()))
 	assert.Nil(t, err)
-	bytes, err := ioutil.ReadAll(resp.Body)
+	bytes, err := io.ReadAll(resp.Body)
 	assert.Nil(t, err)
 
 	assert.Contains(t, string(bytes), `# HELP flato_consensus_test_tx test tx number`)
@@ -150,7 +151,7 @@ func Test_Histogram(t *testing.T) {
 
 	resp, err := client.Get(fmt.Sprintf("http://%s/metrics", server.Listener.Addr().String()))
 	assert.Nil(t, err)
-	bytes, err := ioutil.ReadAll(resp.Body)
+	bytes, err := io.ReadAll(resp.Body)
 	assert.Nil(t, err)
 
 	assert.Contains(t, string(bytes), `# HELP flato_consensus_test_tx test tx number`)
@@ -203,7 +204,7 @@ func Test_Summary(t *testing.T) {
 
 	resp, err := client.Get(fmt.Sprintf("http://%s/metrics", server.Listener.Addr().String()))
 	assert.Nil(t, err)
-	bytes, err := ioutil.ReadAll(resp.Body)
+	bytes, err := io.ReadAll(resp.Body)
 	assert.Nil(t, err)
 
 	assert.Contains(t, string(bytes), `# HELP flato_consensus_test_tx test tx number`)

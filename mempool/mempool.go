@@ -29,7 +29,7 @@ type MemPool[T any, Constraint consensus.TXConstraint[T]] interface {
 	// with committed txs on ledger.
 	// Also, when we receive a tx locally, we need to check if these txs are out-of-date
 	// time by time.
-	AddNewRequests(txs []*T, isPrimary bool, local, isReplace bool) ([]*RequestHashBatch[T, Constraint], []string)
+	AddNewRequests(txs []*T, isPrimary bool, local, isReplace bool, needGenerateBatch bool) ([]*RequestHashBatch[T, Constraint], []string)
 
 	// RemoveBatches removes several batches by given digests of
 	// transaction batches from the pool(batchedTxs).

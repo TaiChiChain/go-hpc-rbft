@@ -22,8 +22,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/gogo/protobuf/proto"
+
+	"github.com/axiomesh/axiom-bft/common/consensus"
 )
 
 // constant timer names

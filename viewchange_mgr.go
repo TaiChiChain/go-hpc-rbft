@@ -552,7 +552,7 @@ func (rbft *rbftImpl[T, Constraint]) sendNewView() consensusEvent {
 // recvNewView receives new view message and check if this node could
 // process this message or not.
 func (rbft *rbftImpl[T, Constraint]) recvNewView(nv *consensus.NewView) consensusEvent {
-	targetView, _, vcBasisSet, valid := rbft.checkNewView(nv)
+	targetView, _, vcBasisSet, valid := rbft.checkNewView(nv, false)
 	if valid {
 		// direct process ViewChanges and then process new view.
 		rbft.processQuorumViewChange(nv.ViewChangeSet.ViewChanges, vcBasisSet, true)
@@ -576,18 +576,9 @@ func (rbft *rbftImpl[T, Constraint]) recvNewView(nv *consensus.NewView) consensu
 // 2. new view hash
 // 3. vc basis of new view
 // 4. if new view is valid or not
-func (rbft *rbftImpl[T, Constraint]) checkNewView(nv *consensus.NewView) (uint64, string, []*consensus.VcBasis, bool) {
+func (rbft *rbftImpl[T, Constraint]) checkNewView(nv *consensus.NewView, isRecovery bool) (uint64, string, []*consensus.VcBasis, bool) {
 	rbft.logger.Infof("Replica %d received newView %d from replica %d", rbft.peerMgr.selfID,
 		nv.View, nv.ReplicaId)
-
-	// TODO: support check auto switched new view
-	// if auto view change
-	if nv.ViewChangeSet == nil {
-		nv.ViewChangeSet = &consensus.QuorumViewChange{
-			ReplicaId:   nv.ReplicaId,
-			ViewChanges: []*consensus.ViewChange{},
-		}
-	}
 
 	// view 0 is the initial view of every epoch, but valid NewView should start from 1.
 	if nv.View == 0 {
@@ -601,14 +592,17 @@ func (rbft *rbftImpl[T, Constraint]) checkNewView(nv *consensus.NewView) (uint64
 		return 0, "", nil, false
 	}
 
-	expectedPrimaryID := rbft.chainConfig.calPrimaryIDByView(nv.View)
-	if expectedPrimaryID != nv.ReplicaId {
-		rbft.logger.Warningf("Replica %d reject invalid newView from %d, v:%d, expected primary: %d",
-			rbft.peerMgr.selfID, nv.ReplicaId, nv.View, expectedPrimaryID)
+	// wrf recovery cannot check the PrimaryID
+	if !(isRecovery && rbft.chainConfig.isWRF()) {
+		expectedPrimaryID := rbft.chainConfig.calPrimaryIDByView(nv.View)
+		if expectedPrimaryID != nv.ReplicaId {
+			rbft.logger.Warningf("Replica %d reject invalid newView from %d, v:%d, expected primary: %d",
+				rbft.peerMgr.selfID, nv.ReplicaId, nv.View, expectedPrimaryID)
 
-		rbft.logger.Debugf("Replica %d current height: %d, dig: %s",
-			rbft.peerMgr.selfID, rbft.exec.lastExec, rbft.chainConfig.LastCheckpointExecBlockHash)
-		return 0, "", nil, false
+			rbft.logger.Debugf("Replica %d current height: %d, dig: %s",
+				rbft.peerMgr.selfID, rbft.exec.lastExec, rbft.chainConfig.LastCheckpointExecBlockHash)
+			return 0, "", nil, false
+		}
 	}
 
 	var (
@@ -818,7 +812,7 @@ func (rbft *rbftImpl[T, Constraint]) recvRecoveryResponse(rcr *consensus.Recover
 	// this targetView.
 	if rbft.atomicIn(InRecovery) {
 		nv := rcr.GetNewView()
-		targetView, nvHash, _, valid := rbft.checkNewView(nv)
+		targetView, nvHash, _, valid := rbft.checkNewView(nv, true)
 		if valid {
 			// only process response in recovery status, which is caused by single node view change
 			return rbft.resetStateForRecovery(targetView, nvHash, rcr)

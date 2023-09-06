@@ -156,13 +156,15 @@ type rbftImpl[T any, Constraint consensus.TXConstraint[T]] struct {
 var once sync.Once
 
 // newRBFT init the RBFT instance
-func newRBFT[T any, Constraint consensus.TXConstraint[T]](c Config, external ExternalStack[T, Constraint], requestPool mempool.MemPool[T, Constraint]) (*rbftImpl[T, Constraint], error) {
+func newRBFT[T any, Constraint consensus.TXConstraint[T]](c Config, external ExternalStack[T, Constraint], requestPool mempool.MemPool[T, Constraint], isTest bool) (*rbftImpl[T, Constraint], error) {
 	err := c.GenesisEpochInfo.Check()
 	if err != nil {
 		return nil, err
 	}
-	if c.GenesisEpochInfo.Epoch != 1 || c.GenesisEpochInfo.StartBlock != 1 {
-		return nil, fmt.Errorf("epoch info error: genesis epoch and start_block must be 1, but get epoch: %d, start_block: %d", c.GenesisEpochInfo.Epoch, c.GenesisEpochInfo.StartBlock)
+	if !isTest {
+		if c.GenesisEpochInfo.Epoch != 1 || c.GenesisEpochInfo.StartBlock != 1 {
+			return nil, fmt.Errorf("epoch info error: genesis epoch and start_block must be 1, but get epoch: %d, start_block: %d", c.GenesisEpochInfo.Epoch, c.GenesisEpochInfo.StartBlock)
+		}
 	}
 
 	// init message event converter
@@ -171,7 +173,9 @@ func newRBFT[T any, Constraint consensus.TXConstraint[T]](c Config, external Ext
 	cpChan := make(chan *types.ServiceState)
 	recvC := make(chan consensusEvent, 1024)
 	rbft := &rbftImpl[T, Constraint]{
-		chainConfig:          &ChainConfig{},
+		chainConfig: &ChainConfig{
+			H: c.GenesisEpochInfo.StartBlock,
+		},
 		config:               c,
 		logger:               c.Logger,
 		external:             external,
@@ -250,7 +254,7 @@ func (rbft *rbftImpl[T, Constraint]) init() error {
 	rbft.metrics.clusterSizeGauge.Set(float64(rbft.chainConfig.N))
 	rbft.metrics.quorumSizeGauge.Set(float64(rbft.commonCaseQuorum()))
 
-	rbft.logger.Infof("RBFT enable wrf = %v", rbft.chainConfig.EpochInfo.ConsensusParams.ProposerElectionType == ProposerElectionTypeWRF)
+	rbft.logger.Infof("RBFT enable wrf = %v", rbft.chainConfig.isWRF())
 	rbft.logger.Infof("RBFT current epoch = %v", rbft.chainConfig.EpochInfo.Epoch)
 	rbft.logger.Infof("RBFT current view = %v", rbft.chainConfig.View)
 	rbft.logger.Infof("RBFT last exec block = %v", rbft.exec.lastExec)
@@ -753,14 +757,14 @@ func (rbft *rbftImpl[T, Constraint]) processReqSetEvent(req *RequestSet[T, Const
 	}
 
 	// if current node is in skipInProgress, it should reject the transactions coming from other nodes, but has the responsibility to keep its own transactions
-	//if rbft.in(SkipInProgress) && !req.Local {
+	// if rbft.in(SkipInProgress) && !req.Local {
 	//	rbft.rejectRequestSet(req)
 	//	return nil
-	//}
+	// }
 
 	// if current node is in abnormal, add normal txs into txPool without generate batches.
 	if !rbft.isNormal() || rbft.in(SkipInProgress) || rbft.in(InRecovery) {
-		_, completionMissingBatchHashes := rbft.batchMgr.requestPool.AddNewRequests(req.Requests, false, req.Local, false)
+		_, completionMissingBatchHashes := rbft.batchMgr.requestPool.AddNewRequests(req.Requests, false, req.Local, false, false)
 		for _, batchHash := range completionMissingBatchHashes {
 			delete(rbft.storeMgr.missingBatchesInFetching, batchHash)
 		}
@@ -772,7 +776,8 @@ func (rbft *rbftImpl[T, Constraint]) processReqSetEvent(req *RequestSet[T, Const
 				rbft.startBatchTimer()
 				rbft.stopNoTxBatchTimer()
 			}
-			batches, _ := rbft.batchMgr.requestPool.AddNewRequests(req.Requests, true, req.Local, false)
+
+			batches, _ := rbft.batchMgr.requestPool.AddNewRequests(req.Requests, true, req.Local, false, rbft.inPrimaryTerm())
 			// If these transactions trigger generating a batch, stop batch timer
 			if len(batches) != 0 {
 				rbft.stopBatchTimer()
@@ -785,7 +790,7 @@ func (rbft *rbftImpl[T, Constraint]) processReqSetEvent(req *RequestSet[T, Const
 				rbft.postBatches(batches)
 			}
 		} else {
-			_, completionMissingBatchHashes := rbft.batchMgr.requestPool.AddNewRequests(req.Requests, false, req.Local, false)
+			_, completionMissingBatchHashes := rbft.batchMgr.requestPool.AddNewRequests(req.Requests, false, req.Local, false, false)
 			for _, batchHash := range completionMissingBatchHashes {
 				idx, ok := rbft.storeMgr.missingBatchesInFetching[batchHash]
 				if !ok {
@@ -935,7 +940,7 @@ func (rbft *rbftImpl[T, Constraint]) recvRequestBatch(reqBatch *mempool.RequestH
 	}
 
 	// primary node should reject generate batch when there is a config batch in ordering.
-	if rbft.isPrimary(rbft.peerMgr.selfID) && rbft.isNormal() && !rbft.atomicIn(InConfChange) {
+	if rbft.isPrimary(rbft.peerMgr.selfID) && rbft.isNormal() && !rbft.atomicIn(InConfChange) && rbft.inPrimaryTerm() {
 		// enter config change status once we generate a config batch.
 		if isConfigBatch(batch.SeqNo, rbft.chainConfig.EpochInfo) {
 			rbft.logger.Noticef("Primary %d has generated a config batch, start config change", rbft.peerMgr.selfID)
@@ -943,6 +948,7 @@ func (rbft *rbftImpl[T, Constraint]) recvRequestBatch(reqBatch *mempool.RequestH
 			rbft.metrics.statusGaugeInConfChange.Set(InConfChange)
 		}
 		rbft.restartBatchTimer()
+		rbft.stopNoTxBatchTimer()
 		if !rbft.batchMgr.requestPool.HasPendingRequestInPool() {
 			rbft.restartNoTxBatchTimer()
 		}
@@ -1027,6 +1033,22 @@ func (rbft *rbftImpl[T, Constraint]) recvPrePrepare(ctx context.Context, preprep
 		rbft.peerMgr.selfID, preprep.ReplicaId, preprep.View, preprep.SequenceNumber, preprep.BatchDigest)
 
 	if !rbft.isPrePrepareLegal(preprep) {
+		if rbft.chainConfig.isWRF() &&
+			preprep.View > rbft.chainConfig.View &&
+			!rbft.beyondRange(preprep.SequenceNumber) {
+			// only for wrf: cache messages that are higher in the view and do not exceed the high watermark, recommit after checkpoint
+			cacheMsg := rbft.getWRFHighViewMsgCache(preprep.View)
+			cacheMsg.prePrepares = append(cacheMsg.prePrepares, preprep)
+			rbft.logger.Debugf("Replica %d received higher view prePrepare from replica %d and cache it, "+
+				"receive view %d, current view %d, seqNo %d, low water mark %d",
+				rbft.peerMgr.selfID, preprep.ReplicaId, preprep.View, rbft.chainConfig.View, preprep.SequenceNumber, rbft.chainConfig.H)
+		} else {
+			if preprep.View > rbft.chainConfig.View {
+				rbft.logger.Warningf("Replica %d ignore too higher view prePrepare from replica %d, "+
+					"receive view %d, current view %d, seqNo %d, low water mark %d",
+					rbft.peerMgr.selfID, preprep.ReplicaId, preprep.View, rbft.chainConfig.View, preprep.SequenceNumber, rbft.chainConfig.H)
+			}
+		}
 		return nil
 	}
 
@@ -1142,6 +1164,23 @@ func (rbft *rbftImpl[T, Constraint]) recvPrepare(ctx context.Context, prep *cons
 		rbft.peerMgr.selfID, prep.ReplicaId, prep.View, prep.SequenceNumber)
 
 	if !rbft.isPrepareLegal(prep) {
+		if rbft.chainConfig.isWRF() &&
+			prep.View > rbft.chainConfig.View &&
+			!rbft.beyondRange(prep.SequenceNumber) {
+			// only for wrf: cache messages that are higher in the view and do not exceed the high watermark, recommit after checkpoint
+			cacheMsg := rbft.getWRFHighViewMsgCache(prep.View)
+			cacheMsg.prepares = append(cacheMsg.prepares, prep)
+			rbft.logger.Debugf("Replica %d received higher view prepare from replica %d and cache it, "+
+				"receive view %d, current view %d, seqNo %d, low water mark %d",
+				rbft.peerMgr.selfID, prep.ReplicaId, prep.View, rbft.chainConfig.View, prep.SequenceNumber, rbft.chainConfig.H)
+		} else {
+			if prep.View > rbft.chainConfig.View {
+				rbft.logger.Warningf("Replica %d ignore too higher view prepare from replica %d, "+
+					"receive view %d, current view %d, seqNo %d, low water mark %d",
+					rbft.peerMgr.selfID, prep.ReplicaId, prep.View, rbft.chainConfig.View, prep.SequenceNumber, rbft.chainConfig.H)
+			}
+		}
+
 		return nil
 	}
 
@@ -1241,6 +1280,22 @@ func (rbft *rbftImpl[T, Constraint]) recvCommit(ctx context.Context, commit *con
 		rbft.peerMgr.selfID, commit.ReplicaId, commit.View, commit.SequenceNumber)
 
 	if !rbft.isCommitLegal(commit) {
+		if rbft.chainConfig.isWRF() &&
+			commit.View > rbft.chainConfig.View &&
+			!rbft.beyondRange(commit.SequenceNumber) {
+			// only for wrf: cache messages that are higher in the view and do not exceed the high watermark, recommit after checkpoint
+			cacheMsg := rbft.getWRFHighViewMsgCache(commit.View)
+			cacheMsg.commits = append(cacheMsg.commits, commit)
+			rbft.logger.Debugf("Replica %d received higher view commit from replica %d and cache it, "+
+				"receive view %d, current view %d, seqNo %d, low water mark %d",
+				rbft.peerMgr.selfID, commit.ReplicaId, commit.View, rbft.chainConfig.View, commit.SequenceNumber, rbft.chainConfig.H)
+		} else {
+			if commit.View > rbft.chainConfig.View {
+				rbft.logger.Warningf("Replica %d ignore too higher view commit from replica %d, "+
+					"receive view %d, current view %d, seqNo %d, low water mark %d",
+					rbft.peerMgr.selfID, commit.ReplicaId, commit.View, rbft.chainConfig.View, commit.SequenceNumber, rbft.chainConfig.H)
+			}
+		}
 		return nil
 	}
 
@@ -1686,7 +1741,7 @@ func (rbft *rbftImpl[T, Constraint]) checkpoint(state *types.ServiceState, isCon
 	} else {
 		// if our lastExec is equal to high watermark, it means there is something wrong with checkpoint procedure, so that
 		// we need to start a high-watermark timer for checkpoint, and trigger view-change when high-watermark timer expired
-		if rbft.exec.lastExec == rbft.chainConfig.H+rbft.chainConfig.L {
+		if rbft.exec.lastExec == rbft.chainConfig.H+rbft.chainConfig.L && !rbft.chainConfig.isWRF() {
 			rbft.logger.Warningf("Replica %d try to send checkpoint equal to high watermark, "+
 				"there may be something wrong with checkpoint", rbft.peerMgr.selfID)
 			rbft.softStartHighWatermarkTimer("replica send checkpoint equal to high-watermark")
@@ -1840,14 +1895,23 @@ func (rbft *rbftImpl[T, Constraint]) finishNormalCheckpoint(checkpointHeight uin
 
 	rbft.moveWatermarks(checkpointHeight, false)
 
-	if rbft.chainConfig.EpochInfo.ConsensusParams.ProposerElectionType == ProposerElectionTypeWRF {
+	if rbft.chainConfig.isWRF() {
 		// update view after checkpoint
-		rbft.setView(rbft.chainConfig.View + uint64(1))
-
 		// persist new view
 		nv := &consensus.NewView{
-			View:      rbft.chainConfig.View,
 			ReplicaId: rbft.peerMgr.selfID,
+			View:      rbft.chainConfig.View + 1,
+			Xset: []*consensus.Vc_PQ{
+				{
+					SequenceNumber: checkpointHeight,
+					BatchDigest:    checkpointDigest,
+					View:           rbft.chainConfig.View + 1,
+				},
+			},
+			ViewChangeSet: &consensus.QuorumViewChange{
+				ReplicaId:   rbft.peerMgr.selfID,
+				ViewChanges: nil,
+			},
 		}
 		sig, sErr := rbft.signNewView(nv)
 		if sErr != nil {
@@ -1866,6 +1930,7 @@ func (rbft *rbftImpl[T, Constraint]) finishNormalCheckpoint(checkpointHeight uin
 
 	rbft.nullReqTimerReset()
 	rbft.restartBatchTimer()
+	rbft.stopNoTxBatchTimer()
 	if !rbft.batchMgr.requestPool.HasPendingRequestInPool() {
 		rbft.restartNoTxBatchTimer()
 	}
@@ -1875,6 +1940,10 @@ func (rbft *rbftImpl[T, Constraint]) finishNormalCheckpoint(checkpointHeight uin
 		Height: checkpointHeight,
 		Config: false,
 	})
+
+	if rbft.chainConfig.isWRF() {
+		rbft.processWRFHighViewMsgs()
+	}
 
 	// make sure node is in normal status before try to batch, as we may reach stable
 	// checkpoint in vc.
