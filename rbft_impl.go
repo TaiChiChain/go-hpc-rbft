@@ -2372,6 +2372,7 @@ func (rbft *rbftImpl[T, Constraint]) recvStateUpdatedEvent(ss *types.ServiceStat
 		// if not(sync chain then vc), trigger recovery to find correct view-number
 		nv, ok := rbft.vcMgr.newViewStore[rbft.chainConfig.View]
 		if ok {
+			rbft.chainConfig.LastCheckpointExecBlockHash = nv.QuorumCheckpoint.Digest()
 			rbft.persistNewView(nv)
 			rbft.logger.Infof("Replica %d persist view=%d after sync chain", rbft.peerMgr.selfID, rbft.chainConfig.View)
 			return &LocalEvent{
