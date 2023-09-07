@@ -51,7 +51,7 @@ type mempoolTransaction[T any, Constraint consensus.TXConstraint[T]] struct {
 	arrivedTime int64 // track the local txs' arrived memPool time
 }
 
-type txnPointer struct {
+type txPointer struct {
 	account string
 	nonce   uint64
 }

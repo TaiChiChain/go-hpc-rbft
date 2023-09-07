@@ -70,7 +70,7 @@ func (mpi *mempoolImpl[T, Constraint]) addNewRequests(txs []*T, isPrimary, local
 				continue
 			}
 		}
-		if txPointer := mpi.txStore.txHashMap[txHash]; txPointer != nil {
+		if pointer := mpi.txStore.txHashMap[txHash]; pointer != nil {
 			// because simultaneous broadcast and active pull may be repeated
 			// mpi.logger.Debugf("Transaction [account: %s, nonce: %d, hash: %s] has already existed in txHashMap", txAccount, txNonce, txHash)
 			continue
@@ -301,7 +301,7 @@ func (mpi *mempoolImpl[T, Constraint]) RemoveBatches(hashList []string) {
 					mpi.txStore.nonceCache.setPendingNonce(txPointer.account, newCommitNonce)
 				}
 			}
-			delete(mpi.txStore.txHashMap, txHash)
+			mpi.txStore.deletePoolTx(txHash)
 			delete(mpi.txStore.batchedTxs, *txPointer)
 			dirtyAccounts[txPointer.account] = true
 		}
@@ -568,7 +568,7 @@ func (mpi *mempoolImpl[T, Constraint]) ReConstructBatchByOrder(oldBatch *Request
 	// There may be some duplicate transactions which are batched in different batches during vc, for those txs,
 	// we only accept them in the first batch containing them and de-duplicate them in following batches.
 	for _, tx := range oldBatch.TxList {
-		ptr := &txnPointer{
+		ptr := &txPointer{
 			account: Constraint(tx).RbftGetFrom(),
 			nonce:   Constraint(tx).RbftGetNonce(),
 		}
@@ -630,7 +630,7 @@ func (mpi *mempoolImpl[T, Constraint]) RestorePool() {
 
 	// clear missingTxs after abnormal.
 	mpi.txStore.missingBatch = make(map[string]map[uint64]string)
-	mpi.txStore.batchedTxs = make(map[txnPointer]bool)
+	mpi.txStore.batchedTxs = make(map[txPointer]bool)
 	mpi.logger.Debugf("After restore pool, there are %d non-batched txs, %d batches, "+
 		"priority len: %d, parkingLot len: %d, batchedTx len: %d, txHashMap len: %d", mpi.txStore.priorityNonBatchSize,
 		len(mpi.txStore.batchesCache), mpi.txStore.priorityIndex.size(), mpi.txStore.parkingLotIndex.size(),
@@ -650,7 +650,7 @@ func (mpi *mempoolImpl[T, Constraint]) FilterOutOfDateRequests() ([]*T, error) {
 		}
 		if now-poolTx.lifeTime > mpi.toleranceTime.Nanoseconds() {
 			// for those batched txs, we don't need to forward temporarily.
-			if _, ok := mpi.txStore.batchedTxs[txnPointer{account: orderedKey.account, nonce: orderedKey.nonce}]; !ok {
+			if _, ok := mpi.txStore.batchedTxs[txPointer{account: orderedKey.account, nonce: orderedKey.nonce}]; !ok {
 				forward = append(forward, poolTx)
 			}
 		} else {
@@ -687,7 +687,7 @@ func (mpi *mempoolImpl[T, Constraint]) RemoveTimeoutRequests() (uint64, error) {
 		if now-poolTx.arrivedTime > mpi.toleranceRemoveTime.Nanoseconds() {
 			mpi.logger.Debugf("handle orderedKey[account:%s, nonce:%d]", poolTx.getAccount(), poolTx.getNonce())
 			// for those batched txs, we don't need to removedTxs temporarily.
-			if _, ok := mpi.txStore.batchedTxs[txnPointer{account: removeKey.account, nonce: removeKey.nonce}]; ok {
+			if _, ok := mpi.txStore.batchedTxs[txPointer{account: removeKey.account, nonce: removeKey.nonce}]; ok {
 				mpi.logger.Debugf("find tx[account: %s, nonce:%d] from batchedTxs, ignore remove request",
 					removeKey.account, removeKey.nonce)
 				return true
@@ -709,7 +709,7 @@ func (mpi *mempoolImpl[T, Constraint]) RemoveTimeoutRequests() (uint64, error) {
 				count++
 				// remove txHashMap
 				txHash := poolTx.getHash()
-				delete(mpi.txStore.txHashMap, txHash)
+				mpi.txStore.deletePoolTx(txHash)
 				return true
 			}
 		}
@@ -794,7 +794,7 @@ func (mpi *mempoolImpl[T, Constraint]) generateRequestBatch() ([]*RequestHashBat
 		mpi.logger.Debug("Mempool is empty")
 		return nil, nil
 	}
-	result := make([]txnPointer, 0, mpi.batchSize)
+	result := make([]txPointer, 0, mpi.batchSize)
 	// txs has lower nonce will be observed first in priority index iterator.
 	mpi.logger.Debugf("Length of non-batched transactions: %d", mpi.txStore.priorityNonBatchSize)
 	var batchSize uint64
@@ -803,12 +803,12 @@ func (mpi *mempoolImpl[T, Constraint]) generateRequestBatch() ([]*RequestHashBat
 	} else {
 		batchSize = mpi.txStore.priorityNonBatchSize
 	}
-	skippedTxs := make(map[txnPointer]bool)
+	skippedTxs := make(map[txPointer]bool)
 	mpi.txStore.priorityIndex.data.Ascend(func(a btree.Item) bool {
 		tx := a.(*orderedIndexKey)
 		// if tx has existed in bathedTxs
 		// TODO (YH): refactor batchedTxs to seen (all the transactions that have been executed) to track all txs batched in ledger.
-		if _, ok := mpi.txStore.batchedTxs[txnPointer{account: tx.account, nonce: tx.nonce}]; ok {
+		if _, ok := mpi.txStore.batchedTxs[txPointer{account: tx.account, nonce: tx.nonce}]; ok {
 			return true
 		}
 		txSeq := tx.nonce
@@ -817,11 +817,11 @@ func (mpi *mempoolImpl[T, Constraint]) generateRequestBatch() ([]*RequestHashBat
 		// mpi.logger.Debugf("ledger txNonce:%s-%d", tx.account, commitNonce)
 		var seenPrevious bool
 		if txSeq >= 1 {
-			_, seenPrevious = mpi.txStore.batchedTxs[txnPointer{account: tx.account, nonce: txSeq - 1}]
+			_, seenPrevious = mpi.txStore.batchedTxs[txPointer{account: tx.account, nonce: txSeq - 1}]
 		}
 		// include transaction if it's "next" for given account or
 		// we've already sent its ancestor to Consensus
-		ptr := txnPointer{account: tx.account, nonce: tx.nonce}
+		ptr := txPointer{account: tx.account, nonce: tx.nonce}
 		// commitNonce is the nonce of last committed tx for given account,
 		// todo(lrx): not sure if txSeq == commitNonce is correct, maybe txSeq == commitNonce+1 is correct
 		if seenPrevious || (txSeq == commitNonce) {
@@ -832,7 +832,7 @@ func (mpi *mempoolImpl[T, Constraint]) generateRequestBatch() ([]*RequestHashBat
 			}
 
 			// check if we can now include some txs that were skipped before for given account
-			skippedTxn := txnPointer{account: tx.account, nonce: tx.nonce + 1}
+			skippedTxn := txPointer{account: tx.account, nonce: tx.nonce + 1}
 			for {
 				if _, ok := skippedTxs[skippedTxn]; !ok {
 					break
@@ -901,11 +901,11 @@ func (mpi *mempoolImpl[T, Constraint]) replaceTx(tx *T) {
 	txHash := Constraint(tx).RbftGetTxHash()
 	txNonce := Constraint(tx).RbftGetNonce()
 	oldPoolTx := mpi.txStore.getPoolTxByTxnPointer(account, txNonce)
-	txPointer := &txnPointer{
+	pointer := &txPointer{
 		account: account,
 		nonce:   txNonce,
 	}
-	mpi.txStore.txHashMap[txHash] = txPointer
+	mpi.txStore.insertPoolTx(txHash, pointer)
 	list, ok := mpi.txStore.allTxs[account]
 	if !ok {
 		list = newTxSortedMap[T, Constraint]()
@@ -923,7 +923,7 @@ func (mpi *mempoolImpl[T, Constraint]) replaceTx(tx *T) {
 
 	// remove old tx from txHashMap、priorityIndex、parkingLotIndex、localTTLIndex and removeTTLIndex
 	if oldPoolTx != nil {
-		delete(mpi.txStore.txHashMap, oldPoolTx.getHash())
+		mpi.txStore.deletePoolTx(oldPoolTx.getHash())
 		mpi.txStore.priorityIndex.removeByOrderedQueueKey(oldPoolTx)
 		mpi.txStore.parkingLotIndex.removeByOrderedQueueKey(oldPoolTx)
 		mpi.txStore.removeTTLIndex.removeByOrderedQueueKey(oldPoolTx)

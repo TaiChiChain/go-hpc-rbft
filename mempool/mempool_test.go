@@ -152,7 +152,7 @@ func TestFilterOutOfDateRequests(t *testing.T) {
 	ast.Equal(tx1NewTimestamp, tx2NewTimestamp)
 	ast.Equal(tx2NewTimestamp, tx3NewTimestamp)
 
-	pool.txStore.batchedTxs[txnPointer{account: tx2.RbftGetFrom(), nonce: uint64(1)}] = true
+	pool.txStore.batchedTxs[txPointer{account: tx2.RbftGetFrom(), nonce: uint64(1)}] = true
 	time.Sleep(2 * time.Second)
 	reqs, _ = pool.FilterOutOfDateRequests()
 	ast.Equal(2, len(reqs))
@@ -250,11 +250,11 @@ func TestCheckRequestsExist(t *testing.T) {
 	txHashList := make([]string, 0)
 	txHashList = append(txHashList, tx1.RbftGetTxHash(), tx2.RbftGetTxHash())
 	pool.CheckRequestsExist(txHashList)
-	tx1Ptr := &txnPointer{account: tx1.RbftGetFrom(), nonce: tx1.RbftGetNonce()}
+	tx1Ptr := &txPointer{account: tx1.RbftGetFrom(), nonce: tx1.RbftGetNonce()}
 	ast.Equal(false, pool.txStore.batchedTxs[*tx1Ptr], "not in txHashMap")
 
 	pool.txStore.txHashMap[tx1.RbftGetTxHash()] = tx1Ptr
-	tx2Ptr := &txnPointer{account: tx2.RbftGetFrom(), nonce: tx2.RbftGetNonce()}
+	tx2Ptr := &txPointer{account: tx2.RbftGetFrom(), nonce: tx2.RbftGetNonce()}
 	pool.txStore.txHashMap[tx2.RbftGetTxHash()] = tx2Ptr
 	pool.CheckRequestsExist(txHashList)
 	ast.Equal(true, pool.txStore.batchedTxs[*tx1Ptr])
@@ -501,7 +501,7 @@ func TestGetRequestsByHashList(t *testing.T) {
 	ast.Equal(0, len(localList))
 	ast.Equal(0, len(missingTxsHash))
 
-	pool.txStore.batchedTxs = make(map[txnPointer]bool)
+	pool.txStore.batchedTxs = make(map[txPointer]bool)
 	poolTx1 := pool.txStore.allTxs[tx1.RbftGetFrom()].items[1]
 	delete(pool.txStore.allTxs[tx1.RbftGetFrom()].items, uint64(1))
 	txs, localList, missingTxsHash, err = pool.GetRequestsByHashList(batches[0].BatchHash, batches[0].Timestamp, txHashList, nil)
