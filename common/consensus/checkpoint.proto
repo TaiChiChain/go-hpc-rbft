@@ -20,6 +20,8 @@ message Checkpoint {
   ExecuteState execute_state = 2;
 
   bool need_update_epoch = 3;
+
+  uint64 new_view = 4;
 }
 
 // SignedCheckpoint contains the actual checkpoint with signature

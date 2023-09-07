@@ -17,6 +17,7 @@ package rbft
 import (
 	"context"
 	"fmt"
+	"github.com/samber/lo"
 	"strconv"
 	"sync"
 	"time"
@@ -1896,6 +1897,8 @@ func (rbft *rbftImpl[T, Constraint]) finishNormalCheckpoint(checkpointHeight uin
 	rbft.moveWatermarks(checkpointHeight, false)
 
 	if rbft.chainConfig.isWRF() {
+		localCheckpoint := rbft.storeMgr.localCheckpoints[checkpointHeight]
+
 		// update view after checkpoint
 		// persist new view
 		nv := &consensus.NewView{
@@ -1909,8 +1912,13 @@ func (rbft *rbftImpl[T, Constraint]) finishNormalCheckpoint(checkpointHeight uin
 				},
 			},
 			ViewChangeSet: &consensus.QuorumViewChange{
-				ReplicaId:   rbft.peerMgr.selfID,
-				ViewChanges: nil,
+				ReplicaId: rbft.peerMgr.selfID,
+			},
+			QuorumCheckpoint: &consensus.QuorumCheckpoint{
+				Checkpoint: localCheckpoint.Checkpoint,
+				Signatures: lo.SliceToMap(matchingCheckpoints, func(item *consensus.SignedCheckpoint) (uint64, []byte) {
+					return item.Author, item.Signature
+				}),
 			},
 		}
 		sig, sErr := rbft.signNewView(nv)

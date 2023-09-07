@@ -552,7 +552,7 @@ func (rbft *rbftImpl[T, Constraint]) sendNewView() consensusEvent {
 // recvNewView receives new view message and check if this node could
 // process this message or not.
 func (rbft *rbftImpl[T, Constraint]) recvNewView(nv *consensus.NewView) consensusEvent {
-	targetView, _, vcBasisSet, valid := rbft.checkNewView(nv, false)
+	targetView, _, vcBasisSet, valid := rbft.checkNewView(nv)
 	if valid {
 		// direct process ViewChanges and then process new view.
 		rbft.processQuorumViewChange(nv.ViewChangeSet.ViewChanges, vcBasisSet, true)
@@ -576,7 +576,7 @@ func (rbft *rbftImpl[T, Constraint]) recvNewView(nv *consensus.NewView) consensu
 // 2. new view hash
 // 3. vc basis of new view
 // 4. if new view is valid or not
-func (rbft *rbftImpl[T, Constraint]) checkNewView(nv *consensus.NewView, isRecovery bool) (uint64, string, []*consensus.VcBasis, bool) {
+func (rbft *rbftImpl[T, Constraint]) checkNewView(nv *consensus.NewView) (uint64, string, []*consensus.VcBasis, bool) {
 	rbft.logger.Infof("Replica %d received newView %d from replica %d", rbft.peerMgr.selfID,
 		nv.View, nv.ReplicaId)
 
@@ -593,8 +593,6 @@ func (rbft *rbftImpl[T, Constraint]) checkNewView(nv *consensus.NewView, isRecov
 	}
 
 	// wrf recovery cannot check the PrimaryID
-	// TODO: need exclude isRecovery?
-	//if !(isRecovery && rbft.chainConfig.isWRF()) {
 	if !rbft.chainConfig.isWRF() {
 		expectedPrimaryID := rbft.chainConfig.calPrimaryIDByView(nv.View)
 		if expectedPrimaryID != nv.ReplicaId {
@@ -611,30 +609,48 @@ func (rbft *rbftImpl[T, Constraint]) checkNewView(nv *consensus.NewView, isRecov
 		targetView uint64
 		vcBasisSet = make([]*consensus.VcBasis, 0, len(nv.ViewChangeSet.ViewChanges))
 	)
-	// ensure all ViewChanges have the same target view and target view is equal to
-	// NewView.view.
-	for i, vc := range nv.ViewChangeSet.ViewChanges {
-		vcBasis := &consensus.VcBasis{}
-		err := proto.Unmarshal(vc.Basis, vcBasis)
-		if err != nil {
-			rbft.logger.Errorf("Consensus Message VcBasis Unmarshal error: %v", err)
-			return 0, "", nil, false
-		}
-		vcBasisSet = append(vcBasisSet, vcBasis)
-		view := vcBasis.GetView()
-		if i == 0 {
-			targetView = view
-			if targetView != nv.View {
-				rbft.logger.Warningf("Replica %d received an invalid NewView with mismatch target "+
-					"view %d and NewView %d", rbft.peerMgr.selfID, targetView, nv.View)
+
+	if rbft.chainConfig.isWRF() && len(nv.ViewChangeSet.ViewChanges) == 0 {
+		targetView = nv.View
+
+		for i, sig := range nv.QuorumCheckpoint.Signatures {
+			err := rbft.verifySignedCheckpoint(&consensus.SignedCheckpoint{
+				Checkpoint: nv.QuorumCheckpoint.Checkpoint,
+				Author:     i,
+				Signature:  sig,
+			})
+			if err != nil {
+				rbft.logger.Warningf("Replica %d received an invalid signature SignedCheckpoint from NewView "+
+					"view %d", rbft.peerMgr.selfID, nv.View)
 				return 0, "", nil, false
 			}
-			continue
 		}
-		if view != targetView {
-			rbft.logger.Warningf("Replica %d received an invalid NewView with mismatch target "+
-				"view %d and %d", rbft.peerMgr.selfID, view, targetView)
-			return 0, "", nil, false
+	} else {
+		// ensure all ViewChanges have the same target view and target view is equal to
+		// NewView.view.
+		for i, vc := range nv.ViewChangeSet.ViewChanges {
+			vcBasis := &consensus.VcBasis{}
+			err := proto.Unmarshal(vc.Basis, vcBasis)
+			if err != nil {
+				rbft.logger.Errorf("Consensus Message VcBasis Unmarshal error: %v", err)
+				return 0, "", nil, false
+			}
+			vcBasisSet = append(vcBasisSet, vcBasis)
+			view := vcBasis.GetView()
+			if i == 0 {
+				targetView = view
+				if targetView != nv.View {
+					rbft.logger.Warningf("Replica %d received an invalid NewView with mismatch target "+
+						"view %d and NewView %d", rbft.peerMgr.selfID, targetView, nv.View)
+					return 0, "", nil, false
+				}
+				continue
+			}
+			if view != targetView {
+				rbft.logger.Warningf("Replica %d received an invalid NewView with mismatch target "+
+					"view %d and %d", rbft.peerMgr.selfID, view, targetView)
+				return 0, "", nil, false
+			}
 		}
 	}
 
@@ -814,7 +830,7 @@ func (rbft *rbftImpl[T, Constraint]) recvRecoveryResponse(rcr *consensus.Recover
 	// this targetView.
 	if rbft.atomicIn(InRecovery) {
 		nv := rcr.GetNewView()
-		targetView, nvHash, _, valid := rbft.checkNewView(nv, true)
+		targetView, nvHash, _, valid := rbft.checkNewView(nv)
 		if valid {
 			// only process response in recovery status, which is caused by single node view change
 			return rbft.resetStateForRecovery(targetView, nvHash, rcr)
