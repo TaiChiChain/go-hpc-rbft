@@ -62,7 +62,7 @@ func (mpi *mempoolImpl[T, Constraint]) addNewRequests(txs []*T, isPrimary, local
 				mpi.logger.Warningf("Receive transaction [account: %s, nonce: %d, hash: %s], but we required %d", txAccount, txNonce, txHash, currentSeqNo)
 				continue
 			} else {
-				if txPointer := mpi.txStore.txHashMap[txHash]; txPointer != nil {
+				if pointer := mpi.txStore.txHashMap[txHash]; pointer != nil {
 					continue
 				}
 				// mpi.logger.Warningf("Receive missing transaction [account: %s, nonce: %d, hash: %s] from primary, we will replace the old transaction", txAccount, txNonce, txHash)
