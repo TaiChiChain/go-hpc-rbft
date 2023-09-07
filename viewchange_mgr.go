@@ -372,18 +372,19 @@ func (rbft *rbftImpl[T, Constraint]) recvViewChange(vc *consensus.ViewChange, vc
 	}
 
 	if rbft.isNormal() {
-		// if received vc message from primary, send view change to other peers directly
-		if rbft.isPrimary(remoteReplicaID) {
-			rbft.logger.Infof("Replica %d received viewChange from old primary %d for view %d, "+
-				"trigger viewChange.", rbft.peerMgr.selfID, remoteReplicaID, targetView)
-			return rbft.sendViewChange()
-		}
 		if vc.Recovery {
 			rbft.logger.Warningf("Replica %d found viewChange message for higher view from "+
 				"replica %d, help remote recovery", rbft.peerMgr.selfID, remoteReplicaID)
 			// for recovery node with a higher view, we can directly send back latest new view to help
 			// remote node rollback to the latest new view if we are in normal status.
 			return rbft.sendRecoveryResponse(remoteReplicaID, targetView)
+		}
+
+		// if received vc message from primary, send view change to other peers directly
+		if rbft.isPrimary(remoteReplicaID) {
+			rbft.logger.Infof("Replica %d received viewChange from old primary %d for view %d, "+
+				"trigger viewChange.", rbft.peerMgr.selfID, remoteReplicaID, targetView)
+			return rbft.sendViewChange()
 		}
 	}
 
@@ -515,6 +516,14 @@ func (rbft *rbftImpl[T, Constraint]) sendNewView() consensusEvent {
 		Xset:          msgList,
 		ReplicaId:     rbft.peerMgr.selfID,
 		ViewChangeSet: vcSet,
+		QuorumCheckpoint: &consensus.QuorumCheckpoint{
+			Checkpoint: &consensus.Checkpoint{
+				ExecuteState: &consensus.Checkpoint_ExecuteState{
+					Height: checkpointState.Meta.Height,
+					Digest: checkpointState.Meta.Digest,
+				},
+			},
+		},
 	}
 	sig, sErr := rbft.signNewView(nv)
 	if sErr != nil {
