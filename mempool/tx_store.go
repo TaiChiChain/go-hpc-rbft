@@ -83,7 +83,7 @@ func (txStore *transactionStore[T, Constraint]) insertTxs(txItems map[string][]*
 				account: account,
 				nonce:   txItem.getNonce(),
 			}
-			txStore.txHashMap[txHash] = pointer
+			txStore.insertPoolTx(txHash, pointer)
 			txList, ok := txStore.allTxs[account]
 			if !ok {
 				// if this is new account to send tx, create a new txSortedMap
