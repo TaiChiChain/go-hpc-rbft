@@ -593,7 +593,9 @@ func (rbft *rbftImpl[T, Constraint]) checkNewView(nv *consensus.NewView, isRecov
 	}
 
 	// wrf recovery cannot check the PrimaryID
-	if !(isRecovery && rbft.chainConfig.isWRF()) {
+	// TODO: need exclude isRecovery?
+	//if !(isRecovery && rbft.chainConfig.isWRF()) {
+	if !rbft.chainConfig.isWRF() {
 		expectedPrimaryID := rbft.chainConfig.calPrimaryIDByView(nv.View)
 		if expectedPrimaryID != nv.ReplicaId {
 			rbft.logger.Warningf("Replica %d reject invalid newView from %d, v:%d, expected primary: %d",
