@@ -50,6 +50,7 @@ message consensus_message {
     uint64 epoch = 4;
     uint64 view = 5;
     bytes payload = 6;
+    int64 nonce = 7;
 }
 
 message null_request {

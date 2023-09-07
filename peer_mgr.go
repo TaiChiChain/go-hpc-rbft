@@ -17,6 +17,7 @@ package rbft
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/axiomesh/axiom-bft/common/consensus"
 )
@@ -36,14 +37,18 @@ type peerManager struct {
 	selfAccountAddress string
 	selfID             uint64
 	nodes              map[uint64]*NodeInfo
+	msgNonce           int64
+	isTest             bool
 }
 
 // init peer pool in rbft core
-func newPeerManager(network Network, config Config) *peerManager {
+func newPeerManager(network Network, config Config, isTest bool) *peerManager {
 	return &peerManager{
 		selfAccountAddress: config.SelfAccountAddress,
 		network:            network,
 		logger:             config.Logger,
+		msgNonce:           time.Now().UnixNano(),
+		isTest:             isTest,
 	}
 }
 
@@ -83,6 +88,11 @@ func (m *peerManager) broadcast(ctx context.Context, msg *consensus.ConsensusMes
 	msg.From = m.selfID
 	msg.Epoch = m.chainConfig.EpochInfo.Epoch
 	msg.View = m.chainConfig.View
+	if !m.isTest {
+		m.msgNonce++
+		msg.Nonce = m.msgNonce
+	}
+
 	err := m.network.Broadcast(ctx, msg)
 	if err != nil {
 		m.logger.Errorf("Broadcast failed: %v", err)
@@ -94,6 +104,10 @@ func (m *peerManager) unicast(ctx context.Context, msg *consensus.ConsensusMessa
 	msg.From = m.selfID
 	msg.Epoch = m.chainConfig.EpochInfo.Epoch
 	msg.View = m.chainConfig.View
+	if !m.isTest {
+		m.msgNonce++
+		msg.Nonce = m.msgNonce
+	}
 
 	node, ok := m.nodes[to]
 	if !ok {

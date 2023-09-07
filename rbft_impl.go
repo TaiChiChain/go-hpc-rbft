@@ -17,12 +17,12 @@ package rbft
 import (
 	"context"
 	"fmt"
-	"github.com/samber/lo"
 	"strconv"
 	"sync"
 	"time"
 
 	"github.com/gogo/protobuf/proto"
+	"github.com/samber/lo"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
@@ -206,7 +206,7 @@ func newRBFT[T any, Constraint consensus.TXConstraint[T]](c Config, external Ext
 	rbft.status = newStatusMgr()
 
 	// new peer pool
-	rbft.peerMgr = newPeerManager(external, c)
+	rbft.peerMgr = newPeerManager(external, c, isTest)
 
 	// new executor
 	rbft.exec = newExecutor()
