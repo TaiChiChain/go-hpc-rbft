@@ -750,6 +750,7 @@ func (rbft *rbftImpl[T, Constraint]) generateSignedCheckpoint(state *types.Servi
 			Height: state.MetaState.Height,
 			Digest: state.MetaState.Digest,
 		},
+		NewView: rbft.chainConfig.View + 1,
 	}
 
 	if isConfig {
