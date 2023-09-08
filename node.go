@@ -56,14 +56,14 @@ type Node[T any, Constraint consensus.TXConstraint[T]] interface {
 }
 
 type External[T any, Constraint consensus.TXConstraint[T]] interface {
-	// GetPendingNonceByAccount will return the latest pending nonce of a given account
-	GetPendingNonceByAccount(account string) uint64
+	// GetPendingTxCountByAccount will return the pending tx count of a given account
+	GetPendingTxCountByAccount(account string) uint64
 
 	// GetPendingTxByHash will return the tx by tx hash
 	GetPendingTxByHash(hash string) *T
 
 	// GetPendingTxCount return the current tx count of mempool
-	GetPendingTxCount() uint64
+	GetTotalPendingTxCount() uint64
 }
 
 // ServiceInbound receives and records modifications from application service which includes two events:
@@ -236,8 +236,8 @@ func (n *node[T, Constraint]) getCurrentState() *types.ServiceState {
 	return n.currentState
 }
 
-// GetPendingNonceByAccount returns pendingNonce by given account.
-func (n *node[T, Constraint]) GetPendingNonceByAccount(account string) uint64 {
+// GetPendingTxCountByAccount returns pendingNonce by given account.
+func (n *node[T, Constraint]) GetPendingTxCountByAccount(account string) uint64 {
 	getNonceReq := &ReqNonceMsg{
 		account: account,
 		ch:      make(chan uint64),
@@ -265,7 +265,7 @@ func (n *node[T, Constraint]) GetPendingTxByHash(hash string) *T {
 	return <-getTxReq.ch
 }
 
-func (n *node[T, Constraint]) GetPendingTxCount() uint64 {
+func (n *node[T, Constraint]) GetTotalPendingTxCount() uint64 {
 	getPendingTxCountReq := &ReqPendingTxCountMsg{
 		ch: make(chan uint64),
 	}

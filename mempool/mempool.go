@@ -106,13 +106,13 @@ type External[T any, Constraint consensus.TXConstraint[T]] interface {
 	// RemoveTimeoutRequests get the remained local txs in timeoutIndex and removeTxs in memPool by tolerance time.
 	RemoveTimeoutRequests() (uint64, error)
 
-	// GetPendingNonceByAccount returns pendingNonce by given account.
-	GetPendingNonceByAccount(account string) uint64
+	// GetPendingTxCountByAccount returns transaction count by given account.
+	GetPendingTxCountByAccount(account string) uint64
 
 	GetPendingTxByHash(hash string) *T
 
-	// GetPendingTxCount return the current tx count of mempool
-	GetPendingTxCount() uint64
+	// GetTotalPendingTxCount return the current tx count of mempool
+	GetTotalPendingTxCount() uint64
 }
 
 // NewMempool returns the mempool instance.

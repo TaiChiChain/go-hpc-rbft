@@ -144,12 +144,12 @@ func (rbft *rbftImpl[T, Constraint]) handleReqTxEvent(e *ReqTxMsg[T, Constraint]
 }
 
 func (rbft *rbftImpl[T, Constraint]) handleReqNonceEvent(e *ReqNonceMsg) consensusEvent {
-	e.ch <- rbft.batchMgr.requestPool.GetPendingNonceByAccount(e.account)
+	e.ch <- rbft.batchMgr.requestPool.GetPendingTxCountByAccount(e.account)
 	return nil
 }
 
 func (rbft *rbftImpl[T, Constraint]) handleReqPendingTxCountEvent(e *ReqPendingTxCountMsg) consensusEvent {
-	e.ch <- rbft.batchMgr.requestPool.GetPendingTxCount()
+	e.ch <- rbft.batchMgr.requestPool.GetTotalPendingTxCount()
 	return nil
 }
 
