@@ -273,6 +273,7 @@ type nextDemandNewView uint64
 const (
 	ReqTxEvent = iota
 	ReqNonceEvent
+	ReqPendingTxCountEvent
 )
 
 // MiscEvent represents misc event sent by local modules
@@ -289,4 +290,8 @@ type ReqTxMsg[T any, Constraint consensus.TXConstraint[T]] struct {
 type ReqNonceMsg struct {
 	account string
 	ch      chan uint64
+}
+
+type ReqPendingTxCountMsg struct {
+	ch chan uint64
 }

@@ -720,3 +720,13 @@ func TestGetPendingTxByHash(t *testing.T) {
 	tx := pool.GetPendingTxByHash(tx1.RbftGetTxHash())
 	ast.Equal(tx1.RbftGetTxHash(), tx.RbftGetTxHash())
 }
+
+func TestMemPoolGetPendingTxCount(t *testing.T) {
+	ast := assert.New(t)
+	pool := mockMempoolImpl[consensus.FltTransaction, *consensus.FltTransaction]()
+	tx1 := ConstructTxByAccountAndNonce("account1", uint64(0))
+	tx2 := ConstructTxByAccountAndNonce("account2", uint64(0))
+	ast.Equal(uint64(0), pool.GetPendingTxCount())
+	pool.AddNewRequests([]*consensus.FltTransaction{tx1, tx2}, false, true, false, false)
+	ast.Equal(uint64(2), pool.GetPendingTxCount())
+}

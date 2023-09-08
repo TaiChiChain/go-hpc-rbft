@@ -110,6 +110,9 @@ type External[T any, Constraint consensus.TXConstraint[T]] interface {
 	GetPendingNonceByAccount(account string) uint64
 
 	GetPendingTxByHash(hash string) *T
+
+	// GetPendingTxCount return the current tx count of mempool
+	GetPendingTxCount() uint64
 }
 
 // NewMempool returns the mempool instance.

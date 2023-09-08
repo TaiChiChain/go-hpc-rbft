@@ -61,6 +61,9 @@ type External[T any, Constraint consensus.TXConstraint[T]] interface {
 
 	// GetPendingTxByHash will return the tx by tx hash
 	GetPendingTxByHash(hash string) *T
+
+	// GetPendingTxCount return the current tx count of mempool
+	GetPendingTxCount() uint64
 }
 
 // ServiceInbound receives and records modifications from application service which includes two events:
@@ -260,4 +263,17 @@ func (n *node[T, Constraint]) GetPendingTxByHash(hash string) *T {
 	n.rbft.postMsg(localEvent)
 
 	return <-getTxReq.ch
+}
+
+func (n *node[T, Constraint]) GetPendingTxCount() uint64 {
+	getPendingTxCountReq := &ReqPendingTxCountMsg{
+		ch: make(chan uint64),
+	}
+	localEvent := &MiscEvent{
+		EventType: ReqPendingTxCountEvent,
+		Event:     getPendingTxCountReq,
+	}
+	n.rbft.postMsg(localEvent)
+
+	return <-getPendingTxCountReq.ch
 }

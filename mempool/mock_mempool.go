@@ -230,6 +230,44 @@ func (c *MemPoolGetPendingTxByHashCall[T, Constraint]) DoAndReturn(f func(string
 	return c
 }
 
+// GetPendingTxCount mocks base method.
+func (m *MockMemPool[T, Constraint]) GetPendingTxCount() uint64 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPendingTxCount")
+	ret0, _ := ret[0].(uint64)
+	return ret0
+}
+
+// GetPendingTxCount indicates an expected call of GetPendingTxCount.
+func (mr *MockMemPoolMockRecorder[T, Constraint]) GetPendingTxCount() *MemPoolGetPendingTxCountCall[T, Constraint] {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPendingTxCount", reflect.TypeOf((*MockMemPool[T, Constraint])(nil).GetPendingTxCount))
+	return &MemPoolGetPendingTxCountCall[T, Constraint]{Call: call}
+}
+
+// MemPoolGetPendingTxCountCall wrap *gomock.Call
+type MemPoolGetPendingTxCountCall[T any, Constraint consensus.TXConstraint[T]] struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MemPoolGetPendingTxCountCall[T, Constraint]) Return(arg0 uint64) *MemPoolGetPendingTxCountCall[T, Constraint] {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MemPoolGetPendingTxCountCall[T, Constraint]) Do(f func() uint64) *MemPoolGetPendingTxCountCall[T, Constraint] {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MemPoolGetPendingTxCountCall[T, Constraint]) DoAndReturn(f func() uint64) *MemPoolGetPendingTxCountCall[T, Constraint] {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // GetRequestsByHashList mocks base method.
 func (m *MockMemPool[T, Constraint]) GetRequestsByHashList(batchHash string, timestamp int64, hashList, deDuplicateTxHashes []string) ([]*T, []bool, map[uint64]string, error) {
 	m.ctrl.T.Helper()
@@ -893,6 +931,44 @@ func (c *ExternalGetPendingTxByHashCall[T, Constraint]) Do(f func(string) *T) *E
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *ExternalGetPendingTxByHashCall[T, Constraint]) DoAndReturn(f func(string) *T) *ExternalGetPendingTxByHashCall[T, Constraint] {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// GetPendingTxCount mocks base method.
+func (m *MockExternal[T, Constraint]) GetPendingTxCount() uint64 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPendingTxCount")
+	ret0, _ := ret[0].(uint64)
+	return ret0
+}
+
+// GetPendingTxCount indicates an expected call of GetPendingTxCount.
+func (mr *MockExternalMockRecorder[T, Constraint]) GetPendingTxCount() *ExternalGetPendingTxCountCall[T, Constraint] {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPendingTxCount", reflect.TypeOf((*MockExternal[T, Constraint])(nil).GetPendingTxCount))
+	return &ExternalGetPendingTxCountCall[T, Constraint]{Call: call}
+}
+
+// ExternalGetPendingTxCountCall wrap *gomock.Call
+type ExternalGetPendingTxCountCall[T any, Constraint consensus.TXConstraint[T]] struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *ExternalGetPendingTxCountCall[T, Constraint]) Return(arg0 uint64) *ExternalGetPendingTxCountCall[T, Constraint] {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *ExternalGetPendingTxCountCall[T, Constraint]) Do(f func() uint64) *ExternalGetPendingTxCountCall[T, Constraint] {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *ExternalGetPendingTxCountCall[T, Constraint]) DoAndReturn(f func() uint64) *ExternalGetPendingTxCountCall[T, Constraint] {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

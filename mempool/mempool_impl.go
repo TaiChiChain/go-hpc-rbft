@@ -27,6 +27,10 @@ type mempoolImpl[T any, Constraint consensus.TXConstraint[T]] struct {
 	getAccountNonce     GetAccountNonceFunc
 }
 
+func (mpi *mempoolImpl[T, Constraint]) GetPendingTxCount() uint64 {
+	return uint64(len(mpi.txStore.txHashMap))
+}
+
 // AddNewRequests adds transactions into txPool.
 // When current node is primary, judge if we need to generate a batch by batch size.
 // When current node is backup, judge if we can eliminate some missing batches.
