@@ -203,7 +203,7 @@ message sync_state_response {
 // EpochChangeRequest is used to get a EpochChangeProof from start_epoch to target_epoch.
 message EpochChangeRequest {
     // Author of the request.
-    string author = 1;
+    uint64 author = 1;
     // The start epoch for the request.
     uint64 start_epoch = 2;
     // The target epoch for the request

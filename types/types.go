@@ -27,6 +27,11 @@ type ServiceState struct {
 	Epoch     uint64
 }
 
+type ServiceSyncState struct {
+	ServiceState
+	EpochChanged bool
+}
+
 // MetaState is the basic info for block.
 type MetaState struct {
 	Height uint64

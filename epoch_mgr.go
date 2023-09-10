@@ -2,9 +2,11 @@ package rbft
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/gogo/protobuf/proto"
+	"github.com/pkg/errors"
 
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/types"
@@ -37,19 +39,26 @@ type epochManager struct {
 	// epoch related service
 	epochService EpochService
 
+	// It is persisted after updating to epochs
+	epochProofCache map[uint64]*consensus.QuorumCheckpoint
+
 	// peer pool
 	peerMgr *peerManager
+
+	storage Storage // manage non-volatile storage of consensus log
 
 	// logger
 	logger Logger
 }
 
-func newEpochManager(c Config, pp *peerManager, epochService EpochService) *epochManager {
+func newEpochManager(c Config, pp *peerManager, epochService EpochService, storage Storage) *epochManager {
 	em := &epochManager{
 		configBatchToCheck:   nil,
 		configBatchToExecute: uint64(0),
 		epochService:         epochService,
+		epochProofCache:      make(map[uint64]*consensus.QuorumCheckpoint),
 		peerMgr:              pp,
+		storage:              storage,
 		logger:               c.Logger,
 	}
 
@@ -62,10 +71,10 @@ func (rbft *rbftImpl[T, Constraint]) dispatchEpochMsg(e consensusEvent) consensu
 	case *consensus.FetchCheckpoint:
 		return rbft.recvFetchCheckpoint(et)
 	case *consensus.EpochChangeRequest:
-		rbft.logger.Debugf("Replica %d don't process epoch change request from %s in same epoch",
-			rbft.peerMgr.selfID, et.GetAuthor())
+		rbft.logger.Debugf("Replica %d don't process epoch change request from %d in same epoch",
+			rbft.peerMgr.selfID, et)
 	case *consensus.EpochChangeProof:
-		rbft.logger.Debugf("Replica %d don't process epoch change proof from %s in same epoch",
+		rbft.logger.Debugf("Replica %d don't process epoch change proof from %d in same epoch",
 			rbft.peerMgr.selfID, et.GetAuthor())
 	}
 	return nil
@@ -155,7 +164,12 @@ func (rbft *rbftImpl[T, Constraint]) turnIntoEpoch() {
 	rbft.persistNewView(initialNewView)
 	rbft.logger.Infof("Replica %d persist view=%d after epoch change", rbft.peerMgr.selfID, rbft.chainConfig.View)
 
-	// update N/f
+	// clean cached old epoch proof
+	for epoch := range rbft.epochMgr.epochProofCache {
+		if epoch < newEpoch.Epoch {
+			delete(rbft.epochMgr.epochProofCache, epoch)
+		}
+	}
 
 	rbft.metrics.clusterSizeGauge.Set(float64(rbft.chainConfig.N))
 	rbft.metrics.quorumSizeGauge.Set(float64(rbft.commonCaseQuorum()))
@@ -201,10 +215,228 @@ func (rbft *rbftImpl[T, Constraint]) readConfigBatchToExecute() uint64 {
 	return rbft.epochMgr.configBatchToExecute
 }
 
-// TODO: refactor epoch sync, use state sync instead of epoch change proof
 // checkEpoch compares local epoch and remote epoch:
 // 1. remoteEpoch > currentEpoch, only accept EpochChangeProof, else retrieveEpochChange
 // 2. remoteEpoch < currentEpoch, only accept EpochChangeRequest, else ignore
 func (em *epochManager) checkEpoch(msg *consensus.ConsensusMessage) consensusEvent {
+	currentEpoch := em.epoch
+	remoteEpoch := msg.Epoch
+	if remoteEpoch > currentEpoch {
+		em.logger.Debugf("Replica %d received message type %s from %d with larger epoch, "+
+			"current epoch %d, remote epoch %d", em.peerMgr.selfID, msg.Type, msg.From, currentEpoch, remoteEpoch)
+		// first process epoch sync response with higher epoch.
+		if msg.Type == consensus.Type_EPOCH_CHANGE_PROOF {
+			proof := &consensus.EpochChangeProof{}
+			if uErr := proto.Unmarshal(msg.Payload, proof); uErr != nil {
+				em.logger.Warningf("Unmarshal EpochChangeProof failed: %s", uErr)
+				return uErr
+			}
+			return em.processEpochChangeProof(proof)
+		}
+		return em.retrieveEpochChange(currentEpoch, remoteEpoch, msg.From)
+	}
+
+	if remoteEpoch < currentEpoch {
+		em.logger.Debugf("Replica %d received message type %s from %d with lower epoch, "+
+			"current epoch %d, remote epoch %d", em.peerMgr.selfID, msg.Type, msg.From, currentEpoch, remoteEpoch)
+		// first process epoch sync request with lower epoch.
+		if msg.Type == consensus.Type_EPOCH_CHANGE_REQUEST {
+			request := &consensus.EpochChangeRequest{}
+			if uErr := proto.Unmarshal(msg.Payload, request); uErr != nil {
+				em.logger.Warningf("Unmarshal EpochChangeRequest failed: %s", uErr)
+				return uErr
+			}
+			return em.processEpochChangeRequest(request)
+		}
+		em.logger.Warningf("reject process message from %d with lower epoch %d, current epoch %d",
+			msg.From, remoteEpoch, currentEpoch)
+	}
 	return nil
+}
+
+func (em *epochManager) retrieveEpochChange(start, target uint64, recipient uint64) error {
+	em.logger.Debugf("Replica %d request epoch changes %d to %d from %d", em.peerMgr.selfID, start, target, recipient)
+	req := &consensus.EpochChangeRequest{
+		Author:      em.peerMgr.selfID,
+		StartEpoch:  start,
+		TargetEpoch: target,
+	}
+	payload, mErr := proto.Marshal(req)
+	if mErr != nil {
+		em.logger.Warningf("Marshal EpochChangeRequest failed: %s", mErr)
+		return mErr
+	}
+	cum := &consensus.ConsensusMessage{
+		Type:    consensus.Type_EPOCH_CHANGE_REQUEST,
+		Payload: payload,
+	}
+	em.peerMgr.unicast(context.TODO(), cum, recipient)
+	return nil
+}
+
+func (em *epochManager) processEpochChangeRequest(request *consensus.EpochChangeRequest) error {
+	em.logger.Debugf("Replica %d received epoch change request %s", em.peerMgr.selfID, request)
+
+	if err := em.verifyEpochChangeRequest(request); err != nil {
+		em.logger.Warningf("Verify epoch change request failed: %s", err)
+		return err
+	}
+
+	if proof := em.pagingGetEpochChangeProof(request.StartEpoch, request.TargetEpoch, MaxNumEpochEndingCheckpoint); proof != nil {
+		em.logger.Noticef("Replica %d send epoch change proof towards %d, info %s", em.peerMgr.selfID, request.GetAuthor(), proof)
+		payload, mErr := proto.Marshal(proof)
+		if mErr != nil {
+			em.logger.Warningf("Marshal EpochChangeProof failed: %s", mErr)
+			return mErr
+		}
+		cum := &consensus.ConsensusMessage{
+			Type:    consensus.Type_EPOCH_CHANGE_PROOF,
+			Payload: payload,
+		}
+		em.peerMgr.unicast(context.TODO(), cum, request.Author)
+		return nil
+	}
+	return nil
+}
+
+func (em *epochManager) processEpochChangeProof(proof *consensus.EpochChangeProof) consensusEvent {
+	em.logger.Debugf("Replica %d received epoch change proof from %d", em.peerMgr.selfID, proof.Author)
+
+	if changeTo := proof.NextEpoch(); changeTo <= em.epoch {
+		// ignore proof old epoch which we have already started
+		em.logger.Debugf("reject lower epoch change to %d", changeTo)
+		return nil
+	}
+
+	// 1.Verify epoch-change-proof
+	err := em.verifyEpochChangeProof(proof)
+	if err != nil {
+		em.logger.Errorf("failed to verify epoch change proof: %s", err)
+		return err
+	}
+
+	// 2.Sync to epoch change state
+	localEvent := &LocalEvent{
+		Service:   EpochMgrService,
+		EventType: EpochSyncEvent,
+		Event:     proof,
+	}
+	return localEvent
+}
+
+// verifyEpochChangeRequest verify the legality of epoch change request.
+func (em *epochManager) verifyEpochChangeRequest(request *consensus.EpochChangeRequest) error {
+	if request == nil {
+		return errors.New("nil epoch-change-request")
+	}
+	if request.StartEpoch >= request.TargetEpoch {
+		return fmt.Errorf("reject epoch change request for illegal change from %d to %d", request.StartEpoch, request.TargetEpoch)
+	}
+	if em.epoch < request.TargetEpoch {
+		return fmt.Errorf("reject epoch change request for higher target %d from %d", request.TargetEpoch, request.Author)
+	}
+	return nil
+}
+
+// pagingGetEpochChangeProof returns epoch change proof with given page limit.
+func (em *epochManager) pagingGetEpochChangeProof(startEpoch, endEpoch, pageLimit uint64) *consensus.EpochChangeProof {
+	pagingEpoch := endEpoch
+	more := uint64(0)
+
+	if pagingEpoch-startEpoch > pageLimit {
+		more = pagingEpoch
+		pagingEpoch = startEpoch + pageLimit
+	}
+
+	checkpoints := make([]*consensus.QuorumCheckpoint, 0)
+	for epoch := startEpoch; epoch < pagingEpoch; epoch++ {
+		cp, err := em.getEpochQuorumCheckpoint(epoch)
+		if err != nil {
+			em.logger.Warningf("Cannot find epoch change for epoch %d", epoch)
+			return nil
+		}
+		checkpoints = append(checkpoints, cp)
+	}
+
+	return &consensus.EpochChangeProof{
+		Checkpoints: checkpoints,
+		More:        more,
+		Author:      em.peerMgr.selfID,
+	}
+}
+
+func (em *epochManager) verifyEpochChangeProof(proof *consensus.EpochChangeProof) error {
+	// Skip any stale checkpoints in the proof prefix. Note that with
+	// the assertion above, we are guaranteed there is at least one
+	// non-stale checkpoints in the proof.
+	//
+	// It's useful to skip these stale checkpoints to better allow for
+	// concurrent node requests.
+	//
+	// For example, suppose the following:
+	//
+	// 1. My current trusted state is at epoch 5.
+	// 2. I make two concurrent requests to two validators A and B, who
+	//    live at epochs 9 and 11 respectively.
+	//
+	// If A's response returns first, I will ratchet my trusted state
+	// to epoch 9. When B's response returns, I will still be able to
+	// ratchet forward to 11 even though B's EpochChangeProof
+	// includes a bunch of stale checkpoints (for epochs 5, 6, 7, 8).
+	//
+	// Of course, if B's response returns first, we will reject A's
+	// response as it's completely stale.
+	var (
+		skip       int
+		startEpoch uint64
+	)
+	for _, cp := range proof.GetCheckpoints() {
+		if cp.Epoch() >= em.epoch {
+			startEpoch = cp.Epoch()
+			break
+		}
+		skip++
+	}
+	if startEpoch != em.epoch {
+		return fmt.Errorf("invalid epoch change proof with start epoch %d, "+
+			"current epoch %d", startEpoch, em.epoch)
+	}
+	proof.Checkpoints = proof.Checkpoints[skip:]
+
+	if proof.IsEmpty() {
+		return errors.New("empty epoch change proof")
+	}
+	// verify ValidatorSet when stateUpdate
+	// return em.epochService.VerifyEpochChangeProof(proof, em.epochService.GetLastCheckpoint().ValidatorSet())
+	return nil
+}
+
+// persistEpochQuorumCheckpoint persists QuorumCheckpoint or epoch to database
+func (em *epochManager) persistEpochQuorumCheckpoint(c *consensus.QuorumCheckpoint) {
+	key := fmt.Sprintf("epoch_q_chkpt.%d", c.Checkpoint.Epoch)
+	raw, err := c.Marshal()
+	if err != nil {
+		em.logger.Errorf("Persist epoch %d quorum chkpt failed with marshal err: %s ", c.Checkpoint.Epoch, err)
+		return
+	}
+
+	if err := em.storage.StoreState(key, raw); err != nil {
+		em.logger.Errorf("Persist epoch %d quorum chkpt failed with err: %s ", c.Checkpoint.Epoch, err)
+	}
+}
+
+// persistDelCheckpoint get QuorumCheckpoint with the given epoch
+func (em *epochManager) getEpochQuorumCheckpoint(epoch uint64) (*consensus.QuorumCheckpoint, error) {
+	key := fmt.Sprintf("epoch_q_chkpt.%d", epoch)
+
+	raw, err := em.storage.ReadState(key)
+	if err != nil {
+		return nil, errors.WithMessagef(err, "failed to read epoch %d quorum chkpt", epoch)
+	}
+	var c consensus.QuorumCheckpoint
+	if err := c.Unmarshal(raw); err != nil {
+		return nil, errors.WithMessagef(err, "failed to unmarshal epoch %d quorum chkpt", epoch)
+	}
+
+	return &c, nil
 }

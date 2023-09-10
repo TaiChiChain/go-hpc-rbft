@@ -1,8 +1,7 @@
 package rbft
 
 import (
-	"errors"
-
+	"github.com/pkg/errors"
 	"go.uber.org/mock/gomock"
 
 	"github.com/axiomesh/axiom-bft/common/consensus"

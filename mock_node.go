@@ -267,7 +267,7 @@ func (c *NodeReportExecutedCall[T, Constraint]) DoAndReturn(f func(*types.Servic
 }
 
 // ReportStateUpdated mocks base method.
-func (m *MockNode[T, Constraint]) ReportStateUpdated(state *types.ServiceState) {
+func (m *MockNode[T, Constraint]) ReportStateUpdated(state *types.ServiceSyncState) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "ReportStateUpdated", state)
 }
@@ -291,13 +291,13 @@ func (c *NodeReportStateUpdatedCall[T, Constraint]) Return() *NodeReportStateUpd
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *NodeReportStateUpdatedCall[T, Constraint]) Do(f func(*types.ServiceState)) *NodeReportStateUpdatedCall[T, Constraint] {
+func (c *NodeReportStateUpdatedCall[T, Constraint]) Do(f func(*types.ServiceSyncState)) *NodeReportStateUpdatedCall[T, Constraint] {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *NodeReportStateUpdatedCall[T, Constraint]) DoAndReturn(f func(*types.ServiceState)) *NodeReportStateUpdatedCall[T, Constraint] {
+func (c *NodeReportStateUpdatedCall[T, Constraint]) DoAndReturn(f func(*types.ServiceSyncState)) *NodeReportStateUpdatedCall[T, Constraint] {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -611,7 +611,7 @@ func (c *ServiceInboundReportExecutedCall) DoAndReturn(f func(*types.ServiceStat
 }
 
 // ReportStateUpdated mocks base method.
-func (m *MockServiceInbound) ReportStateUpdated(state *types.ServiceState) {
+func (m *MockServiceInbound) ReportStateUpdated(state *types.ServiceSyncState) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "ReportStateUpdated", state)
 }
@@ -635,13 +635,13 @@ func (c *ServiceInboundReportStateUpdatedCall) Return() *ServiceInboundReportSta
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *ServiceInboundReportStateUpdatedCall) Do(f func(*types.ServiceState)) *ServiceInboundReportStateUpdatedCall {
+func (c *ServiceInboundReportStateUpdatedCall) Do(f func(*types.ServiceSyncState)) *ServiceInboundReportStateUpdatedCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *ServiceInboundReportStateUpdatedCall) DoAndReturn(f func(*types.ServiceState)) *ServiceInboundReportStateUpdatedCall {
+func (c *ServiceInboundReportStateUpdatedCall) DoAndReturn(f func(*types.ServiceSyncState)) *ServiceInboundReportStateUpdatedCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

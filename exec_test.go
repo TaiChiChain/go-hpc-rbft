@@ -107,7 +107,10 @@ func TestExec_handleCoreRbftEvent_StateUpdatedEvent(t *testing.T) {
 	ev := &LocalEvent{
 		Service:   CoreRbftService,
 		EventType: CoreStateUpdatedEvent,
-		Event:     ss,
+		Event: &types.ServiceSyncState{
+			ServiceState: *ss,
+			EpochChanged: false,
+		},
 	}
 	assert.Equal(t, uint64(0), rbfts[1].exec.lastExec)
 	rbfts[1].storeMgr.highStateTarget = &stateUpdateTarget{
