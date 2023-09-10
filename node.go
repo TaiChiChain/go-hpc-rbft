@@ -80,7 +80,7 @@ type ServiceInbound interface {
 	// request which was triggered by RBFT core before.
 	// Users must ReportStateUpdated after RBFT core invoked StateUpdate request no matter this request was
 	// finished successfully or not, otherwise, RBFT core will enter abnormal status infinitely.
-	ReportStateUpdated(state *types.ServiceState)
+	ReportStateUpdated(state *types.ServiceSyncState)
 }
 
 // node implements the Node interface and track application service synchronously to help RBFT core
@@ -194,13 +194,13 @@ func (n *node[T, Constraint]) ReportExecuted(state *types.ServiceState) {
 // request which was triggered by RBFT core before.
 // Users must ReportStateUpdated after RBFT core invoked StateUpdate request no matter this request was
 // finished successfully or not, otherwise, RBFT core will enter abnormal status infinitely.
-func (n *node[T, Constraint]) ReportStateUpdated(state *types.ServiceState) {
+func (n *node[T, Constraint]) ReportStateUpdated(state *types.ServiceSyncState) {
 	n.stateLock.Lock()
 	if state.MetaState.Height != 0 && state.MetaState.Height <= n.currentState.MetaState.Height {
 		n.logger.Infof("Receive a service state with height ID which is not "+
 			"larger than current state, received: %+v, current state: %+v", state, n.currentState)
 	}
-	n.currentState = state
+	n.currentState = &state.ServiceState
 	n.stateLock.Unlock()
 
 	n.rbft.reportStateUpdated(state)

@@ -258,7 +258,7 @@ func TestRecovery_NormalCheckpointFailing_Recovery(t *testing.T) {
 	// node4 finish sync chain to height 10.
 	msg := <-rbfts[3].recvChan
 	event := msg.(*LocalEvent)
-	ss := event.Event.(*types.ServiceState)
+	ss := event.Event.(*types.ServiceSyncState)
 	assert.Equal(t, uint64(10), ss.MetaState.Height)
 
 	// node4 finish recovery.
@@ -333,7 +333,7 @@ func TestRecovery_SyncStateToStateUpdate(t *testing.T) {
 
 	msg := <-rbfts[3].recvChan
 	event := msg.(*LocalEvent)
-	ss := event.Event.(*types.ServiceState)
+	ss := event.Event.(*types.ServiceSyncState)
 	assert.Equal(t, uint64(1), ss.MetaState.Height)
 
 	assert.Equal(t, uint64(0), rbfts[3].exec.lastExec)

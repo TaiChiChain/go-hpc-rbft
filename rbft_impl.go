@@ -224,7 +224,7 @@ func newRBFT[T any, Constraint consensus.TXConstraint[T]](c Config, external Ext
 	rbft.vcMgr = newVcManager(c)
 
 	// new epoch manager
-	rbft.epochMgr = newEpochManager(c, rbft.peerMgr, external)
+	rbft.epochMgr = newEpochManager(c, rbft.peerMgr, external, external)
 
 	// use GenesisEpochInfo as default
 	rbft.chainConfig.EpochInfo = c.GenesisEpochInfo
@@ -462,7 +462,7 @@ func (rbft *rbftImpl[T, Constraint]) postMsg(msg any) {
 }
 
 // reportStateUpdated informs RBFT stateUpdated event.
-func (rbft *rbftImpl[T, Constraint]) reportStateUpdated(state *types.ServiceState) {
+func (rbft *rbftImpl[T, Constraint]) reportStateUpdated(state *types.ServiceSyncState) {
 	if rbft.atomicIn(Pending) {
 		rbft.logger.Debugf("Replica %d is in pending status, reject report state updated", rbft.peerMgr.selfID)
 		return
@@ -551,13 +551,6 @@ func (rbft *rbftImpl[T, Constraint]) listenEvent() {
 			rbft.logger.Notice("exit RBFT event listener")
 			return
 		case next := <-rbft.recvChan:
-			if _, ok := next.(*RequestSet[T, Constraint]); !ok {
-				if rbft.atomicIn(inEpochSyncing) {
-					rbft.logger.Debugf("Replica %d is in epoch syncing status, reject propose request", rbft.peerMgr.selfID)
-					return
-				}
-			}
-
 			cm, isConsensusMessage := next.(*consensusMessageWrapper)
 			for {
 				select {
@@ -764,7 +757,7 @@ func (rbft *rbftImpl[T, Constraint]) processReqSetEvent(req *RequestSet[T, Const
 	// }
 
 	// if current node is in abnormal, add normal txs into txPool without generate batches.
-	if !rbft.isNormal() || rbft.in(SkipInProgress) || rbft.in(InRecovery) {
+	if !rbft.isNormal() || rbft.in(SkipInProgress) || rbft.in(InRecovery) || rbft.in(inEpochSyncing) {
 		_, completionMissingBatchHashes := rbft.batchMgr.requestPool.AddNewRequests(req.Requests, false, req.Local, false, false)
 		for _, batchHash := range completionMissingBatchHashes {
 			delete(rbft.storeMgr.missingBatchesInFetching, batchHash)
@@ -1839,6 +1832,7 @@ func (rbft *rbftImpl[T, Constraint]) recvCheckpoint(signedCheckpoint *consensus.
 		return nil
 	}
 
+	rbft.chainConfig.LastCheckpointExecBlockHash = checkpointDigest
 	// the checkpoint is trigger by config batch
 	if signedCheckpoint.Checkpoint.NeedUpdateEpoch {
 		return rbft.finishConfigCheckpoint(checkpointHeight, checkpointDigest, matchingCheckpoints)
@@ -1931,9 +1925,9 @@ func (rbft *rbftImpl[T, Constraint]) finishNormalCheckpoint(checkpointHeight uin
 
 		// Slave -> Primary： need update self seqNo(because only primary will update)
 		rbft.batchMgr.setSeqNo(checkpointHeight)
-		rbft.logger.Infof("Replica %d post stable checkpoint event for seqNo %d after executed to the height with the same digest, update to new view: %d, new primary ID: %d", rbft.peerMgr.selfID, rbft.chainConfig.H, rbft.chainConfig.View, rbft.chainConfig.PrimaryID)
+		rbft.logger.Infof("Replica %d post stable checkpoint event for seqNo %d, update to new view: %d, epoch:%d, last checkpoint digest: %s, new primary ID: %d", rbft.peerMgr.selfID, rbft.chainConfig.H, rbft.chainConfig.View, rbft.chainConfig.EpochInfo.Epoch, rbft.chainConfig.LastCheckpointExecBlockHash, rbft.chainConfig.PrimaryID)
 	} else {
-		rbft.logger.Infof("Replica %d post stable checkpoint event for seqNo %d after executed to the height with the same digest", rbft.peerMgr.selfID, rbft.chainConfig.H)
+		rbft.logger.Infof("Replica %d post stable checkpoint event for seqNo %d", rbft.peerMgr.selfID, rbft.chainConfig.H)
 	}
 
 	rbft.nullReqTimerReset()
@@ -2249,7 +2243,7 @@ func (rbft *rbftImpl[T, Constraint]) tryStateTransfer() {
 // we need to move watermark and update our checkpoint storage for it
 // at last if the epoch info has been changed, we also need to update
 // self epoch-info and trigger another recovery process
-func (rbft *rbftImpl[T, Constraint]) recvStateUpdatedEvent(ss *types.ServiceState) consensusEvent {
+func (rbft *rbftImpl[T, Constraint]) recvStateUpdatedEvent(ss *types.ServiceSyncState) consensusEvent {
 	seqNo := ss.MetaState.Height
 	digest := ss.MetaState.Digest
 
@@ -2257,13 +2251,20 @@ func (rbft *rbftImpl[T, Constraint]) recvStateUpdatedEvent(ss *types.ServiceStat
 	if rbft.storeMgr.highStateTarget == nil {
 		rbft.logger.Warningf("Replica %d has no state targets, cannot resume tryStateTransfer yet", rbft.peerMgr.selfID)
 	} else if seqNo < rbft.storeMgr.highStateTarget.metaState.Height {
-		// If state transfer did not complete successfully, or if it did not reach the highest target, try again.
-		rbft.logger.Warningf("Replica %d recovered to seqNo %d but our high-target has moved to %d, "+
-			"keep on state transferring", rbft.peerMgr.selfID, seqNo, rbft.storeMgr.highStateTarget.metaState.Height)
-		rbft.atomicOff(StateTransferring)
-		rbft.metrics.statusGaugeStateTransferring.Set(0)
-		rbft.exec.setLastExec(seqNo)
-		rbft.tryStateTransfer()
+		if !ss.EpochChanged {
+			// If state transfer did not complete successfully, or if it did not reach the highest target, try again.
+			rbft.logger.Warningf("Replica %d recovered to seqNo %d but our high-target has moved to %d, "+
+				"keep on state transferring", rbft.peerMgr.selfID, seqNo, rbft.storeMgr.highStateTarget.metaState.Height)
+			rbft.atomicOff(StateTransferring)
+			rbft.metrics.statusGaugeStateTransferring.Set(0)
+			rbft.exec.setLastExec(seqNo)
+			rbft.tryStateTransfer()
+		} else {
+			rbft.logger.Debugf("Replica %d state updated, lastExec = %d, seqNo = %d, accept epoch proof for %d", rbft.peerMgr.selfID, rbft.exec.lastExec, seqNo, ss.Epoch)
+			if ckp, ok := rbft.epochMgr.epochProofCache[ss.Epoch]; ok {
+				rbft.epochMgr.persistEpochQuorumCheckpoint(ckp)
+			}
+		}
 		return nil
 	} else if seqNo > rbft.storeMgr.highStateTarget.metaState.Height {
 		rbft.logger.Errorf("Replica %d recovered to seqNo %d which is higher than high-target %d",
@@ -2272,7 +2273,13 @@ func (rbft *rbftImpl[T, Constraint]) recvStateUpdatedEvent(ss *types.ServiceStat
 		return nil
 	}
 
-	rbft.logger.Debugf("lastExec = %d, seqNo = %d", rbft.exec.lastExec, seqNo)
+	rbft.logger.Debugf("Replica %d state updated, lastExec = %d, seqNo = %d", rbft.peerMgr.selfID, rbft.exec.lastExec, seqNo)
+	if ss.EpochChanged {
+		rbft.logger.Debugf("Replica %d accept epoch proof for %d", rbft.peerMgr.selfID, ss.Epoch)
+		if ckp, ok := rbft.epochMgr.epochProofCache[ss.Epoch]; ok {
+			rbft.epochMgr.persistEpochQuorumCheckpoint(ckp)
+		}
+	}
 
 	// 1. clear useless txs in txpool after state updated and saves txs which are not committed to ensure
 	// all received txs will be committed eventually.
@@ -2361,7 +2368,7 @@ func (rbft *rbftImpl[T, Constraint]) recvStateUpdatedEvent(ss *types.ServiceStat
 	}
 
 	if rbft.atomicIn(InViewChange) {
-		if rbft.isPrimary(rbft.peerMgr.selfID) {
+		if rbft.peerMgr.selfID == rbft.chainConfig.calPrimaryIDByView(rbft.chainConfig.View) {
 			// view may not be changed after state-update, current node mistakes itself for primary
 			// so send view change to step into the new view
 			rbft.logger.Debugf("Primary %d send view-change after state update", rbft.peerMgr.selfID)
@@ -2372,7 +2379,6 @@ func (rbft *rbftImpl[T, Constraint]) recvStateUpdatedEvent(ss *types.ServiceStat
 		// if not(sync chain then vc), trigger recovery to find correct view-number
 		nv, ok := rbft.vcMgr.newViewStore[rbft.chainConfig.View]
 		if ok {
-			rbft.chainConfig.LastCheckpointExecBlockHash = nv.QuorumCheckpoint.Digest()
 			rbft.persistNewView(nv)
 			rbft.logger.Infof("Replica %d persist view=%d after sync chain", rbft.peerMgr.selfID, rbft.chainConfig.View)
 			return &LocalEvent{

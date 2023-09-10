@@ -3,11 +3,11 @@ package rbft
 import (
 	"context"
 	"encoding/binary"
-	"errors"
 	"testing"
 	"time"
 
 	"github.com/gogo/protobuf/proto"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
@@ -98,22 +98,22 @@ func TestPersist_restoreQList(t *testing.T) {
 	ret = map[string][]byte{"qlist.": []byte("test")}
 	ext.EXPECT().ReadStateSet("qlist.").Return(ret, nil)
 	_, err = node.rbft.restoreQList()
-	assert.Equal(t, errors.New("incorrect format"), err)
+	assert.Equal(t, "incorrect format", err.Error())
 
 	ret = map[string][]byte{"2.qlist.1": []byte("test")}
 	ext.EXPECT().ReadStateSet("qlist.").Return(ret, nil)
 	_, err = node.rbft.restoreQList()
-	assert.Equal(t, errors.New("incorrect prefix"), err)
+	assert.Equal(t, "incorrect prefix", err.Error())
 
 	ret = map[string][]byte{"qlist.one.test": []byte("test")}
 	ext.EXPECT().ReadStateSet("qlist.").Return(ret, nil)
 	_, err = node.rbft.restoreQList()
-	assert.Equal(t, errors.New("parse failed"), err)
+	assert.Equal(t, "parse failed", err.Error())
 
 	ret = map[string][]byte{"qlist.1.test": []byte("test")}
 	ext.EXPECT().ReadStateSet("qlist.").Return(ret, nil)
 	_, err = node.rbft.restoreQList()
-	assert.Equal(t, errors.New("proto: vc_PQ: wiretype end group for non-group"), err)
+	assert.Equal(t, "proto: vc_PQ: wiretype end group for non-group", err.Error())
 
 	ret = map[string][]byte{"qlist.1.test": {24, 10}}
 	ext.EXPECT().ReadStateSet("qlist.").Return(ret, nil)
@@ -131,17 +131,17 @@ func TestPersist_restorePList(t *testing.T) {
 	ret = map[string][]byte{"plist.1.1": []byte("test")}
 	ext.EXPECT().ReadStateSet("plist.").Return(ret, nil)
 	_, err = node.rbft.restorePList()
-	assert.Equal(t, errors.New("incorrect format"), err)
+	assert.Equal(t, "incorrect format", err.Error())
 
 	ret = map[string][]byte{"1.plist": []byte("test")}
 	ext.EXPECT().ReadStateSet("plist.").Return(ret, nil)
 	_, err = node.rbft.restorePList()
-	assert.Equal(t, errors.New("incorrect prefix"), err)
+	assert.Equal(t, "incorrect prefix", err.Error())
 
 	ret = map[string][]byte{"plist.test": []byte("test")}
 	ext.EXPECT().ReadStateSet("plist.").Return(ret, nil)
 	_, err = node.rbft.restorePList()
-	assert.Equal(t, errors.New("parse failed"), err)
+	assert.Equal(t, "parse failed", err.Error())
 
 	ret = map[string][]byte{"plist.1": {24, 9}}
 	ext.EXPECT().ReadStateSet("plist.").Return(ret, nil)
@@ -334,25 +334,25 @@ func TestPersist_parseQPCKey(t *testing.T) {
 	assert.Equal(t, uint64(0), u1)
 	assert.Equal(t, uint64(0), u2)
 	assert.Equal(t, "", str)
-	assert.Equal(t, errors.New("incorrect format"), err)
+	assert.Equal(t, "incorrect format", err.Error())
 
 	u1, u2, str, err = rbfts[0].parseQPCKey("test.1.wang.2", "msg")
 	assert.Equal(t, uint64(0), u1)
 	assert.Equal(t, uint64(0), u2)
 	assert.Equal(t, "", str)
-	assert.Equal(t, errors.New("incorrect prefix"), err)
+	assert.Equal(t, "incorrect prefix", err.Error())
 
 	u1, u2, str, err = rbfts[0].parseQPCKey("test.a.wang.1", "test")
 	assert.Equal(t, uint64(0), u1)
 	assert.Equal(t, uint64(0), u2)
 	assert.Equal(t, "", str)
-	assert.Equal(t, errors.New("parse failed"), err)
+	assert.Equal(t, "parse failed", err.Error())
 
 	u1, u2, str, err = rbfts[0].parseQPCKey("test.1.b.wang", "test")
 	assert.Equal(t, uint64(0), u1)
 	assert.Equal(t, uint64(0), u2)
 	assert.Equal(t, "", str)
-	assert.Equal(t, errors.New("parse failed"), err)
+	assert.Equal(t, "parse failed", err.Error())
 
 	u1, u2, str, err = rbfts[0].parseQPCKey("test.1.2.wang", "test")
 	assert.Equal(t, uint64(1), u1)

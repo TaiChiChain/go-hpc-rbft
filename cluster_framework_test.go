@@ -3,11 +3,11 @@ package rbft
 import (
 	"context"
 	"encoding/hex"
-	"errors"
 	"math/rand"
 	"strconv"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel/trace"
 
@@ -525,7 +525,10 @@ func (ext *testExternal[T, Constraint]) StateUpdate(seqNo uint64, digest string,
 		Digest: ext.testNode.Digest,
 	}
 	ext.tf.log.Infof("Replica %d report state updated state: %+v", ext.testNode.ID, state)
-	ext.testNode.N.ReportStateUpdated(state)
+	ext.testNode.N.ReportStateUpdated(&types.ServiceSyncState{
+		ServiceState: *state,
+		EpochChanged: false,
+	})
 }
 
 func (ext *testExternal[T, Constraint]) SendFilterEvent(informType types.InformType, message ...any) {

@@ -237,7 +237,7 @@ func (rbft *rbftImpl[T, Constraint]) handleCoreRbftEvent(e *LocalEvent) consensu
 		return nil
 
 	case CoreStateUpdatedEvent:
-		return rbft.recvStateUpdatedEvent(e.Event.(*types.ServiceState))
+		return rbft.recvStateUpdatedEvent(e.Event.(*types.ServiceSyncState))
 
 	case CoreHighWatermarkEvent:
 		if rbft.atomicIn(InViewChange) {
@@ -355,8 +355,8 @@ func (rbft *rbftImpl[T, Constraint]) handleViewChangeEvent(e *LocalEvent) consen
 			rbft.atomicOff(InRecovery)
 			rbft.metrics.statusGaugeInRecovery.Set(0)
 			rbft.logger.Noticef("======== Replica %d finished recovery, primary=%d, "+
-				"epoch=%d/n=%d/f=%d/view=%d/h=%d/lastExec=%d", rbft.peerMgr.selfID, rbft.chainConfig.PrimaryID,
-				rbft.chainConfig.EpochInfo.Epoch, rbft.chainConfig.N, rbft.chainConfig.F, rbft.chainConfig.View, rbft.chainConfig.H, rbft.exec.lastExec)
+				"epoch=%d/n=%d/f=%d/view=%d/h=%d/lastExec=%d/lastCkpDigest=%s", rbft.peerMgr.selfID, rbft.chainConfig.PrimaryID,
+				rbft.chainConfig.EpochInfo.Epoch, rbft.chainConfig.N, rbft.chainConfig.F, rbft.chainConfig.View, rbft.chainConfig.H, rbft.exec.lastExec, rbft.chainConfig.LastCheckpointExecBlockHash)
 
 			rbft.logger.Notice(`
 
@@ -484,6 +484,10 @@ func (rbft *rbftImpl[T, Constraint]) handleEpochMgrEvent(e *LocalEvent) consensu
 	case EpochSyncEvent:
 		proof := e.Event.(*consensus.EpochChangeProof)
 		quorumCheckpoint := proof.Last()
+		for _, checkpoint := range proof.Checkpoints {
+			// TODO: support restore
+			rbft.epochMgr.epochProofCache[checkpoint.Epoch()] = checkpoint
+		}
 		rbft.logger.Noticef("Replica %d try epoch sync to height %d, epoch %d", rbft.peerMgr.selfID,
 			quorumCheckpoint.Height(), quorumCheckpoint.NextEpoch())
 

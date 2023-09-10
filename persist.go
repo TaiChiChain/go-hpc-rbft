@@ -16,13 +16,13 @@ package rbft
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gogo/protobuf/proto"
+	"github.com/pkg/errors"
 
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/types"
@@ -515,9 +515,10 @@ func (rbft *rbftImpl[T, Constraint]) restoreEpochInfo() {
 	if err != nil {
 		rbft.logger.Warningf("Replica %d failed to get current epoch from ledger: %v, will use genesis epoch info", rbft.peerMgr.selfID, err)
 		rbft.chainConfig.EpochInfo = rbft.config.GenesisEpochInfo
-		return
+	} else {
+		rbft.chainConfig.EpochInfo = e
 	}
-	rbft.chainConfig.EpochInfo = e
+	rbft.epochMgr.epoch = rbft.chainConfig.EpochInfo.Epoch
 }
 
 // It is application's responsibility to ensure data compatibility, so RBFT core need only trust and restore

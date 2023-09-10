@@ -4,12 +4,12 @@ import (
 	"crypto/md5"
 	"encoding/binary"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"sync"
 	"time"
 
 	"github.com/google/btree"
+	"github.com/pkg/errors"
 
 	"github.com/axiomesh/axiom-bft/common/consensus"
 )

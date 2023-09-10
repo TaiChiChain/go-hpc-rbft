@@ -166,7 +166,10 @@ func TestNode_ReportStateUpdated(t *testing.T) {
 	}
 
 	n.currentState = state
-	n.ReportStateUpdated(state2)
+	n.ReportStateUpdated(&types.ServiceSyncState{
+		ServiceState: *state2,
+		EpochChanged: false,
+	})
 	assert.Equal(t, "state2", n.currentState.MetaState.Digest)
 
 	state3 := &types.ServiceState{
@@ -175,7 +178,10 @@ func TestNode_ReportStateUpdated(t *testing.T) {
 			Digest: "state3",
 		},
 	}
-	n.ReportStateUpdated(state3)
+	n.ReportStateUpdated(&types.ServiceSyncState{
+		ServiceState: *state3,
+		EpochChanged: false,
+	})
 	assert.Equal(t, "state3", n.currentState.MetaState.Digest)
 }
 

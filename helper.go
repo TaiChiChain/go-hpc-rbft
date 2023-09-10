@@ -23,6 +23,7 @@ import (
 	"math"
 
 	"github.com/gogo/protobuf/proto"
+	"github.com/samber/lo"
 	"golang.org/x/crypto/sha3"
 
 	"github.com/axiomesh/axiom-bft/common/consensus"
@@ -796,14 +797,18 @@ func (rbft *rbftImpl[T, Constraint]) verifySignedCheckpoint(signedCheckpoint *co
 
 // syncConfigCheckpoint posts config checkpoint out and wait for its completion synchronously.
 func (rbft *rbftImpl[T, Constraint]) syncConfigCheckpoint(checkpointHeight uint64, quorumCheckpoints []*consensus.SignedCheckpoint) {
-	// waiting for stable checkpoint finish
-	rbft.logger.Infof("Replica %d post stable checkpoint event for seqNo %d after "+
-		"executed to the height with the same digest", rbft.peerMgr.selfID, checkpointHeight)
-
 	rbft.external.SendFilterEvent(types.InformTypeFilterStableCheckpoint, quorumCheckpoints)
 	rbft.epochMgr.configBatchToCheck = nil
 
-	rbft.logger.Debugf("Replica %d received a stable checkpoint finished event at height %d", rbft.peerMgr.selfID, checkpointHeight)
+	if len(quorumCheckpoints) != 0 {
+		rbft.epochMgr.persistEpochQuorumCheckpoint(&consensus.QuorumCheckpoint{
+			Checkpoint: quorumCheckpoints[0].Checkpoint,
+			Signatures: lo.SliceToMap(quorumCheckpoints, func(item *consensus.SignedCheckpoint) (uint64, []byte) {
+				return item.Author, item.Signature
+			}),
+		})
+		rbft.logger.Infof("Replica %d persist stable checkpoint for seqNo %d, epoch: %d", rbft.peerMgr.selfID, checkpointHeight, quorumCheckpoints[0].Epoch())
+	}
 }
 
 // syncEpoch tries to sync rbft.Epoch with current latest epoch on ledger and returns

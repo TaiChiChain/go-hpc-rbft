@@ -16,8 +16,9 @@ package rbft
 
 import (
 	"context"
-	"errors"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/axiomesh/axiom-bft/common/consensus"
 )

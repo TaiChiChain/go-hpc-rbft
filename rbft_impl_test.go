@@ -179,10 +179,16 @@ func TestRBFT_reportStateUpdated(t *testing.T) {
 	event := &LocalEvent{
 		Service:   CoreRbftService,
 		EventType: CoreStateUpdatedEvent,
-		Event:     state2,
+		Event: &types.ServiceSyncState{
+			ServiceState: *state2,
+			EpochChanged: false,
+		},
 	}
 
-	rbfts[0].reportStateUpdated(state2)
+	rbfts[0].reportStateUpdated(&types.ServiceSyncState{
+		ServiceState: *state2,
+		EpochChanged: false,
+	})
 	obj := <-rbfts[0].recvChan
 	assert.Equal(t, event, obj)
 }

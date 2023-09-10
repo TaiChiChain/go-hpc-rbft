@@ -403,7 +403,6 @@ func (rbft *rbftImpl[T, Constraint]) recvViewChange(vc *consensus.ViewChange, vc
 				return rbft.sendRecoveryResponse(remoteReplicaID, targetView)
 			}
 		}
-
 	}
 
 	return nil
@@ -1046,7 +1045,12 @@ func (rbft *rbftImpl[T, Constraint]) resetStateForRecovery(targetView uint64, nv
 	nc, ok := rbft.vcMgr.newViewCache[nvIdx]
 	if !ok {
 		rbft.logger.Infof("Replica %d starts cache new view %d forward from %d with stable "+
-			"checkpoint height %d", rbft.peerMgr.selfID, targetView, forwardPeer, initialCheckpointHeight)
+			"checkpoint height %d, checkpoint digest: %s, checkpoint isConfig: %v, newViewHash: %s,", rbft.peerMgr.selfID, targetView, forwardPeer,
+			initialCheckpointHeight,
+			initialCheckpointDigest,
+			isConfig,
+			nvHash,
+		)
 		nc = &newViewCert{}
 	}
 	nc.forwardPeers = append(nc.forwardPeers, forwardPeer)
