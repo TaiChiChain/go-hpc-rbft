@@ -13,7 +13,7 @@ func TestNewMempool(t *testing.T) {
 	ast := assert.New(t)
 	conf := NewMockMempoolConfig()
 	pool := NewMempool[consensus.FltTransaction, *consensus.FltTransaction](conf)
-	ast.Equal(uint64(0), pool.GetPendingNonceByAccount("account1"))
+	ast.Equal(uint64(0), pool.GetPendingTxCountByAccount("account1"))
 }
 
 func TestAddNewRequests(t *testing.T) {
@@ -39,9 +39,9 @@ func TestAddNewRequests(t *testing.T) {
 	ast.Equal(tx2.RbftGetNonce(), actTx2.RbftGetNonce())
 	ast.Equal(tx3.RbftGetNonce(), actTx3.RbftGetNonce())
 	ast.Equal(tx4.RbftGetNonce(), actTx4.RbftGetNonce())
-	pendingNonce := pool.GetPendingNonceByAccount(tx1.RbftGetFrom())
+	pendingNonce := pool.GetPendingTxCountByAccount(tx1.RbftGetFrom())
 	ast.Equal(uint64(2), pendingNonce)
-	pendingNonce = pool.GetPendingNonceByAccount(tx3.RbftGetFrom())
+	pendingNonce = pool.GetPendingTxCountByAccount(tx3.RbftGetFrom())
 	ast.Equal(uint64(3), pendingNonce)
 
 	// test replace tx
@@ -51,27 +51,57 @@ func TestAddNewRequests(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 	batch, _ = pool.AddNewRequests([]*consensus.FltTransaction{tx1}, true, true, true, true)
 	ast.Nil(batch)
-	// replace same tx, needn't update
+
 	poolTx := pool.txStore.getPoolTxByTxnPointer(tx1.RbftGetFrom(), uint64(0))
 	ast.Equal(poolTx.getHash(), tx1.RbftGetTxHash())
 	ast.Equal(5, pool.txStore.localTTLIndex.size())
-	ast.True(poolTx.arrivedTime == oldTimeStamp)
+	ast.True(poolTx.arrivedTime != oldTimeStamp, "tx1 has been replaced")
+	ast.Equal(0, pool.txStore.parkingLotIndex.size())
+	ast.Equal(5, pool.txStore.priorityIndex.size())
 
-	// replace different tx with same nonce
+	// replace different tx with same nonce, smaller than currentSeqNo
 	time.Sleep(2 * time.Millisecond)
-	tx11 := ConstructTxByAccountAndNonce("account1", uint64(0))
-	ast.NotEqual(tx1.RbftGetTxHash(), tx11.RbftGetTxHash())
-	batch, _ = pool.AddNewRequests([]*consensus.FltTransaction{tx11}, true, false, true, true)
+	dupTx1 := ConstructTxByAccountAndNonce("account1", uint64(0))
+	ast.NotEqual(tx1.RbftGetTxHash(), dupTx1.RbftGetTxHash())
+	batch, _ = pool.AddNewRequests([]*consensus.FltTransaction{dupTx1}, true, false, true, true)
 	ast.Nil(batch)
 	ast.Nil(pool.txStore.txHashMap[tx1.RbftGetTxHash()])
 	poolTx = pool.txStore.getPoolTxByTxnPointer(tx1.RbftGetFrom(), uint64(0))
-	ast.Equal(poolTx.getHash(), tx11.RbftGetTxHash())
+	ast.Equal(poolTx.getHash(), dupTx1.RbftGetTxHash())
 	ast.Equal(5, len(pool.txStore.txHashMap))
 	ast.Equal(0, pool.txStore.parkingLotIndex.size())
 	ast.Equal(5, pool.txStore.priorityIndex.size())
 	// tx11 is not local
-	ast.Equal(4, pool.txStore.localTTLIndex.size(), "tx1 will be remove")
+	ast.Equal(4, pool.txStore.localTTLIndex.size(), "tx1 will be remove, tx11 is not local, "+
+		"so the size will decrease 1")
 
+	// replace different tx with same nonce, bigger than currentSeqNo
+	time.Sleep(2 * time.Millisecond)
+	tx15 := ConstructTxByAccountAndNonce("account1", uint64(5))
+	batch, _ = pool.AddNewRequests([]*consensus.FltTransaction{tx15}, true, false, true, true)
+	ast.Nil(batch)
+	ast.True(pool.txStore.txHashMap[tx15.RbftGetTxHash()] != nil)
+	ast.Equal(6, len(pool.txStore.txHashMap))
+	ast.Equal(1, pool.txStore.parkingLotIndex.size())
+	ast.Equal(5, pool.txStore.priorityIndex.size())
+	ast.Equal(4, pool.txStore.localTTLIndex.size())
+	ast.Equal(6, pool.txStore.removeTTLIndex.size())
+	ast.Equal(3, pool.txStore.allTxs[tx15.RbftGetFrom()].index.size())
+
+	sameNonce := uint64(5)
+	dupTx15 := ConstructTxByAccountAndNonce("account1", sameNonce)
+	batch, _ = pool.AddNewRequests([]*consensus.FltTransaction{dupTx15}, true, false, true, true)
+	ast.Nil(batch)
+	ast.True(pool.txStore.txHashMap[tx15.RbftGetTxHash()] == nil, "tx15 has been replaced")
+	ast.Equal(6, len(pool.txStore.txHashMap))
+	ast.Equal(1, pool.txStore.parkingLotIndex.size())
+	ast.Equal(4, pool.txStore.localTTLIndex.size())
+	ast.Equal(6, pool.txStore.removeTTLIndex.size())
+	ast.Equal(3, pool.txStore.allTxs[tx15.RbftGetFrom()].index.size())
+	ast.Equal(pool.txStore.allTxs[tx15.RbftGetFrom()].items[sameNonce].getHash(), dupTx15.RbftGetTxHash(),
+		"tx15 has been replaced by dupTx15")
+
+	// test generate batch flag
 	tx1 = ConstructTxByAccountAndNonce("1account1", uint64(0))
 	tx2 = ConstructTxByAccountAndNonce("1account1", uint64(1))
 	tx3 = ConstructTxByAccountAndNonce("1account2", uint64(0))
@@ -277,8 +307,8 @@ func TestRestorePool(t *testing.T) {
 	ast.Equal(1, len(pool.txStore.batchesCache))
 	ast.Equal(5, pool.txStore.priorityIndex.size())
 	ast.Equal(0, pool.txStore.parkingLotIndex.size())
-	ast.Equal(uint64(2), pool.GetPendingNonceByAccount(tx1.RbftGetFrom()))
-	ast.Equal(uint64(3), pool.GetPendingNonceByAccount(tx3.RbftGetFrom()))
+	ast.Equal(uint64(2), pool.GetPendingTxCountByAccount(tx1.RbftGetFrom()))
+	ast.Equal(uint64(3), pool.GetPendingTxCountByAccount(tx3.RbftGetFrom()))
 
 	pool.RestorePool()
 	ast.Equal(0, len(pool.txStore.batchedTxs))
@@ -286,8 +316,8 @@ func TestRestorePool(t *testing.T) {
 	ast.Equal(0, len(pool.txStore.batchesCache))
 	ast.Equal(5, pool.txStore.priorityIndex.size())
 	ast.Equal(0, pool.txStore.parkingLotIndex.size())
-	ast.Equal(uint64(0), pool.GetPendingNonceByAccount(tx1.RbftGetFrom()), "nonce had already rollback to 0")
-	ast.Equal(uint64(0), pool.GetPendingNonceByAccount(tx3.RbftGetFrom()), "nonce had already rollback to 0")
+	ast.Equal(uint64(0), pool.GetPendingTxCountByAccount(tx1.RbftGetFrom()), "nonce had already rollback to 0")
+	ast.Equal(uint64(0), pool.GetPendingTxCountByAccount(tx3.RbftGetFrom()), "nonce had already rollback to 0")
 }
 
 func TestReConstructBatchByOrder(t *testing.T) {
@@ -719,4 +749,14 @@ func TestGetPendingTxByHash(t *testing.T) {
 
 	tx := pool.GetPendingTxByHash(tx1.RbftGetTxHash())
 	ast.Equal(tx1.RbftGetTxHash(), tx.RbftGetTxHash())
+}
+
+func TestMemPoolGetPendingTxCount(t *testing.T) {
+	ast := assert.New(t)
+	pool := mockMempoolImpl[consensus.FltTransaction, *consensus.FltTransaction]()
+	tx1 := ConstructTxByAccountAndNonce("account1", uint64(0))
+	tx2 := ConstructTxByAccountAndNonce("account2", uint64(0))
+	ast.Equal(uint64(0), pool.GetTotalPendingTxCount())
+	pool.AddNewRequests([]*consensus.FltTransaction{tx1, tx2}, false, true, false, false)
+	ast.Equal(uint64(2), pool.GetTotalPendingTxCount())
 }

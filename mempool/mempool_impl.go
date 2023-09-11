@@ -27,6 +27,10 @@ type mempoolImpl[T any, Constraint consensus.TXConstraint[T]] struct {
 	getAccountNonce     GetAccountNonceFunc
 }
 
+func (mpi *mempoolImpl[T, Constraint]) GetTotalPendingTxCount() uint64 {
+	return uint64(len(mpi.txStore.txHashMap))
+}
+
 // AddNewRequests adds transactions into txPool.
 // When current node is primary, judge if we need to generate a batch by batch size.
 // When current node is backup, judge if we can eliminate some missing batches.
@@ -57,23 +61,33 @@ func (mpi *mempoolImpl[T, Constraint]) addNewRequests(txs []*T, isPrimary, local
 			currentSeqNo = mpi.txStore.nonceCache.getPendingNonce(txAccount)
 			currentSeqNoList[txAccount] = currentSeqNo
 		}
+
+		var ready bool
 		if txNonce < currentSeqNo {
+			ready = true
 			if !isReplace {
 				mpi.logger.Warningf("Receive transaction [account: %s, nonce: %d, hash: %s], but we required %d", txAccount, txNonce, txHash, currentSeqNo)
 				continue
 			} else {
-				if pointer := mpi.txStore.txHashMap[txHash]; pointer != nil {
-					continue
-				}
-				// mpi.logger.Warningf("Receive missing transaction [account: %s, nonce: %d, hash: %s] from primary, we will replace the old transaction", txAccount, txNonce, txHash)
-				mpi.replaceTx(tx)
+				mpi.logger.Warningf("Receive transaction [account: %s, nonce: %d, hash: %s], but we required %d,"+
+					" will replace old tx", txAccount, txNonce, txHash, currentSeqNo)
+				mpi.replaceTx(tx, local, ready)
 				continue
 			}
 		}
+		// ignore duplicate tx
 		if pointer := mpi.txStore.txHashMap[txHash]; pointer != nil {
-			// because simultaneous broadcast and active pull may be repeated
-			// mpi.logger.Debugf("Transaction [account: %s, nonce: %d, hash: %s] has already existed in txHashMap", txAccount, txNonce, txHash)
+			mpi.logger.Warningf("Transaction [account: %s, nonce: %d, hash: %s] has already existed in txHashMap, "+
+				"ignore it", txAccount, txNonce, txHash)
 			continue
+		}
+
+		if mpi.txStore.allTxs[txAccount] != nil {
+			if oldTx, ok := mpi.txStore.allTxs[txAccount].items[txNonce]; ok {
+				mpi.logger.Warningf("Receive duplicate nonce transaction [account: %s, nonce: %d, hash: %s],"+
+					" will replace old tx[hash: %s]", txAccount, txNonce, txHash, oldTx.getHash())
+				mpi.replaceTx(tx, local, ready)
+			}
 		}
 
 		// update currentSeqNoList
@@ -190,8 +204,8 @@ func (mpi *mempoolImpl[T, Constraint]) Init(selfID uint64) error {
 	return nil
 }
 
-// GetPendingNonceByAccount returns the latest pending nonce of the account in mempool
-func (mpi *mempoolImpl[T, Constraint]) GetPendingNonceByAccount(account string) uint64 {
+// GetPendingTxCountByAccount returns the latest pending nonce of the account in mempool
+func (mpi *mempoolImpl[T, Constraint]) GetPendingTxCountByAccount(account string) uint64 {
 	return mpi.txStore.nonceCache.getPendingNonce(account)
 }
 
@@ -896,7 +910,7 @@ func (mpi *mempoolImpl[T, Constraint]) generateRequestBatch() ([]*RequestHashBat
 	return batches, nil
 }
 
-func (mpi *mempoolImpl[T, Constraint]) replaceTx(tx *T) {
+func (mpi *mempoolImpl[T, Constraint]) replaceTx(tx *T, local, ready bool) {
 	account := Constraint(tx).RbftGetFrom()
 	txHash := Constraint(tx).RbftGetTxHash()
 	txNonce := Constraint(tx).RbftGetNonce()
@@ -905,7 +919,24 @@ func (mpi *mempoolImpl[T, Constraint]) replaceTx(tx *T) {
 		account: account,
 		nonce:   txNonce,
 	}
+
+	// remove old tx from txHashMap、priorityIndex、parkingLotIndex、localTTLIndex and removeTTLIndex
+	if oldPoolTx != nil {
+		mpi.txStore.deletePoolTx(oldPoolTx.getHash())
+		mpi.txStore.priorityIndex.removeByOrderedQueueKey(oldPoolTx)
+		mpi.txStore.parkingLotIndex.removeByOrderedQueueKey(oldPoolTx)
+		mpi.txStore.removeTTLIndex.removeByOrderedQueueKey(oldPoolTx)
+		mpi.txStore.localTTLIndex.removeByOrderedQueueKey(oldPoolTx)
+	}
+
+	if !ready {
+		// if not ready, just delete old tx, outbound will handle insert new tx
+		return
+	}
+	// insert new tx
 	mpi.txStore.insertPoolTx(txHash, pointer)
+
+	// update txPointer in allTxs
 	list, ok := mpi.txStore.allTxs[account]
 	if !ok {
 		list = newTxSortedMap[T, Constraint]()
@@ -921,16 +952,12 @@ func (mpi *mempoolImpl[T, Constraint]) replaceTx(tx *T) {
 	}
 	list.items[txNonce] = newPoolTx
 
-	// remove old tx from txHashMap、priorityIndex、parkingLotIndex、localTTLIndex and removeTTLIndex
-	if oldPoolTx != nil {
-		mpi.txStore.deletePoolTx(oldPoolTx.getHash())
-		mpi.txStore.priorityIndex.removeByOrderedQueueKey(oldPoolTx)
-		mpi.txStore.parkingLotIndex.removeByOrderedQueueKey(oldPoolTx)
-		mpi.txStore.removeTTLIndex.removeByOrderedQueueKey(oldPoolTx)
-		mpi.txStore.localTTLIndex.removeByOrderedQueueKey(oldPoolTx)
-	}
 	// insert new tx received from remote vp
 	mpi.txStore.priorityIndex.insertByOrderedQueueKey(newPoolTx)
+	if local {
+		mpi.txStore.localTTLIndex.insertByOrderedQueueKey(newPoolTx)
+	}
+	mpi.txStore.removeTTLIndex.insertByOrderedQueueKey(newPoolTx)
 }
 
 // getBatchHash calculate hash of a RequestHashBatch
