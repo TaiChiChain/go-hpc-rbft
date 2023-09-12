@@ -575,6 +575,7 @@ func (rbft *rbftImpl[T, Constraint]) listenEvent() {
 
 // processEvent process consensus messages and local events cyclically.
 func (rbft *rbftImpl[T, Constraint]) processEvent(ee consensusEvent) consensusEvent {
+	start := time.Now()
 	switch e := ee.(type) {
 	case *RequestSet[T, Constraint]:
 		// e.Local indicates whether this RequestSet was generated locally or received
@@ -588,11 +589,11 @@ func (rbft *rbftImpl[T, Constraint]) processEvent(ee consensusEvent) consensusEv
 		}
 
 		rbft.processReqSetEvent(e)
-
+		rbft.metrics.processEventDuration.With("event", "request_set").Observe(time.Since(start).Seconds())
 		return nil
+
 	case *consensus.RequestSet:
-		// e.Local indicates whether this RequestSet was generated locally or received
-		// from remote nodes.
+		// handle reBroadcast requestSet
 		if e.Local {
 			rbft.metrics.incomingLocalTxSets.Add(float64(1))
 			rbft.metrics.incomingLocalTxs.Add(float64(len(e.Requests)))
@@ -607,17 +608,23 @@ func (rbft *rbftImpl[T, Constraint]) processEvent(ee consensusEvent) consensusEv
 			return nil
 		}
 		rbft.processReqSetEvent(&requestSet)
-
+		rbft.metrics.processEventDuration.With("event", "rebroadcast_request_set").Observe(time.Since(start).Seconds())
 		return nil
 
 	case *LocalEvent:
-		return rbft.dispatchLocalEvent(e)
+		ev := rbft.dispatchLocalEvent(e)
+		rbft.metrics.processEventDuration.With("event", "local_event").Observe(time.Since(start).Seconds())
+		return ev
 
 	case *MiscEvent:
-		return rbft.dispatchMiscEvent(e)
+		ev := rbft.dispatchMiscEvent(e)
+		rbft.metrics.processEventDuration.With("event", "misc_event").Observe(time.Since(start).Seconds())
+		return ev
 
 	case *consensusMessageWrapper:
-		return rbft.consensusMessageFilter(e.ctx, e.ConsensusMessage)
+		ev := rbft.consensusMessageFilter(e.ctx, e.ConsensusMessage)
+		rbft.metrics.processEventDuration.With("event", "consensus_message").Observe(time.Since(start).Seconds())
+		return ev
 
 	default:
 		rbft.logger.Errorf("Can't recognize event type of %v.", e)
