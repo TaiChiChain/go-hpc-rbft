@@ -2,6 +2,7 @@ package rbft
 
 import (
 	"github.com/axiomesh/axiom-bft/common/metrics"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // rbftMetrics helps collect all metrics in rbft
@@ -74,6 +75,9 @@ type rbftMetrics struct {
 	// monitor the time from batch[primary] to commit.
 	// may be negative due to the time difference between primary and replica.
 	batchToCommitDuration metrics.Summary
+
+	// monitor the time from recvChan to processEvent.
+	processEventDuration metrics.Histogram
 
 	// ========================== metrics related to batch number info ==========================
 	// monitor the batch number in batchStore, including the batches that cached to help
@@ -353,6 +357,18 @@ func newRBFTMetrics(metricsProv metrics.Provider) (*rbftMetrics, error) {
 		return m, err
 	}
 
+	m.processEventDuration, err = metricsProv.NewHistogram(
+		metrics.HistogramOpts{
+			Name:       "process_event_duration",
+			Help:       "duration from recvChan to processEvent",
+			Buckets:    prometheus.ExponentialBuckets(0.0005, 2, 10),
+			LabelNames: []string{"event"},
+		},
+	)
+	if err != nil {
+		return m, err
+	}
+
 	m.batchesGauge, err = metricsProv.NewGauge(
 		metrics.GaugeOpts{
 			Name: "batch_number",
@@ -584,6 +600,9 @@ func (rm *rbftMetrics) unregisterMetrics() {
 	}
 	if rm.batchToCommitDuration != nil {
 		rm.batchToCommitDuration.Unregister()
+	}
+	if rm.processEventDuration != nil {
+		rm.processEventDuration.Unregister()
 	}
 	if rm.batchesGauge != nil {
 		rm.batchesGauge.Unregister()
