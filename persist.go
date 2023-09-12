@@ -540,7 +540,7 @@ func (rbft *rbftImpl[T, Constraint]) restoreState() error {
 	state := &types.ServiceState{
 		MetaState: &types.MetaState{
 			Height: rbft.config.GenesisEpochInfo.StartBlock,
-			Digest: "GENESIS",
+			Digest: rbft.config.GenesisBlockDigest,
 		},
 		Epoch: rbft.config.GenesisEpochInfo.Epoch,
 	}

@@ -1398,6 +1398,14 @@ func (rbft *rbftImpl[T, Constraint]) selectInitialCheckpoint(set []*consensus.Vc
 		return nil, nil, false
 	}
 
+	if initialCheckpointState.Meta.Height == rbft.config.GenesisEpochInfo.StartBlock {
+		if initialCheckpointState.Meta.Digest != rbft.config.GenesisBlockDigest {
+			rbft.logger.Errorf("Replica %d self genesis config is not consistent with most nodes, expected genesis block hash: %s, self genesis block hash: %s",
+				rbft.peerMgr.selfID, initialCheckpointState.Meta.Digest, rbft.config.GenesisBlockDigest)
+			return nil, nil, false
+		}
+	}
+
 	return &initialCheckpointState, checkpointSet, true
 }
 

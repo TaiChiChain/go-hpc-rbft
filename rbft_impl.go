@@ -37,13 +37,13 @@ type Config struct {
 	// Genesis for test
 	GenesisEpochInfo *EpochInfo
 
+	GenesisBlockDigest string
+
 	// self staking account address
 	SelfAccountAddress string
 
 	// Applied is the latest height index of application service which should be assigned when node restart.
 	Applied uint64
-
-	AppliedBlockHash string
 
 	// SetSize is the max size of a request set to broadcast among cluster.
 	SetSize int
@@ -256,6 +256,7 @@ func (rbft *rbftImpl[T, Constraint]) init() error {
 	rbft.metrics.quorumSizeGauge.Set(float64(rbft.commonCaseQuorum()))
 
 	rbft.logger.Infof("RBFT enable wrf = %v", rbft.chainConfig.isWRF())
+	rbft.logger.Infof("RBFT epoch period = %v", rbft.chainConfig.EpochInfo.EpochPeriod)
 	rbft.logger.Infof("RBFT current epoch = %v", rbft.chainConfig.EpochInfo.Epoch)
 	rbft.logger.Infof("RBFT current view = %v", rbft.chainConfig.View)
 	rbft.logger.Infof("RBFT last exec block = %v", rbft.exec.lastExec)
