@@ -170,6 +170,12 @@ func (e *EpochInfo) Check() error {
 		return errors.New("epoch info error: validator_set need at least 4")
 	}
 
+	for _, nodeInfo := range e.ValidatorSet {
+		if nodeInfo.ConsensusVotingPower < 0 {
+			return errors.Errorf("epoch info error: validator(%d) consensus_voting_power cannot be negative", nodeInfo.ID)
+		}
+	}
+
 	if e.ConsensusParams.ProposerElectionType != ProposerElectionTypeWRF && e.ConsensusParams.ProposerElectionType != ProposerElectionTypeRotating {
 		return fmt.Errorf("epoch info error: unsupported proposer_election_type: %d", e.ConsensusParams.ProposerElectionType)
 	}

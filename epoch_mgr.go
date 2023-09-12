@@ -49,6 +49,7 @@ type epochManager struct {
 
 	// logger
 	logger Logger
+	config Config
 }
 
 func newEpochManager(c Config, pp *peerManager, epochService EpochService, storage Storage) *epochManager {
@@ -60,6 +61,7 @@ func newEpochManager(c Config, pp *peerManager, epochService EpochService, stora
 		peerMgr:              pp,
 		storage:              storage,
 		logger:               c.Logger,
+		config:               c,
 	}
 
 	return em
@@ -284,6 +286,7 @@ func (em *epochManager) processEpochChangeRequest(request *consensus.EpochChange
 
 	if proof := em.pagingGetEpochChangeProof(request.StartEpoch, request.TargetEpoch, MaxNumEpochEndingCheckpoint); proof != nil {
 		em.logger.Noticef("Replica %d send epoch change proof towards %d, info %s", em.peerMgr.selfID, request.GetAuthor(), proof)
+		proof.GenesisBlockDigest = em.config.GenesisBlockDigest
 		payload, mErr := proto.Marshal(proof)
 		if mErr != nil {
 			em.logger.Warningf("Marshal EpochChangeProof failed: %s", mErr)
@@ -305,6 +308,12 @@ func (em *epochManager) processEpochChangeProof(proof *consensus.EpochChangeProo
 	if changeTo := proof.NextEpoch(); changeTo <= em.epoch {
 		// ignore proof old epoch which we have already started
 		em.logger.Debugf("reject lower epoch change to %d", changeTo)
+		return nil
+	}
+
+	if proof.GenesisBlockDigest != em.config.GenesisBlockDigest {
+		em.logger.Errorf("Replica %d reject epoch change proof, because self genesis config is not consistent with most nodes, expected genesis block hash: %s, self genesis block hash: %s",
+			em.peerMgr.selfID, proof.GenesisBlockDigest, em.config.GenesisBlockDigest)
 		return nil
 	}
 

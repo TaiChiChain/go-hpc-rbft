@@ -58,4 +58,6 @@ message EpochChangeProof {
   uint64 more = 2;
   // Where the proof comes from
   uint64 author = 3;
+  // Help remote check genesis block digest
+  string genesis_block_digest = 4;
 }
