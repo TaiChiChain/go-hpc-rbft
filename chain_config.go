@@ -170,10 +170,16 @@ func (e *EpochInfo) Check() error {
 		return errors.New("epoch info error: validator_set need at least 4")
 	}
 
+	isAllZero := true
 	for _, nodeInfo := range e.ValidatorSet {
 		if nodeInfo.ConsensusVotingPower < 0 {
 			return errors.Errorf("epoch info error: validator(%d) consensus_voting_power cannot be negative", nodeInfo.ID)
+		} else if nodeInfo.ConsensusVotingPower > 0 {
+			isAllZero = false
 		}
+	}
+	if isAllZero {
+		return errors.New("epoch info error: validators consensus_voting_power cannot all be zero")
 	}
 
 	if e.ConsensusParams.ProposerElectionType != ProposerElectionTypeWRF && e.ConsensusParams.ProposerElectionType != ProposerElectionTypeRotating {
