@@ -825,8 +825,9 @@ func (rbft *rbftImpl[T, Constraint]) sendRecoveryResponse(remoteReplicaID, remot
 		rbft.peerMgr.selfID, remoteReplicaID, rbft.chainConfig.View, remoteView)
 
 	rcr := &consensus.RecoveryResponse{
-		NewView:           nv,
-		InitialCheckpoint: rbft.storeMgr.localCheckpoints[rbft.chainConfig.H],
+		NewView:            nv,
+		InitialCheckpoint:  rbft.storeMgr.localCheckpoints[rbft.chainConfig.H],
+		GenesisBlockDigest: rbft.config.GenesisBlockDigest,
 	}
 	payload, err := proto.Marshal(rcr)
 	if err != nil {
@@ -856,6 +857,12 @@ func (rbft *rbftImpl[T, Constraint]) recvRecoveryResponse(rcr *consensus.Recover
 	// until received f+1 NewViews with the same targetView, and trigger single node recovery to
 	// this targetView.
 	if rbft.atomicIn(InRecovery) {
+		if rcr.GenesisBlockDigest != rbft.config.GenesisBlockDigest {
+			errMsg := fmt.Sprintf("Replica %d self genesis config is not consistent with most nodes, expected genesis block hash: %s, self genesis block hash: %s",
+				rbft.peerMgr.selfID, rcr.GenesisBlockDigest, rbft.config.GenesisBlockDigest)
+			rbft.logger.Error(errMsg)
+			panic(errMsg)
+		}
 		nv := rcr.GetNewView()
 		targetView, nvHash, _, valid := rbft.checkNewView(nv)
 		if valid {
