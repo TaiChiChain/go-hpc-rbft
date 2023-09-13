@@ -312,8 +312,10 @@ func (em *epochManager) processEpochChangeProof(proof *consensus.EpochChangeProo
 	}
 
 	if proof.GenesisBlockDigest != em.config.GenesisBlockDigest {
-		em.logger.Errorf("Replica %d reject epoch change proof, because self genesis config is not consistent with most nodes, expected genesis block hash: %s, self genesis block hash: %s",
+		errMsg := fmt.Sprintf("Replica %d reject epoch change proof, because self genesis config is not consistent with most nodes, expected genesis block hash: %s, self genesis block hash: %s",
 			em.peerMgr.selfID, proof.GenesisBlockDigest, em.config.GenesisBlockDigest)
+		em.logger.Error(errMsg)
+		panic(errMsg)
 		return nil
 	}
 
