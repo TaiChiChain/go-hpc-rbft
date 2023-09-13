@@ -139,6 +139,8 @@ message fetch_view {
 message recovery_response {
     new_view new_view = 1;
     consensus.SignedCheckpoint initial_checkpoint = 2;
+    // Help remote check genesis block digest
+    string genesis_block_digest = 3;
 }
 
 message fetch_batch_request {
