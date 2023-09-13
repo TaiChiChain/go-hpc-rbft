@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"fmt"
 	"time"
 
 	"github.com/gogo/protobuf/proto"
@@ -1400,8 +1401,10 @@ func (rbft *rbftImpl[T, Constraint]) selectInitialCheckpoint(set []*consensus.Vc
 
 	if initialCheckpointState.Meta.Height == rbft.config.GenesisEpochInfo.StartBlock {
 		if initialCheckpointState.Meta.Digest != rbft.config.GenesisBlockDigest {
-			rbft.logger.Errorf("Replica %d self genesis config is not consistent with most nodes, expected genesis block hash: %s, self genesis block hash: %s",
+			errMsg := fmt.Sprintf("Replica %d self genesis config is not consistent with most nodes, expected genesis block hash: %s, self genesis block hash: %s",
 				rbft.peerMgr.selfID, initialCheckpointState.Meta.Digest, rbft.config.GenesisBlockDigest)
+			rbft.logger.Error(errMsg)
+			panic(errMsg)
 			return nil, nil, false
 		}
 	}
