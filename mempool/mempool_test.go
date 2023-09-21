@@ -110,6 +110,14 @@ func TestAddNewRequests(t *testing.T) {
 	batch, completionMissingBatchHashes = pool.AddNewRequests([]*consensus.FltTransaction{tx1, tx2, tx3, tx4, tx5}, true, true, false, false)
 	ast.Equal(0, len(batch))
 	ast.Equal(0, len(completionMissingBatchHashes))
+
+	oldPoolTxLen := len(pool.txStore.txHashMap)
+	illegalTx := ConstructTxByAccountAndNonce("mockAccount1", DefaultToleranceNonceGap+1)
+	batch, completionMissingBatchHashes = pool.AddNewRequests([]*consensus.FltTransaction{illegalTx}, true, true, false, true)
+
+	_, ok := pool.txStore.allTxs[illegalTx.RbftGetFrom()]
+	ast.Equal(oldPoolTxLen, len(pool.txStore.txHashMap), "illegalTx should not be added to txHashMap")
+	ast.False(ok, "illegalTx should not be added to allTxs")
 }
 
 func constructAllTxs[T any, Constraint consensus.TXConstraint[T]](txs []*T) map[string]*txSortedMap[T, Constraint] {
@@ -618,6 +626,18 @@ func TestRemoveTimeoutRequests(t *testing.T) {
 	ast.Equal(2, pool.txStore.priorityIndex.size())
 	ast.Equal(6, len(pool.txStore.txHashMap))
 
+	readyTxA := ConstructTxByAccountAndNonce("Alice", uint64(1))
+	readyTxB := ConstructTxByAccountAndNonce("Bob", uint64(1))
+
+	pool.AddNewRequests([]*consensus.FltTransaction{readyTxA, readyTxB}, false, true, false, false)
+
+	ast.Equal(4, len(list1.items))
+	ast.Equal(4, len(list2.items))
+	ast.Equal(4, pool.txStore.parkingLotIndex.size(), "tx3-tx6, remove priorityIndex must in checkpoint")
+	ast.Equal(8, pool.txStore.priorityIndex.size(), "tx1-tx6, readyTxA, readyTxB")
+	ast.Equal(8, pool.txStore.removeTTLIndex.size())
+	ast.Equal(8, len(pool.txStore.txHashMap))
+
 	time.Sleep(2 * time.Second)
 	// after remove timeout request
 	reqLen, err := pool.RemoveTimeoutRequests()
@@ -628,10 +648,10 @@ func TestRemoveTimeoutRequests(t *testing.T) {
 	ast.Equal(true, ok)
 	ast.Equal(1, len(list1.items))
 	ast.Equal(1, len(list2.items))
-	ast.Equal(4, int(reqLen))
+	ast.Equal(6, int(reqLen), "remove tx3-tx6, readyTxA, readyTxB")
 	ast.Equal(2, pool.txStore.removeTTLIndex.size())
 	ast.Equal(0, pool.txStore.parkingLotIndex.size())
-	ast.Equal(2, pool.txStore.priorityIndex.size())
+	ast.Equal(2, pool.txStore.priorityIndex.size(), "tx1,tx2 belong to batchedTxs")
 	ast.Equal(2, len(pool.txStore.txHashMap))
 }
 

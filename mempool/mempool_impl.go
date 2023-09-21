@@ -21,6 +21,7 @@ type mempoolImpl[T any, Constraint consensus.TXConstraint[T]] struct {
 	batchSize           uint64
 	isTimed             bool
 	txStore             *transactionStore[T, Constraint] // store all transactions info
+	toleranceNonceGap   uint64
 	toleranceTime       time.Duration
 	toleranceRemoveTime time.Duration
 	poolSize            uint64
@@ -75,6 +76,14 @@ func (mpi *mempoolImpl[T, Constraint]) addNewRequests(txs []*T, isPrimary, local
 				continue
 			}
 		}
+
+		// reject nonce too high tx
+		if txNonce > currentSeqNo+mpi.toleranceNonceGap {
+			mpi.logger.Warningf("Receive transaction [account: %s, nonce: %d, hash: %s], but we required %d,"+
+				" and the nonce gap is %d, reject it", txAccount, txNonce, txHash, currentSeqNo, mpi.toleranceNonceGap)
+			continue
+		}
+
 		// ignore duplicate tx
 		if pointer := mpi.txStore.txHashMap[txHash]; pointer != nil {
 			mpi.logger.Warningf("Transaction [account: %s, nonce: %d, hash: %s] has already existed in txHashMap, "+
@@ -190,12 +199,18 @@ func newMempoolImpl[T any, Constraint consensus.TXConstraint[T]](config Config) 
 	} else {
 		mpi.toleranceRemoveTime = config.ToleranceRemoveTime
 	}
+	if config.ToleranceNonceGap == 0 {
+		mpi.toleranceNonceGap = DefaultToleranceNonceGap
+	} else {
+		mpi.toleranceNonceGap = config.ToleranceNonceGap
+	}
 	mpi.logger.Infof("MemPool pool size = %d", mpi.poolSize)
 	mpi.logger.Infof("MemPool batch size = %d", mpi.batchSize)
 	mpi.logger.Infof("MemPool batch mem limit = %v", config.BatchMemLimit)
 	mpi.logger.Infof("MemPool batch max mem size = %d", config.BatchMaxMem)
 	mpi.logger.Infof("MemPool tolerance time = %v", config.ToleranceTime)
 	mpi.logger.Infof("MemPool tolerance remove time = %v", mpi.toleranceRemoveTime)
+	mpi.logger.Infof("MemPool tolerance nonce gap = %d", mpi.toleranceNonceGap)
 	return mpi
 }
 
@@ -684,6 +699,15 @@ func (mpi *mempoolImpl[T, Constraint]) FilterOutOfDateRequests() ([]*T, error) {
 	return result, nil
 }
 
+func (mpi *mempoolImpl[T, Constraint]) fillRemoveTxs(orderedKey *orderedIndexKey, poolTx *mempoolTransaction[T, Constraint],
+	removedTxs map[string][]*mempoolTransaction[T, Constraint]) {
+	if _, ok := removedTxs[orderedKey.account]; !ok {
+		removedTxs[orderedKey.account] = make([]*mempoolTransaction[T, Constraint], 0)
+	}
+	// record need removedTxs and the count
+	removedTxs[orderedKey.account] = append(removedTxs[orderedKey.account], poolTx)
+}
+
 // RemoveTimeoutRequests remove the remained local txs in timeoutIndex and removeTxs in memPool by tolerance time.
 func (mpi *mempoolImpl[T, Constraint]) RemoveTimeoutRequests() (uint64, error) {
 	now := time.Now().UnixNano()
@@ -709,17 +733,16 @@ func (mpi *mempoolImpl[T, Constraint]) RemoveTimeoutRequests() (uint64, error) {
 
 			orderedKey := &orderedIndexKey{time: poolTx.getRawTimestamp(), account: poolTx.getAccount(), nonce: poolTx.getNonce()}
 			if tx := mpi.txStore.priorityIndex.data.Get(orderedKey); tx != nil {
-				mpi.logger.Debugf("find tx[account: %s, nonce:%d] from priorityIndex, ignore remove request",
-					orderedKey.account, orderedKey.nonce)
+				mpi.fillRemoveTxs(orderedKey, poolTx, removedTxs)
+				count++
+				// remove txHashMap
+				txHash := poolTx.getHash()
+				mpi.txStore.deletePoolTx(txHash)
 				return true
 			}
 
 			if tx := mpi.txStore.parkingLotIndex.data.Get(orderedKey); tx != nil {
-				if _, ok := removedTxs[orderedKey.account]; !ok {
-					removedTxs[orderedKey.account] = make([]*mempoolTransaction[T, Constraint], 0)
-				}
-				// record need removedTxs and the count
-				removedTxs[orderedKey.account] = append(removedTxs[orderedKey.account], poolTx)
+				mpi.fillRemoveTxs(orderedKey, poolTx, removedTxs)
 				count++
 				// remove txHashMap
 				txHash := poolTx.getHash()
