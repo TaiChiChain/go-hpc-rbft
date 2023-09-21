@@ -16,6 +16,7 @@ const (
 const (
 	DefaultPoolSize            = 50000
 	DefaultBatchSize           = 500
+	DefaultToleranceNonceGap   = 1000
 	DefaultToleranceTime       = 5 * time.Minute
 	DefaultToleranceRemoveTime = 15 * time.Minute
 )
@@ -38,6 +39,7 @@ type Config struct {
 	BatchMemLimit       bool
 	BatchMaxMem         uint64
 	IsTimed             bool
+	ToleranceNonceGap   uint64
 	ToleranceTime       time.Duration
 	ToleranceRemoveTime time.Duration
 	Logger              Logger
