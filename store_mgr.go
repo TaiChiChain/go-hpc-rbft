@@ -91,7 +91,7 @@ type stateUpdateTarget struct {
 	checkpointSet []*consensus.SignedCheckpoint
 
 	// path of epoch changes from epoch-change-proof
-	epochChanges []*consensus.QuorumCheckpoint
+	epochChanges []*consensus.EpochChange
 }
 
 // newStoreMgr news an instance of storeManager

@@ -157,7 +157,7 @@ type testExternal[T any, Constraint consensus.TXConstraint[T]] struct {
 	lastConfigCheckpoint *consensus.QuorumCheckpoint
 
 	// config checkpoint record
-	configCheckpointRecord map[uint64]*consensus.QuorumCheckpoint
+	configCheckpointRecord map[uint64]*consensus.EpochChange
 }
 
 // channelMsg is the form of data in cluster network.
@@ -279,7 +279,7 @@ func (tf *testFramework[T, Constraint]) newTestNode(id uint64, p2pNodeID string,
 		tf:                     tf,
 		testNode:               nil,
 		clusterChan:            cc,
-		configCheckpointRecord: make(map[uint64]*consensus.QuorumCheckpoint),
+		configCheckpointRecord: make(map[uint64]*consensus.EpochChange),
 	}
 	ext = testExt
 
@@ -479,7 +479,7 @@ func (ext *testExternal[T, Constraint]) Execute(requests []*T, _ []bool, seqNo u
 	}
 }
 
-func (ext *testExternal[T, Constraint]) StateUpdate(seqNo uint64, digest string, signedCheckpoints []*consensus.SignedCheckpoint, epochChanges ...*consensus.QuorumCheckpoint) {
+func (ext *testExternal[T, Constraint]) StateUpdate(seqNo uint64, digest string, signedCheckpoints []*consensus.SignedCheckpoint, epochChanges ...*consensus.EpochChange) {
 	for key, val := range ext.tf.TestNode[0].blocks {
 		if key <= seqNo && key > ext.testNode.Applied {
 			ext.testNode.blocks[key] = val
@@ -510,7 +510,7 @@ func (ext *testExternal[T, Constraint]) StateUpdate(seqNo uint64, digest string,
 	}
 
 	for _, ec := range epochChanges {
-		ext.configCheckpointRecord[ec.Epoch()] = ec
+		ext.configCheckpointRecord[ec.Checkpoint.Epoch()] = ec
 	}
 	quorumCheckpoint := &consensus.QuorumCheckpoint{
 		Checkpoint: checkpoint,
@@ -557,9 +557,20 @@ func (ext *testExternal[T, Constraint]) SendFilterEvent(informType types.InformT
 			Checkpoint: checkpoint,
 			Signatures: signatures,
 		}
+
+		validator := make([]string, len(peerSet))
+		for i, p := range peerSet {
+			validator[i] = p.P2PNodeID
+		}
+
+		epochChange := &consensus.EpochChange{
+			Checkpoint: quorumCheckpoint,
+			Validators: validator,
+		}
+
 		if quorumCheckpoint.NeedUpdateEpoch() {
 			ext.lastConfigCheckpoint = quorumCheckpoint
-			ext.configCheckpointRecord[quorumCheckpoint.Epoch()] = quorumCheckpoint
+			ext.configCheckpointRecord[quorumCheckpoint.Epoch()] = epochChange
 			ext.testNode.n.logger.Noticef("update latest checkpoint to epoch: %d, height: %d",
 				quorumCheckpoint.Epoch(), quorumCheckpoint.Height())
 		}

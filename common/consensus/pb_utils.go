@@ -155,12 +155,6 @@ func (m *QuorumCheckpoint) String() string {
 
 // ======================= EpochChangeProof =======================
 
-// NewEpochChangeProof create a new proof with given checkpoints
-func NewEpochChangeProof(checkpoints ...*QuorumCheckpoint) *EpochChangeProof {
-	// checkpoints should end epoch
-	return &EpochChangeProof{Checkpoints: checkpoints}
-}
-
 // StartEpoch returns start epoch of the proof
 func (m *EpochChangeProof) StartEpoch() uint64 {
 	return m.First().Epoch()
@@ -168,7 +162,7 @@ func (m *EpochChangeProof) StartEpoch() uint64 {
 
 // NextEpoch returns the next epoch to change to of the proof
 func (m *EpochChangeProof) NextEpoch() uint64 {
-	return m.Last().NextEpoch()
+	return m.Last().Checkpoint.NextEpoch()
 }
 
 // First returns the first checkpoint of the proof
@@ -176,15 +170,15 @@ func (m *EpochChangeProof) First() *QuorumCheckpoint {
 	if m.IsEmpty() {
 		return nil
 	}
-	return m.Checkpoints[0]
+	return m.EpochChanges[0].Checkpoint
 }
 
 // Last returns the last checkpoint of the proof
-func (m *EpochChangeProof) Last() *QuorumCheckpoint {
+func (m *EpochChangeProof) Last() *EpochChange {
 	if m.IsEmpty() {
 		return nil
 	}
-	return m.Checkpoints[len(m.Checkpoints)-1]
+	return m.EpochChanges[len(m.EpochChanges)-1]
 }
 
 // IsEmpty returns whether the proof is empty
@@ -192,7 +186,7 @@ func (m *EpochChangeProof) IsEmpty() bool {
 	if m == nil {
 		return true
 	}
-	return len(m.GetCheckpoints()) == 0
+	return len(m.GetEpochChanges()) == 0
 }
 
 // String returns a formatted string for EpochChangeProof.
@@ -200,5 +194,5 @@ func (m *EpochChangeProof) String() string {
 	if m == nil {
 		return "NIL"
 	}
-	return fmt.Sprintf("EpochChangeProof: checkpoints %s, more %d, author %d", m.GetCheckpoints(), m.GetMore(), m.GetAuthor())
+	return fmt.Sprintf("EpochChangeProof: epochChange:%v, more %d, author %d", m.GetEpochChanges(), m.GetMore(), m.GetAuthor())
 }

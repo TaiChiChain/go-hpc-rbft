@@ -40,7 +40,7 @@ type epochManager struct {
 	epochService EpochService
 
 	// It is persisted after updating to epochs
-	epochProofCache map[uint64]*consensus.QuorumCheckpoint
+	epochProofCache map[uint64]*consensus.EpochChange
 
 	// peer pool
 	peerMgr *peerManager
@@ -57,7 +57,7 @@ func newEpochManager(c Config, pp *peerManager, epochService EpochService, stora
 		configBatchToCheck:   nil,
 		configBatchToExecute: uint64(0),
 		epochService:         epochService,
-		epochProofCache:      make(map[uint64]*consensus.QuorumCheckpoint),
+		epochProofCache:      make(map[uint64]*consensus.EpochChange),
 		peerMgr:              pp,
 		storage:              storage,
 		logger:               c.Logger,
@@ -359,20 +359,29 @@ func (em *epochManager) pagingGetEpochChangeProof(startEpoch, endEpoch, pageLimi
 		pagingEpoch = startEpoch + pageLimit
 	}
 
-	checkpoints := make([]*consensus.QuorumCheckpoint, 0)
+	epochChanges := make([]*consensus.EpochChange, 0)
 	for epoch := startEpoch; epoch < pagingEpoch; epoch++ {
 		cp, err := em.getEpochQuorumCheckpoint(epoch)
 		if err != nil {
 			em.logger.Warningf("Cannot find epoch change for epoch %d", epoch)
 			return nil
 		}
-		checkpoints = append(checkpoints, cp)
+		info, err := em.epochService.GetEpochInfo(epoch)
+		if err != nil {
+			em.logger.Warningf("Cannot find history epoch info for epoch %d", epoch)
+		}
+
+		validators := make([]string, len(info.ValidatorSet))
+		for i, nodeInfo := range info.ValidatorSet {
+			validators[i] = nodeInfo.P2PNodeID
+		}
+		epochChanges = append(epochChanges, &consensus.EpochChange{Checkpoint: cp, Validators: validators})
 	}
 
 	return &consensus.EpochChangeProof{
-		Checkpoints: checkpoints,
-		More:        more,
-		Author:      em.peerMgr.selfID,
+		EpochChanges: epochChanges,
+		More:         more,
+		Author:       em.peerMgr.selfID,
 	}
 }
 
@@ -401,9 +410,9 @@ func (em *epochManager) verifyEpochChangeProof(proof *consensus.EpochChangeProof
 		skip       int
 		startEpoch uint64
 	)
-	for _, cp := range proof.GetCheckpoints() {
-		if cp.Epoch() >= em.epoch {
-			startEpoch = cp.Epoch()
+	for _, epc := range proof.EpochChanges {
+		if epc.GetCheckpoint().Epoch() >= em.epoch {
+			startEpoch = epc.GetCheckpoint().Epoch()
 			break
 		}
 		skip++
@@ -412,7 +421,8 @@ func (em *epochManager) verifyEpochChangeProof(proof *consensus.EpochChangeProof
 		return fmt.Errorf("invalid epoch change proof with start epoch %d, "+
 			"current epoch %d", startEpoch, em.epoch)
 	}
-	proof.Checkpoints = proof.Checkpoints[skip:]
+	// skip smaller epoch
+	proof.EpochChanges = proof.EpochChanges[skip:]
 
 	if proof.IsEmpty() {
 		return errors.New("empty epoch change proof")

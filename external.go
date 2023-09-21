@@ -74,7 +74,7 @@ type ServiceOutbound[T any, Constraint consensus.TXConstraint[T]] interface {
 
 	// StateUpdate informs application layer to catch up to given seqNo with specified state digest.
 	// epochChanges should be provided when the sync request has a backwardness of epoch changes
-	StateUpdate(seqNo uint64, digest string, checkpoints []*consensus.SignedCheckpoint, epochChanges ...*consensus.QuorumCheckpoint)
+	StateUpdate(seqNo uint64, digest string, checkpoints []*consensus.SignedCheckpoint, epochChanges ...*consensus.EpochChange)
 
 	// SendFilterEvent posts some impotent events to application layer.
 	// Users can decide to post filer event synchronously or asynchronously.

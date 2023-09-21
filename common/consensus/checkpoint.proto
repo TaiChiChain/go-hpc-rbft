@@ -51,13 +51,18 @@ message QuorumCheckpoint {
 // to prove a sequence if epoch changes from the first checkpoint's epoch
 message EpochChangeProof {
   option (gogoproto.goproto_stringer) = false;
-
-  // The slice of quorum checkpoints
-  repeated QuorumCheckpoint checkpoints = 1;
+  repeated EpochChange epoch_changes = 1;
   // Indicate whether the node where proof comes from has more epoch changes
   uint64 more = 2;
   // Where the proof comes from
   uint64 author = 3;
   // Help remote check genesis block digest
   string genesis_block_digest = 4;
+}
+
+message EpochChange {
+  // The slice of quorum checkpoints
+  QuorumCheckpoint checkpoint = 1;
+  // Help remote node sync from validators
+  repeated string validators = 2;
 }
