@@ -40,6 +40,44 @@ func (m *MockNode[T, Constraint]) EXPECT() *MockNodeMockRecorder[T, Constraint] 
 	return m.recorder
 }
 
+// GetLowWatermark mocks base method.
+func (m *MockNode[T, Constraint]) GetLowWatermark() uint64 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetLowWatermark")
+	ret0, _ := ret[0].(uint64)
+	return ret0
+}
+
+// GetLowWatermark indicates an expected call of GetLowWatermark.
+func (mr *MockNodeMockRecorder[T, Constraint]) GetLowWatermark() *NodeGetLowWatermarkCall[T, Constraint] {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLowWatermark", reflect.TypeOf((*MockNode[T, Constraint])(nil).GetLowWatermark))
+	return &NodeGetLowWatermarkCall[T, Constraint]{Call: call}
+}
+
+// NodeGetLowWatermarkCall wrap *gomock.Call
+type NodeGetLowWatermarkCall[T any, Constraint consensus.TXConstraint[T]] struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *NodeGetLowWatermarkCall[T, Constraint]) Return(arg0 uint64) *NodeGetLowWatermarkCall[T, Constraint] {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *NodeGetLowWatermarkCall[T, Constraint]) Do(f func() uint64) *NodeGetLowWatermarkCall[T, Constraint] {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *NodeGetLowWatermarkCall[T, Constraint]) DoAndReturn(f func() uint64) *NodeGetLowWatermarkCall[T, Constraint] {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // GetPendingTxByHash mocks base method.
 func (m *MockNode[T, Constraint]) GetPendingTxByHash(hash string) *T {
 	m.ctrl.T.Helper()
@@ -511,6 +549,44 @@ func NewMockExternal[T any, Constraint consensus.TXConstraint[T]](ctrl *gomock.C
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockExternal[T, Constraint]) EXPECT() *MockExternalMockRecorder[T, Constraint] {
 	return m.recorder
+}
+
+// GetLowWatermark mocks base method.
+func (m *MockExternal[T, Constraint]) GetLowWatermark() uint64 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetLowWatermark")
+	ret0, _ := ret[0].(uint64)
+	return ret0
+}
+
+// GetLowWatermark indicates an expected call of GetLowWatermark.
+func (mr *MockExternalMockRecorder[T, Constraint]) GetLowWatermark() *ExternalGetLowWatermarkCall[T, Constraint] {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLowWatermark", reflect.TypeOf((*MockExternal[T, Constraint])(nil).GetLowWatermark))
+	return &ExternalGetLowWatermarkCall[T, Constraint]{Call: call}
+}
+
+// ExternalGetLowWatermarkCall wrap *gomock.Call
+type ExternalGetLowWatermarkCall[T any, Constraint consensus.TXConstraint[T]] struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *ExternalGetLowWatermarkCall[T, Constraint]) Return(arg0 uint64) *ExternalGetLowWatermarkCall[T, Constraint] {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *ExternalGetLowWatermarkCall[T, Constraint]) Do(f func() uint64) *ExternalGetLowWatermarkCall[T, Constraint] {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *ExternalGetLowWatermarkCall[T, Constraint]) DoAndReturn(f func() uint64) *ExternalGetLowWatermarkCall[T, Constraint] {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
 }
 
 // GetPendingTxByHash mocks base method.

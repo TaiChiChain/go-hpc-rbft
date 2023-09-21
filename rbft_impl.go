@@ -2150,7 +2150,7 @@ func (rbft *rbftImpl[T, Constraint]) moveWatermarks(n uint64, newEpoch bool) {
 }
 
 // updateHighStateTarget updates high state target
-func (rbft *rbftImpl[T, Constraint]) updateHighStateTarget(target *types.MetaState, checkpointSet []*consensus.SignedCheckpoint, epochChanges ...*consensus.QuorumCheckpoint) {
+func (rbft *rbftImpl[T, Constraint]) updateHighStateTarget(target *types.MetaState, checkpointSet []*consensus.SignedCheckpoint, epochChanges ...*consensus.EpochChange) {
 	if target == nil {
 		rbft.logger.Warningf("Replica %d received a nil target", rbft.peerMgr.selfID)
 		return
@@ -2237,7 +2237,7 @@ func (rbft *rbftImpl[T, Constraint]) tryStateTransfer() {
 
 	// attempts to synchronize state to a particular target, implicitly calls rollback if needed
 	rbft.metrics.stateUpdateCounter.Add(float64(1))
-	rbft.external.StateUpdate(target.metaState.Height, target.metaState.Digest, target.checkpointSet, target.epochChanges...)
+	rbft.external.StateUpdate(rbft.chainConfig.H, target.metaState.Height, target.metaState.Digest, target.checkpointSet, target.epochChanges...)
 }
 
 // recvStateUpdatedEvent processes StateUpdatedMessage.
@@ -2269,8 +2269,8 @@ func (rbft *rbftImpl[T, Constraint]) recvStateUpdatedEvent(ss *types.ServiceSync
 			rbft.tryStateTransfer()
 		} else {
 			rbft.logger.Debugf("Replica %d state updated, lastExec = %d, seqNo = %d, accept epoch proof for %d", rbft.peerMgr.selfID, rbft.exec.lastExec, seqNo, ss.Epoch)
-			if ckp, ok := rbft.epochMgr.epochProofCache[ss.Epoch]; ok {
-				rbft.epochMgr.persistEpochQuorumCheckpoint(ckp)
+			if ec, ok := rbft.epochMgr.epochProofCache[ss.Epoch]; ok {
+				rbft.epochMgr.persistEpochQuorumCheckpoint(ec.GetCheckpoint())
 			}
 		}
 		return nil
@@ -2284,8 +2284,8 @@ func (rbft *rbftImpl[T, Constraint]) recvStateUpdatedEvent(ss *types.ServiceSync
 	rbft.logger.Debugf("Replica %d state updated, lastExec = %d, seqNo = %d", rbft.peerMgr.selfID, rbft.exec.lastExec, seqNo)
 	if ss.EpochChanged {
 		rbft.logger.Debugf("Replica %d accept epoch proof for %d", rbft.peerMgr.selfID, ss.Epoch)
-		if ckp, ok := rbft.epochMgr.epochProofCache[ss.Epoch]; ok {
-			rbft.epochMgr.persistEpochQuorumCheckpoint(ckp)
+		if ec, ok := rbft.epochMgr.epochProofCache[ss.Epoch]; ok {
+			rbft.epochMgr.persistEpochQuorumCheckpoint(ec.GetCheckpoint())
 		}
 	}
 

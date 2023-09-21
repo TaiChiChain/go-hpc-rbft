@@ -77,8 +77,8 @@ func (mpi *mempoolImpl[T, Constraint]) addNewRequests(txs []*T, isPrimary, local
 			}
 		}
 
-		// reject nonce too high tx
-		if txNonce > currentSeqNo+mpi.toleranceNonceGap {
+		// reject nonce too high tx from api
+		if txNonce > currentSeqNo+mpi.toleranceNonceGap && local {
 			mpi.logger.Warningf("Receive transaction [account: %s, nonce: %d, hash: %s], but we required %d,"+
 				" and the nonce gap is %d, reject it", txAccount, txNonce, txHash, currentSeqNo, mpi.toleranceNonceGap)
 			continue

@@ -64,6 +64,9 @@ type External[T any, Constraint consensus.TXConstraint[T]] interface {
 
 	// GetPendingTxCount return the current tx count of mempool
 	GetTotalPendingTxCount() uint64
+
+	// GetLowWatermark return the low watermark of mempool
+	GetLowWatermark() uint64
 }
 
 // ServiceInbound receives and records modifications from application service which includes two events:
@@ -276,4 +279,17 @@ func (n *node[T, Constraint]) GetTotalPendingTxCount() uint64 {
 	n.rbft.postMsg(localEvent)
 
 	return <-getPendingTxCountReq.ch
+}
+
+func (n *node[T, Constraint]) GetLowWatermark() uint64 {
+	getWatermarkReq := &ReqGetWatermarkMsg{
+		ch: make(chan uint64),
+	}
+	localEvent := &MiscEvent{
+		EventType: ReqGetWatermarkEvent,
+		Event:     getWatermarkReq,
+	}
+	n.rbft.postMsg(localEvent)
+
+	return <-getWatermarkReq.ch
 }

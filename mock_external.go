@@ -532,9 +532,9 @@ func (c *ServiceOutboundSendFilterEventCall[T, Constraint]) DoAndReturn(f func(t
 }
 
 // StateUpdate mocks base method.
-func (m *MockServiceOutbound[T, Constraint]) StateUpdate(seqNo uint64, digest string, checkpoints []*consensus.SignedCheckpoint, epochChanges ...*consensus.QuorumCheckpoint) {
+func (m *MockServiceOutbound[T, Constraint]) StateUpdate(localLowWatermark, seqNo uint64, digest string, checkpoints []*consensus.SignedCheckpoint, epochChanges ...*consensus.EpochChange) {
 	m.ctrl.T.Helper()
-	varargs := []any{seqNo, digest, checkpoints}
+	varargs := []any{localLowWatermark, seqNo, digest, checkpoints}
 	for _, a := range epochChanges {
 		varargs = append(varargs, a)
 	}
@@ -542,9 +542,9 @@ func (m *MockServiceOutbound[T, Constraint]) StateUpdate(seqNo uint64, digest st
 }
 
 // StateUpdate indicates an expected call of StateUpdate.
-func (mr *MockServiceOutboundMockRecorder[T, Constraint]) StateUpdate(seqNo, digest, checkpoints any, epochChanges ...any) *ServiceOutboundStateUpdateCall[T, Constraint] {
+func (mr *MockServiceOutboundMockRecorder[T, Constraint]) StateUpdate(localLowWatermark, seqNo, digest, checkpoints any, epochChanges ...any) *ServiceOutboundStateUpdateCall[T, Constraint] {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{seqNo, digest, checkpoints}, epochChanges...)
+	varargs := append([]any{localLowWatermark, seqNo, digest, checkpoints}, epochChanges...)
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StateUpdate", reflect.TypeOf((*MockServiceOutbound[T, Constraint])(nil).StateUpdate), varargs...)
 	return &ServiceOutboundStateUpdateCall[T, Constraint]{Call: call}
 }
@@ -561,13 +561,13 @@ func (c *ServiceOutboundStateUpdateCall[T, Constraint]) Return() *ServiceOutboun
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *ServiceOutboundStateUpdateCall[T, Constraint]) Do(f func(uint64, string, []*consensus.SignedCheckpoint, ...*consensus.QuorumCheckpoint)) *ServiceOutboundStateUpdateCall[T, Constraint] {
+func (c *ServiceOutboundStateUpdateCall[T, Constraint]) Do(f func(uint64, uint64, string, []*consensus.SignedCheckpoint, ...*consensus.EpochChange)) *ServiceOutboundStateUpdateCall[T, Constraint] {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *ServiceOutboundStateUpdateCall[T, Constraint]) DoAndReturn(f func(uint64, string, []*consensus.SignedCheckpoint, ...*consensus.QuorumCheckpoint)) *ServiceOutboundStateUpdateCall[T, Constraint] {
+func (c *ServiceOutboundStateUpdateCall[T, Constraint]) DoAndReturn(f func(uint64, uint64, string, []*consensus.SignedCheckpoint, ...*consensus.EpochChange)) *ServiceOutboundStateUpdateCall[T, Constraint] {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -1083,9 +1083,9 @@ func (c *ExternalStackSignCall[T, Constraint]) DoAndReturn(f func([]byte) ([]byt
 }
 
 // StateUpdate mocks base method.
-func (m *MockExternalStack[T, Constraint]) StateUpdate(seqNo uint64, digest string, checkpoints []*consensus.SignedCheckpoint, epochChanges ...*consensus.QuorumCheckpoint) {
+func (m *MockExternalStack[T, Constraint]) StateUpdate(localLowWatermark, seqNo uint64, digest string, checkpoints []*consensus.SignedCheckpoint, epochChanges ...*consensus.EpochChange) {
 	m.ctrl.T.Helper()
-	varargs := []any{seqNo, digest, checkpoints}
+	varargs := []any{localLowWatermark, seqNo, digest, checkpoints}
 	for _, a := range epochChanges {
 		varargs = append(varargs, a)
 	}
@@ -1093,9 +1093,9 @@ func (m *MockExternalStack[T, Constraint]) StateUpdate(seqNo uint64, digest stri
 }
 
 // StateUpdate indicates an expected call of StateUpdate.
-func (mr *MockExternalStackMockRecorder[T, Constraint]) StateUpdate(seqNo, digest, checkpoints any, epochChanges ...any) *ExternalStackStateUpdateCall[T, Constraint] {
+func (mr *MockExternalStackMockRecorder[T, Constraint]) StateUpdate(localLowWatermark, seqNo, digest, checkpoints any, epochChanges ...any) *ExternalStackStateUpdateCall[T, Constraint] {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{seqNo, digest, checkpoints}, epochChanges...)
+	varargs := append([]any{localLowWatermark, seqNo, digest, checkpoints}, epochChanges...)
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StateUpdate", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).StateUpdate), varargs...)
 	return &ExternalStackStateUpdateCall[T, Constraint]{Call: call}
 }
@@ -1112,13 +1112,13 @@ func (c *ExternalStackStateUpdateCall[T, Constraint]) Return() *ExternalStackSta
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *ExternalStackStateUpdateCall[T, Constraint]) Do(f func(uint64, string, []*consensus.SignedCheckpoint, ...*consensus.QuorumCheckpoint)) *ExternalStackStateUpdateCall[T, Constraint] {
+func (c *ExternalStackStateUpdateCall[T, Constraint]) Do(f func(uint64, uint64, string, []*consensus.SignedCheckpoint, ...*consensus.EpochChange)) *ExternalStackStateUpdateCall[T, Constraint] {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *ExternalStackStateUpdateCall[T, Constraint]) DoAndReturn(f func(uint64, string, []*consensus.SignedCheckpoint, ...*consensus.QuorumCheckpoint)) *ExternalStackStateUpdateCall[T, Constraint] {
+func (c *ExternalStackStateUpdateCall[T, Constraint]) DoAndReturn(f func(uint64, uint64, string, []*consensus.SignedCheckpoint, ...*consensus.EpochChange)) *ExternalStackStateUpdateCall[T, Constraint] {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
