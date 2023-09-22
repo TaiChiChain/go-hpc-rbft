@@ -1,4 +1,4 @@
-package mempool
+package txpool
 
 import (
 	"github.com/google/btree"
@@ -68,7 +68,7 @@ func newBtreeIndex[T any, Constraint consensus.TXConstraint[T]](typ int) *btreeI
 	}
 }
 
-func (idx *btreeIndex[T, Constraint]) getTimestamp(poolTx *mempoolTransaction[T, Constraint]) int64 {
+func (idx *btreeIndex[T, Constraint]) getTimestamp(poolTx *internalTransaction[T, Constraint]) int64 {
 	switch idx.typ {
 	case Ordered:
 		return poolTx.getRawTimestamp()
@@ -84,7 +84,7 @@ func (idx *btreeIndex[T, Constraint]) insertBySortedNonceKey(nonce uint64) {
 	idx.data.ReplaceOrInsert(makeSortedNonceKey(nonce))
 }
 
-func (idx *btreeIndex[T, Constraint]) removeBySortedNonceKeys(txs map[string][]*mempoolTransaction[T, Constraint]) {
+func (idx *btreeIndex[T, Constraint]) removeBySortedNonceKeys(txs map[string][]*internalTransaction[T, Constraint]) {
 	for _, list := range txs {
 		for _, poolTx := range list {
 			idx.data.Delete(makeSortedNonceKey(poolTx.getNonce()))
@@ -92,15 +92,15 @@ func (idx *btreeIndex[T, Constraint]) removeBySortedNonceKeys(txs map[string][]*
 	}
 }
 
-func (idx *btreeIndex[T, Constraint]) insertByOrderedQueueKey(poolTx *mempoolTransaction[T, Constraint]) {
+func (idx *btreeIndex[T, Constraint]) insertByOrderedQueueKey(poolTx *internalTransaction[T, Constraint]) {
 	idx.data.ReplaceOrInsert(makeOrderedIndexKey(idx.getTimestamp(poolTx), poolTx.getAccount(), poolTx.getNonce()))
 }
 
-func (idx *btreeIndex[T, Constraint]) removeByOrderedQueueKey(poolTx *mempoolTransaction[T, Constraint]) {
+func (idx *btreeIndex[T, Constraint]) removeByOrderedQueueKey(poolTx *internalTransaction[T, Constraint]) {
 	idx.data.Delete(makeOrderedIndexKey(idx.getTimestamp(poolTx), poolTx.getAccount(), poolTx.getNonce()))
 }
 
-func (idx *btreeIndex[T, Constraint]) removeByOrderedQueueKeys(poolTxs map[string][]*mempoolTransaction[T, Constraint]) {
+func (idx *btreeIndex[T, Constraint]) removeByOrderedQueueKeys(poolTxs map[string][]*internalTransaction[T, Constraint]) {
 	for _, list := range poolTxs {
 		for _, poolTx := range list {
 			idx.removeByOrderedQueueKey(poolTx)
@@ -113,7 +113,7 @@ func (idx *btreeIndex[T, Constraint]) size() int {
 	return idx.data.Len()
 }
 
-func (idx *btreeIndex[T, Constraint]) updateIndex(oldPoolTx *mempoolTransaction[T, Constraint], newTimestamp int64) {
+func (idx *btreeIndex[T, Constraint]) updateIndex(oldPoolTx *internalTransaction[T, Constraint], newTimestamp int64) {
 	oldOrderedKey := &orderedIndexKey{time: idx.getTimestamp(oldPoolTx), account: oldPoolTx.getAccount(), nonce: oldPoolTx.getNonce()}
 	newOrderedKey := &orderedIndexKey{time: newTimestamp, account: oldPoolTx.getAccount(), nonce: oldPoolTx.getNonce()}
 	idx.data.Delete(oldOrderedKey)

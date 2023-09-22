@@ -13,7 +13,7 @@ import (
 
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/common/metrics/disabled"
-	"github.com/axiomesh/axiom-bft/mempool"
+	"github.com/axiomesh/axiom-bft/txpool"
 	"github.com/axiomesh/axiom-bft/types"
 )
 
@@ -284,7 +284,7 @@ func (tf *testFramework[T, Constraint]) newTestNode(id uint64, p2pNodeID string,
 	ext = testExt
 
 	// Memool Instance, Parameters in Config are Flexible
-	confMemPool := mempool.Config{
+	txpoolConfig := txpool.Config{
 		PoolSize:            100000,
 		BatchSize:           4,
 		BatchMemLimit:       false,
@@ -296,7 +296,7 @@ func (tf *testFramework[T, Constraint]) newTestNode(id uint64, p2pNodeID string,
 			return 0
 		},
 	}
-	pool := mempool.NewMempool[T, Constraint](confMemPool)
+	pool := txpool.NewTxPool[T, Constraint](txpoolConfig)
 	conf := tf.newNodeConfig(p2pNodeID, log, 1)
 	n, err := newNode[T, Constraint](conf, ext, pool, true)
 	if err != nil {

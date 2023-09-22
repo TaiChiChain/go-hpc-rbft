@@ -13,11 +13,11 @@ import (
 
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/common/metrics/disabled"
-	"github.com/axiomesh/axiom-bft/mempool"
+	"github.com/axiomesh/axiom-bft/txpool"
 )
 
 func newPersistTestReplica[T any, Constraint consensus.TXConstraint[T]](ctrl *gomock.Controller) (*node[T, Constraint], *MockExternalStack[T, Constraint]) {
-	pool := mempool.NewMockMinimalMemPool[T, Constraint](ctrl)
+	pool := txpool.NewMockMinimalTxPool[T, Constraint](ctrl)
 	log := newRawLogger()
 	ext := NewMockExternalStack[T, Constraint](ctrl)
 	ext.EXPECT().Sign(gomock.Any()).Return(nil, nil).AnyTimes()

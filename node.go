@@ -19,7 +19,7 @@ import (
 	"sync"
 
 	"github.com/axiomesh/axiom-bft/common/consensus"
-	"github.com/axiomesh/axiom-bft/mempool"
+	"github.com/axiomesh/axiom-bft/txpool"
 	"github.com/axiomesh/axiom-bft/types"
 )
 
@@ -62,10 +62,10 @@ type External[T any, Constraint consensus.TXConstraint[T]] interface {
 	// GetPendingTxByHash will return the tx by tx hash
 	GetPendingTxByHash(hash string) *T
 
-	// GetPendingTxCount return the current tx count of mempool
+	// GetPendingTxCount return the current tx count of txpool
 	GetTotalPendingTxCount() uint64
 
-	// GetLowWatermark return the low watermark of mempool
+	// GetLowWatermark return the low watermark of txpool
 	GetLowWatermark() uint64
 }
 
@@ -106,12 +106,12 @@ type node[T any, Constraint consensus.TXConstraint[T]] struct {
 }
 
 // NewNode initializes a Node service.
-func NewNode[T any, Constraint consensus.TXConstraint[T]](c Config, external ExternalStack[T, Constraint], requestPool mempool.MemPool[T, Constraint]) (Node[T, Constraint], error) {
+func NewNode[T any, Constraint consensus.TXConstraint[T]](c Config, external ExternalStack[T, Constraint], requestPool txpool.TxPool[T, Constraint]) (Node[T, Constraint], error) {
 	return newNode[T, Constraint](c, external, requestPool, false)
 }
 
 // newNode help to initialize a Node service.
-func newNode[T any, Constraint consensus.TXConstraint[T]](c Config, external ExternalStack[T, Constraint], requestPool mempool.MemPool[T, Constraint], isTest bool) (*node[T, Constraint], error) {
+func newNode[T any, Constraint consensus.TXConstraint[T]](c Config, external ExternalStack[T, Constraint], requestPool txpool.TxPool[T, Constraint], isTest bool) (*node[T, Constraint], error) {
 	rbft, err := newRBFT[T, Constraint](c, external, requestPool, isTest)
 	if err != nil {
 		return nil, err

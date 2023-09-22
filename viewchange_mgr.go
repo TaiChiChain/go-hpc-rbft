@@ -25,7 +25,7 @@ import (
 
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/common/metrics"
-	"github.com/axiomesh/axiom-bft/mempool"
+	"github.com/axiomesh/axiom-bft/txpool"
 	"github.com/axiomesh/axiom-bft/types"
 )
 
@@ -1638,7 +1638,7 @@ func (rbft *rbftImpl[T, Constraint]) processNewView(msgList []*consensus.Vc_PQ) 
 
 			// re-construct batches by order in xSet to de-duplicate txs during different batches in msgList which
 			// may be caused by different primary puts the same txs into different batches with different seqNo'
-			oldBatch := &mempool.RequestHashBatch[T, Constraint]{
+			oldBatch := &txpool.RequestHashBatch[T, Constraint]{
 				BatchHash:  batch.BatchHash,
 				TxHashList: batch.RequestHashList,
 				TxList:     batch.RequestList,

@@ -1,4 +1,4 @@
-package mempool
+package txpool
 
 import (
 	"encoding/hex"
@@ -13,14 +13,12 @@ const (
 	DefaultTestBatchSize = uint64(4)
 )
 
-func mockMempoolImpl[T any, Constraint consensus.TXConstraint[T]]() *mempoolImpl[T, Constraint] {
-	config := NewMockMempoolConfig()
-	mempool := newMempoolImpl[T, Constraint](config)
-	return mempool
+func mockTxPoolImpl[T any, Constraint consensus.TXConstraint[T]]() *txPoolImpl[T, Constraint] {
+	return  newTxPoolImpl[T, Constraint](NewMockTxPoolConfig())
 }
 
-// NewMockMempoolConfig returns the default test config
-func NewMockMempoolConfig() Config {
+// NewMockTxPoolConfig returns the default test config
+func NewMockTxPoolConfig() Config {
 	poolConfig := Config{
 		BatchSize:     DefaultTestBatchSize,
 		PoolSize:      DefaultPoolSize,

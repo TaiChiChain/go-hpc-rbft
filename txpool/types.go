@@ -1,4 +1,4 @@
-package mempool
+package txpool
 
 import (
 	"fmt"
@@ -32,7 +32,7 @@ type RequestHashBatch[T any, Constraint consensus.TXConstraint[T]] struct {
 
 type GetAccountNonceFunc func(address string) uint64
 
-// Config defines the mempool config items.
+// Config defines the txpool config items.
 type Config struct {
 	BatchSize           uint64
 	PoolSize            uint64
@@ -46,11 +46,11 @@ type Config struct {
 	GetAccountNonce     GetAccountNonceFunc
 }
 
-type mempoolTransaction[T any, Constraint consensus.TXConstraint[T]] struct {
+type internalTransaction[T any, Constraint consensus.TXConstraint[T]] struct {
 	rawTx       *T
 	local       bool
 	lifeTime    int64 // track the local txs' broadcast time
-	arrivedTime int64 // track the local txs' arrived memPool time
+	arrivedTime int64 // track the local txs' arrived txpool time
 }
 
 type txPointer struct {
@@ -58,7 +58,7 @@ type txPointer struct {
 	nonce   uint64
 }
 
-// Logger is the mempool logger interface which managers logger output.
+// Logger is the txpool logger interface which managers logger output.
 type Logger interface {
 	Debug(v ...any)
 	Debugf(format string, v ...any)

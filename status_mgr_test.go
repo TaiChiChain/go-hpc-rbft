@@ -8,13 +8,13 @@ import (
 
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/common/metrics/disabled"
-	"github.com/axiomesh/axiom-bft/mempool"
+	"github.com/axiomesh/axiom-bft/txpool"
 )
 
 func newTestStatusNode[T any, Constraint consensus.TXConstraint[T]](ctrl *gomock.Controller) *rbftImpl[T, Constraint] {
 	log := newRawLogger()
 	external := NewMockMinimalExternal[T, Constraint](ctrl)
-	pool := mempool.NewMockMinimalMemPool[T, Constraint](ctrl)
+	pool := txpool.NewMockMinimalTxPool[T, Constraint](ctrl)
 	conf := Config{
 		SelfAccountAddress: "node1",
 		GenesisEpochInfo: &EpochInfo{
