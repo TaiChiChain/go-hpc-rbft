@@ -296,6 +296,7 @@ type ReqNonceMsg struct {
 type ReqPendingTxCountMsg struct {
 	ch chan uint64
 }
+
 type ReqGetWatermarkMsg struct {
 	ch chan uint64
 }

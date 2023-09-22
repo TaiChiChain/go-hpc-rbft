@@ -1,8 +1,9 @@
 package rbft
 
 import (
-	"github.com/axiomesh/axiom-bft/common/metrics"
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/axiomesh/axiom-bft/common/metrics"
 )
 
 // rbftMetrics helps collect all metrics in rbft

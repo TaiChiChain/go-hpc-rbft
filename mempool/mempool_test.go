@@ -431,21 +431,29 @@ func TestReceiveMissingRequests(t *testing.T) {
 		LocalList:  []bool{true},
 		Timestamp:  time.Now().UnixNano(),
 	}
-	batchDigest = getBatchHash(newBatch)
+	batchDigest2 := getBatchHash(newBatch)
 
 	missingHashList = make(map[uint64]string)
 	missingHashList[uint64(5)] = tx5.RbftGetTxHash()
 	missingHashList[uint64(6)] = tx6.RbftGetTxHash()
 	missingHashList[uint64(7)] = tx7.RbftGetTxHash()
 	missingHashList[uint64(8)] = tx8.RbftGetTxHash()
+	pool.txStore.missingBatch[batchDigest2] = missingHashList
 
-	pool.txStore.missingBatch[batchDigest] = missingHashList
+	batchDigest3 := "mock batchDigest3"
+	tx9 := ConstructTxByAccountAndNonce("account9", uint64(0))
+	pool.txStore.missingBatch[batchDigest3] = map[uint64]string{
+		0: tx9.RbftGetTxHash(),
+	}
 
+	// exist 2 missingBatch, but only completion the first batch
 	batch, completionMissingBatchHashes := pool.AddNewRequests([]*consensus.FltTransaction{tx5, tx6, tx7, tx8}, false, true, false, true)
 	ast.Equal(0, len(batch))
 	ast.Equal(1, len(completionMissingBatchHashes))
-	ast.Equal(batchDigest, completionMissingBatchHashes[0])
-	ast.Equal(0, len(pool.txStore.missingBatch))
+	ast.Equal(batchDigest2, completionMissingBatchHashes[0])
+	ast.Equal(1, len(pool.txStore.missingBatch))
+	_, batchDigest3Exist := pool.txStore.missingBatch[batchDigest3]
+	ast.True(batchDigest3Exist)
 }
 
 func TestSendMissingRequests(t *testing.T) {
