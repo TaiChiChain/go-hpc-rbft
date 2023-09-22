@@ -132,6 +132,8 @@ func (rbft *rbftImpl[T, Constraint]) dispatchMiscEvent(e *MiscEvent) consensusEv
 		return rbft.handleReqNonceEvent(e.Event.(*ReqNonceMsg))
 	case ReqPendingTxCountEvent:
 		return rbft.handleReqPendingTxCountEvent(e.Event.(*ReqPendingTxCountMsg))
+	case ReqGetWatermarkEvent:
+		return rbft.handleReqGetWatermarkEvent(e.Event.(*ReqGetWatermarkMsg))
 	default:
 		rbft.logger.Errorf("Not Supported event: %v", e)
 		return nil
@@ -150,6 +152,11 @@ func (rbft *rbftImpl[T, Constraint]) handleReqNonceEvent(e *ReqNonceMsg) consens
 
 func (rbft *rbftImpl[T, Constraint]) handleReqPendingTxCountEvent(e *ReqPendingTxCountMsg) consensusEvent {
 	e.ch <- rbft.batchMgr.requestPool.GetTotalPendingTxCount()
+	return nil
+}
+
+func (rbft *rbftImpl[T, Constraint]) handleReqGetWatermarkEvent(e *ReqGetWatermarkMsg) consensusEvent {
+	e.ch <- rbft.chainConfig.H
 	return nil
 }
 
@@ -490,10 +497,10 @@ func (rbft *rbftImpl[T, Constraint]) handleEpochMgrEvent(e *LocalEvent) consensu
 
 	case EpochSyncEvent:
 		proof := e.Event.(*consensus.EpochChangeProof)
-		quorumCheckpoint := proof.Last()
-		for _, checkpoint := range proof.Checkpoints {
+		quorumCheckpoint := proof.Last().Checkpoint
+		for _, ec := range proof.GetEpochChanges() {
 			// TODO: support restore
-			rbft.epochMgr.epochProofCache[checkpoint.Epoch()] = checkpoint
+			rbft.epochMgr.epochProofCache[ec.Checkpoint.Epoch()] = ec
 		}
 		rbft.logger.Noticef("Replica %d try epoch sync to height %d, epoch %d", rbft.peerMgr.selfID,
 			quorumCheckpoint.Height(), quorumCheckpoint.NextEpoch())
@@ -511,7 +518,8 @@ func (rbft *rbftImpl[T, Constraint]) handleEpochMgrEvent(e *LocalEvent) consensu
 				Signature:  sig,
 			})
 		}
-		rbft.updateHighStateTarget(target, checkpointSet, proof.GetCheckpoints()...) // for new epoch
+
+		rbft.updateHighStateTarget(target, checkpointSet, proof.GetEpochChanges()...) // for new epoch
 		rbft.tryStateTransfer()
 
 	default:
