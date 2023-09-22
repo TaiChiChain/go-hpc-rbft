@@ -42,12 +42,11 @@ func (mpi *mempoolImpl[T, Constraint]) GetTotalPendingTxCount() uint64 {
 // Also, when we receive a tx locally, we need to check if these txs are out-of-date
 // time by time.
 func (mpi *mempoolImpl[T, Constraint]) AddNewRequests(txs []*T, isPrimary, local, isReplace bool, needGenerateBatch bool) ([]*RequestHashBatch[T, Constraint], []string) {
-	return mpi.addNewRequests(txs, isPrimary, local, isReplace, needGenerateBatch)
+	return mpi.addNewRequests(txs, isPrimary, local, isReplace, needGenerateBatch, true)
 }
 
-func (mpi *mempoolImpl[T, Constraint]) addNewRequests(txs []*T, isPrimary, local, isReplace bool, needGenerateBatch bool) ([]*RequestHashBatch[T, Constraint], []string) {
+func (mpi *mempoolImpl[T, Constraint]) addNewRequests(txs []*T, isPrimary, local, isReplace bool, needGenerateBatch bool, needCompletionMissingBatch bool) ([]*RequestHashBatch[T, Constraint], []string) {
 	completionMissingBatchHashes := make([]string, 0)
-	existTxsHash := make(map[string]struct{})
 	validTxs := make(map[string][]*mempoolTransaction[T, Constraint])
 
 	currentSeqNoList := make(map[string]uint64, 0)
@@ -118,16 +117,15 @@ func (mpi *mempoolImpl[T, Constraint]) addNewRequests(txs []*T, isPrimary, local
 		validTxs[txAccount] = append(validTxs[txAccount], txItem)
 
 		// for replica, add validTxs to nonBatchedTxs and check if the missing transactions and batches are fetched
-		if !isPrimary {
+		if !isPrimary && needCompletionMissingBatch {
 			for batchHash, missingTxsHash := range mpi.txStore.missingBatch {
-				for _, missingTxHash := range missingTxsHash {
+				for txIndex, missingTxHash := range missingTxsHash {
 					// we have received a tx which we are fetching.
 					if txHash == missingTxHash {
-						existTxsHash[txHash] = struct{}{}
+						delete(missingTxsHash, txIndex)
 					}
 				}
-				// receive all the missing txs
-				if len(existTxsHash) == len(missingTxsHash) {
+				if len(missingTxsHash) == 0 {
 					delete(mpi.txStore.missingBatch, batchHash)
 					completionMissingBatchHashes = append(completionMissingBatchHashes, batchHash)
 				}
@@ -542,7 +540,7 @@ func (mpi *mempoolImpl[T, Constraint]) ReceiveMissingRequests(batchHash string, 
 		}
 		validTxn = append(validTxn, tx)
 	}
-	mpi.AddNewRequests(validTxn, false, false, true, false)
+	mpi.addNewRequests(validTxn, false, false, true, false, false)
 	delete(mpi.txStore.missingBatch, batchHash)
 	return nil
 }

@@ -49,6 +49,7 @@ type epochManager struct {
 
 	// logger
 	logger Logger
+
 	config Config
 }
 
