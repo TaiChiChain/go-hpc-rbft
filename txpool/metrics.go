@@ -1,12 +1,12 @@
-package mempool
+package txpool
 
 import "github.com/prometheus/client_golang/prometheus"
 
 var (
 	poolTxNum = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: "mempool",
+		Namespace: "txpool",
 		Name:      "tx_counter",
-		Help:      "the total number of transactions in mempool",
+		Help:      "the total number of transactions",
 	})
 )
 

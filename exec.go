@@ -224,7 +224,7 @@ func (rbft *rbftImpl[T, Constraint]) handleCoreRbftEvent(e *LocalEvent) consensu
 		}
 
 		if len(rbft.batchMgr.cacheBatch) > 0 || rbft.batchMgr.requestPool.HasPendingRequestInPool() {
-			rbft.logger.Warningf("mempool is not empty, cannot generate no-tx batches", rbft.peerMgr.selfID)
+			rbft.logger.Warningf("txpool is not empty, cannot generate no-tx batches", rbft.peerMgr.selfID)
 			rbft.stopNoTxBatchTimer()
 			return nil
 		}

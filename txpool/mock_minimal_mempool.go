@@ -1,4 +1,4 @@
-package mempool
+package txpool
 
 import (
 	"go.uber.org/mock/gomock"
@@ -6,13 +6,13 @@ import (
 	"github.com/axiomesh/axiom-bft/common/consensus"
 )
 
-// NewMockMinimalMemPool returns a minimal implement of MockMemPool which accepts
+// NewMockMinimalTxPool returns a minimal implement of MockTxPool which accepts
 // any kinds of input and returns 'zero value' as all outputs.
-// Users can defines custom MockMemPool like this:
-// func NewMockCustomMemPool(ctrl *gomock.Controller) *MockMemPool {...}
+// Users can defines custom MockTxPool like this:
+// func NewMockCustomTxPool(ctrl *gomock.Controller) *MockTxPool {...}
 // in which users must specify output for all functions.
-func NewMockMinimalMemPool[T any, Constraint consensus.TXConstraint[T]](ctrl *gomock.Controller) *MockMemPool[T, Constraint] {
-	mock := NewMockMemPool[T, Constraint](ctrl)
+func NewMockMinimalTxPool[T any, Constraint consensus.TXConstraint[T]](ctrl *gomock.Controller) *MockTxPool[T, Constraint] {
+	mock := NewMockTxPool[T, Constraint](ctrl)
 	mock.EXPECT().GenerateRequestBatch().Return(nil).AnyTimes()
 	mock.EXPECT().AddNewRequests(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
 	mock.EXPECT().RemoveBatches(gomock.Any()).Return().AnyTimes()

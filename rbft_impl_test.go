@@ -10,7 +10,7 @@ import (
 
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/common/metrics/disabled"
-	"github.com/axiomesh/axiom-bft/mempool"
+	"github.com/axiomesh/axiom-bft/txpool"
 	"github.com/axiomesh/axiom-bft/types"
 )
 
@@ -18,7 +18,7 @@ import (
 // Basic Tools
 // ============================================
 func newMockRbft[T any, Constraint consensus.TXConstraint[T]](t *testing.T, ctrl *gomock.Controller) *rbftImpl[T, Constraint] {
-	pool := mempool.NewMockMemPool[T, Constraint](ctrl)
+	pool := txpool.NewMockTxPool[T, Constraint](ctrl)
 	log := newRawLogger()
 	external := NewMockMinimalExternal[T, Constraint](ctrl)
 

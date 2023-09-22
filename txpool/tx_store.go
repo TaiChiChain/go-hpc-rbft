@@ -1,4 +1,4 @@
-package mempool
+package txpool
 
 import (
 	"sync"
@@ -9,7 +9,7 @@ import (
 )
 
 type transactionStore[T any, Constraint consensus.TXConstraint[T]] struct {
-	// track all valid tx hashes cached in mempool
+	// track all valid tx hashes cached in txpool
 	txHashMap map[string]*txPointer
 
 	// track all valid tx, mapping user' account to all related transactions.
@@ -42,7 +42,7 @@ type transactionStore[T any, Constraint consensus.TXConstraint[T]] struct {
 	localTTLIndex *btreeIndex[T, Constraint]
 
 	// removeTTLIndex based on the remove tolerance time to track all the remained txs
-	// that arrived in memPool and remove these txs from memPoll cache in case these exist too long.
+	// that arrived in txpool and remove these txs from memPoll cache in case these exist too long.
 	removeTTLIndex *btreeIndex[T, Constraint]
 }
 
@@ -74,7 +74,7 @@ func (txStore *transactionStore[T, Constraint]) deletePoolTx(txHash string) {
 	}
 }
 
-func (txStore *transactionStore[T, Constraint]) insertTxs(txItems map[string][]*mempoolTransaction[T, Constraint], isLocal bool) map[string]bool {
+func (txStore *transactionStore[T, Constraint]) insertTxs(txItems map[string][]*internalTransaction[T, Constraint], isLocal bool) map[string]bool {
 	dirtyAccounts := make(map[string]bool)
 	for account, list := range txItems {
 		for _, txItem := range list {
@@ -104,7 +104,7 @@ func (txStore *transactionStore[T, Constraint]) insertTxs(txItems map[string][]*
 }
 
 // getPoolTxByTxnPointer gets transaction by account address + nonce
-func (txStore *transactionStore[T, Constraint]) getPoolTxByTxnPointer(account string, nonce uint64) *mempoolTransaction[T, Constraint] {
+func (txStore *transactionStore[T, Constraint]) getPoolTxByTxnPointer(account string, nonce uint64) *internalTransaction[T, Constraint] {
 	if list, ok := txStore.allTxs[account]; ok {
 		return list.items[nonce]
 	}
@@ -112,19 +112,19 @@ func (txStore *transactionStore[T, Constraint]) getPoolTxByTxnPointer(account st
 }
 
 type txSortedMap[T any, Constraint consensus.TXConstraint[T]] struct {
-	items map[uint64]*mempoolTransaction[T, Constraint] // map nonce to transaction
-	index *btreeIndex[T, Constraint]                    // index for items' nonce
+	items map[uint64]*internalTransaction[T, Constraint] // map nonce to transaction
+	index *btreeIndex[T, Constraint]                     // index for items' nonce
 }
 
 func newTxSortedMap[T any, Constraint consensus.TXConstraint[T]]() *txSortedMap[T, Constraint] {
 	return &txSortedMap[T, Constraint]{
-		items: make(map[uint64]*mempoolTransaction[T, Constraint]),
+		items: make(map[uint64]*internalTransaction[T, Constraint]),
 		index: newBtreeIndex[T, Constraint](SortNonce),
 	}
 }
 
-func (m *txSortedMap[T, Constraint]) filterReady(demandNonce uint64) ([]*mempoolTransaction[T, Constraint], []*mempoolTransaction[T, Constraint], uint64) {
-	var readyTxs, nonReadyTxs []*mempoolTransaction[T, Constraint]
+func (m *txSortedMap[T, Constraint]) filterReady(demandNonce uint64) ([]*internalTransaction[T, Constraint], []*internalTransaction[T, Constraint], uint64) {
+	var readyTxs, nonReadyTxs []*internalTransaction[T, Constraint]
 	if m.index.data.Len() == 0 {
 		return nil, nil, demandNonce
 	}
@@ -145,8 +145,8 @@ func (m *txSortedMap[T, Constraint]) filterReady(demandNonce uint64) ([]*mempool
 
 // forward removes all allTxs from the map with a nonce lower than the
 // provided commitNonce.
-func (m *txSortedMap[T, Constraint]) forward(commitNonce uint64) map[string][]*mempoolTransaction[T, Constraint] {
-	removedTxs := make(map[string][]*mempoolTransaction[T, Constraint])
+func (m *txSortedMap[T, Constraint]) forward(commitNonce uint64) map[string][]*internalTransaction[T, Constraint] {
+	removedTxs := make(map[string][]*internalTransaction[T, Constraint])
 	commitNonceKey := makeSortedNonceKey(commitNonce)
 	m.index.data.AscendLessThan(commitNonceKey, func(i btree.Item) bool {
 		// delete tx from map.
@@ -154,7 +154,7 @@ func (m *txSortedMap[T, Constraint]) forward(commitNonce uint64) map[string][]*m
 		txItem := m.items[nonce]
 		account := txItem.getAccount()
 		if _, ok := removedTxs[account]; !ok {
-			removedTxs[account] = make([]*mempoolTransaction[T, Constraint], 0)
+			removedTxs[account] = make([]*internalTransaction[T, Constraint], 0)
 		}
 		removedTxs[account] = append(removedTxs[account], txItem)
 		delete(m.items, nonce)
@@ -208,7 +208,7 @@ func (nc *nonceCache) getPendingNonce(account string) uint64 {
 	nonce, ok := nc.pendingNonces[account]
 	if !ok {
 		// if nonce is unknown, check if there is committed nonce persisted in db
-		// cause there are no pending txs in memPool now, pending nonce is equal to committed nonce
+		// cause there are no pending txs in txpool now, pending nonce is equal to committed nonce
 		return nc.getCommitNonce(account)
 	}
 	return nonce
@@ -220,18 +220,18 @@ func (nc *nonceCache) setPendingNonce(account string, nonce uint64) {
 	nc.pendingMu.Unlock()
 }
 
-func (tx *mempoolTransaction[T, Constraint]) getRawTimestamp() int64 {
+func (tx *internalTransaction[T, Constraint]) getRawTimestamp() int64 {
 	return Constraint(tx.rawTx).RbftGetTimeStamp()
 }
 
-func (tx *mempoolTransaction[T, Constraint]) getAccount() string {
+func (tx *internalTransaction[T, Constraint]) getAccount() string {
 	return Constraint(tx.rawTx).RbftGetFrom()
 }
 
-func (tx *mempoolTransaction[T, Constraint]) getNonce() uint64 {
+func (tx *internalTransaction[T, Constraint]) getNonce() uint64 {
 	return Constraint(tx.rawTx).RbftGetNonce()
 }
 
-func (tx *mempoolTransaction[T, Constraint]) getHash() string {
+func (tx *internalTransaction[T, Constraint]) getHash() string {
 	return Constraint(tx.rawTx).RbftGetTxHash()
 }
