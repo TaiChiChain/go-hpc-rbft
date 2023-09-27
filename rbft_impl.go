@@ -786,7 +786,7 @@ func (rbft *rbftImpl[T, Constraint]) processReqSetEvent(req *RequestSet[T, Const
 				now := time.Now().UnixNano()
 				if rbft.batchMgr.lastBatchTime != 0 {
 					interval := time.Duration(now - rbft.batchMgr.lastBatchTime).Seconds()
-					rbft.metrics.batchInterval.Observe(interval)
+					rbft.metrics.batchInterval.With("type", "maxSize").Observe(interval)
 				}
 				rbft.batchMgr.lastBatchTime = now
 				rbft.postBatches(batches)

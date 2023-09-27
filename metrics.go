@@ -330,6 +330,7 @@ func newRBFTMetrics(metricsProv metrics.Provider) (*rbftMetrics, error) {
 			Name:       "batch_interval_duration",
 			Help:       "interval duration of batch",
 			Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
+			LabelNames: []string{"type"},
 		},
 	)
 	if err != nil {

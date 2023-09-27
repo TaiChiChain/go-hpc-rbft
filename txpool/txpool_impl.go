@@ -49,6 +49,10 @@ func (p *txPoolImpl[T, Constraint]) addNewRequests(txs []*T, isPrimary, local, i
 	completionMissingBatchHashes := make([]string, 0)
 	validTxs := make(map[string][]*internalTransaction[T, Constraint])
 
+	// key: missing batch hash
+	// val: txHash -> bool
+	matchMissingTxBatch := make(map[string]map[string]struct{})
+
 	currentSeqNoList := make(map[string]uint64, 0)
 	for _, tx := range txs {
 		txAccount := Constraint(tx).RbftGetFrom()
@@ -119,13 +123,18 @@ func (p *txPoolImpl[T, Constraint]) addNewRequests(txs []*T, isPrimary, local, i
 		// for replica, add validTxs to nonBatchedTxs and check if the missing transactions and batches are fetched
 		if !isPrimary && needCompletionMissingBatch {
 			for batchHash, missingTxsHash := range p.txStore.missingBatch {
-				for txIndex, missingTxHash := range missingTxsHash {
+				if _, ok := matchMissingTxBatch[batchHash]; !ok {
+					matchMissingTxBatch[batchHash] = make(map[string]struct{}, 0)
+				}
+				for _, missingTxHash := range missingTxsHash {
 					// we have received a tx which we are fetching.
 					if txHash == missingTxHash {
-						delete(missingTxsHash, txIndex)
+						matchMissingTxBatch[batchHash][txHash] = struct{}{}
 					}
 				}
-				if len(missingTxsHash) == 0 {
+
+				// we receive all missing txs
+				if len(missingTxsHash) == len(matchMissingTxBatch[batchHash]) {
 					delete(p.txStore.missingBatch, batchHash)
 					completionMissingBatchHashes = append(completionMissingBatchHashes, batchHash)
 				}
@@ -997,12 +1006,15 @@ func getBatchHash[T any, Constraint consensus.TXConstraint[T]](batch *RequestHas
 
 func (p *txPoolImpl[T, Constraint]) increasePriorityNonBatchSize(addSize uint64) {
 	p.txStore.priorityNonBatchSize = p.txStore.priorityNonBatchSize + addSize
+	readyTxNum.Set(float64(p.txStore.priorityNonBatchSize))
 }
 
 func (p *txPoolImpl[T, Constraint]) decreasePriorityNonBatchSize(subSize uint64) {
 	p.txStore.priorityNonBatchSize = p.txStore.priorityNonBatchSize - subSize
+	readyTxNum.Set(float64(p.txStore.priorityNonBatchSize))
 }
 
 func (p *txPoolImpl[T, Constraint]) setPriorityNonBatchSize(txnSize uint64) {
 	p.txStore.priorityNonBatchSize = txnSize
+	readyTxNum.Set(float64(p.txStore.priorityNonBatchSize))
 }
