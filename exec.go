@@ -17,6 +17,7 @@ package rbft
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/gogo/protobuf/proto"
 
@@ -193,6 +194,12 @@ func (rbft *rbftImpl[T, Constraint]) handleCoreRbftEvent(e *LocalEvent) consensu
 			// call requestPool module to generate a tx batch
 			if rbft.inPrimaryTerm() {
 				batches := rbft.batchMgr.requestPool.GenerateRequestBatch()
+				now := time.Now().UnixNano()
+				if rbft.batchMgr.lastBatchTime != 0 {
+					interval := time.Duration(now - rbft.batchMgr.lastBatchTime).Seconds()
+					rbft.metrics.batchInterval.With("type", "timeout").Observe(interval)
+				}
+				rbft.batchMgr.lastBatchTime = now
 				rbft.postBatches(batches)
 			}
 		}
