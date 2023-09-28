@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/btree"
 	"github.com/pkg/errors"
+	"github.com/samber/lo"
 
 	"github.com/axiomesh/axiom-bft/common/consensus"
 )
@@ -185,7 +186,7 @@ func newTxPoolImpl[T any, Constraint consensus.TXConstraint[T]](config Config) *
 		getAccountNonce: config.GetAccountNonce,
 		isTimed:         config.IsTimed,
 	}
-	mpi.txStore = newTransactionStore[T, Constraint](config.GetAccountNonce)
+	mpi.txStore = newTransactionStore[T, Constraint](config.GetAccountNonce, config.Logger)
 	if config.BatchSize == 0 {
 		mpi.batchSize = DefaultBatchSize
 	} else {
@@ -266,14 +267,66 @@ func (p *txPoolImpl[T, Constraint]) GenerateRequestBatch() []*RequestHashBatch[T
 // todo(lrx): except saveBatches
 func (p *txPoolImpl[T, Constraint]) Reset(saveBatches []string) {
 	p.logger.Debug("Reset txpool...")
-	oldNonceCache := p.txStore.nonceCache
-	p.txStore = newTransactionStore[T, Constraint](p.getAccountNonce)
-	p.txStore.nonceCache.commitNonces = oldNonceCache.commitNonces
-	for account, commitNonce := range oldNonceCache.commitNonces {
-		pendingNonce := oldNonceCache.getPendingNonce(account)
-		p.logger.Debugf("Reset account %s pending nonce %d to commit nonce %d", account, pendingNonce, commitNonce)
-		p.txStore.nonceCache.pendingNonces[account] = commitNonce
+	oldBatchCache := p.txStore.batchesCache
+	// 1. reset txStore in txPool
+	p.txStore = newTransactionStore[T, Constraint](p.getAccountNonce, p.logger)
+
+	// 2. clean txPool metrics
+	resetTxPoolMetrics()
+
+	lo.ForEach(saveBatches, func(exceptBatch string, index int) {
+		if oldBatch, ok := oldBatchCache[exceptBatch]; ok {
+			p.logger.Debugf("Reset txpool, batch %s is in saveBatches, ignore it", oldBatch.BatchHash)
+			err := p.saveOldBatchedTxs(oldBatch)
+			if err != nil {
+				p.logger.Errorf("Reset txpool, save old batched txs failed, err: %s", err.Error())
+			}
+		}
+	})
+}
+
+// saveOldBatchedTxs re-put batch txs into txPool, only used in state updated status.
+func (p *txPoolImpl[T, Constraint]) saveOldBatchedTxs(batch *RequestHashBatch[T, Constraint]) error {
+	// check if the batch is valid
+	if len(batch.TxList) != len(batch.TxHashList) {
+		return fmt.Errorf("batch[batchHash:%s] txList length %d is not equal to txHashList length %d",
+			batch.BatchHash, len(batch.TxList), len(batch.TxHashList))
 	}
+
+	insertTxs := make(map[string][]*internalTransaction[T, Constraint])
+	for i, tx := range batch.TxList {
+		// 2. insert batched txs into batchedTxs and batchesCache
+		pointer := &txPointer{
+			account: Constraint(tx).RbftGetFrom(),
+			nonce:   Constraint(tx).RbftGetNonce(),
+		}
+		p.txStore.batchedTxs[*pointer] = true
+		p.txStore.batchesCache[batch.BatchHash] = batch
+
+		// 3. insert batched txs into txHashMap、allTxs、removeTTLIndex、localTTLIndex
+		txAccount := Constraint(tx).RbftGetFrom()
+		if len(batch.LocalList) != len(batch.TxList) {
+			return fmt.Errorf("batch localList length %d is not equal to txList length %d", len(batch.LocalList), len(batch.TxList))
+		}
+
+		_, ok := insertTxs[txAccount]
+		if !ok {
+			insertTxs[txAccount] = make([]*internalTransaction[T, Constraint], 0)
+		}
+		now := time.Now().UnixNano()
+		txItem := &internalTransaction[T, Constraint]{
+			rawTx:       tx,
+			local:       batch.LocalList[i],
+			lifeTime:    Constraint(tx).RbftGetTimeStamp(),
+			arrivedTime: now,
+		}
+		insertTxs[txAccount] = append(insertTxs[txAccount], txItem)
+
+		// 4. insert batched txs into priorityIndex
+		p.txStore.priorityIndex.insertByOrderedQueueKey(txItem)
+	}
+	p.txStore.insertTxs(insertTxs, true)
+	return nil
 }
 
 // RestoreOneBatch moves one batch from batchStore.

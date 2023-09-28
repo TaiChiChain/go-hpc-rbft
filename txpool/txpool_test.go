@@ -205,22 +205,46 @@ func TestFilterOutOfDateRequests(t *testing.T) {
 func TestReset(t *testing.T) {
 	ast := assert.New(t)
 	pool := mockTxPoolImpl[consensus.FltTransaction, *consensus.FltTransaction]()
-	pool.txStore.nonceCache.setCommitNonce("account1", uint64(1))
-	pool.txStore.nonceCache.setCommitNonce("account2", uint64(1))
-	pool.txStore.nonceCache.setPendingNonce("account1", uint64(2))
-	pool.txStore.nonceCache.setPendingNonce("account2", uint64(4))
-	pool.Reset(nil)
-	ast.Equal(uint64(1), pool.txStore.nonceCache.getPendingNonce("account1"), "pending nonce should be reset to commit nonce")
-	ast.Equal(uint64(1), pool.txStore.nonceCache.getCommitNonce("account1"))
-	ast.Equal(uint64(1), pool.txStore.nonceCache.getPendingNonce("account2"), "pending nonce should be reset to commit nonce")
-	ast.Equal(uint64(1), pool.txStore.nonceCache.getCommitNonce("account2"))
-	ast.Equal(0, len(pool.txStore.batchedTxs))
-	ast.Equal(0, len(pool.txStore.txHashMap))
-	ast.Equal(0, len(pool.txStore.allTxs))
-	ast.Equal(0, pool.txStore.localTTLIndex.size())
+
+	tx1 := ConstructTxByAccountAndNonce("account1", 0)
+	tx2 := ConstructTxByAccountAndNonce("account2", 0)
+	tx3 := ConstructTxByAccountAndNonce("account3", 0)
+	batch1 := &RequestHashBatch[consensus.FltTransaction, *consensus.FltTransaction]{
+		BatchHash:  "batch1",
+		TxHashList: []string{tx1.RbftGetTxHash()},
+		TxList:     []*consensus.FltTransaction{tx1},
+		LocalList:  []bool{true},
+		Timestamp:  time.Now().Unix(),
+	}
+
+	batch2 := &RequestHashBatch[consensus.FltTransaction, *consensus.FltTransaction]{
+		BatchHash:  "batch2",
+		TxHashList: []string{tx2.RbftGetTxHash()},
+		TxList:     []*consensus.FltTransaction{tx2},
+		LocalList:  []bool{true},
+		Timestamp:  time.Now().Unix(),
+	}
+
+	batch3 := &RequestHashBatch[consensus.FltTransaction, *consensus.FltTransaction]{
+		BatchHash:  "batch3",
+		TxHashList: []string{tx3.RbftGetTxHash()},
+		TxList:     []*consensus.FltTransaction{tx3},
+		LocalList:  []bool{true},
+		Timestamp:  time.Now().Unix(),
+	}
+
+	pool.txStore.batchesCache["batch1"] = batch1
+	pool.txStore.batchesCache["batch2"] = batch2
+	pool.txStore.batchesCache["batch3"] = batch3
+
+	pool.Reset([]string{"batch2"})
+	ast.Equal(1, len(pool.txStore.batchedTxs))
+	ast.Equal(1, len(pool.txStore.txHashMap))
+	ast.Equal(1, len(pool.txStore.allTxs))
+	ast.Equal(1, pool.txStore.localTTLIndex.size())
 	ast.Equal(0, pool.txStore.parkingLotIndex.size())
-	ast.Equal(0, pool.txStore.priorityIndex.size())
-	ast.Equal(0, len(pool.txStore.batchesCache))
+	ast.Equal(1, pool.txStore.priorityIndex.size())
+	ast.Equal(1, len(pool.txStore.batchesCache))
 	ast.Equal(0, len(pool.txStore.missingBatch))
 	ast.Equal(uint64(0), pool.txStore.priorityNonBatchSize)
 }
