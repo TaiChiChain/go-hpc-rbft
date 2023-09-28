@@ -19,3 +19,7 @@ func init() {
 	prometheus.MustRegister(poolTxNum)
 	prometheus.MustRegister(readyTxNum)
 }
+
+func resetTxPoolMetrics() {
+	poolTxNum.Set(0)
+}

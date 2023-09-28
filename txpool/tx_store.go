@@ -9,6 +9,7 @@ import (
 )
 
 type transactionStore[T any, Constraint consensus.TXConstraint[T]] struct {
+	logger Logger
 	// track all valid tx hashes cached in txpool
 	txHashMap map[string]*txPointer
 
@@ -46,8 +47,9 @@ type transactionStore[T any, Constraint consensus.TXConstraint[T]] struct {
 	removeTTLIndex *btreeIndex[T, Constraint]
 }
 
-func newTransactionStore[T any, Constraint consensus.TXConstraint[T]](f GetAccountNonceFunc) *transactionStore[T, Constraint] {
+func newTransactionStore[T any, Constraint consensus.TXConstraint[T]](f GetAccountNonceFunc, logger Logger) *transactionStore[T, Constraint] {
 	return &transactionStore[T, Constraint]{
+		logger:               logger,
 		priorityNonBatchSize: 0,
 		txHashMap:            make(map[string]*txPointer),
 		allTxs:               make(map[string]*txSortedMap[T, Constraint]),
@@ -63,8 +65,13 @@ func newTransactionStore[T any, Constraint consensus.TXConstraint[T]](f GetAccou
 }
 
 func (txStore *transactionStore[T, Constraint]) insertPoolTx(txHash string, pointer *txPointer) {
+	if _, ok := txStore.txHashMap[txHash]; !ok {
+		txStore.txHashMap[txHash] = pointer
+		poolTxNum.Inc()
+		return
+	}
+	txStore.logger.Warningf("tx %s already exists in txpool", txHash)
 	txStore.txHashMap[txHash] = pointer
-	poolTxNum.Inc()
 }
 
 func (txStore *transactionStore[T, Constraint]) deletePoolTx(txHash string) {
