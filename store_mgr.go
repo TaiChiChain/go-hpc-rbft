@@ -118,6 +118,11 @@ func (sm *storeManager[T, Constraint]) saveCheckpoint(height uint64, signedCheck
 	sm.localCheckpoints[height] = signedCheckpoint
 }
 
+// deleteCheckpoint delete checkpoint information to localCheckpoints
+func (sm *storeManager[T, Constraint]) deleteCheckpoint(height uint64) {
+	delete(sm.localCheckpoints, height)
+}
+
 // Given a digest/view/seq, is there an entry in the certStore?
 // If so, return it else, create a new entry
 func (sm *storeManager[T, Constraint]) getCert(v uint64, n uint64, d string) *msgCert {
