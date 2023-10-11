@@ -100,6 +100,10 @@ func (rbft *rbftImpl[T, Constraint]) stopNoTxBatchTimer() {
 
 // restartNoTxBatchTimer restarts the no tx batch timer
 func (rbft *rbftImpl[T, Constraint]) restartNoTxBatchTimer() bool {
+	// if timed gen empty block is disabled, we do not need to restart the no tx batch timer
+	if !rbft.chainConfig.EpochInfo.ConsensusParams.EnableTimedGenEmptyBlock {
+		return false
+	}
 	rbft.timerMgr.stopTimer(noTxBatchTimer)
 
 	localEvent := &LocalEvent{

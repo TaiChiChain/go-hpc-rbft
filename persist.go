@@ -550,7 +550,7 @@ func (rbft *rbftImpl[T, Constraint]) restoreState() error {
 		rbft.metrics = nil
 		return gErr
 	}
-	rbft.storeMgr.localCheckpoints[state.MetaState.Height] = mockCheckpoint
+	rbft.storeMgr.saveCheckpoint(state.MetaState.Height, mockCheckpoint)
 
 	chkpts, err := rbft.storage.ReadStateSet("chkpt.")
 	if err == nil {

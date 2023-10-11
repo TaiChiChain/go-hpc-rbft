@@ -2102,7 +2102,8 @@ func (rbft *rbftImpl[T, Constraint]) moveWatermarks(n uint64, newEpoch bool) {
 		if seqNo < h {
 			rbft.logger.Debugf("Replica %d remove localCheckpoints, seqNo: %d",
 				rbft.peerMgr.selfID, seqNo)
-			delete(rbft.storeMgr.localCheckpoints, seqNo)
+			// remove local checkpoint from cache and database
+			rbft.storeMgr.deleteCheckpoint(seqNo)
 			rbft.persistDelCheckpoint(seqNo)
 		} else {
 			if newEpoch {

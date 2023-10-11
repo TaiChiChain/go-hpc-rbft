@@ -783,7 +783,6 @@ func (p *txPoolImpl[T, Constraint]) RemoveTimeoutRequests() (uint64, error) {
 			return true
 		}
 		if now-poolTx.arrivedTime > p.toleranceRemoveTime.Nanoseconds() {
-			p.logger.Debugf("handle orderedKey[account:%s, nonce:%d]", poolTx.getAccount(), poolTx.getNonce())
 			// for those batched txs, we don't need to removedTxs temporarily.
 			if _, ok := p.txStore.batchedTxs[txPointer{account: removeKey.account, nonce: removeKey.nonce}]; ok {
 				p.logger.Debugf("find tx[account: %s, nonce:%d] from batchedTxs, ignore remove request",
@@ -843,6 +842,18 @@ func (p *txPoolImpl[T, Constraint]) RemoveTimeoutRequests() (uint64, error) {
 			wg.Wait()
 		}
 	}
+
+	// when remove priorityIndex, we need to decrease priorityNonBatchSize
+	// NOTICE!!! we remove priorityIndex when it's timeout, it may cause the priorityNonBatchSize is not correct.
+	// for example, if we have 10 txs in priorityIndex whitch nonce is 1-10, and we remove nonce 1-5, then the priorityNonBatchSize is 5.
+	// but the nonce 6-10 is not ready because of we remove nonce 1-5, so the priorityNonBatchSize is actual 0.
+	readyNum := uint64(p.txStore.priorityIndex.size())
+	// set priorityNonBatchSize to min(nonBatchedTxs, readyNum),
+	if p.txStore.priorityNonBatchSize > readyNum {
+		p.logger.Warningf("Set priorityNonBatchSize from %d to the length of priorityIndex %d", p.txStore.priorityNonBatchSize, readyNum)
+		p.setPriorityNonBatchSize(readyNum)
+	}
+
 	return count, nil
 }
 
@@ -948,13 +959,10 @@ func (p *txPoolImpl[T, Constraint]) generateRequestBatch() ([]*RequestHashBatch[
 	})
 
 	if !p.isTimed && len(result) == 0 && p.HasPendingRequestInPool() {
-		for account := range p.txStore.nonceCache.pendingNonces {
-			nonce := p.txStore.nonceCache.getPendingNonce(account)
-			p.logger.Errorf("PriorityNonBatchSize: %d,===== account:%s,  ==== pendingNonce: %d",
-				p.txStore.priorityNonBatchSize, account, nonce)
-		}
+		p.logger.Warningf("===== Note!!! Primary generate a batch with 0 txs, "+
+			"but PriorityNonBatchSize is %d, we need reset PriorityNonBatchSize", p.txStore.priorityNonBatchSize)
 		p.setPriorityNonBatchSize(0)
-		return nil, errors.New("===== Note!!! Primary generate a batch with 0 txs")
+		return nil, nil
 	}
 
 	batches := make([]*RequestHashBatch[T, Constraint], 0)
