@@ -18,6 +18,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/axiomesh/axiom-bft/common"
 )
 
 // titleTimer manages timer with the same timer name, which, we allow different timer with the same timer name, such as:
@@ -65,7 +67,7 @@ func (tt *titleTimer) clear() {
 type timerManager struct {
 	tTimers   map[string]*titleTimer
 	eventChan chan<- consensusEvent
-	logger    Logger
+	logger    common.Logger
 }
 
 // newTimerMgr news an instance of timerManager.

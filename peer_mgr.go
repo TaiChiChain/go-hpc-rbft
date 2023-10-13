@@ -20,6 +20,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
 )
 
@@ -28,12 +29,13 @@ import (
 // every node has the latest peer list.
 type peerManager struct {
 	chainConfig *ChainConfig
+	metrics     *rbftMetrics // collect all metrics in rbft
 
 	// network helper to broadcast/unicast messages.
 	network Network
 
 	// logger
-	logger Logger
+	logger common.Logger
 
 	selfAccountAddress string
 	selfID             uint64
@@ -43,8 +45,9 @@ type peerManager struct {
 }
 
 // init peer pool in rbft core
-func newPeerManager(network Network, config Config, isTest bool) *peerManager {
+func newPeerManager(metrics *rbftMetrics, network Network, config Config, isTest bool) *peerManager {
 	return &peerManager{
+		metrics:            metrics,
 		selfAccountAddress: config.SelfAccountAddress,
 		network:            network,
 		logger:             config.Logger,
@@ -115,7 +118,9 @@ func (m *peerManager) unicast(ctx context.Context, msg *consensus.ConsensusMessa
 		m.logger.Errorf("Unicast to %d failed: not found node", to)
 		return
 	}
+	start := time.Now()
 	err := m.network.Unicast(ctx, msg, node.P2PNodeID)
+	m.metrics.processEventDuration.With("event", "p2p_unicast").Observe(time.Since(start).Seconds())
 	if err != nil {
 		m.logger.Errorf("Unicast to %d failed: %v", to, err)
 		return

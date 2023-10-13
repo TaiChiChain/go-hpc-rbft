@@ -8,12 +8,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
+	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/common/metrics/disabled"
 )
 
 func newTestTimerMgr[T any, Constraint consensus.TXConstraint[T]](ctrl *gomock.Controller) *timerManager {
-	log := newRawLogger()
+	log := common.NewSimpleLogger()
 	conf := Config{
 		SelfAccountAddress: "node1",
 		GenesisEpochInfo: &EpochInfo{

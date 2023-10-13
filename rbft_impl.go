@@ -26,6 +26,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
+	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/common/metrics"
 	"github.com/axiomesh/axiom-bft/txpool"
@@ -103,7 +104,7 @@ type Config struct {
 	DelFlag chan bool
 
 	// Logger is the logger used to record logger in RBFT.
-	Logger Logger
+	Logger common.Logger
 
 	// NoTxBatchTimeout is the max time duration before one generating block which packing no tx.
 	NoTxBatchTimeout time.Duration
@@ -129,10 +130,9 @@ type rbftImpl[T any, Constraint consensus.TXConstraint[T]] struct {
 	epochMgr    *epochManager                // manage epoch issues
 	storage     Storage                      // manage non-volatile storage of consensus log
 
-	recvChan chan consensusEvent      // channel to receive ordered consensus messages and local events
-	cpChan   chan *types.ServiceState // channel to wait for local checkpoint event
-	delFlag  chan bool                // channel to stop namespace when there is a non-recoverable error
-	close    chan bool                // channel to close this event process
+	recvChan chan consensusEvent // channel to receive ordered consensus messages and local events
+	delFlag  chan bool           // channel to stop namespace when there is a non-recoverable error
+	close    chan bool           // channel to close this event process
 
 	flowControl       bool // whether limit flow or not
 	flowControlMaxMem int  // the max memory size of txs in request set
@@ -146,12 +146,13 @@ type rbftImpl[T any, Constraint consensus.TXConstraint[T]] struct {
 
 	wg sync.WaitGroup // make sure the listener has been closed
 
-	config  Config       // get configuration info
-	metrics *rbftMetrics // collect all metrics in rbft
-	tracer  trace.Tracer // record tracing info
-	logger  Logger       // write logger to record some info
+	config  Config        // get configuration info
+	metrics *rbftMetrics  // collect all metrics in rbft
+	tracer  trace.Tracer  // record tracing info
+	logger  common.Logger // write logger to record some info
 
 	isInited bool
+	isTest   bool
 }
 
 var once sync.Once
@@ -171,8 +172,10 @@ func newRBFT[T any, Constraint consensus.TXConstraint[T]](c Config, external Ext
 	// init message event converter
 	once.Do(initMsgEventMap)
 
-	cpChan := make(chan *types.ServiceState)
-	recvC := make(chan consensusEvent, 1024)
+	recvC := make(chan consensusEvent)
+	if isTest {
+		recvC = make(chan consensusEvent, 1024)
+	}
 	rbft := &rbftImpl[T, Constraint]{
 		chainConfig: &ChainConfig{
 			H: c.GenesisEpochInfo.StartBlock,
@@ -182,13 +185,13 @@ func newRBFT[T any, Constraint consensus.TXConstraint[T]](c Config, external Ext
 		external:             external,
 		storage:              external,
 		recvChan:             recvC,
-		cpChan:               cpChan,
 		close:                make(chan bool),
 		delFlag:              c.DelFlag,
 		flowControl:          c.FlowControl,
 		flowControlMaxMem:    c.FlowControlMaxMem,
 		reusableRequestBatch: &consensus.FetchBatchResponse{},
 		tracer:               c.Tracer,
+		isTest:               isTest,
 	}
 
 	// new metrics instance
@@ -206,7 +209,7 @@ func newRBFT[T any, Constraint consensus.TXConstraint[T]](c Config, external Ext
 	rbft.status = newStatusMgr()
 
 	// new peer pool
-	rbft.peerMgr = newPeerManager(external, c, isTest)
+	rbft.peerMgr = newPeerManager(rbft.metrics, external, c, isTest)
 
 	// new executor
 	rbft.exec = newExecutor()
@@ -330,14 +333,6 @@ func (rbft *rbftImpl[T, Constraint]) stop() []*T {
 	// reset status to pending.
 	rbft.initStatus()
 	rbft.atomicOn(Stopped)
-
-	// close checkpoint channel.
-	select {
-	case <-rbft.cpChan:
-	default:
-	}
-	rbft.logger.Notice("close channel: checkpoint")
-	close(rbft.cpChan)
 
 	remainTxs, err := rbft.drainChannel(rbft.recvChan)
 	if err != nil {
@@ -488,14 +483,16 @@ func (rbft *rbftImpl[T, Constraint]) reportCheckpoint(state *types.ServiceState)
 	// report checkpoint of config block height or checkpoint block height.
 	if rbft.readConfigBatchToExecute() == height || height%rbft.chainConfig.EpochInfo.ConsensusParams.CheckpointPeriod == 0 {
 		rbft.logger.Debugf("Report checkpoint: {%d, %s} to core", state.MetaState.Height, state.MetaState.Digest)
-		go func() {
-			defer func() {
-				if r := recover(); r != nil {
-					rbft.logger.Debugf("reject report checkpoint for recovered")
-				}
-			}()
-			rbft.cpChan <- state
-		}()
+		event := &LocalEvent{
+			Service:   CoreRbftService,
+			EventType: CoreCheckpointBlockExecutedEvent,
+			Event:     state,
+		}
+
+		// for test, will auto report checkpoint, no need to report
+		if !rbft.isTest {
+			go rbft.postMsg(event)
+		}
 	}
 }
 
@@ -574,6 +571,28 @@ func (rbft *rbftImpl[T, Constraint]) listenEvent() {
 	}
 }
 
+func (rbft *rbftImpl[T, Constraint]) checkEventCanProcessWhenWaitCheckpoint(eventType int, event any) bool {
+	if !rbft.in(waitCheckpointBatchExecute) {
+		return true
+	}
+	if _, ok := canProcessEventsWhenWaitCheckpoint[eventType]; ok {
+		return true
+	}
+	rbft.storeMgr.beforeCheckpointEventCache = append(rbft.storeMgr.beforeCheckpointEventCache, event)
+	return false
+}
+
+func (rbft *rbftImpl[T, Constraint]) checkMsgCanProcessWhenWaitCheckpoint(msgType consensus.Type, msg any) bool {
+	if !rbft.in(waitCheckpointBatchExecute) {
+		return true
+	}
+	if _, ok := canProcessMsgsWhenWaitCheckpoint[msgType]; ok {
+		return true
+	}
+	rbft.storeMgr.beforeCheckpointEventCache = append(rbft.storeMgr.beforeCheckpointEventCache, msg)
+	return false
+}
+
 // processEvent process consensus messages and local events cyclically.
 func (rbft *rbftImpl[T, Constraint]) processEvent(ee consensusEvent) consensusEvent {
 	start := time.Now()
@@ -613,6 +632,10 @@ func (rbft *rbftImpl[T, Constraint]) processEvent(ee consensusEvent) consensusEv
 		return nil
 
 	case *LocalEvent:
+		if !rbft.checkEventCanProcessWhenWaitCheckpoint(e.EventType, e) {
+			rbft.metrics.processEventDuration.With("event", "local_event").Observe(time.Since(start).Seconds())
+			return nil
+		}
 		ev := rbft.dispatchLocalEvent(e)
 		rbft.metrics.processEventDuration.With("event", "local_event").Observe(time.Since(start).Seconds())
 		return ev
@@ -623,7 +646,11 @@ func (rbft *rbftImpl[T, Constraint]) processEvent(ee consensusEvent) consensusEv
 		return ev
 
 	case *consensusMessageWrapper:
-		ev := rbft.consensusMessageFilter(e.ctx, e.ConsensusMessage)
+		if !rbft.checkMsgCanProcessWhenWaitCheckpoint(e.ConsensusMessage.Type, e) {
+			rbft.metrics.processEventDuration.With("event", "consensus_message").Observe(time.Since(start).Seconds())
+			return nil
+		}
+		ev := rbft.consensusMessageFilter(e.ctx, e, e.ConsensusMessage)
 		rbft.metrics.processEventDuration.With("event", "consensus_message").Observe(time.Since(start).Seconds())
 		return ev
 
@@ -633,18 +660,27 @@ func (rbft *rbftImpl[T, Constraint]) processEvent(ee consensusEvent) consensusEv
 	}
 }
 
-func (rbft *rbftImpl[T, Constraint]) consensusMessageFilter(ctx context.Context, msg *consensus.ConsensusMessage) consensusEvent {
+func (rbft *rbftImpl[T, Constraint]) consensusMessageFilter(ctx context.Context, originEvent consensusEvent, msg *consensus.ConsensusMessage) consensusEvent {
 	// A node in different epoch or in epoch sync will reject normal consensus messages, except:
 	// EpochChangeRequest and EpochChangeProof.
 	if msg.Epoch != rbft.chainConfig.EpochInfo.Epoch {
+		if msg.Epoch > rbft.epochMgr.epoch {
+			if !rbft.checkEventCanProcessWhenWaitCheckpoint(cannotProcessEventWhenWaitCheckpoint, originEvent) {
+				return nil
+			}
+		}
+
 		return rbft.epochMgr.checkEpoch(msg)
 	}
 
-	next, err := rbft.msgToEvent(msg)
+	msgEvent, err := rbft.msgToEvent(msg)
 	if err != nil {
 		return nil
 	}
-	return rbft.dispatchConsensusMsg(ctx, next)
+	start := time.Now()
+	next := rbft.dispatchConsensusMsg(ctx, originEvent, msgEvent)
+	rbft.metrics.processEventDuration.With("event", "consensus_message_"+msg.Type.String()).Observe(time.Since(start).Seconds())
+	return next
 }
 
 // dispatchCoreRbftMsg dispatch core RBFT consensus messages.
@@ -765,10 +801,28 @@ func (rbft *rbftImpl[T, Constraint]) processReqSetEvent(req *RequestSet[T, Const
 	// }
 
 	// if current node is in abnormal, add normal txs into txPool without generate batches.
-	if !rbft.isNormal() || rbft.in(SkipInProgress) || rbft.in(InRecovery) || rbft.in(inEpochSyncing) {
+	if !rbft.isNormal() || rbft.in(SkipInProgress) || rbft.in(InRecovery) || rbft.in(inEpochSyncing) || rbft.in(waitCheckpointBatchExecute) {
 		_, completionMissingBatchHashes := rbft.batchMgr.requestPool.AddNewRequests(req.Requests, false, req.Local, false, false)
+		var completionMissingBatchIdxs []msgID
 		for _, batchHash := range completionMissingBatchHashes {
+			idx, ok := rbft.storeMgr.missingBatchesInFetching[batchHash]
+			if !ok {
+				rbft.logger.Warningf("Replica %d completion batch with hash %s but not found missing record",
+					rbft.peerMgr.selfID, batchHash)
+			} else {
+				rbft.logger.Infof("Replica %d completion batch with hash %s",
+					rbft.peerMgr.selfID, batchHash)
+				completionMissingBatchIdxs = append(completionMissingBatchIdxs, idx)
+			}
 			delete(rbft.storeMgr.missingBatchesInFetching, batchHash)
+		}
+		if rbft.in(waitCheckpointBatchExecute) {
+			// findNextPrepareBatch after call checkpoint
+			rbft.storeMgr.beforeCheckpointEventCache = append(rbft.storeMgr.beforeCheckpointEventCache, &LocalEvent{
+				Service:   CoreRbftService,
+				EventType: CoreFindNextPrepareBatchsEvent,
+				Event:     completionMissingBatchIdxs,
+			})
 		}
 	} else {
 		// primary nodes would check if this transaction triggered generating a batch or not
@@ -1332,11 +1386,13 @@ func (rbft *rbftImpl[T, Constraint]) recvCommit(ctx context.Context, commit *con
 			rbft.storeMgr.committedCert[idx] = commit.BatchDigest
 			rbft.commitPendingBlocks()
 
-			// reset last new view timeout after commit one block successfully.
-			rbft.vcMgr.lastNewViewTimeout = rbft.timerMgr.getTimeoutValue(newViewTimer)
-			if commit.SequenceNumber == rbft.vcMgr.viewChangeSeqNo {
-				rbft.logger.Warningf("Replica %d cycling view for seqNo=%d", rbft.peerMgr.selfID, commit.SequenceNumber)
-				rbft.sendViewChange()
+			if !rbft.in(waitCheckpointBatchExecute) {
+				// reset last new view timeout after commit one block successfully.
+				rbft.vcMgr.lastNewViewTimeout = rbft.timerMgr.getTimeoutValue(newViewTimer)
+				if commit.SequenceNumber == rbft.vcMgr.viewChangeSeqNo {
+					rbft.logger.Warningf("Replica %d cycling view for seqNo=%d", rbft.peerMgr.selfID, commit.SequenceNumber)
+					rbft.sendViewChange()
+				}
 			}
 		} else {
 			rbft.logger.Debugf("Replica %d committed for seqNo: %d, but sentExecute: %v",
@@ -1595,7 +1651,9 @@ func (rbft *rbftImpl[T, Constraint]) commitPendingBlocks() {
 			hasTxToExec = false
 		}
 	}
-	rbft.startTimerIfOutstandingRequests()
+	if !rbft.in(waitCheckpointBatchExecute) {
+		rbft.startTimerIfOutstandingRequests()
+	}
 }
 
 // filterExecutableTxs flatten txs into txs and kick out duplicate txs with hash included in deDuplicateTxHashes.
@@ -1624,6 +1682,9 @@ func (rbft *rbftImpl[T, Constraint]) filterExecutableTxs(digest string, deDuplic
 
 // findNextCommitBatch find next msgID which is able to commit.
 func (rbft *rbftImpl[T, Constraint]) findNextCommitBatch() (find bool, idx msgID, cert *msgCert) {
+	if rbft.in(waitCheckpointBatchExecute) {
+		return false, msgID{}, nil
+	}
 	for idx = range rbft.storeMgr.committedCert {
 		cert = rbft.storeMgr.certStore[idx]
 
@@ -1675,42 +1736,102 @@ func (rbft *rbftImpl[T, Constraint]) afterCommitBlock(idx msgID, isConfig bool) 
 	rbft.logger.Debugf("Replica %d finished execution %d, trying next", rbft.peerMgr.selfID, idx.n)
 	rbft.exec.setLastExec(idx.n)
 	delete(rbft.storeMgr.committedCert, idx)
+	// not checkpoint
+	if isConfig || rbft.exec.lastExec%rbft.chainConfig.EpochInfo.ConsensusParams.CheckpointPeriod == 0 {
+		if !rbft.isTest {
+			rbft.logger.Debugf("Replica %d start wait checkpoint batch=%d executed", rbft.peerMgr.selfID, rbft.exec.lastExec)
+			rbft.on(waitCheckpointBatchExecute)
+		} else {
+			// for test, auto report checkpoint
+			rbft.recvCheckpointBlockExecutedEvent(&types.ServiceState{
+				MetaState: &types.MetaState{
+					Height: idx.n,
+					Digest: idx.d,
+				},
+				Epoch: rbft.epochMgr.epoch,
+			})
+		}
+	}
+}
 
-	// after committed block, there are 3 cases:
+func (rbft *rbftImpl[T, Constraint]) reProcessCacheEvents() {
+	c := rbft.storeMgr.beforeCheckpointEventCache
+	// reset
+	rbft.storeMgr.beforeCheckpointEventCache = []consensusEvent{}
+
+	for _, msg := range c {
+		cm, isConsensusMessage := msg.(*consensusMessageWrapper)
+		for {
+			select {
+			case <-rbft.close:
+				rbft.logger.Notice("exit RBFT event listener")
+				return
+			default:
+			}
+			msg = rbft.processEvent(msg)
+			if msg == nil {
+				break
+			}
+		}
+		// check view after finished process consensus messages from remote node as current view may
+		// be changed because of above consensus messages.
+		if isConsensusMessage {
+			rbft.checkView(cm.ConsensusMessage)
+		}
+	}
+}
+
+func (rbft *rbftImpl[T, Constraint]) recvCheckpointBlockExecutedEvent(state *types.ServiceState) {
+	// after execute a block, there are 3 cases:
 	// 1. a config transaction: waiting for checkpoint channel and turn into epoch process
 	// 2. a normal transaction in checkpoint: waiting for checkpoint channel and turn into checkpoint process
 	// 3. a normal transaction not in checkpoint: finish directly
-	if isConfig {
-		state, ok := <-rbft.cpChan
-		if !ok {
-			rbft.logger.Info("checkpoint channel closed")
-			return
-		}
-
+	if isConfigBatch(state.MetaState.Height, rbft.chainConfig.EpochInfo) {
 		// reset config transaction to execute
 		rbft.resetConfigBatchToExecute()
-
 		if state.MetaState.Height == rbft.exec.lastExec {
 			rbft.logger.Debugf("Call the checkpoint for config batch, seqNo=%d", rbft.exec.lastExec)
 			rbft.epochMgr.configBatchToCheck = state.MetaState
 			rbft.checkpoint(state, true)
+			rbft.off(waitCheckpointBatchExecute)
+
+			rbft.startTimerIfOutstandingRequests()
+
+			// reset last new view timeout after commit one block successfully.
+			rbft.vcMgr.lastNewViewTimeout = rbft.timerMgr.getTimeoutValue(newViewTimer)
+			if state.MetaState.Height == rbft.vcMgr.viewChangeSeqNo {
+				rbft.logger.Warningf("Replica %d cycling view for seqNo=%d", rbft.peerMgr.selfID, state.MetaState.Height)
+				rbft.sendViewChange()
+			}
+
+			rbft.logger.Debugf("Replica %d start reprocess cache events after checkpoint batch, seqNo=%d, cache events size=%d", rbft.peerMgr.selfID, rbft.exec.lastExec, len(rbft.storeMgr.beforeCheckpointEventCache))
+			rbft.reProcessCacheEvents()
+			rbft.logger.Debugf("Replica %d after reprocess cache events after checkpoint batch, seqNo=%d", rbft.peerMgr.selfID, rbft.exec.lastExec)
 		} else {
 			// reqBatch call execute but have not done with execute
 			rbft.logger.Errorf("Fail to call the checkpoint, seqNo=%d", rbft.exec.lastExec)
 		}
-	} else if rbft.exec.lastExec%rbft.chainConfig.EpochInfo.ConsensusParams.CheckpointPeriod == 0 {
-		state, ok := <-rbft.cpChan
-		if !ok {
-			rbft.logger.Info("checkpoint channel closed")
-			return
-		}
-
+	} else if state.MetaState.Height%rbft.chainConfig.EpochInfo.ConsensusParams.CheckpointPeriod == 0 {
 		if state.MetaState.Height == rbft.exec.lastExec {
 			rbft.logger.Debugf("Call the checkpoint for normal, seqNo=%d", rbft.exec.lastExec)
 			rbft.checkpoint(state, false)
+			rbft.off(waitCheckpointBatchExecute)
+
+			rbft.startTimerIfOutstandingRequests()
+
+			// reset last new view timeout after commit one block successfully.
+			rbft.vcMgr.lastNewViewTimeout = rbft.timerMgr.getTimeoutValue(newViewTimer)
+			if state.MetaState.Height == rbft.vcMgr.viewChangeSeqNo {
+				rbft.logger.Warningf("Replica %d cycling view for seqNo=%d", rbft.peerMgr.selfID, state.MetaState.Height)
+				rbft.sendViewChange()
+			}
+
+			rbft.logger.Debugf("Replica %d start reprocess cache events after checkpoint batch, seqNo=%d, cache events size=%d", rbft.peerMgr.selfID, rbft.exec.lastExec, len(rbft.storeMgr.beforeCheckpointEventCache))
+			rbft.reProcessCacheEvents()
+			rbft.logger.Debugf("Replica %d after reprocess cache events after checkpoint batch, seqNo=%d", rbft.peerMgr.selfID, rbft.exec.lastExec)
 		} else {
 			// reqBatch call execute but have not done with execute
-			rbft.logger.Errorf("Fail to call the checkpoint, seqNo=%d", rbft.exec.lastExec)
+			rbft.logger.Errorf("Fail to call the checkpoint, lastExec=%d, report height=%d", rbft.exec.lastExec, state.MetaState.Height)
 		}
 	}
 }
@@ -2138,6 +2259,7 @@ func (rbft *rbftImpl[T, Constraint]) moveWatermarks(n uint64, newEpoch bool) {
 
 	for digest, idx := range rbft.storeMgr.missingBatchesInFetching {
 		if idx.n <= h {
+			rbft.logger.Debugf("Clean old missingBatchesInFetching, batch=%s", digest)
 			delete(rbft.storeMgr.missingBatchesInFetching, digest)
 		}
 	}

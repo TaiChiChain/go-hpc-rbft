@@ -5,11 +5,13 @@ import (
 
 	"github.com/google/btree"
 
+	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
 )
 
 type transactionStore[T any, Constraint consensus.TXConstraint[T]] struct {
-	logger Logger
+	logger common.Logger
+
 	// track all valid tx hashes cached in txpool
 	txHashMap map[string]*txPointer
 
@@ -47,7 +49,7 @@ type transactionStore[T any, Constraint consensus.TXConstraint[T]] struct {
 	removeTTLIndex *btreeIndex[T, Constraint]
 }
 
-func newTransactionStore[T any, Constraint consensus.TXConstraint[T]](f GetAccountNonceFunc, logger Logger) *transactionStore[T, Constraint] {
+func newTransactionStore[T any, Constraint consensus.TXConstraint[T]](f GetAccountNonceFunc, logger common.Logger) *transactionStore[T, Constraint] {
 	return &transactionStore[T, Constraint]{
 		logger:               logger,
 		priorityNonBatchSize: 0,

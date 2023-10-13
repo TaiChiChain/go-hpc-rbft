@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
+	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/common/metrics/disabled"
 	"github.com/axiomesh/axiom-bft/txpool"
@@ -19,7 +20,7 @@ import (
 // ============================================
 func newMockRbft[T any, Constraint consensus.TXConstraint[T]](t *testing.T, ctrl *gomock.Controller) *rbftImpl[T, Constraint] {
 	pool := txpool.NewMockTxPool[T, Constraint](ctrl)
-	log := newRawLogger()
+	log := common.NewSimpleLogger()
 	external := NewMockMinimalExternal[T, Constraint](ctrl)
 
 	conf := Config{
@@ -100,7 +101,7 @@ func TestRBFT_consensusMessageFilter(t *testing.T) {
 	sync := nodes[2].broadcastMessageCache
 	assert.Equal(t, consensus.Type_SYNC_STATE, sync.Type)
 	sync.Epoch = uint64(5)
-	rbfts[1].consensusMessageFilter(context.TODO(), sync.ConsensusMessage)
+	rbfts[1].consensusMessageFilter(context.TODO(), sync, sync.ConsensusMessage)
 
 	tx := newTx()
 	rbfts[0].batchMgr.requestPool.AddNewRequests([]*consensus.FltTransaction{tx}, false, true, false, true)
@@ -112,7 +113,7 @@ func TestRBFT_consensusMessageFilter(t *testing.T) {
 	preprepMsg := nodes[0].broadcastMessageCache
 	assert.Equal(t, consensus.Type_PRE_PREPARE, preprepMsg.Type)
 	preprepMsg.Epoch = uint64(5)
-	rbfts[1].consensusMessageFilter(context.TODO(), preprepMsg.ConsensusMessage)
+	rbfts[1].consensusMessageFilter(context.TODO(), preprepMsg, preprepMsg.ConsensusMessage)
 }
 
 // ============================================

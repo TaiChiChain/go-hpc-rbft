@@ -19,6 +19,7 @@ import (
 
 	"github.com/samber/lo"
 
+	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/types"
 )
@@ -29,7 +30,7 @@ This file provides a mechanism to manage the memory storage in RBFT
 
 // storeManager manages consensus store data structures for RBFT.
 type storeManager[T any, Constraint consensus.TXConstraint[T]] struct {
-	logger Logger
+	logger common.Logger
 
 	// track quorum certificates for messages
 	certStore map[msgID]*msgCert
@@ -75,6 +76,8 @@ type storeManager[T any, Constraint consensus.TXConstraint[T]] struct {
 
 	// higher view -> cache msg
 	wrfHighViewMsgCache map[uint64]*wrfHighViewCacheMsg
+
+	beforeCheckpointEventCache []consensusEvent
 }
 
 type wrfHighViewCacheMsg struct {

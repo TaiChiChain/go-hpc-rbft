@@ -1,10 +1,9 @@
 package txpool
 
 import (
-	"fmt"
-	"log"
 	"time"
 
+	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
 )
 
@@ -42,7 +41,7 @@ type Config struct {
 	ToleranceNonceGap   uint64
 	ToleranceTime       time.Duration
 	ToleranceRemoveTime time.Duration
-	Logger              Logger
+	Logger              common.Logger
 	GetAccountNonce     GetAccountNonceFunc
 }
 
@@ -56,83 +55,4 @@ type internalTransaction[T any, Constraint consensus.TXConstraint[T]] struct {
 type txPointer struct {
 	account string
 	nonce   uint64
-}
-
-// Logger is the txpool logger interface which managers logger output.
-type Logger interface {
-	Debug(v ...any)
-	Debugf(format string, v ...any)
-
-	Info(v ...any)
-	Infof(format string, v ...any)
-
-	Notice(v ...any)
-	Noticef(format string, v ...any)
-
-	Warning(v ...any)
-	Warningf(format string, v ...any)
-
-	Error(v ...any)
-	Errorf(format string, v ...any)
-
-	Critical(v ...any)
-	Criticalf(format string, v ...any)
-}
-
-type LogWrapper struct {
-	logger *log.Logger
-}
-
-func NewLogWrapper() Logger {
-	return &LogWrapper{
-		logger: log.New(log.Writer(), "", log.Lshortfile|log.Ldate|log.Ltime),
-	}
-}
-
-func (lw *LogWrapper) Debug(v ...any) {
-	lw.logger.Println("[DEBUG]", fmt.Sprint(v...))
-}
-
-func (lw *LogWrapper) Debugf(format string, v ...any) {
-	lw.logger.Printf("[DEBUG] "+format, v...)
-}
-
-func (lw *LogWrapper) Info(v ...any) {
-	lw.logger.Println("[INFO]", fmt.Sprint(v...))
-}
-
-func (lw *LogWrapper) Infof(format string, v ...any) {
-	lw.logger.Printf("[INFO] "+format, v...)
-}
-
-func (lw *LogWrapper) Notice(v ...any) {
-	lw.logger.Println("[NOTICE]", fmt.Sprint(v...))
-}
-
-func (lw *LogWrapper) Noticef(format string, v ...any) {
-	lw.logger.Printf("[NOTICE] "+format, v...)
-}
-
-func (lw *LogWrapper) Warning(v ...any) {
-	lw.logger.Println("[WARNING]", fmt.Sprint(v...))
-}
-
-func (lw *LogWrapper) Warningf(format string, v ...any) {
-	lw.logger.Printf("[WARNING] "+format, v...)
-}
-
-func (lw *LogWrapper) Error(v ...any) {
-	lw.logger.Println("[ERROR]", fmt.Sprint(v...))
-}
-
-func (lw *LogWrapper) Errorf(format string, v ...any) {
-	lw.logger.Printf("[ERROR] "+format, v...)
-}
-
-func (lw *LogWrapper) Critical(v ...any) {
-	lw.logger.Println("[CRITICAL]", fmt.Sprint(v...))
-}
-
-func (lw *LogWrapper) Criticalf(format string, v ...any) {
-	lw.logger.Printf("[CRITICAL] "+format, v...)
 }

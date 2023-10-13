@@ -19,6 +19,7 @@ import (
 
 	"github.com/gogo/protobuf/proto"
 
+	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
 )
 
@@ -30,7 +31,7 @@ This file contains recovery related issues
 type recoveryManager struct {
 	syncRspStore map[uint64]*consensus.SyncStateResponse // store sync state response
 
-	logger Logger
+	logger common.Logger
 }
 
 // newRecoveryMgr news an instance of recoveryManager

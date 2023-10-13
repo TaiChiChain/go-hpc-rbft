@@ -222,6 +222,12 @@ func (rbft *rbftImpl[T, Constraint]) maybeSendPrePrepare(batch *RequestBatch[T, 
 		nextBatch *RequestBatch[T, Constraint]
 	)
 
+	if rbft.in(waitCheckpointBatchExecute) {
+		rbft.logger.Debugf("Replica %d is wait checkpoint block %d executed, not sending prePrepare",
+			rbft.peerMgr.selfID, rbft.exec.lastExec)
+		return
+	}
+
 	nextSeqNo = rbft.batchMgr.getSeqNo() + 1
 	// restrict the speed of sending prePrepare.
 	if rbft.beyondRange(nextSeqNo) || !rbft.inPrimaryTerm() {

@@ -42,6 +42,7 @@ const (
 	SkipInProgress // node try to state update
 	byzantine      // byzantine
 	inEpochSyncing // in epoch syncing, used to block consensus progress until sync to epoch change height.
+	waitCheckpointBatchExecute
 )
 
 // NodeStatus reflects the internal consensus status.

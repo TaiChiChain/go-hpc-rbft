@@ -73,6 +73,8 @@ const (
 	CoreNullRequestTimerEvent
 	CoreCheckPoolTimerEvent
 	CoreStateUpdatedEvent
+	CoreCheckpointBlockExecutedEvent
+	CoreFindNextPrepareBatchsEvent
 	CoreHighWatermarkEvent
 	CoreCheckPoolRemoveTimerEvent
 	CoreNoTxBatchTimerEvent
@@ -102,6 +104,31 @@ const (
 	EpochMgrService
 	NotSupportService
 )
+
+var cannotProcessEventWhenWaitCheckpoint = -1
+
+var canProcessEventsWhenWaitCheckpoint = map[int]struct{}{
+	// CoreRbftService
+	CoreCheckpointBlockExecutedEvent: {},
+	CoreCheckPoolTimerEvent:          {},
+	CoreCheckPoolRemoveTimerEvent:    {},
+}
+
+var canProcessMsgsWhenWaitCheckpoint = map[consensus.Type]struct{}{
+	// CoreRbftService
+	consensus.Type_FETCH_MISSING_REQUEST: {},
+
+	// RecoveryService
+	consensus.Type_SYNC_STATE:          {},
+	consensus.Type_SYNC_STATE_RESPONSE: {},
+	consensus.Type_FETCH_PQC_REQUEST:   {},
+	consensus.Type_FETCH_PQC_RESPONSE:  {},
+
+	// EpochMgrService
+	consensus.Type_FETCH_CHECKPOINT:     {},
+	consensus.Type_EPOCH_CHANGE_REQUEST: {},
+	consensus.Type_EPOCH_CHANGE_PROOF:   {},
+}
 
 type RequestSet[T any, Constraint consensus.TXConstraint[T]] struct {
 	Requests []*T
