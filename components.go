@@ -179,6 +179,7 @@ type RequestBatch[T any, Constraint consensus.TXConstraint[T]] struct {
 	SeqNo           uint64
 	LocalList       []bool
 	BatchHash       string
+	Proposer        uint64
 }
 
 func (b *RequestBatch[T, Constraint]) ToPB() (*consensus.RequestBatch, error) {
@@ -193,6 +194,7 @@ func (b *RequestBatch[T, Constraint]) ToPB() (*consensus.RequestBatch, error) {
 		SeqNo:           b.SeqNo,
 		LocalList:       b.LocalList,
 		BatchHash:       b.BatchHash,
+		Proposer:        b.Proposer,
 	}, nil
 }
 
@@ -207,6 +209,7 @@ func (b *RequestBatch[T, Constraint]) FromPB(pb *consensus.RequestBatch) error {
 	b.SeqNo = pb.SeqNo
 	b.LocalList = pb.LocalList
 	b.BatchHash = pb.BatchHash
+	b.Proposer = pb.Proposer
 	return nil
 }
 
