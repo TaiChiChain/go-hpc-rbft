@@ -1,16 +1,11 @@
 package rbft
 
 import (
-	"fmt"
-	"os"
-	"path/filepath"
 	"reflect"
-	"runtime"
 	"testing"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/axiomesh/axiom-bft/common/consensus"
@@ -94,7 +89,7 @@ func executeExceptN[T any, Constraint consensus.TXConstraint[T]](t *testing.T, r
 		if index == primaryIndex || index == notExec {
 			continue
 		}
-		t.Logf("%d process pre-prepare", rbfts[index].peerMgr.selfID)
+		nodes[primaryIndex].Logger.Debug("process pre-prepare")
 		rbfts[index].processEvent(preprepMsg)
 		prepMsg[index] = nodes[index].broadcastMessageCache
 		assert.Equal(t, consensus.Type_PREPARE, prepMsg[index].Type)
@@ -151,30 +146,6 @@ func executeExceptN[T any, Constraint consensus.TXConstraint[T]](t *testing.T, r
 	}
 
 	return retMessages
-}
-
-// =============================================================================
-// Tools for Cluster Check Stable State
-// =============================================================================
-
-// newRawLogger create log file for local cluster tests
-func newRawLogger() *testLogger {
-	logger := logrus.New()
-	logger.SetFormatter(&logrus.TextFormatter{
-		ForceColors:     true,
-		FullTimestamp:   true,
-		TimestampFormat: "2006-01-02T15:04:05.000",
-		CallerPrettyfier: func(f *runtime.Frame) (string, string) {
-			_, filename := filepath.Split(f.File)
-			return "", fmt.Sprintf("%12s:%-4d", filename, f.Line)
-		},
-	})
-	logger.SetReportCaller(false)
-	logger.SetOutput(os.Stdout)
-	logger.SetLevel(logrus.DebugLevel)
-	return &testLogger{
-		FieldLogger: logger,
-	}
 }
 
 // set N/f of cluster

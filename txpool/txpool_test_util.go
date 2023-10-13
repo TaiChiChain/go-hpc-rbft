@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
 )
 
@@ -14,7 +15,7 @@ const (
 )
 
 func mockTxPoolImpl[T any, Constraint consensus.TXConstraint[T]]() *txPoolImpl[T, Constraint] {
-	return  newTxPoolImpl[T, Constraint](NewMockTxPoolConfig())
+	return newTxPoolImpl[T, Constraint](NewMockTxPoolConfig())
 }
 
 // NewMockTxPoolConfig returns the default test config
@@ -22,7 +23,7 @@ func NewMockTxPoolConfig() Config {
 	poolConfig := Config{
 		BatchSize:     DefaultTestBatchSize,
 		PoolSize:      DefaultPoolSize,
-		Logger:        NewRawLogger(),
+		Logger:        common.NewSimpleLogger(),
 		ToleranceTime: DefaultToleranceTime,
 		GetAccountNonce: func(address string) uint64 {
 			return 0
@@ -51,8 +52,4 @@ func ConstructTxByAccountAndNonce(account string, nonce uint64) *consensus.FltTr
 	fromStr := hex.EncodeToString(from)
 	tx := newMockFltTx(fromStr, int64(nonce))
 	return &tx
-}
-
-func NewRawLogger() Logger {
-	return NewLogWrapper()
 }

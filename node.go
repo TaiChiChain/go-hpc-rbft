@@ -18,6 +18,7 @@ import (
 	"context"
 	"sync"
 
+	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/txpool"
 	"github.com/axiomesh/axiom-bft/types"
@@ -102,7 +103,7 @@ type node[T any, Constraint consensus.TXConstraint[T]] struct {
 	currentState *types.ServiceState
 
 	config Config
-	logger Logger
+	logger common.Logger
 }
 
 // NewNode initializes a Node service.

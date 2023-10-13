@@ -18,11 +18,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
-	"fmt"
 	"time"
 
 	"github.com/gogo/protobuf/proto"
 
+	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/common/metrics"
 	"github.com/axiomesh/axiom-bft/txpool"
@@ -60,7 +60,7 @@ type vcManager struct {
 	// track higher view from other nodes, map node id to view.
 	higherViewRecord map[uint64]uint64
 
-	logger Logger
+	logger common.Logger
 }
 
 // quorumViewChangeCache is the cache of a QuorumViewChange message.
@@ -858,10 +858,8 @@ func (rbft *rbftImpl[T, Constraint]) recvRecoveryResponse(rcr *consensus.Recover
 	// this targetView.
 	if rbft.atomicIn(InRecovery) {
 		if rcr.GenesisBlockDigest != rbft.config.GenesisBlockDigest {
-			errMsg := fmt.Sprintf("Replica %d self genesis config is not consistent with most nodes, expected genesis block hash: %s, self genesis block hash: %s",
+			rbft.logger.Criticalf("Replica %d self genesis config is not consistent with most nodes, expected genesis block hash: %s, self genesis block hash: %s",
 				rbft.peerMgr.selfID, rcr.GenesisBlockDigest, rbft.config.GenesisBlockDigest)
-			rbft.logger.Error(errMsg)
-			panic(errMsg)
 		}
 		nv := rcr.GetNewView()
 		targetView, nvHash, _, valid := rbft.checkNewView(nv)
@@ -1408,11 +1406,8 @@ func (rbft *rbftImpl[T, Constraint]) selectInitialCheckpoint(set []*consensus.Vc
 
 	if initialCheckpointState.Meta.Height == rbft.config.GenesisEpochInfo.StartBlock {
 		if initialCheckpointState.Meta.Digest != rbft.config.GenesisBlockDigest {
-			errMsg := fmt.Sprintf("Replica %d self genesis config is not consistent with most nodes, expected genesis block hash: %s, self genesis block hash: %s",
+			rbft.logger.Criticalf("Replica %d self genesis config is not consistent with most nodes, expected genesis block hash: %s, self genesis block hash: %s",
 				rbft.peerMgr.selfID, initialCheckpointState.Meta.Digest, rbft.config.GenesisBlockDigest)
-			rbft.logger.Error(errMsg)
-			panic(errMsg)
-			return nil, nil, false
 		}
 	}
 

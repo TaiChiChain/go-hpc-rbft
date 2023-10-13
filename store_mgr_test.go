@@ -7,12 +7,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
+	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/common/metrics/disabled"
 )
 
 func newStorageTestNode[T any, Constraint consensus.TXConstraint[T]](ctrl *gomock.Controller) (*storeManager[T, Constraint], Config) {
-	log := newRawLogger()
+	log := common.NewSimpleLogger()
 
 	conf := Config{
 		SelfAccountAddress: "node2",

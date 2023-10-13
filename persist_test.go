@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
+	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/common/metrics/disabled"
 	"github.com/axiomesh/axiom-bft/txpool"
@@ -18,7 +19,7 @@ import (
 
 func newPersistTestReplica[T any, Constraint consensus.TXConstraint[T]](ctrl *gomock.Controller) (*node[T, Constraint], *MockExternalStack[T, Constraint]) {
 	pool := txpool.NewMockMinimalTxPool[T, Constraint](ctrl)
-	log := newRawLogger()
+	log := common.NewSimpleLogger()
 	ext := NewMockExternalStack[T, Constraint](ctrl)
 	ext.EXPECT().Sign(gomock.Any()).Return(nil, nil).AnyTimes()
 	ext.EXPECT().Verify(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()

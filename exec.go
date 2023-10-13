@@ -222,8 +222,6 @@ func (rbft *rbftImpl[T, Constraint]) handleCoreRbftEvent(e *LocalEvent) consensu
 			return nil
 		}
 
-		rbft.logger.Debugf("Primary %d no-tx batch timer expired, try to create a no-tx batch", rbft.peerMgr.selfID)
-
 		if rbft.atomicIn(InConfChange) {
 			rbft.logger.Debugf("Replica %d is processing a config transaction, cannot generate no-tx batches", rbft.peerMgr.selfID)
 			rbft.restartNoTxBatchTimer()
@@ -235,6 +233,7 @@ func (rbft *rbftImpl[T, Constraint]) handleCoreRbftEvent(e *LocalEvent) consensu
 			rbft.stopNoTxBatchTimer()
 			return nil
 		}
+		rbft.logger.Debugf("Primary %d no-tx batch timer expired, try to create a no-tx batch", rbft.peerMgr.selfID)
 		rbft.stopNoTxBatchTimer()
 
 		// call requestPool module to generate a tx batch
@@ -259,6 +258,20 @@ func (rbft *rbftImpl[T, Constraint]) handleCoreRbftEvent(e *LocalEvent) consensu
 
 	case CoreStateUpdatedEvent:
 		return rbft.recvStateUpdatedEvent(e.Event.(*types.ServiceSyncState))
+
+	case CoreCheckpointBlockExecutedEvent:
+		rbft.recvCheckpointBlockExecutedEvent(e.Event.(*types.ServiceState))
+		return nil
+
+	case CoreFindNextPrepareBatchsEvent:
+		ctx := context.Background()
+		completionMissingBatchIdxs := e.Event.([]msgID)
+		for _, idx := range completionMissingBatchIdxs {
+			rbft.logger.Infof("Replica %d completion batch with hash %s when wait checkpoint, try to prepare this batch",
+				rbft.peerMgr.selfID, idx.d)
+			_ = rbft.findNextPrepareBatch(ctx, idx.v, idx.n, idx.d)
+		}
+		return nil
 
 	case CoreHighWatermarkEvent:
 		if rbft.atomicIn(InViewChange) {
@@ -537,7 +550,7 @@ func (rbft *rbftImpl[T, Constraint]) handleEpochMgrEvent(e *LocalEvent) consensu
 }
 
 // dispatchConsensusMsg dispatches consensus messages to corresponding handlers using its service type
-func (rbft *rbftImpl[T, Constraint]) dispatchConsensusMsg(ctx context.Context, e consensusEvent) consensusEvent {
+func (rbft *rbftImpl[T, Constraint]) dispatchConsensusMsg(ctx context.Context, originEvent consensusEvent, e consensusEvent) consensusEvent {
 	service := rbft.dispatchMsgToService(e)
 	switch service {
 	case CoreRbftService:

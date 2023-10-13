@@ -12,12 +12,13 @@ import (
 	"github.com/pkg/errors"
 	"github.com/samber/lo"
 
+	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
 )
 
 // txPoolImpl contains all currently known transactions.
 type txPoolImpl[T any, Constraint consensus.TXConstraint[T]] struct {
-	logger              Logger
+	logger              common.Logger
 	selfID              uint64
 	batchSize           uint64
 	isTimed             bool

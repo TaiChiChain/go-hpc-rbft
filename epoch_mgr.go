@@ -8,6 +8,7 @@ import (
 	"github.com/gogo/protobuf/proto"
 	"github.com/pkg/errors"
 
+	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/types"
 )
@@ -48,7 +49,7 @@ type epochManager struct {
 	storage Storage // manage non-volatile storage of consensus log
 
 	// logger
-	logger Logger
+	logger common.Logger
 
 	config Config
 }
@@ -317,10 +318,8 @@ func (em *epochManager) processEpochChangeProof(proof *consensus.EpochChangeProo
 	}
 
 	if proof.GenesisBlockDigest != em.config.GenesisBlockDigest {
-		errMsg := fmt.Sprintf("Replica %d reject epoch change proof, because self genesis config is not consistent with most nodes, expected genesis block hash: %s, self genesis block hash: %s",
+		em.logger.Criticalf("Replica %d reject epoch change proof, because self genesis config is not consistent with most nodes, expected genesis block hash: %s, self genesis block hash: %s",
 			em.peerMgr.selfID, proof.GenesisBlockDigest, em.config.GenesisBlockDigest)
-		em.logger.Error(errMsg)
-		panic(errMsg)
 		return nil
 	}
 

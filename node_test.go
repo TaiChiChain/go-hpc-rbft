@@ -142,8 +142,11 @@ func TestNode_ReportExecuted(t *testing.T) {
 	}
 	go func() {
 		n.ReportExecuted(state4)
-		obj := <-n.rbft.cpChan
-		assert.Equal(t, state4, obj)
+		obj := <-n.rbft.recvChan
+		e, ok := obj.(*LocalEvent)
+		assert.True(t, ok)
+		assert.Equal(t, CoreCheckpointBlockExecutedEvent, e.EventType)
+		assert.Equal(t, state4, e.Event)
 	}()
 }
 

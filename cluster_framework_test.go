@@ -3,44 +3,20 @@ package rbft
 import (
 	"context"
 	"encoding/hex"
+	"fmt"
 	"math/rand"
 	"strconv"
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel/trace"
 
+	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/common/metrics/disabled"
 	"github.com/axiomesh/axiom-bft/txpool"
 	"github.com/axiomesh/axiom-bft/types"
 )
-
-type testLogger struct {
-	logrus.FieldLogger
-}
-
-// Trace implements rbft.Logger.
-func (lg *testLogger) Trace(name string, stage string, content any) {
-	lg.Info(name, stage, content)
-}
-
-func (lg *testLogger) Critical(v ...any) {
-	lg.Info(v...)
-}
-
-func (lg *testLogger) Criticalf(format string, v ...any) {
-	lg.Infof(format, v...)
-}
-
-func (lg *testLogger) Notice(v ...any) {
-	lg.Info(v...)
-}
-
-func (lg *testLogger) Noticef(format string, v ...any) {
-	lg.Infof(format, v...)
-}
 
 var peerSet = []*NodeInfo{
 	{
@@ -90,11 +66,13 @@ type testFramework[T any, Constraint consensus.TXConstraint[T]] struct {
 	delFlag chan bool
 
 	// Write logger to record some info.
-	log Logger
+	log common.Logger
 }
 
 // testNode contains the parameters of one node instance.
 type testNode[T any, Constraint consensus.TXConstraint[T]] struct {
+	Logger common.Logger
+
 	// Node is provided for application to contact wih RBFT core.
 	N Node[T, Constraint]
 
@@ -202,7 +180,7 @@ func newTestFramework[T any, Constraint consensus.TXConstraint[T]](account int) 
 
 		delFlag: delFlag,
 
-		log: newRawLogger(),
+		log: common.NewSimpleLogger(),
 	}
 
 	tf.log.Debugf("routers:")
@@ -225,7 +203,7 @@ func newTestFramework[T any, Constraint consensus.TXConstraint[T]](account int) 
 // newNodeConfig init the Config of Node.
 func (tf *testFramework[T, Constraint]) newNodeConfig(
 	p2pNodeID string,
-	log Logger,
+	log common.Logger,
 	epoch uint64) Config {
 	return Config{
 		GenesisEpochInfo: &EpochInfo{
@@ -271,8 +249,8 @@ func (tf *testFramework[T, Constraint]) newNodeConfig(
 // newTestNode init the testNode instance
 func (tf *testFramework[T, Constraint]) newTestNode(id uint64, p2pNodeID string, cc chan *channelMsg) *testNode[T, Constraint] {
 	// Init logger
-	log := newRawLogger()
-
+	log := common.NewSimpleLogger()
+	log.SetPrefix(fmt.Sprintf("[node%d] ", id))
 	// Simulation Function of External
 	var ext ExternalStack[T, Constraint]
 	testExt := &testExternal[T, Constraint]{
@@ -305,6 +283,7 @@ func (tf *testFramework[T, Constraint]) newTestNode(id uint64, p2pNodeID string,
 	// init new view.
 	n.rbft.vcMgr.latestNewView = initialNewView
 	tn := &testNode[T, Constraint]{
+		Logger:     log,
 		N:          n,
 		n:          n,
 		Router:     peerSet,
@@ -409,7 +388,7 @@ func (ext *testExternal[T, Constraint]) Broadcast(ctx context.Context, msg *cons
 		msg: msg,
 		to:  "",
 	}
-	ext.tf.log.Debugf("%d broadcast msg %v", ext.testNode.ID, msg.Type)
+	ext.tf.log.Infof("[node%d] Broadcast msg %v", ext.testNode.ID, msg.Type)
 	ext.testNode.broadcastMessageCache = &consensusMessageWrapper{
 		ctx:              ctx,
 		ConsensusMessage: msg,
@@ -524,7 +503,7 @@ func (ext *testExternal[T, Constraint]) StateUpdate(localLowWatermark, seqNo uin
 		Height: ext.testNode.Applied,
 		Digest: ext.testNode.Digest,
 	}
-	ext.tf.log.Infof("Replica %d report state updated state: %+v", ext.testNode.ID, state)
+	ext.tf.log.Infof("[node%d] Report state updated state: %+v", ext.testNode.ID, state)
 	ext.testNode.N.ReportStateUpdated(&types.ServiceSyncState{
 		ServiceState: *state,
 		EpochChanged: false,
