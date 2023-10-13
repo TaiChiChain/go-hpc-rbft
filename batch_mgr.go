@@ -360,6 +360,7 @@ func (rbft *rbftImpl[T, Constraint]) findNextPrepareBatch(ctx context.Context, v
 		SeqNo:           prePrep.SequenceNumber,
 		LocalList:       localList,
 		BatchHash:       d,
+		Proposer:        prePrep.HashBatch.Proposer,
 	}
 
 	// store batch to outstandingReqBatches until execute this batch

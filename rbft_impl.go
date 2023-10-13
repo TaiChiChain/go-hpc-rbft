@@ -993,6 +993,7 @@ func (rbft *rbftImpl[T, Constraint]) recvRequestBatch(reqBatch *txpool.RequestHa
 		SeqNo:           rbft.batchMgr.getSeqNo() + 1,
 		LocalList:       reqBatch.LocalList,
 		BatchHash:       reqBatch.BatchHash,
+		Proposer:        rbft.peerMgr.selfID,
 	}
 
 	// primary node should reject generate batch when there is a config batch in ordering.
@@ -1039,6 +1040,7 @@ func (rbft *rbftImpl[T, Constraint]) sendPrePrepare(seqNo uint64, digest string,
 	hashBatch := &consensus.HashBatch{
 		RequestHashList: reqBatch.RequestHashList,
 		Timestamp:       reqBatch.Timestamp,
+		Proposer:        reqBatch.Proposer,
 	}
 
 	preprepare := &consensus.PrePrepare{
@@ -1605,7 +1607,7 @@ func (rbft *rbftImpl[T, Constraint]) commitPendingBlocks() {
 
 			var proposerAccount string
 			if cert != nil && cert.prePrepare != nil {
-				proposer := rbft.peerMgr.nodes[cert.prePrepare.ReplicaId]
+				proposer := rbft.peerMgr.nodes[cert.prePrepare.HashBatch.Proposer]
 				if proposer != nil {
 					proposerAccount = proposer.AccountAddress
 				} else {

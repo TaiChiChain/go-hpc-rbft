@@ -88,6 +88,7 @@ message hash_batch {
     repeated string request_hash_list = 1;
     repeated string de_duplicate_request_hash_list = 2;
     int64 timestamp = 3;
+    uint64 proposer = 4;
 }
 
 message fetch_checkpoint {
@@ -161,6 +162,7 @@ message request_batch {
     uint64 seq_no = 4;
     repeated bool local_list = 5;
     string batch_hash = 6;
+    uint64 proposer = 7;
 }
 
 message fetch_missing_request {

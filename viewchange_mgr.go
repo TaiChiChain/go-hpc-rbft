@@ -1613,10 +1613,11 @@ func (rbft *rbftImpl[T, Constraint]) processNewView(msgList []*consensus.Vc_PQ) 
 			ReplicaId:      rbft.chainConfig.PrimaryID,
 		}
 		if d == "" {
-			rbft.logger.Infof("Replica %d need to process seqNo %d as a null request", rbft.peerMgr.selfID, n)
+			rbft.logger.Infof("Replica %d need to process seqNo %d as a null request, proposer:%d", rbft.peerMgr.selfID, n, rbft.chainConfig.PrimaryID)
 			// construct prePrepare with an empty batch
 			prePrep.HashBatch = &consensus.HashBatch{
 				RequestHashList: []string{},
+				Proposer:        rbft.chainConfig.PrimaryID,
 			}
 		} else {
 			// put un-executed batch into outstandingReqBatches, if replica cannot execute this batch
@@ -1629,6 +1630,7 @@ func (rbft *rbftImpl[T, Constraint]) processNewView(msgList []*consensus.Vc_PQ) 
 			prePrep.HashBatch = &consensus.HashBatch{
 				RequestHashList: batch.RequestHashList,
 				Timestamp:       batch.Timestamp,
+				Proposer:        batch.Proposer,
 			}
 
 			// re-construct batches by order in xSet to de-duplicate txs during different batches in msgList which
