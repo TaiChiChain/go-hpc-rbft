@@ -560,6 +560,10 @@ func (p *txPoolImpl[T, Constraint]) HasPendingRequestInPool() bool {
 	return p.txStore.priorityNonBatchSize > 0
 }
 
+func (p *txPoolImpl[T, Constraint]) PendingRequestsNumberIsReady() bool {
+	return p.txStore.priorityNonBatchSize >= p.batchSize
+}
+
 func (p *txPoolImpl[T, Constraint]) SendMissingRequests(batchHash string, missingHashList map[uint64]string) (
 	txs map[uint64]*T, err error) {
 	for _, txHash := range missingHashList {

@@ -461,6 +461,44 @@ func (c *TxPoolIsPoolFullCall[T, Constraint]) DoAndReturn(f func() bool) *TxPool
 	return c
 }
 
+// PendingRequestsNumberIsReady mocks base method.
+func (m *MockTxPool[T, Constraint]) PendingRequestsNumberIsReady() bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PendingRequestsNumberIsReady")
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// PendingRequestsNumberIsReady indicates an expected call of PendingRequestsNumberIsReady.
+func (mr *MockTxPoolMockRecorder[T, Constraint]) PendingRequestsNumberIsReady() *TxPoolPendingRequestsNumberIsReadyCall[T, Constraint] {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PendingRequestsNumberIsReady", reflect.TypeOf((*MockTxPool[T, Constraint])(nil).PendingRequestsNumberIsReady))
+	return &TxPoolPendingRequestsNumberIsReadyCall[T, Constraint]{Call: call}
+}
+
+// TxPoolPendingRequestsNumberIsReadyCall wrap *gomock.Call
+type TxPoolPendingRequestsNumberIsReadyCall[T any, Constraint consensus.TXConstraint[T]] struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *TxPoolPendingRequestsNumberIsReadyCall[T, Constraint]) Return(arg0 bool) *TxPoolPendingRequestsNumberIsReadyCall[T, Constraint] {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *TxPoolPendingRequestsNumberIsReadyCall[T, Constraint]) Do(f func() bool) *TxPoolPendingRequestsNumberIsReadyCall[T, Constraint] {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *TxPoolPendingRequestsNumberIsReadyCall[T, Constraint]) DoAndReturn(f func() bool) *TxPoolPendingRequestsNumberIsReadyCall[T, Constraint] {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // ReConstructBatchByOrder mocks base method.
 func (m *MockTxPool[T, Constraint]) ReConstructBatchByOrder(oldBatch *RequestHashBatch[T, Constraint]) ([]string, error) {
 	m.ctrl.T.Helper()
