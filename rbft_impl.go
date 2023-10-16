@@ -111,6 +111,9 @@ type Config struct {
 
 	// CheckPoolRemoveTimeout is the max time duration before one removing tx from pool.
 	CheckPoolRemoveTimeout time.Duration
+
+	// MinimumNumberOfBatchesToRetainAfterCheckpoint is Minimum number of batches to retain after checkpoint
+	MinimumNumberOfBatchesToRetainAfterCheckpoint uint64
 }
 
 // rbftImpl is the core struct of RBFT service, which handles all functions about consensus.
@@ -166,6 +169,13 @@ func newRBFT[T any, Constraint consensus.TXConstraint[T]](c Config, external Ext
 	if !isTest {
 		if c.GenesisEpochInfo.Epoch != 1 || c.GenesisEpochInfo.StartBlock != 1 {
 			return nil, fmt.Errorf("epoch info error: genesis epoch and start_block must be 1, but get epoch: %d, start_block: %d", c.GenesisEpochInfo.Epoch, c.GenesisEpochInfo.StartBlock)
+		}
+	}
+	if c.MinimumNumberOfBatchesToRetainAfterCheckpoint == 0 {
+		if !isTest {
+			c.MinimumNumberOfBatchesToRetainAfterCheckpoint = 10
+		} else {
+			c.MinimumNumberOfBatchesToRetainAfterCheckpoint = c.GenesisEpochInfo.ConsensusParams.CheckpointPeriod
 		}
 	}
 
@@ -271,6 +281,7 @@ func (rbft *rbftImpl[T, Constraint]) init() error {
 	rbft.logger.Infof("RBFT log size (L) = %v", rbft.chainConfig.L)
 	rbft.logger.Infof("RBFT ID: %d", rbft.peerMgr.selfID)
 	rbft.logger.Infof("RBFT isTimed: %v", rbft.chainConfig.EpochInfo.ConsensusParams.EnableTimedGenEmptyBlock)
+	rbft.logger.Infof("RBFT minimum number of batches to retain after checkpoint = %v", rbft.config.MinimumNumberOfBatchesToRetainAfterCheckpoint)
 
 	if err := rbft.batchMgr.requestPool.Init(rbft.peerMgr.selfID); err != nil {
 		return err
@@ -2195,11 +2206,21 @@ func (rbft *rbftImpl[T, Constraint]) moveWatermarks(n uint64, newEpoch bool) {
 	} else {
 		target = pos - rbft.chainConfig.EpochInfo.ConsensusParams.CheckpointPeriod
 	}
+	// At least the last k batches are also kept when checkpoint is 1
+	if n-target < rbft.config.MinimumNumberOfBatchesToRetainAfterCheckpoint {
+		if n > rbft.config.MinimumNumberOfBatchesToRetainAfterCheckpoint {
+			target = n - rbft.config.MinimumNumberOfBatchesToRetainAfterCheckpoint
+		} else {
+			target = 0
+		}
+	}
 
+	rbft.logger.Debugf("Replica %d clean batch, seqNo<=%d", rbft.peerMgr.selfID, target)
 	// clean batches every K interval
 	var digestList []string
 	for digest, batch := range rbft.storeMgr.batchStore {
 		if batch.SeqNo <= target {
+			rbft.logger.Debugf("Replica %d clean batch, seqNo=%d, digest=%s", rbft.peerMgr.selfID, batch.SeqNo, digest)
 			delete(rbft.storeMgr.batchStore, digest)
 			rbft.persistDelBatch(digest)
 			digestList = append(digestList, digest)
