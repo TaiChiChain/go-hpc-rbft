@@ -40,6 +40,8 @@ type Config struct {
 
 	GenesisBlockDigest string
 
+	LastCheckpointBlockDigest string
+
 	// self staking account address
 	SelfAccountAddress string
 

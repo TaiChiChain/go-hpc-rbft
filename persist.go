@@ -134,12 +134,12 @@ func (rbft *rbftImpl[T, Constraint]) restoreQSet() (map[msgID]*consensus.PrePrep
 					idx := msgID{v: v, n: n, d: d}
 					qset[idx] = preprep
 				} else {
-					rbft.logger.Warningf("Could not restore prePrepare %v, err: %v", set, err)
+					rbft.logger.Warningf("Replica %d could not restore prePrepare %v, err: %v", rbft.peerMgr.selfID, set, err)
 				}
 			}
 		}
 	} else {
-		rbft.logger.Warningf("Replica %d could not restore qset: %s", rbft.peerMgr.selfID, err)
+		rbft.logger.Debugf("Replica %d could not restore qset: %s", rbft.peerMgr.selfID, err)
 	}
 
 	return qset, err
@@ -168,7 +168,7 @@ func (rbft *rbftImpl[T, Constraint]) restorePSet() (map[msgID]*consensus.Pset, e
 			}
 		}
 	} else {
-		rbft.logger.Warningf("Replica %d could not restore pset: %s", rbft.peerMgr.selfID, err)
+		rbft.logger.Debugf("Replica %d could not restore pset: %s", rbft.peerMgr.selfID, err)
 	}
 
 	return pset, err
@@ -198,7 +198,7 @@ func (rbft *rbftImpl[T, Constraint]) restoreCSet() (map[msgID]*consensus.Cset, e
 			}
 		}
 	} else {
-		rbft.logger.Warningf("Replica %d could not restore cset: %s", rbft.peerMgr.selfID, err)
+		rbft.logger.Debugf("Replica %d could not restore cset: %s", rbft.peerMgr.selfID, err)
 	}
 
 	return cset, err
@@ -478,8 +478,9 @@ func (rbft *rbftImpl[T, Constraint]) restoreView() {
 			rbft.logger.Noticef("========= restore view %d =======", rbft.chainConfig.View)
 			return
 		}
+	} else {
+		rbft.logger.Debugf("Replica %d could not restore view: %s, set to 0", rbft.peerMgr.selfID, err)
 	}
-	rbft.logger.Warningf("Replica %d could not restore view: %s, set to 0", rbft.peerMgr.selfID, err)
 	// initial view 0 in new epoch.
 	rbft.vcMgr.latestNewView = initialNewView
 	rbft.setView(0)
@@ -506,14 +507,14 @@ func (rbft *rbftImpl[T, Constraint]) restoreBatchStore() {
 			}
 		}
 	} else {
-		rbft.logger.Warningf("Replica %d could not restore batch: %v", rbft.peerMgr.selfID, err)
+		rbft.logger.Debugf("Replica %d could not restore batch: %v", rbft.peerMgr.selfID, err)
 	}
 }
 
 func (rbft *rbftImpl[T, Constraint]) restoreEpochInfo() {
 	e, err := rbft.external.GetCurrentEpochInfo()
 	if err != nil {
-		rbft.logger.Warningf("Replica %d failed to get current epoch from ledger: %v, will use genesis epoch info", rbft.peerMgr.selfID, err)
+		rbft.logger.Debugf("Replica %d failed to get current epoch from ledger: %v, will use genesis epoch info", rbft.peerMgr.selfID, err)
 		rbft.chainConfig.EpochInfo = rbft.config.GenesisEpochInfo
 	} else {
 		rbft.chainConfig.EpochInfo = e
@@ -535,22 +536,6 @@ func (rbft *rbftImpl[T, Constraint]) restoreState() error {
 	rbft.restoreView()
 	rbft.restoreBatchStore()
 	rbft.restoreCert()
-
-	// mock an initial checkpoint.
-	state := &types.ServiceState{
-		MetaState: &types.MetaState{
-			Height: rbft.config.GenesisEpochInfo.StartBlock,
-			Digest: rbft.config.GenesisBlockDigest,
-		},
-		Epoch: rbft.config.GenesisEpochInfo.Epoch,
-	}
-	mockCheckpoint, gErr := rbft.generateSignedCheckpoint(state, false)
-	if gErr != nil {
-		rbft.metrics.unregisterMetrics()
-		rbft.metrics = nil
-		return gErr
-	}
-	rbft.storeMgr.saveCheckpoint(state.MetaState.Height, mockCheckpoint)
 
 	chkpts, err := rbft.storage.ReadStateSet("chkpt.")
 	if err == nil {
@@ -578,13 +563,45 @@ func (rbft *rbftImpl[T, Constraint]) restoreState() error {
 			}
 		}
 	} else {
-		rbft.logger.Warningf("Replica %d could not restore checkpoints: %s", rbft.peerMgr.selfID, err)
+		rbft.logger.Debugf("Replica %d could not restore checkpoints: %s", rbft.peerMgr.selfID, err)
+		lastCheckpointBlockNumber := rbft.config.Applied / rbft.config.GenesisEpochInfo.ConsensusParams.CheckpointPeriod * rbft.config.GenesisEpochInfo.ConsensusParams.CheckpointPeriod
+		if rbft.config.GenesisEpochInfo.StartBlock != rbft.config.Applied && lastCheckpointBlockNumber != 0 {
+			// find last checkpoint
+			lastCheckpointState := &types.ServiceState{
+				MetaState: &types.MetaState{
+					Height: lastCheckpointBlockNumber,
+					Digest: rbft.config.LastCheckpointBlockDigest,
+				},
+				Epoch: rbft.chainConfig.EpochInfo.Epoch,
+			}
+			lastCheckpoint, gErr := rbft.generateSignedCheckpoint(lastCheckpointState, isConfigBatch(lastCheckpointState.MetaState.Height, rbft.chainConfig.EpochInfo))
+			if gErr != nil {
+				return gErr
+			}
+			rbft.storeMgr.saveCheckpoint(lastCheckpointState.MetaState.Height, lastCheckpoint)
+			rbft.logger.Debugf("Replica %d construct last checkpoint %s for seqNo %d", rbft.peerMgr.selfID, rbft.config.LastCheckpointBlockDigest, lastCheckpointBlockNumber)
+		} else {
+			// generate genesis checkpoint
+			state := &types.ServiceState{
+				MetaState: &types.MetaState{
+					Height: rbft.config.GenesisEpochInfo.StartBlock,
+					Digest: rbft.config.GenesisBlockDigest,
+				},
+				Epoch: rbft.config.GenesisEpochInfo.Epoch,
+			}
+			genesisCheckpoint, gErr := rbft.generateSignedCheckpoint(state, false)
+			if gErr != nil {
+				return gErr
+			}
+			rbft.storeMgr.saveCheckpoint(state.MetaState.Height, genesisCheckpoint)
+			rbft.logger.Debugf("Replica %d construct genesis checkpoint %s for seqNo %d", rbft.peerMgr.selfID, state.MetaState.Digest, state.MetaState.Height)
+		}
 	}
 	rbft.chainConfig.updatePrimaryID()
 
 	hstr, rErr := rbft.storage.ReadState("rbft.h")
 	if rErr != nil {
-		rbft.logger.Warningf("Replica %d could not restore h: %s", rbft.peerMgr.selfID, rErr)
+		rbft.logger.Debugf("Replica %d could not restore h: %s", rbft.peerMgr.selfID, rErr)
 	} else {
 		h, err := strconv.ParseUint(string(hstr), 10, 64)
 		if err != nil {

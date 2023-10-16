@@ -753,6 +753,9 @@ func (rbft *rbftImpl[T, Constraint]) generateSignedCheckpoint(state *types.Servi
 		},
 		NewView: rbft.chainConfig.View + 1,
 	}
+	if state.Epoch == 0 {
+		checkpoint.Epoch = rbft.chainConfig.EpochInfo.Epoch
+	}
 
 	if isConfig {
 		checkpoint.NeedUpdateEpoch = true

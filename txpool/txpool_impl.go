@@ -91,14 +91,14 @@ func (p *txPoolImpl[T, Constraint]) addNewRequests(txs []*T, isPrimary, local, i
 
 		// ignore duplicate tx
 		if pointer := p.txStore.txHashMap[txHash]; pointer != nil {
-			p.logger.Warningf("Transaction [account: %s, nonce: %d, hash: %s] has already existed in txHashMap, "+
+			p.logger.Debugf("Transaction [account: %s, nonce: %d, hash: %s] has already existed in txHashMap, "+
 				"ignore it", txAccount, txNonce, txHash)
 			continue
 		}
 
 		if p.txStore.allTxs[txAccount] != nil {
 			if oldTx, ok := p.txStore.allTxs[txAccount].items[txNonce]; ok {
-				p.logger.Warningf("Receive duplicate nonce transaction [account: %s, nonce: %d, hash: %s],"+
+				p.logger.Debugf("Receive duplicate nonce transaction [account: %s, nonce: %d, hash: %s],"+
 					" will replace old tx[hash: %s]", txAccount, txNonce, txHash, oldTx.getHash())
 				p.replaceTx(tx, local, ready)
 			}
