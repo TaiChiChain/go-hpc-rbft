@@ -3,7 +3,6 @@ package rbft
 import (
 	"testing"
 
-	"github.com/gogo/protobuf/proto"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/axiomesh/axiom-bft/common/consensus"
@@ -76,10 +75,10 @@ func TestVC_recvViewChange_FromPrimary(t *testing.T) {
 
 	vcPayload := nodes[1].broadcastMessageCache.Payload
 	vc := &consensus.ViewChange{}
-	_ = proto.Unmarshal(vcPayload, vc)
+	_ = vc.UnmarshalVT(vcPayload)
 
 	// backup node3 receive vc and trigger vc.
-	rbfts[2].recvViewChange(vc, unMarshalVcBasis(vc), false)
+	rbfts[2].recvViewChange(vc, false)
 	assert.Equal(t, consensus.Type_VIEW_CHANGE, nodes[2].broadcastMessageCache.Type)
 
 	assert.Equal(t, uint64(2), rbfts[2].chainConfig.View)
@@ -96,15 +95,15 @@ func TestVC_recvViewChange_Quorum(t *testing.T) {
 
 	vcPayload1 := nodes[1].broadcastMessageCache.Payload
 	vc1 := &consensus.ViewChange{}
-	_ = proto.Unmarshal(vcPayload1, vc1)
+	_ = vc1.UnmarshalVT(vcPayload1)
 
 	vcPayload3 := nodes[3].broadcastMessageCache.Payload
 	vc3 := &consensus.ViewChange{}
-	_ = proto.Unmarshal(vcPayload3, vc3)
+	_ = vc3.UnmarshalVT(vcPayload3)
 
 	// get quorum
-	rbfts[2].recvViewChange(vc1, unMarshalVcBasis(vc1), false)
-	ret := rbfts[2].recvViewChange(vc3, unMarshalVcBasis(vc3), false)
+	rbfts[2].recvViewChange(vc1, false)
+	ret := rbfts[2].recvViewChange(vc3, false)
 	exp := &LocalEvent{
 		Service:   ViewChangeService,
 		EventType: ViewChangeQuorumEvent,
@@ -155,14 +154,14 @@ func TestVC_recvFetchBatchResponse_AfterViewChanged(t *testing.T) {
 	rbfts[1].sendViewChange()
 	vcPayload0 := nodes[0].broadcastMessageCache.Payload
 	vc0 := &consensus.ViewChange{}
-	_ = proto.Unmarshal(vcPayload0, vc0)
+	_ = vc0.UnmarshalVT(vcPayload0)
 	vcPayload1 := nodes[1].broadcastMessageCache.Payload
 	vc1 := &consensus.ViewChange{}
-	_ = proto.Unmarshal(vcPayload1, vc1)
+	_ = vc1.UnmarshalVT(vcPayload1)
 
 	// new primary node3 receive f+1 vc request and trigger vc quorum.
-	rbfts[2].recvViewChange(vc0, unMarshalVcBasis(vc0), false)
-	ret := rbfts[2].recvViewChange(vc1, unMarshalVcBasis(vc1), false)
+	rbfts[2].recvViewChange(vc0, false)
+	ret := rbfts[2].recvViewChange(vc1, false)
 	exp := &LocalEvent{
 		Service:   ViewChangeService,
 		EventType: ViewChangeQuorumEvent,
@@ -173,7 +172,7 @@ func TestVC_recvFetchBatchResponse_AfterViewChanged(t *testing.T) {
 	rbfts[2].sendNewView()
 	nvMessage := nodes[2].broadcastMessageCache
 	nv := &consensus.NewView{}
-	_ = proto.Unmarshal(nvMessage.Payload, nv)
+	_ = nv.UnmarshalVT(nvMessage.Payload)
 
 	// mock node1 store the new-view from primary
 	rbfts[0].vcMgr.newViewStore[nv.View] = nv
@@ -230,7 +229,7 @@ func TestVC_processNewView_AfterViewChanged_PrimaryNormal(t *testing.T) {
 	batch := rbfts[1].batchMgr.requestPool.GenerateRequestBatch()
 
 	// a message list
-	msgList := []*consensus.Vc_PQ{
+	msgList := []*consensus.VcPq{
 		{SequenceNumber: 1, BatchDigest: ""},
 		{SequenceNumber: 2, BatchDigest: ""},
 		{SequenceNumber: 3, BatchDigest: batch[0].BatchHash},
@@ -264,7 +263,7 @@ func TestVC_processNewView_AfterViewChanged_ReplicaNormal(t *testing.T) {
 	batch := rbfts[0].batchMgr.requestPool.GenerateRequestBatch()
 
 	// a message list
-	msgList := []*consensus.Vc_PQ{
+	msgList := []*consensus.VcPq{
 		{SequenceNumber: 1, BatchDigest: ""},
 		{SequenceNumber: 2, BatchDigest: ""},
 		{SequenceNumber: 3, BatchDigest: batch[0].BatchHash},
@@ -296,7 +295,7 @@ func TestVC_fetchMissingReqBatchIfNeeded(t *testing.T) {
 	batch := rbfts[0].batchMgr.requestPool.GenerateRequestBatch()
 
 	// a message list
-	msgList := []*consensus.Vc_PQ{
+	msgList := []*consensus.VcPq{
 		{SequenceNumber: 1, BatchDigest: ""},
 		{SequenceNumber: 2, BatchDigest: ""},
 		{SequenceNumber: 3, BatchDigest: batch[0].BatchHash},
@@ -328,17 +327,17 @@ func TestVC_correctViewChange(t *testing.T) {
 	rbfts[2].sendViewChange()
 	vcPayload := nodes[2].broadcastMessageCache.Payload
 	vc := &consensus.ViewChange{}
-	_ = proto.Unmarshal(vcPayload, vc)
+	_ = vc.UnmarshalVT(vcPayload)
 
 	flag1 := rbfts[0].correctViewChange(unMarshalVcBasis(vc))
 	assert.Equal(t, true, flag1)
 
-	p := &consensus.Vc_PQ{
+	p := &consensus.VcPq{
 		SequenceNumber: uint64(19),
 		BatchDigest:    "batch-number-19",
 		View:           uint64(2),
 	}
-	pSet := []*consensus.Vc_PQ{p}
+	pSet := []*consensus.VcPq{p}
 
 	vcBasisError1 := &consensus.VcBasis{
 		View: uint64(1),
@@ -380,29 +379,29 @@ func TestVC_assignSequenceNumbers(t *testing.T) {
 		},
 	}
 	CSet := []*consensus.SignedCheckpoint{C}
-	P1 := &consensus.Vc_PQ{
+	P1 := &consensus.VcPq{
 		SequenceNumber: 5,
 		BatchDigest:    "msg",
 		View:           1,
 	}
 	// with another sequenceNumber
-	P2 := &consensus.Vc_PQ{
+	P2 := &consensus.VcPq{
 		SequenceNumber: 10,
 		BatchDigest:    "msgHigh",
 		View:           0,
 	}
-	PSet := []*consensus.Vc_PQ{P1, P2}
-	Q1 := &consensus.Vc_PQ{
+	PSet := []*consensus.VcPq{P1, P2}
+	Q1 := &consensus.VcPq{
 		SequenceNumber: 5,
 		BatchDigest:    "msg",
 		View:           1,
 	}
-	Q2 := &consensus.Vc_PQ{
+	Q2 := &consensus.VcPq{
 		SequenceNumber: 10,
 		BatchDigest:    "msgHigh",
 		View:           0,
 	}
-	QSet := []*consensus.Vc_PQ{Q1, Q2}
+	QSet := []*consensus.VcPq{Q1, Q2}
 	Basis := &consensus.VcBasis{
 		ReplicaId: 1,
 		View:      1,
@@ -422,7 +421,7 @@ func TestVC_assignSequenceNumbers(t *testing.T) {
 	set := []*consensus.VcBasis{BasisHighH, Basis, Basis, Basis}
 	list := rbfts[1].assignSequenceNumbers(set, 4)
 
-	expectList := []*consensus.Vc_PQ{
+	expectList := []*consensus.VcPq{
 		{SequenceNumber: 5, BatchDigest: "msg"},
 		{SequenceNumber: 6, BatchDigest: ""},
 		{SequenceNumber: 7, BatchDigest: ""},

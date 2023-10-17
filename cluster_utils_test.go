@@ -4,7 +4,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/gogo/protobuf/proto"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 
@@ -262,70 +261,70 @@ func (rbft *rbftImpl[T, Constraint]) consensusMessagePacker(e consensusEvent) *c
 	switch et := e.(type) {
 	case *consensus.NullRequest:
 		eventType = consensus.Type_NULL_REQUEST
-		payload, err = proto.Marshal(et)
+		payload, err = et.MarshalVTStrict()
 	case *consensus.PrePrepare:
 		eventType = consensus.Type_PRE_PREPARE
-		payload, err = proto.Marshal(et)
+		payload, err = et.MarshalVTStrict()
 	case *consensus.Prepare:
 		eventType = consensus.Type_PREPARE
-		payload, err = proto.Marshal(et)
+		payload, err = et.MarshalVTStrict()
 	case *consensus.Commit:
 		eventType = consensus.Type_COMMIT
-		payload, err = proto.Marshal(et)
+		payload, err = et.MarshalVTStrict()
 	case *consensus.RequestSet:
 		eventType = consensus.Type_REQUEST_SET
-		payload, err = proto.Marshal(et)
+		payload, err = et.MarshalVTStrict()
 	case *consensus.SignedCheckpoint:
 		eventType = consensus.Type_SIGNED_CHECKPOINT
-		payload, err = proto.Marshal(et)
+		payload, err = et.MarshalVTStrict()
 	case *consensus.FetchCheckpoint:
 		eventType = consensus.Type_FETCH_CHECKPOINT
-		payload, err = proto.Marshal(et)
+		payload, err = et.MarshalVTStrict()
 	case *consensus.ViewChange:
 		eventType = consensus.Type_VIEW_CHANGE
-		payload, err = proto.Marshal(et)
+		payload, err = et.MarshalVTStrict()
 	case *consensus.QuorumViewChange:
 		eventType = consensus.Type_QUORUM_VIEW_CHANGE
-		payload, err = proto.Marshal(et)
+		payload, err = et.MarshalVTStrict()
 	case *consensus.NewView:
 		eventType = consensus.Type_NEW_VIEW
-		payload, err = proto.Marshal(et)
+		payload, err = et.MarshalVTStrict()
 	case *consensus.FetchView:
 		eventType = consensus.Type_FETCH_VIEW
-		payload, err = proto.Marshal(et)
+		payload, err = et.MarshalVTStrict()
 	case *consensus.RecoveryResponse:
 		eventType = consensus.Type_RECOVERY_RESPONSE
-		payload, err = proto.Marshal(et)
+		payload, err = et.MarshalVTStrict()
 	case *consensus.FetchBatchRequest:
 		eventType = consensus.Type_FETCH_BATCH_REQUEST
-		payload, err = proto.Marshal(et)
+		payload, err = et.MarshalVTStrict()
 	case *consensus.FetchBatchResponse:
 		eventType = consensus.Type_FETCH_BATCH_RESPONSE
-		payload, err = proto.Marshal(et)
+		payload, err = et.MarshalVTStrict()
 	case *consensus.FetchPQCRequest:
 		eventType = consensus.Type_FETCH_PQC_REQUEST
-		payload, err = proto.Marshal(et)
+		payload, err = et.MarshalVTStrict()
 	case *consensus.FetchPQCResponse:
 		eventType = consensus.Type_FETCH_PQC_RESPONSE
-		payload, err = proto.Marshal(et)
+		payload, err = et.MarshalVTStrict()
 	case *consensus.FetchMissingRequest:
 		eventType = consensus.Type_FETCH_MISSING_REQUEST
-		payload, err = proto.Marshal(et)
+		payload, err = et.MarshalVTStrict()
 	case *consensus.FetchMissingResponse:
 		eventType = consensus.Type_FETCH_MISSING_RESPONSE
-		payload, err = proto.Marshal(et)
+		payload, err = et.MarshalVTStrict()
 	case *consensus.SyncState:
 		eventType = consensus.Type_SYNC_STATE
-		payload, err = proto.Marshal(et)
+		payload, err = et.MarshalVTStrict()
 	case *consensus.SyncStateResponse:
 		eventType = consensus.Type_SYNC_STATE_RESPONSE
-		payload, err = proto.Marshal(et)
+		payload, err = et.MarshalVTStrict()
 	case *consensus.EpochChangeRequest:
 		eventType = consensus.Type_EPOCH_CHANGE_REQUEST
-		payload, err = proto.Marshal(et)
+		payload, err = et.MarshalVTStrict()
 	case *consensus.EpochChangeProof:
 		eventType = consensus.Type_EPOCH_CHANGE_PROOF
-		payload, err = proto.Marshal(et)
+		payload, err = et.MarshalVTStrict()
 	default:
 		rbft.logger.Errorf("ConsensusMessage Unknown Type: %+v", e)
 		return nil

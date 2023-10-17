@@ -21,7 +21,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gogo/protobuf/proto"
 	"github.com/samber/lo"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -409,17 +408,12 @@ func (rbft *rbftImpl[T, Constraint]) step(ctx context.Context, msg *consensus.Co
 				return
 			}
 			vc := &consensus.ViewChange{}
-			err := proto.Unmarshal(msg.Payload, vc)
+			err := vc.UnmarshalVT(msg.Payload)
 			if err != nil {
 				rbft.logger.Errorf("Consensus Message ViewChange Unmarshal error: %v", err)
 				return
 			}
-			vcBasis := &consensus.VcBasis{}
-			err = proto.Unmarshal(vc.Basis, vcBasis)
-			if err != nil {
-				rbft.logger.Errorf("Consensus Message VcBasis Unmarshal error: %v", err)
-				return
-			}
+			vcBasis := vc.Basis
 			idx := vcIdx{v: vcBasis.GetView(), id: vcBasis.GetReplicaId()}
 			rbft.logger.Debugf("Replica %d is in pending status, pre-store the view change message: "+
 				"from replica %d, e:%d, v:%d, h:%d, |C|:%d, |P|:%d, |Q|:%d",
@@ -752,7 +746,7 @@ func (rbft *rbftImpl[T, Constraint]) sendNullRequest() {
 	nullRequest := &consensus.NullRequest{
 		ReplicaId: rbft.peerMgr.selfID,
 	}
-	payload, err := proto.Marshal(nullRequest)
+	payload, err := nullRequest.MarshalVTStrict()
 	if err != nil {
 		rbft.logger.Errorf("ConsensusMessage_NULL_REQUEST Marshal Error: %s", err)
 		return
@@ -1075,7 +1069,7 @@ func (rbft *rbftImpl[T, Constraint]) sendPrePrepare(seqNo uint64, digest string,
 		rbft.metrics.batchToPrePrepared.Observe(duration)
 	}
 
-	payload, err := proto.Marshal(preprepare)
+	payload, err := preprepare.MarshalVTStrict()
 	if err != nil {
 		rbft.logger.Errorf("ConsensusMessage_PRE_PREPARE Marshal Error: %s", err)
 		span.RecordError(err)
@@ -1211,7 +1205,7 @@ func (rbft *rbftImpl[T, Constraint]) sendPrepare(ctx context.Context, v uint64, 
 		ReplicaId:      rbft.peerMgr.selfID,
 	}
 
-	payload, err := proto.Marshal(prep)
+	payload, err := prep.MarshalVTStrict()
 	if err != nil {
 		rbft.logger.Errorf("ConsensusMessage_PREPARE Marshal Error: %s", err)
 		return nil
@@ -1256,8 +1250,8 @@ func (rbft *rbftImpl[T, Constraint]) recvPrepare(ctx context.Context, prep *cons
 	}
 
 	cert := rbft.storeMgr.getCert(prep.View, prep.SequenceNumber, prep.BatchDigest)
-	ok := cert.prepare[*prep]
-
+	prepID := prep.ID()
+	_, ok := cert.prepare[prepID]
 	if ok {
 		if prep.SequenceNumber <= rbft.exec.lastExec {
 			rbft.logger.Debugf("Replica %d received duplicate prepare from replica %d, view=%d/seqNo=%d, self lastExec=%d",
@@ -1270,7 +1264,7 @@ func (rbft *rbftImpl[T, Constraint]) recvPrepare(ctx context.Context, prep *cons
 		return nil
 	}
 
-	cert.prepare[*prep] = true
+	cert.prepare[prepID] = prep
 
 	return rbft.maybeSendCommit(ctx, prep.View, prep.SequenceNumber, prep.BatchDigest)
 }
@@ -1329,7 +1323,7 @@ func (rbft *rbftImpl[T, Constraint]) sendCommit(ctx context.Context, v uint64, n
 
 	rbft.persistPSet(v, n, d)
 
-	payload, err := proto.Marshal(commit)
+	payload, err := commit.MarshalVTStrict()
 	if err != nil {
 		rbft.logger.Errorf("ConsensusMessage_COMMIT Marshal Error: %s", err)
 		return nil
@@ -1372,7 +1366,8 @@ func (rbft *rbftImpl[T, Constraint]) recvCommit(ctx context.Context, commit *con
 
 	cert := rbft.storeMgr.getCert(commit.View, commit.SequenceNumber, commit.BatchDigest)
 
-	ok := cert.commit[*commit]
+	commitID := commit.ID()
+	_, ok := cert.commit[commitID]
 
 	if ok {
 		if commit.SequenceNumber <= rbft.exec.lastExec {
@@ -1388,7 +1383,7 @@ func (rbft *rbftImpl[T, Constraint]) recvCommit(ctx context.Context, commit *con
 			"current lastExec is %d", rbft.peerMgr.selfID, commit.ReplicaId, commit.View, commit.SequenceNumber, rbft.exec.lastExec)
 	}
 
-	cert.commit[*commit] = true
+	cert.commit[commitID] = commit
 
 	if rbft.committed(commit.View, commit.SequenceNumber, commit.BatchDigest) {
 		idx := msgID{v: commit.View, n: commit.SequenceNumber, d: commit.BatchDigest}
@@ -1438,7 +1433,7 @@ func (rbft *rbftImpl[T, Constraint]) fetchMissingTxs(ctx context.Context, prePre
 		ReplicaId:            rbft.peerMgr.selfID,
 	}
 
-	payload, err := proto.Marshal(fetch)
+	payload, err := fetch.MarshalVTStrict()
 	if err != nil {
 		rbft.logger.Errorf("ConsensusMessage_FetchMissingRequest Marshal Error: %s", err)
 		return
@@ -1507,7 +1502,7 @@ func (rbft *rbftImpl[T, Constraint]) recvFetchMissingRequest(ctx context.Context
 		ReplicaId:            rbft.peerMgr.selfID,
 	}
 
-	payload, err := proto.Marshal(re)
+	payload, err := re.MarshalVTStrict()
 	if err != nil {
 		rbft.logger.Errorf("ConsensusMessage_FetchMissingResponse Marshal Error: %s", err)
 		return nil
@@ -1886,7 +1881,7 @@ func (rbft *rbftImpl[T, Constraint]) checkpoint(state *types.ServiceState, isCon
 		}
 	}
 
-	payload, err := proto.Marshal(signedCheckpoint)
+	payload, err := signedCheckpoint.MarshalVTStrict()
 	if err != nil {
 		rbft.logger.Errorf("ConsensusMessage_CHECKPOINT Marshal Error: %s", err)
 		return
@@ -2037,27 +2032,32 @@ func (rbft *rbftImpl[T, Constraint]) finishNormalCheckpoint(checkpointHeight uin
 	if rbft.chainConfig.isWRF() {
 		localCheckpoint := rbft.storeMgr.localCheckpoints[checkpointHeight]
 
+		newView := rbft.chainConfig.View + 1
+		qvc := &consensus.QuorumViewChange{
+			ViewChanges: make([]*consensus.ViewChange, 0, len(rbft.vcMgr.viewChangeStore)),
+		}
+		for _, ckp := range matchingCheckpoints {
+			if ckp.Checkpoint.ViewChange != nil {
+				if ckp.Checkpoint.ViewChange.Basis.View == newView {
+					qvc.ViewChanges = append(qvc.ViewChanges, ckp.Checkpoint.ViewChange)
+				}
+			}
+		}
+
 		// update view after checkpoint
 		// persist new view
 		nv := &consensus.NewView{
-			ReplicaId: rbft.peerMgr.selfID,
-			View:      rbft.chainConfig.View + 1,
-			Xset: []*consensus.Vc_PQ{
-				{
-					SequenceNumber: checkpointHeight,
-					BatchDigest:    checkpointDigest,
-					View:           rbft.chainConfig.View + 1,
-				},
-			},
-			ViewChangeSet: &consensus.QuorumViewChange{
-				ReplicaId: rbft.peerMgr.selfID,
-			},
+			ReplicaId:     rbft.chainConfig.PrimaryID,
+			View:          newView,
+			ViewChangeSet: qvc,
 			QuorumCheckpoint: &consensus.QuorumCheckpoint{
 				Checkpoint: localCheckpoint.Checkpoint,
 				Signatures: lo.SliceToMap(matchingCheckpoints, func(item *consensus.SignedCheckpoint) (uint64, []byte) {
 					return item.Author, item.Signature
 				}),
 			},
+			FromId:         rbft.peerMgr.selfID,
+			AutoTermUpdate: true,
 		}
 		sig, sErr := rbft.signNewView(nv)
 		if sErr != nil {
@@ -2235,10 +2235,10 @@ func (rbft *rbftImpl[T, Constraint]) moveWatermarks(n uint64, newEpoch bool) {
 		rbft.setNotFull()
 	}
 
-	for cID, digest := range rbft.storeMgr.checkpointStore {
+	for cID, signedCheckpoint := range rbft.storeMgr.checkpointStore {
 		if cID.sequence <= h {
 			rbft.logger.Debugf("Replica %d cleaning checkpoint message from replica %d, seqNo %d, digest %s",
-				rbft.peerMgr.selfID, cID.author, cID.sequence, digest)
+				rbft.peerMgr.selfID, cID.author, cID.sequence, signedCheckpoint.Checkpoint.Digest())
 			delete(rbft.storeMgr.checkpointStore, cID)
 		}
 	}

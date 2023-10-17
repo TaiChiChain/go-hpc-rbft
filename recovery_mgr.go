@@ -17,8 +17,6 @@ package rbft
 import (
 	"context"
 
-	"github.com/gogo/protobuf/proto"
-
 	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
 )
@@ -66,7 +64,7 @@ func (rbft *rbftImpl[T, Constraint]) fetchRecoveryPQC() consensusEvent {
 		H:         rbft.chainConfig.H,
 		ReplicaId: rbft.peerMgr.selfID,
 	}
-	payload, err := proto.Marshal(fetch)
+	payload, err := fetch.MarshalVTStrict()
 	if err != nil {
 		rbft.logger.Errorf("ConsensusMessage_FetchPQCRequest marshal error")
 		return nil
@@ -106,16 +104,16 @@ func (rbft *rbftImpl[T, Constraint]) recvFetchPQCRequest(fetch *consensus.FetchP
 			} else if cert.prePrepare.ReplicaId == rbft.peerMgr.selfID {
 				prePres = append(prePres, cert.prePrepare)
 			}
-			for pre := range cert.prepare {
+			for _, pre := range cert.prepare {
 				if pre.ReplicaId == rbft.peerMgr.selfID {
 					prepare := pre
-					pres = append(pres, &prepare)
+					pres = append(pres, prepare)
 				}
 			}
-			for cmt := range cert.commit {
+			for _, cmt := range cert.commit {
 				if cmt.ReplicaId == rbft.peerMgr.selfID {
 					commit := cmt
-					cmts = append(cmts, &commit)
+					cmts = append(cmts, commit)
 				}
 			}
 		}
@@ -135,7 +133,7 @@ func (rbft *rbftImpl[T, Constraint]) recvFetchPQCRequest(fetch *consensus.FetchP
 		pqcResponse.CmtSet = cmts
 	}
 
-	payload, err := proto.Marshal(pqcResponse)
+	payload, err := pqcResponse.MarshalVTStrict()
 	if err != nil {
 		rbft.logger.Errorf("ConsensusMessage_FetchPQCResponse marshal error: %v", err)
 		return nil
@@ -237,7 +235,7 @@ func (rbft *rbftImpl[T, Constraint]) initSyncState() consensusEvent {
 	syncStateMsg := &consensus.SyncState{
 		ReplicaId: rbft.peerMgr.selfID,
 	}
-	payload, err := proto.Marshal(syncStateMsg)
+	payload, err := syncStateMsg.MarshalVTStrict()
 	if err != nil {
 		rbft.logger.Errorf("ConsensusMessage_SYNC_STATE marshal error: %v", err)
 		return nil
@@ -297,7 +295,7 @@ func (rbft *rbftImpl[T, Constraint]) recvSyncState(sync *consensus.SyncState) co
 		SignedCheckpoint: signedCheckpoint,
 	}
 
-	payload, err := proto.Marshal(syncStateRsp)
+	payload, err := syncStateRsp.MarshalVTStrict()
 	if err != nil {
 		rbft.logger.Errorf("Marshal SyncStateResponse Error!")
 		return nil
@@ -307,8 +305,8 @@ func (rbft *rbftImpl[T, Constraint]) recvSyncState(sync *consensus.SyncState) co
 		Payload: payload,
 	}
 	rbft.peerMgr.unicast(context.TODO(), consensusMsg, sync.ReplicaId)
-	rbft.logger.Debugf("Replica %d send sync state response to replica %d: view=%d, checkpoint=%+v",
-		rbft.peerMgr.selfID, sync.ReplicaId, rbft.chainConfig.View, signedCheckpoint.GetCheckpoint())
+	rbft.logger.Debugf("Replica %d send sync state response to replica %d: view=%d, checkpoint=%s",
+		rbft.peerMgr.selfID, sync.ReplicaId, rbft.chainConfig.View, signedCheckpoint.GetCheckpoint().Pretty())
 	return nil
 }
 
@@ -333,8 +331,8 @@ func (rbft *rbftImpl[T, Constraint]) recvSyncStateResponse(rsp *consensus.SyncSt
 	}
 
 	checkpoint := rsp.GetSignedCheckpoint().GetCheckpoint()
-	rbft.logger.Debugf("Replica %d now received sync state response from replica %d: view=%d, checkpoint=%+v",
-		rbft.peerMgr.selfID, rsp.ReplicaId, rsp.View, checkpoint)
+	rbft.logger.Debugf("Replica %d now received sync state response from replica %d: view=%d, checkpoint=%s",
+		rbft.peerMgr.selfID, rsp.ReplicaId, rsp.View, checkpoint.Pretty())
 
 	if oldRsp, ok := rbft.recoveryMgr.syncRspStore[rsp.ReplicaId]; ok {
 		if oldRsp.GetSignedCheckpoint().GetCheckpoint().Height() > checkpoint.Height() {

@@ -128,7 +128,7 @@ func TestRBFT_processReqSetEvent_PrimaryGenerateBatch(t *testing.T) {
 	var transactionSet [][]byte
 	for i := 0; i < 4; i++ {
 		tx := newTx()
-		txBytes, err := tx.Marshal()
+		txBytes, err := tx.RbftMarshal()
 		assert.Nil(t, err)
 		transactionSet = append(transactionSet, txBytes)
 	}
@@ -149,7 +149,7 @@ func TestRBFT_processReqSetEvent(t *testing.T) {
 	unlockCluster(rbfts)
 
 	ctx := newTx()
-	ctxBytes, err := ctx.Marshal()
+	ctxBytes, err := ctx.RbftMarshal()
 	assert.Nil(t, err)
 	req := &consensus.RequestSet{
 		Local:    true,
@@ -449,7 +449,7 @@ func TestRBFT_recvPrePrepare_EmptyDigest(t *testing.T) {
 
 func TestRBFT_recvPrePrepare_WrongSeqNo(t *testing.T) {
 	tx := newTx()
-	txBytes, err := tx.Marshal()
+	txBytes, err := tx.RbftMarshal()
 	assert.Nil(t, err)
 
 	txHash := tx.RbftGetTxHash()
@@ -505,7 +505,7 @@ func TestRBFT_recvFetchMissingResponse(t *testing.T) {
 	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 
 	tx := newTx()
-	txBytes, err := tx.Marshal()
+	txBytes, err := tx.RbftMarshal()
 	assert.Nil(t, err)
 	txHash := tx.RbftGetTxHash()
 

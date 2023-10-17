@@ -136,8 +136,8 @@ func (sm *storeManager[T, Constraint]) getCert(v uint64, n uint64, d string) *ms
 		return cert
 	}
 
-	prepare := make(map[consensus.Prepare]bool)
-	commit := make(map[consensus.Commit]bool)
+	prepare := make(map[string]*consensus.Prepare)
+	commit := make(map[string]*consensus.Commit)
 	cert = &msgCert{
 		prepare: prepare,
 		commit:  commit,

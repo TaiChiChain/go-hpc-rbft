@@ -3,7 +3,6 @@ module github.com/axiomesh/axiom-bft
 go 1.20
 
 require (
-	github.com/gogo/protobuf v1.3.2
 	github.com/google/btree v1.1.2
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.16.0
@@ -14,6 +13,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.16.0
 	go.uber.org/mock v0.2.0
 	golang.org/x/crypto v0.11.0
+	google.golang.org/protobuf v1.31.0
 )
 
 require (
@@ -30,6 +30,5 @@ require (
 	github.com/rogpeppe/go-internal v1.11.0 // indirect
 	golang.org/x/exp v0.0.0-20220303212507-bbda1eaf7a17 // indirect
 	golang.org/x/sys v0.10.0 // indirect
-	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

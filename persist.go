@@ -21,7 +21,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gogo/protobuf/proto"
 	"github.com/pkg/errors"
 
 	"github.com/axiomesh/axiom-bft/common/consensus"
@@ -35,7 +34,7 @@ func (rbft *rbftImpl[T, Constraint]) persistQSet(preprep *consensus.PrePrepare) 
 		return
 	}
 
-	raw, err := proto.Marshal(preprep)
+	raw, err := preprep.MarshalVTStrict()
 	if err != nil {
 		rbft.logger.Warningf("Replica %d could not persist qset: %s", rbft.peerMgr.selfID, err)
 		return
@@ -52,12 +51,11 @@ func (rbft *rbftImpl[T, Constraint]) persistPSet(v uint64, n uint64, d string) {
 	cert := rbft.storeMgr.getCert(v, n, d)
 	set := make([]*consensus.Prepare, 0)
 	pset := &consensus.Pset{Set: set}
-	for p := range cert.prepare {
-		tmp := p
-		pset.Set = append(pset.Set, &tmp)
+	for _, p := range cert.prepare {
+		pset.Set = append(pset.Set, p.CloneVT())
 	}
 
-	raw, err := proto.Marshal(pset)
+	raw, err := pset.MarshalVTStrict()
 	if err != nil {
 		rbft.logger.Warningf("Replica %d could not persist pset: %s", rbft.peerMgr.selfID, err)
 		return
@@ -74,12 +72,11 @@ func (rbft *rbftImpl[T, Constraint]) persistCSet(v uint64, n uint64, d string) {
 	cert := rbft.storeMgr.getCert(v, n, d)
 	set := make([]*consensus.Commit, 0)
 	cset := &consensus.Cset{Set: set}
-	for c := range cert.commit {
-		tmp := c
-		cset.Set = append(cset.Set, &tmp)
+	for _, c := range cert.commit {
+		cset.Set = append(cset.Set, c.CloneVT())
 	}
 
-	raw, err := proto.Marshal(cset)
+	raw, err := cset.MarshalVTStrict()
 	if err != nil {
 		rbft.logger.Warningf("Replica %d could not persist cset: %s", rbft.peerMgr.selfID, err)
 		return
@@ -129,7 +126,7 @@ func (rbft *rbftImpl[T, Constraint]) restoreQSet() (map[msgID]*consensus.PrePrep
 				rbft.logger.Warningf("Replica %d could not restore qset key %s, err: %s", rbft.peerMgr.selfID, key, err)
 			} else {
 				preprep := &consensus.PrePrepare{}
-				err = proto.Unmarshal(set, preprep)
+				err = preprep.UnmarshalVT(set)
 				if err == nil {
 					idx := msgID{v: v, n: n, d: d}
 					qset[idx] = preprep
@@ -158,7 +155,7 @@ func (rbft *rbftImpl[T, Constraint]) restorePSet() (map[msgID]*consensus.Pset, e
 				rbft.logger.Warningf("Replica %d could not restore pset key %s, err: %s", rbft.peerMgr.selfID, key, err)
 			} else {
 				prepares := &consensus.Pset{}
-				err = proto.Unmarshal(set, prepares)
+				err = prepares.UnmarshalVT(set)
 				if err == nil {
 					idx := msgID{v: v, n: n, d: d}
 					pset[idx] = prepares
@@ -188,7 +185,7 @@ func (rbft *rbftImpl[T, Constraint]) restoreCSet() (map[msgID]*consensus.Cset, e
 				rbft.logger.Warningf("Replica %d could not restore pset key %s, err: %s", rbft.peerMgr.selfID, key, err)
 			} else {
 				commits := &consensus.Cset{}
-				err = proto.Unmarshal(set, commits)
+				err = commits.UnmarshalVT(set)
 				if err == nil {
 					idx := msgID{v: v, n: n, d: d}
 					cset[idx] = commits
@@ -205,9 +202,9 @@ func (rbft *rbftImpl[T, Constraint]) restoreCSet() (map[msgID]*consensus.Cset, e
 }
 
 // persistQList persists marshaled qList into DB before vc.
-func (rbft *rbftImpl[T, Constraint]) persistQList(ql map[qidx]*consensus.Vc_PQ) {
+func (rbft *rbftImpl[T, Constraint]) persistQList(ql map[qidx]*consensus.VcPq) {
 	for idx, q := range ql {
-		raw, err := proto.Marshal(q)
+		raw, err := q.MarshalVTStrict()
 		if err != nil {
 			rbft.logger.Warningf("Replica %d could not persist qlist with index %+v, error : %s", rbft.peerMgr.selfID, idx, err)
 			continue
@@ -221,9 +218,9 @@ func (rbft *rbftImpl[T, Constraint]) persistQList(ql map[qidx]*consensus.Vc_PQ) 
 }
 
 // persistPList persists marshaled pList into DB before vc.
-func (rbft *rbftImpl[T, Constraint]) persistPList(pl map[uint64]*consensus.Vc_PQ) {
+func (rbft *rbftImpl[T, Constraint]) persistPList(pl map[uint64]*consensus.VcPq) {
 	for idx, p := range pl {
-		raw, err := proto.Marshal(p)
+		raw, err := p.MarshalVTStrict()
 		if err != nil {
 			rbft.logger.Warningf("Replica %d could not persist plist with index %+v, error : %s", rbft.peerMgr.selfID, idx, err)
 			continue
@@ -258,8 +255,8 @@ func (rbft *rbftImpl[T, Constraint]) persistDelQPList() {
 }
 
 // restoreQList restores qList from DB, which, keyed by qidx
-func (rbft *rbftImpl[T, Constraint]) restoreQList() (map[qidx]*consensus.Vc_PQ, error) {
-	qList := make(map[qidx]*consensus.Vc_PQ)
+func (rbft *rbftImpl[T, Constraint]) restoreQList() (map[qidx]*consensus.VcPq, error) {
+	qList := make(map[qidx]*consensus.VcPq)
 	payload, err := rbft.external.ReadStateSet("qlist.")
 	if err == nil {
 		for key, value := range payload {
@@ -284,8 +281,8 @@ func (rbft *rbftImpl[T, Constraint]) restoreQList() (map[qidx]*consensus.Vc_PQ, 
 
 			d = splitKeys[2]
 
-			q := &consensus.Vc_PQ{}
-			err = proto.Unmarshal(value, q)
+			q := &consensus.VcPq{}
+			err = q.UnmarshalVT(value)
 			if err == nil {
 				rbft.logger.Debugf("Replica %d restore qList %+v", rbft.peerMgr.selfID, q)
 				idx := qidx{d: d, n: uint64(n)}
@@ -301,8 +298,8 @@ func (rbft *rbftImpl[T, Constraint]) restoreQList() (map[qidx]*consensus.Vc_PQ, 
 }
 
 // restorePList restores pList from DB
-func (rbft *rbftImpl[T, Constraint]) restorePList() (map[uint64]*consensus.Vc_PQ, error) {
-	pList := make(map[uint64]*consensus.Vc_PQ)
+func (rbft *rbftImpl[T, Constraint]) restorePList() (map[uint64]*consensus.VcPq, error) {
+	pList := make(map[uint64]*consensus.VcPq)
 	payload, err := rbft.external.ReadStateSet("plist.")
 	if err == nil {
 		for key, value := range payload {
@@ -324,8 +321,8 @@ func (rbft *rbftImpl[T, Constraint]) restorePList() (map[uint64]*consensus.Vc_PQ
 				return nil, errors.New("parse failed")
 			}
 
-			p := &consensus.Vc_PQ{}
-			err = proto.Unmarshal(value, p)
+			p := &consensus.VcPq{}
+			err = p.UnmarshalVT(value)
 			if err == nil {
 				rbft.logger.Debugf("Replica %d restore pList %+v", rbft.peerMgr.selfID, p)
 				pList[uint64(n)] = p
@@ -363,7 +360,7 @@ func (rbft *rbftImpl[T, Constraint]) restoreCert() {
 		}
 		cert := rbft.storeMgr.getCert(idx.v, idx.n, idx.d)
 		for _, p := range prepares.Set {
-			cert.prepare[*p] = true
+			cert.prepare[p.ID()] = p
 			if p.ReplicaId == rbft.peerMgr.selfID && idx.n <= rbft.exec.lastExec {
 				cert.sentPrepare = true
 			}
@@ -377,7 +374,7 @@ func (rbft *rbftImpl[T, Constraint]) restoreCert() {
 		}
 		cert := rbft.storeMgr.getCert(idx.v, idx.n, idx.d)
 		for _, c := range commits.Set {
-			cert.commit[*c] = true
+			cert.commit[c.ID()] = c
 			if c.ReplicaId == rbft.peerMgr.selfID && idx.n <= rbft.exec.lastExec {
 				cert.sentCommit = true
 			}
@@ -449,7 +446,7 @@ func (rbft *rbftImpl[T, Constraint]) persistH(seqNo uint64) {
 // persistNewView persists current view to database
 func (rbft *rbftImpl[T, Constraint]) persistNewView(nv *consensus.NewView) {
 	key := "new-view"
-	raw, err := proto.Marshal(nv)
+	raw, err := nv.MarshalVTStrict()
 	if err != nil {
 		rbft.logger.Warningf("Replica %d could not persist NewView, error : %s", rbft.peerMgr.selfID, err)
 		rbft.stopNamespace()
@@ -470,7 +467,7 @@ func (rbft *rbftImpl[T, Constraint]) restoreView() {
 	raw, err := rbft.storage.ReadState("new-view")
 	if err == nil {
 		nv := &consensus.NewView{}
-		err = proto.Unmarshal(raw, nv)
+		err = nv.UnmarshalVT(raw)
 		if err == nil {
 			rbft.logger.Debugf("Replica %d restore view %d", rbft.peerMgr.selfID, nv.View)
 			rbft.vcMgr.latestNewView = nv
@@ -578,6 +575,7 @@ func (rbft *rbftImpl[T, Constraint]) restoreState() error {
 			if gErr != nil {
 				return gErr
 			}
+			rbft.chainConfig.LastCheckpointExecBlockHash = rbft.config.LastCheckpointBlockDigest
 			rbft.storeMgr.saveCheckpoint(lastCheckpointState.MetaState.Height, lastCheckpoint)
 			rbft.logger.Debugf("Replica %d construct last checkpoint %s for seqNo %d", rbft.peerMgr.selfID, rbft.config.LastCheckpointBlockDigest, lastCheckpointBlockNumber)
 		} else {
@@ -593,6 +591,7 @@ func (rbft *rbftImpl[T, Constraint]) restoreState() error {
 			if gErr != nil {
 				return gErr
 			}
+			rbft.chainConfig.LastCheckpointExecBlockHash = rbft.config.GenesisBlockDigest
 			rbft.storeMgr.saveCheckpoint(state.MetaState.Height, genesisCheckpoint)
 			rbft.logger.Debugf("Replica %d construct genesis checkpoint %s for seqNo %d", rbft.peerMgr.selfID, state.MetaState.Digest, state.MetaState.Height)
 		}

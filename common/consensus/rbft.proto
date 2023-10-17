@@ -14,9 +14,9 @@
 
 syntax = "proto3";
 
-import "checkpoint.proto";
-
 package consensus;
+
+option go_package = "../consensus";
 
 enum Type {
     NULL_REQUEST = 0;
@@ -43,7 +43,7 @@ enum Type {
     EPOCH_CHANGE_PROOF = 21;
 }
 
-message consensus_message {
+message ConsensusMessage {
     Type type = 1;
     uint64 from = 2;
     uint64 to = 3;
@@ -53,109 +53,113 @@ message consensus_message {
     int64 nonce = 7;
 }
 
-message null_request {
+message NullRequest {
     uint64 replica_id = 1;
 }
 
-message pre_prepare {
-    uint64 replica_id = 1;
-    uint64 view = 2;
-    uint64 sequence_number = 3;
-    string batch_digest = 4;
-    hash_batch hash_batch = 5;
-}
-
-message prepare {
+message PrePrepare {
     uint64 replica_id = 1;
     uint64 view = 2;
     uint64 sequence_number = 3;
     string batch_digest = 4;
+    HashBatch hash_batch = 5;
 }
 
-message commit {
+message Prepare {
     uint64 replica_id = 1;
     uint64 view = 2;
     uint64 sequence_number = 3;
     string batch_digest = 4;
 }
 
-message request_set {
+message Commit {
+    uint64 replica_id = 1;
+    uint64 view = 2;
+    uint64 sequence_number = 3;
+    string batch_digest = 4;
+}
+
+message RequestSet {
     repeated bytes requests = 1;
     bool local = 2;
 }
 
-message hash_batch {
+message HashBatch {
     repeated string request_hash_list = 1;
     repeated string de_duplicate_request_hash_list = 2;
     int64 timestamp = 3;
     uint64 proposer = 4;
 }
 
-message fetch_checkpoint {
+message FetchCheckpoint {
     uint64 replica_id = 1;
     uint64 sequence_number = 2;
 }
 
-message view_change {
-    bytes basis = 1;
-    bytes    signature = 2;
-    int64    timestamp = 3;
+message ViewChange {
+    VcBasis basis = 1;
+    bytes signature = 2;
+    int64 timestamp = 3;
     bool recovery = 4;
 }
 
-message vc_basis {
-    uint64   replica_id = 1;
-    uint64   view = 2;
-    uint64   h = 3;
-    repeated vc_PQ pset = 4;
-    repeated vc_PQ qset = 5;
-    repeated consensus.SignedCheckpoint cset = 6;
+message VcBasis {
+    uint64 replica_id = 1;
+    uint64 view = 2;
+    uint64 h = 3;
+    repeated VcPq pset = 4;
+    repeated VcPq qset = 5;
+    repeated SignedCheckpoint cset = 6;
 }
 
-message vc_PQ {
+message VcPq {
     uint64 sequence_number = 1;
     string batch_digest = 2;
     uint64 view = 3;
 }
 
-message quorum_view_change {
-    uint64   replica_id = 1;
-    repeated view_change view_changes = 2;
+message QuorumViewChange {
+    uint64 replica_id = 1;
+    repeated ViewChange view_changes = 2;
 }
 
-message new_view {
+message NewView {
+    // new primary id
     uint64 replica_id = 1;
     uint64 view = 2;
-    repeated vc_PQ xset = 3;
-    quorum_view_change view_change_set = 4;
-    consensus.QuorumCheckpoint quorum_checkpoint = 5;
-    bytes    signature = 6;
+    repeated VcPq xset = 3;
+    QuorumViewChange view_change_set = 4;
+    QuorumCheckpoint quorum_checkpoint = 5;
+    bytes signature = 6;
+    // signed from replica id(for wrf check)
+    uint64 from_id = 7;
+    bool auto_term_update = 8;
 }
 
-message fetch_view {
+message FetchView {
     uint64 replica_id = 1;
     uint64 view = 2;
 }
 
-message recovery_response {
-    new_view new_view = 1;
-    consensus.SignedCheckpoint initial_checkpoint = 2;
+message RecoveryResponse {
+    NewView new_view = 1;
+    SignedCheckpoint initial_checkpoint = 2;
     // Help remote check genesis block digest
     string genesis_block_digest = 3;
 }
 
-message fetch_batch_request {
+message FetchBatchRequest {
     uint64 replica_id = 1;
     string batch_digest = 2;
 }
 
-message fetch_batch_response {
+message FetchBatchResponse {
     uint64 replica_id = 1;
-    request_batch batch = 2;
+    RequestBatch batch = 2;
     string batch_digest = 3;
 }
 
-message request_batch {
+message RequestBatch {
     repeated string request_hash_list = 1;
     repeated bytes request_list = 2;
     int64 timestamp = 3;
@@ -165,7 +169,7 @@ message request_batch {
     uint64 proposer = 7;
 }
 
-message fetch_missing_request {
+message FetchMissingRequest {
     uint64 replica_id = 1;
     uint64 view = 2;
     uint64 sequence_number = 3;
@@ -173,7 +177,7 @@ message fetch_missing_request {
     map<uint64, string> missing_request_hashes = 5;
 }
 
-message fetch_missing_response {
+message FetchMissingResponse {
     uint64 replica_id = 1;
     uint64 view = 2;
     uint64 sequence_number = 3;
@@ -182,26 +186,26 @@ message fetch_missing_response {
     map<uint64, bytes> missing_requests = 6;
 }
 
-message fetchPQC_request {
+message FetchPQCRequest {
     uint64 replica_id = 1;
     uint64 h = 2;
 }
 
-message fetchPQC_response {
-    uint64   replica_id = 1;
-    repeated pre_prepare prepre_set = 2;
-    repeated prepare pre_set = 3;
-    repeated commit cmt_set = 4;
+message FetchPQCResponse {
+    uint64 replica_id = 1;
+    repeated PrePrepare prepre_set = 2;
+    repeated Prepare pre_set = 3;
+    repeated Commit cmt_set = 4;
 }
 
-message sync_state {
+message SyncState {
     uint64 replica_id = 1;
 }
 
-message sync_state_response {
+message SyncStateResponse {
     uint64 replica_id = 1;
     uint64 view = 2;
-    consensus.SignedCheckpoint signed_checkpoint = 3;
+    SignedCheckpoint signed_checkpoint = 3;
 }
 
 // EpochChangeRequest is used to get a EpochChangeProof from start_epoch to target_epoch.
@@ -215,9 +219,64 @@ message EpochChangeRequest {
 }
 
 message Pset {
-    repeated prepare set = 1;
+    repeated Prepare set = 1;
 }
 
 message Cset {
-    repeated commit set = 1;
+    repeated Commit set = 1;
+}
+
+message Checkpoint {
+    uint64 epoch = 1;
+
+    // Execute state of the executed block
+    message ExecuteState {
+        uint64 height = 1;
+        string digest = 2;
+    }
+    ExecuteState execute_state = 2;
+
+    bool need_update_epoch = 3;
+
+    ViewChange view_change = 4;
+}
+
+// SignedCheckpoint contains the actual checkpoint with signature
+message SignedCheckpoint {
+    // Checkpoint is the info of checkpoint.
+    Checkpoint checkpoint = 1;
+    // Author is the signer for signature.
+    uint64 author = 2;
+    // Signature is the signature for checkpoint.
+    bytes signature = 3;
+}
+
+// QuorumCheckpoint contains the actual checkpoint with signatures
+// by different quorum validators
+message QuorumCheckpoint {
+    // Checkpoint is the info of checkpoint.
+    Checkpoint checkpoint = 1;
+    // Signatures is the aggregated signature for checkpoint.
+    map<uint64, bytes> signatures = 2;
+}
+
+// EpochChangeProof is a slice of checkpoints with contiguous increasing epoch numbers
+// to prove a sequence if epoch changes from the first checkpoint's epoch
+message EpochChangeProof {
+    repeated EpochChange epoch_changes = 1;
+    // Indicate whether the node where proof comes from has more epoch changes
+    uint64 more = 2;
+    // Where the proof comes from
+    uint64 author = 3;
+    // Help remote check genesis block digest
+    string genesis_block_digest = 4;
+}
+
+message EpochChange {
+    // The slice of quorum checkpoints
+    QuorumCheckpoint checkpoint = 1;
+    // Help remote node sync from validators
+    repeated string validators = 2;
+    // local node's quorum height
+    uint64 low_watermark = 3;
 }

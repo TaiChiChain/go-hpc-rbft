@@ -19,8 +19,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gogo/protobuf/proto"
-
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/types"
 )
@@ -46,7 +44,7 @@ func (rbft *rbftImpl[T, Constraint]) msgToEvent(msg *consensus.ConsensusMessage)
 	// reuse FetchBatchResponse to avoid too many useless FetchBatchResponse message caused by
 	// broadcast fetch.
 	if msg.Type == consensus.Type_FETCH_BATCH_RESPONSE {
-		err := proto.Unmarshal(msg.Payload, rbft.reusableRequestBatch)
+		err := rbft.reusableRequestBatch.UnmarshalVT(msg.Payload)
 		if err != nil {
 			rbft.logger.Errorf("Unmarshal error, can not unmarshal %v, error: %v", msg.Type, err)
 			return nil, err
@@ -61,12 +59,8 @@ func (rbft *rbftImpl[T, Constraint]) msgToEvent(msg *consensus.ConsensusMessage)
 	}
 
 	if fn, ok := eventCreators[msg.Type]; ok {
-		event, ok := fn().(proto.Message)
-		if !ok {
-			rbft.logger.Errorf("Unmarshal error, can not unmarshal msg type %v", msg.Type)
-			return nil, fmt.Errorf("unknown msg type %v", msg.Type)
-		}
-		err := proto.Unmarshal(msg.Payload, event)
+		event := fn()
+		err := event.UnmarshalVT(msg.Payload)
 		if err != nil {
 			rbft.logger.Errorf("Unmarshal error, can not unmarshal %v, error: %v", msg.Type, err)
 			return nil, err
@@ -77,34 +71,34 @@ func (rbft *rbftImpl[T, Constraint]) msgToEvent(msg *consensus.ConsensusMessage)
 	return nil, fmt.Errorf("unknown msg type %v", msg.Type)
 }
 
-var eventCreators map[consensus.Type]func() any
+var eventCreators map[consensus.Type]func() consensus.Message
 
 // initMsgEventMap maps consensus_message to real consensus msg type which used to Unmarshal consensus_message's payload
 // to actual consensus msg
 func initMsgEventMap() {
-	eventCreators = make(map[consensus.Type]func() any)
+	eventCreators = make(map[consensus.Type]func() consensus.Message)
 
-	eventCreators[consensus.Type_NULL_REQUEST] = func() any { return &consensus.NullRequest{} }
-	eventCreators[consensus.Type_PRE_PREPARE] = func() any { return &consensus.PrePrepare{} }
-	eventCreators[consensus.Type_PREPARE] = func() any { return &consensus.Prepare{} }
-	eventCreators[consensus.Type_COMMIT] = func() any { return &consensus.Commit{} }
-	eventCreators[consensus.Type_SIGNED_CHECKPOINT] = func() any { return &consensus.SignedCheckpoint{} }
-	eventCreators[consensus.Type_FETCH_CHECKPOINT] = func() any { return &consensus.FetchCheckpoint{} }
-	eventCreators[consensus.Type_VIEW_CHANGE] = func() any { return &consensus.ViewChange{} }
-	eventCreators[consensus.Type_QUORUM_VIEW_CHANGE] = func() any { return &consensus.QuorumViewChange{} }
-	eventCreators[consensus.Type_NEW_VIEW] = func() any { return &consensus.NewView{} }
-	eventCreators[consensus.Type_FETCH_VIEW] = func() any { return &consensus.FetchView{} }
-	eventCreators[consensus.Type_RECOVERY_RESPONSE] = func() any { return &consensus.RecoveryResponse{} }
-	eventCreators[consensus.Type_FETCH_BATCH_REQUEST] = func() any { return &consensus.FetchBatchRequest{} }
-	eventCreators[consensus.Type_FETCH_BATCH_RESPONSE] = func() any { return &consensus.FetchBatchResponse{} }
-	eventCreators[consensus.Type_FETCH_PQC_REQUEST] = func() any { return &consensus.FetchPQCRequest{} }
-	eventCreators[consensus.Type_FETCH_PQC_RESPONSE] = func() any { return &consensus.FetchPQCResponse{} }
-	eventCreators[consensus.Type_FETCH_MISSING_REQUEST] = func() any { return &consensus.FetchMissingRequest{} }
-	eventCreators[consensus.Type_FETCH_MISSING_RESPONSE] = func() any { return &consensus.FetchMissingResponse{} }
-	eventCreators[consensus.Type_SYNC_STATE] = func() any { return &consensus.SyncState{} }
-	eventCreators[consensus.Type_SYNC_STATE_RESPONSE] = func() any { return &consensus.SyncStateResponse{} }
-	eventCreators[consensus.Type_EPOCH_CHANGE_REQUEST] = func() any { return &consensus.EpochChangeRequest{} }
-	eventCreators[consensus.Type_EPOCH_CHANGE_PROOF] = func() any { return &consensus.EpochChangeProof{} }
+	eventCreators[consensus.Type_NULL_REQUEST] = func() consensus.Message { return &consensus.NullRequest{} }
+	eventCreators[consensus.Type_PRE_PREPARE] = func() consensus.Message { return &consensus.PrePrepare{} }
+	eventCreators[consensus.Type_PREPARE] = func() consensus.Message { return &consensus.Prepare{} }
+	eventCreators[consensus.Type_COMMIT] = func() consensus.Message { return &consensus.Commit{} }
+	eventCreators[consensus.Type_SIGNED_CHECKPOINT] = func() consensus.Message { return &consensus.SignedCheckpoint{} }
+	eventCreators[consensus.Type_FETCH_CHECKPOINT] = func() consensus.Message { return &consensus.FetchCheckpoint{} }
+	eventCreators[consensus.Type_VIEW_CHANGE] = func() consensus.Message { return &consensus.ViewChange{} }
+	eventCreators[consensus.Type_QUORUM_VIEW_CHANGE] = func() consensus.Message { return &consensus.QuorumViewChange{} }
+	eventCreators[consensus.Type_NEW_VIEW] = func() consensus.Message { return &consensus.NewView{} }
+	eventCreators[consensus.Type_FETCH_VIEW] = func() consensus.Message { return &consensus.FetchView{} }
+	eventCreators[consensus.Type_RECOVERY_RESPONSE] = func() consensus.Message { return &consensus.RecoveryResponse{} }
+	eventCreators[consensus.Type_FETCH_BATCH_REQUEST] = func() consensus.Message { return &consensus.FetchBatchRequest{} }
+	eventCreators[consensus.Type_FETCH_BATCH_RESPONSE] = func() consensus.Message { return &consensus.FetchBatchResponse{} }
+	eventCreators[consensus.Type_FETCH_PQC_REQUEST] = func() consensus.Message { return &consensus.FetchPQCRequest{} }
+	eventCreators[consensus.Type_FETCH_PQC_RESPONSE] = func() consensus.Message { return &consensus.FetchPQCResponse{} }
+	eventCreators[consensus.Type_FETCH_MISSING_REQUEST] = func() consensus.Message { return &consensus.FetchMissingRequest{} }
+	eventCreators[consensus.Type_FETCH_MISSING_RESPONSE] = func() consensus.Message { return &consensus.FetchMissingResponse{} }
+	eventCreators[consensus.Type_SYNC_STATE] = func() consensus.Message { return &consensus.SyncState{} }
+	eventCreators[consensus.Type_SYNC_STATE_RESPONSE] = func() consensus.Message { return &consensus.SyncStateResponse{} }
+	eventCreators[consensus.Type_EPOCH_CHANGE_REQUEST] = func() consensus.Message { return &consensus.EpochChangeRequest{} }
+	eventCreators[consensus.Type_EPOCH_CHANGE_PROOF] = func() consensus.Message { return &consensus.EpochChangeProof{} }
 }
 
 // dispatchLocalEvent dispatches local Event to corresponding handles using its service type

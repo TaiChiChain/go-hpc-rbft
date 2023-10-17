@@ -142,11 +142,11 @@ func (m *FltTransaction) RbftGetNonce() uint64 {
 }
 
 func (m *FltTransaction) RbftUnmarshal(raw []byte) error {
-	return m.Unmarshal(raw)
+	return m.UnmarshalVT(raw)
 }
 
 func (m *FltTransaction) RbftMarshal() ([]byte, error) {
-	return m.Marshal()
+	return m.MarshalVTStrict()
 }
 
 func (m *FltTransaction) RbftIsConfigTx() bool {
@@ -155,5 +155,5 @@ func (m *FltTransaction) RbftIsConfigTx() bool {
 }
 
 func (m *FltTransaction) RbftGetSize() int {
-	return m.Size()
+	return m.SizeVT()
 }

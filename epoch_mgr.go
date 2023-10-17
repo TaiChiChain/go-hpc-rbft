@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/gogo/protobuf/proto"
 	"github.com/pkg/errors"
 
 	"github.com/axiomesh/axiom-bft/common"
@@ -96,7 +95,7 @@ func (rbft *rbftImpl[T, Constraint]) fetchCheckpoint() consensusEvent {
 	}
 	rbft.startFetchCheckpointTimer()
 
-	payload, err := proto.Marshal(fetch)
+	payload, err := fetch.MarshalVTStrict()
 	if err != nil {
 		rbft.logger.Errorf("ConsensusMessage_PREPARE Marshal Error: %s", err)
 		return nil
@@ -125,7 +124,7 @@ func (rbft *rbftImpl[T, Constraint]) recvFetchCheckpoint(fetch *consensus.FetchC
 		}
 	}
 
-	payload, err := proto.Marshal(signedCheckpoint)
+	payload, err := signedCheckpoint.MarshalVTStrict()
 	if err != nil {
 		rbft.logger.Errorf("ConsensusMessage_CHECKPOINT Marshal Error: %s", err)
 		return nil
@@ -231,7 +230,7 @@ func (em *epochManager) checkEpoch(msg *consensus.ConsensusMessage) consensusEve
 		// first process epoch sync response with higher epoch.
 		if msg.Type == consensus.Type_EPOCH_CHANGE_PROOF {
 			proof := &consensus.EpochChangeProof{}
-			if uErr := proto.Unmarshal(msg.Payload, proof); uErr != nil {
+			if uErr := proof.UnmarshalVT(msg.Payload); uErr != nil {
 				em.logger.Warningf("Unmarshal EpochChangeProof failed: %s", uErr)
 				return uErr
 			}
@@ -246,7 +245,7 @@ func (em *epochManager) checkEpoch(msg *consensus.ConsensusMessage) consensusEve
 		// first process epoch sync request with lower epoch.
 		if msg.Type == consensus.Type_EPOCH_CHANGE_REQUEST {
 			request := &consensus.EpochChangeRequest{}
-			if uErr := proto.Unmarshal(msg.Payload, request); uErr != nil {
+			if uErr := request.UnmarshalVT(msg.Payload); uErr != nil {
 				em.logger.Warningf("Unmarshal EpochChangeRequest failed: %s", uErr)
 				return uErr
 			}
@@ -265,7 +264,7 @@ func (em *epochManager) retrieveEpochChange(start, target uint64, recipient uint
 		StartEpoch:  start,
 		TargetEpoch: target,
 	}
-	payload, mErr := proto.Marshal(req)
+	payload, mErr := req.MarshalVTStrict()
 	if mErr != nil {
 		em.logger.Warningf("Marshal EpochChangeRequest failed: %s", mErr)
 		return mErr
@@ -293,7 +292,7 @@ func (em *epochManager) processEpochChangeRequest(request *consensus.EpochChange
 	if proof != nil {
 		em.logger.Noticef("Replica %d send epoch change proof towards %d, info %s", em.peerMgr.selfID, request.GetAuthor(), proof)
 		proof.GenesisBlockDigest = em.config.GenesisBlockDigest
-		payload, mErr := proto.Marshal(proof)
+		payload, mErr := proof.MarshalVTStrict()
 		if mErr != nil {
 			em.logger.Warningf("Marshal EpochChangeProof failed: %s", mErr)
 			return mErr
@@ -440,7 +439,7 @@ func (em *epochManager) verifyEpochChangeProof(proof *consensus.EpochChangeProof
 // persistEpochQuorumCheckpoint persists QuorumCheckpoint or epoch to database
 func (em *epochManager) persistEpochQuorumCheckpoint(c *consensus.QuorumCheckpoint) {
 	key := fmt.Sprintf("epoch_q_chkpt.%d", c.Checkpoint.Epoch)
-	raw, err := c.Marshal()
+	raw, err := c.MarshalVTStrict()
 	if err != nil {
 		em.logger.Errorf("Persist epoch %d quorum chkpt failed with marshal err: %s ", c.Checkpoint.Epoch, err)
 		return
@@ -459,10 +458,10 @@ func (em *epochManager) getEpochQuorumCheckpoint(epoch uint64) (*consensus.Quoru
 	if err != nil {
 		return nil, errors.WithMessagef(err, "failed to read epoch %d quorum chkpt", epoch)
 	}
-	var c consensus.QuorumCheckpoint
-	if err := c.Unmarshal(raw); err != nil {
+	c := &consensus.QuorumCheckpoint{}
+	if err := c.UnmarshalVT(raw); err != nil {
 		return nil, errors.WithMessagef(err, "failed to unmarshal epoch %d quorum chkpt", epoch)
 	}
 
-	return &c, nil
+	return c, nil
 }
