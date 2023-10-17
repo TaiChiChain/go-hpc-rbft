@@ -564,3 +564,11 @@ func (ext *testExternal[T, Constraint]) GetCurrentEpochInfo() (*EpochInfo, error
 func (ext *testExternal[T, Constraint]) GetEpochInfo(epoch uint64) (*EpochInfo, error) {
 	return ext.testNode.n.config.GenesisEpochInfo, nil
 }
+
+func (ext *testExternal[T, Constraint]) StoreEpochState(key string, value []byte) error {
+	return nil
+}
+
+func (ext *testExternal[T, Constraint]) ReadEpochState(key string) ([]byte, error) {
+	return nil, nil
+}

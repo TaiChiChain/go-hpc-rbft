@@ -446,7 +446,7 @@ func (em *epochManager) persistEpochQuorumCheckpoint(c *consensus.QuorumCheckpoi
 		return
 	}
 
-	if err := em.storage.StoreState(key, raw); err != nil {
+	if err := em.epochService.StoreEpochState(key, raw); err != nil {
 		em.logger.Errorf("Persist epoch %d quorum chkpt failed with err: %s ", c.Checkpoint.Epoch, err)
 	}
 }
@@ -455,7 +455,7 @@ func (em *epochManager) persistEpochQuorumCheckpoint(c *consensus.QuorumCheckpoi
 func (em *epochManager) getEpochQuorumCheckpoint(epoch uint64) (*consensus.QuorumCheckpoint, error) {
 	key := fmt.Sprintf("epoch_q_chkpt.%d", epoch)
 
-	raw, err := em.storage.ReadState(key)
+	raw, err := em.epochService.ReadEpochState(key)
 	if err != nil {
 		return nil, errors.WithMessagef(err, "failed to read epoch %d quorum chkpt", epoch)
 	}

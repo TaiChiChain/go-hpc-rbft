@@ -33,6 +33,8 @@ func NewMockMinimalExternal[T any, Constraint consensus.TXConstraint[T]](ctrl *g
 
 	mock.EXPECT().GetEpochInfo(gomock.Any()).Return(nil, nil).AnyTimes()
 	mock.EXPECT().GetCurrentEpochInfo().Return(nil, errors.New("not found epoch info for mock")).AnyTimes()
+	mock.EXPECT().StoreEpochState(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	mock.EXPECT().ReadEpochState(gomock.Any()).Return(nil, errors.New("ReadEpochState Error")).AnyTimes()
 
 	return mock
 }

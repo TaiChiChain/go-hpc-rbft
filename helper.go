@@ -751,7 +751,12 @@ func (rbft *rbftImpl[T, Constraint]) generateSignedCheckpoint(state *types.Servi
 			Height: state.MetaState.Height,
 			Digest: state.MetaState.Digest,
 		},
-		NewView: rbft.chainConfig.View + 1,
+	}
+	if rbft.chainConfig.isWRF() {
+		checkpoint.NewView = rbft.chainConfig.View + 1
+	}
+	if state.Epoch == 0 {
+		checkpoint.Epoch = rbft.chainConfig.EpochInfo.Epoch
 	}
 
 	if isConfig {
