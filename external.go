@@ -85,6 +85,8 @@ type ServiceOutbound[T any, Constraint consensus.TXConstraint[T]] interface {
 type EpochService interface {
 	GetCurrentEpochInfo() (*EpochInfo, error)
 	GetEpochInfo(epoch uint64) (*EpochInfo, error)
+	StoreEpochState(key string, value []byte) error
+	ReadEpochState(key string) ([]byte, error)
 }
 
 // ExternalStack integrates all external interfaces which must be implemented by application users.

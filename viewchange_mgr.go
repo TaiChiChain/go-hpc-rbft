@@ -1051,7 +1051,7 @@ func (rbft *rbftImpl[T, Constraint]) resetStateForRecovery(targetView uint64, nv
 	nc, ok := rbft.vcMgr.newViewCache[nvIdx]
 	if !ok {
 		rbft.logger.Infof("Replica %d starts cache new view %d forward from %d with stable "+
-			"checkpoint height %d, checkpoint digest: %s, checkpoint isConfig: %v, newViewHash: %s,", rbft.peerMgr.selfID, targetView, forwardPeer,
+			"checkpoint height %d, checkpoint digest: %s, checkpoint isConfig: %v, newViewHash: %s", rbft.peerMgr.selfID, targetView, forwardPeer,
 			initialCheckpointHeight,
 			initialCheckpointDigest,
 			isConfig,
