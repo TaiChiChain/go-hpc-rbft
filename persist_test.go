@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gogo/protobuf/proto"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -82,7 +81,7 @@ func TestPersist_restoreView(t *testing.T) {
 	nv := &consensus.NewView{
 		View: 1,
 	}
-	nvb, _ := proto.Marshal(nv)
+	nvb, _ := nv.MarshalVTStrict()
 	ext.EXPECT().ReadState("new-view").Return(nvb, nil)
 	node.rbft.restoreView()
 	assert.Equal(t, uint64(1), node.rbft.chainConfig.View)
@@ -114,7 +113,7 @@ func TestPersist_restoreQList(t *testing.T) {
 	ret = map[string][]byte{"qlist.1.test": []byte("test")}
 	ext.EXPECT().ReadStateSet("qlist.").Return(ret, nil)
 	_, err = node.rbft.restoreQList()
-	assert.Equal(t, "proto: vc_PQ: wiretype end group for non-group", err.Error())
+	assert.Equal(t, "proto: VcPq: wiretype end group for non-group", err.Error())
 
 	ret = map[string][]byte{"qlist.1.test": {24, 10}}
 	ext.EXPECT().ReadStateSet("qlist.").Return(ret, nil)
@@ -174,7 +173,7 @@ func TestPersist_restoreQSet(t *testing.T) {
 		BatchDigest:    "msg",
 		HashBatch:      nil,
 	}
-	prePrepareByte, _ := proto.Marshal(q)
+	prePrepareByte, _ := q.MarshalVTStrict()
 	retQset := map[string][]byte{
 		"qset.1.2.msg": prePrepareByte,
 	}
@@ -197,7 +196,7 @@ func TestPersist_restorePSet(t *testing.T) {
 		BatchDigest:    "msg",
 	}
 	set := &consensus.Pset{Set: []*consensus.Prepare{p}}
-	PrepareByte, _ := proto.Marshal(set)
+	PrepareByte, _ := set.MarshalVTStrict()
 	retPset := map[string][]byte{
 		"pset.1.2.msg": PrepareByte,
 	}
@@ -220,7 +219,7 @@ func TestPersist_restoreCSet(t *testing.T) {
 		BatchDigest:    "msg",
 	}
 	set := &consensus.Cset{Set: []*consensus.Commit{c}}
-	CommitByte, _ := proto.Marshal(set)
+	CommitByte, _ := set.MarshalVTStrict()
 	retCset := map[string][]byte{
 		"cset.1.2.msg": CommitByte,
 	}
@@ -243,7 +242,7 @@ func TestPersist_restoreCert(t *testing.T) {
 		BatchDigest:    "msg",
 		HashBatch:      nil,
 	}
-	prePrepareByte, _ := proto.Marshal(q)
+	prePrepareByte, _ := q.MarshalVTStrict()
 	retQset := map[string][]byte{
 		"qset.1.2.msg": prePrepareByte,
 	}
@@ -256,7 +255,7 @@ func TestPersist_restoreCert(t *testing.T) {
 		BatchDigest:    "msg",
 	}
 	pset := &consensus.Pset{Set: []*consensus.Prepare{p}}
-	PrepareByte, _ := proto.Marshal(pset)
+	PrepareByte, _ := pset.MarshalVTStrict()
 	retPset := map[string][]byte{
 		"pset.1.2.msg": PrepareByte,
 	}
@@ -269,7 +268,7 @@ func TestPersist_restoreCert(t *testing.T) {
 		BatchDigest:    "msg",
 	}
 	cset := &consensus.Cset{Set: []*consensus.Commit{c}}
-	CommitByte, _ := proto.Marshal(cset)
+	CommitByte, _ := cset.MarshalVTStrict()
 	retCset := map[string][]byte{
 		"cset.1.2.msg": CommitByte,
 	}
@@ -280,7 +279,7 @@ func TestPersist_restoreCert(t *testing.T) {
 	ext.EXPECT().ReadStateSet("plist.").Return(map[string][]byte{"plist.": []byte("PList")}, nil).AnyTimes()
 
 	node.rbft.restoreCert()
-	exp := &msgCert{prePrepare: q, prePrepareCtx: context.TODO(), prepare: map[consensus.Prepare]bool{*p: true}, commit: map[consensus.Commit]bool{*c: true}}
+	exp := &msgCert{prePrepare: q, prePrepareCtx: context.TODO(), prepare: map[string]*consensus.Prepare{p.ID(): p}, commit: map[string]*consensus.Commit{c.ID(): c}}
 	assert.Equal(t, exp, node.rbft.storeMgr.certStore[msgID{v: 1, n: 2, d: "msg"}])
 }
 
@@ -300,7 +299,7 @@ func TestPersist_restoreState(t *testing.T) {
 	nv := &consensus.NewView{
 		View: 1,
 	}
-	nvb, _ := proto.Marshal(nv)
+	nvb, _ := nv.MarshalVTStrict()
 	ext.EXPECT().SendFilterEvent(gomock.Any(), gomock.Any()).Return().AnyTimes()
 	ext.EXPECT().DelState(gomock.Any()).Return(nil).AnyTimes()
 

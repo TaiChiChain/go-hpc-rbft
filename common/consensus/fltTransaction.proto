@@ -1,14 +1,10 @@
 syntax = "proto3";
+
 package consensus;
 
-//option go_package = "github.com/axiomesh/axiom-bft/common/consensus/protos";
-//option java_package = "cn.hyperchain.sdk.transaction.proto";
-//option java_outer_classname = "TransactionValueProto";
-
-import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+option go_package = "../consensus";
 
 message FltTransaction {
-  option (gogoproto.goproto_getters) = false;
   bytes version = 1;
 	bytes from = 2;
 	bytes to = 3;

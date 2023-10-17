@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/gogo/protobuf/proto"
 	"github.com/samber/lo"
 	"golang.org/x/crypto/sha3"
 
@@ -450,8 +449,8 @@ func (rbft *rbftImpl[T, Constraint]) compareWholeStates(states wholeStates) cons
 // calcQSet selects Pre-prepares which satisfy the following conditions
 // 1. Pre-prepares in previous qlist
 // 2. Pre-prepares from certStore which is preprepared and its view <= its idx.v or not in qlist
-func (rbft *rbftImpl[T, Constraint]) calcQSet() map[qidx]*consensus.Vc_PQ {
-	qset := make(map[qidx]*consensus.Vc_PQ)
+func (rbft *rbftImpl[T, Constraint]) calcQSet() map[qidx]*consensus.VcPq {
+	qset := make(map[qidx]*consensus.VcPq)
 
 	for n, q := range rbft.vcMgr.qlist {
 		qset[n] = q
@@ -467,7 +466,7 @@ func (rbft *rbftImpl[T, Constraint]) calcQSet() map[qidx]*consensus.Vc_PQ {
 			continue
 		}
 
-		qset[qi] = &consensus.Vc_PQ{
+		qset[qi] = &consensus.VcPq{
 			SequenceNumber: idx.n,
 			BatchDigest:    idx.d,
 			View:           idx.v,
@@ -480,8 +479,8 @@ func (rbft *rbftImpl[T, Constraint]) calcQSet() map[qidx]*consensus.Vc_PQ {
 // calcPSet selects prepares which satisfy the following conditions:
 // 1. prepares in previous qlist
 // 2. prepares from certStore which is prepared and (its view <= its idx.v or not in plist)
-func (rbft *rbftImpl[T, Constraint]) calcPSet() map[uint64]*consensus.Vc_PQ {
-	pset := make(map[uint64]*consensus.Vc_PQ)
+func (rbft *rbftImpl[T, Constraint]) calcPSet() map[uint64]*consensus.VcPq {
+	pset := make(map[uint64]*consensus.VcPq)
 
 	for n, p := range rbft.vcMgr.plist {
 		pset[n] = p
@@ -496,7 +495,7 @@ func (rbft *rbftImpl[T, Constraint]) calcPSet() map[uint64]*consensus.Vc_PQ {
 			continue
 		}
 
-		pset[idx.n] = &consensus.Vc_PQ{
+		pset[idx.n] = &consensus.VcPq{
 			SequenceNumber: idx.n,
 			BatchDigest:    idx.d,
 			View:           idx.v,
@@ -549,7 +548,7 @@ func (rbft *rbftImpl[T, Constraint]) getVcBasis() *consensus.VcBasis {
 }
 
 // gatherPQC just gather all checkpoints, p entries and q entries.
-func (rbft *rbftImpl[T, Constraint]) gatherPQC() (pset []*consensus.Vc_PQ, qset []*consensus.Vc_PQ, signedCheckpoints []*consensus.SignedCheckpoint) {
+func (rbft *rbftImpl[T, Constraint]) gatherPQC() (pset []*consensus.VcPq, qset []*consensus.VcPq, signedCheckpoints []*consensus.SignedCheckpoint) {
 	// Gather all the checkpoints
 	rbft.logger.Debugf("Replica %d gather CSet:", rbft.peerMgr.selfID)
 	for n, signedCheckpoint := range rbft.storeMgr.localCheckpoints {
@@ -582,7 +581,7 @@ func (rbft *rbftImpl[T, Constraint]) gatherPQC() (pset []*consensus.Vc_PQ, qset 
 }
 
 // putBackRequestBatches reset all txs into 'non-batched' state in requestPool to prepare re-arrange by order.
-func (rbft *rbftImpl[T, Constraint]) putBackRequestBatches(xset []*consensus.Vc_PQ) {
+func (rbft *rbftImpl[T, Constraint]) putBackRequestBatches(xset []*consensus.VcPq) {
 	// remove all the batches that smaller than initial checkpoint.
 	// those batches are the dependency of duplicator,
 	// but we can remove since we already have checkpoint after viewChange.
@@ -753,7 +752,58 @@ func (rbft *rbftImpl[T, Constraint]) generateSignedCheckpoint(state *types.Servi
 		},
 	}
 	if rbft.chainConfig.isWRF() {
-		checkpoint.NewView = rbft.chainConfig.View + 1
+		// proof viewchanged by term update
+
+		// create viewChange message
+		var pset []*consensus.VcPq
+		var qset []*consensus.VcPq
+		var cset []*consensus.SignedCheckpoint
+		rbft.logger.Debugf("Replica %d gather CSet:", rbft.peerMgr.selfID)
+		for n, signedCheckpoint := range rbft.storeMgr.localCheckpoints {
+			cset = append(cset, signedCheckpoint)
+			rbft.logger.Debugf("seqNo: %d, ID: %s", n, signedCheckpoint.Checkpoint.Digest())
+		}
+		// Gather all the p entries
+		rbft.logger.Debugf("Replica %d gather PSet:", rbft.peerMgr.selfID)
+		for _, p := range rbft.calcPSet() {
+			if p.SequenceNumber < rbft.chainConfig.H {
+				rbft.logger.Errorf("Replica %d should not have anything in our pset less than h, found %+v", rbft.peerMgr.selfID, p)
+				continue
+			}
+			pset = append(pset, p)
+			rbft.logger.Debugf("seqNo: %d, view: %d, digest: %s", p.SequenceNumber, p.View, p.BatchDigest)
+		}
+
+		// Gather all the q entries
+		rbft.logger.Debugf("Replica %d gather QSet:", rbft.peerMgr.selfID)
+		for _, q := range rbft.calcQSet() {
+			if q.SequenceNumber < rbft.chainConfig.H {
+				rbft.logger.Errorf("Replica %d should not have anything in our qset less than h, found %+v", rbft.peerMgr.selfID, q)
+				continue
+			}
+			qset = append(qset, q)
+			rbft.logger.Debugf("seqNo: %d, view: %d, digest: %s", q.SequenceNumber, q.View, q.BatchDigest)
+		}
+
+		vcBasis := &consensus.VcBasis{
+			ReplicaId: rbft.peerMgr.selfID,
+			View:      rbft.chainConfig.View + 1,
+			H:         rbft.chainConfig.H,
+			Cset:      cset,
+		}
+
+		vc := &consensus.ViewChange{
+			Basis:    vcBasis,
+			Recovery: false,
+		}
+		sig, sErr := rbft.signViewChange(vc)
+		if sErr != nil {
+			rbft.logger.Warningf("Replica %d sign view change failed: %s", rbft.peerMgr.selfID, sErr)
+			return nil, sErr
+		}
+		vc.Signature = sig
+
+		checkpoint.ViewChange = vc
 	}
 	if state.Epoch == 0 {
 		checkpoint.Epoch = rbft.chainConfig.EpochInfo.Epoch
@@ -870,8 +920,14 @@ func (rbft *rbftImpl[T, Constraint]) verifySignedViewChange(vc *consensus.ViewCh
 
 func (rbft *rbftImpl[T, Constraint]) calculateViewChangeHash(vc *consensus.ViewChange) ([]byte, error) {
 	hasher := sha3.NewLegacyKeccak256()
-	//nolint
-	hasher.Write(vc.GetBasis())
+	raw, err := vc.GetBasis().MarshalVTStrict()
+	if err != nil {
+		return nil, err
+	}
+	_, err = hasher.Write(raw)
+	if err != nil {
+		return nil, err
+	}
 	hash := hasher.Sum(nil)
 	return hash, nil
 }
@@ -893,6 +949,7 @@ func (rbft *rbftImpl[T, Constraint]) signNewView(nv *consensus.NewView) ([]byte,
 
 // verifySignedNewView returns whether given NewView contains a valid signature.
 func (rbft *rbftImpl[T, Constraint]) verifySignedNewView(nv *consensus.NewView) ([]byte, error) {
+	rbft.logger.Debugf("verifySignedNewView: ")
 	hash, hErr := rbft.calculateNewViewHash(nv)
 	if hErr != nil {
 		return nil, hErr
@@ -906,11 +963,12 @@ func (rbft *rbftImpl[T, Constraint]) verifySignedNewView(nv *consensus.NewView) 
 
 func (rbft *rbftImpl[T, Constraint]) calculateNewViewHash(nv *consensus.NewView) ([]byte, error) {
 	signValue := &consensus.NewView{
-		ReplicaId: nv.ReplicaId,
-		View:      nv.View,
-		Xset:      nv.Xset,
+		ReplicaId:      nv.ReplicaId,
+		View:           nv.View,
+		Xset:           nv.Xset,
+		AutoTermUpdate: nv.AutoTermUpdate,
 	}
-	res, mErr := proto.Marshal(signValue)
+	res, mErr := signValue.MarshalVTStrict()
 	if mErr != nil {
 		rbft.logger.Warningf("Replica %d marshal new view failed: %s", rbft.peerMgr.selfID, mErr)
 		rbft.stopNamespace()

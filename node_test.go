@@ -5,7 +5,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/gogo/protobuf/proto"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/axiomesh/axiom-bft/common/consensus"
@@ -89,7 +88,7 @@ func TestNode_Step(t *testing.T) {
 	nullRequest := &consensus.NullRequest{
 		ReplicaId: n.rbft.peerMgr.selfID,
 	}
-	payload, _ := proto.Marshal(nullRequest)
+	payload, _ := nullRequest.MarshalVTStrict()
 	msgTmp := &consensus.ConsensusMessage{
 		Type:    consensus.Type_NULL_REQUEST,
 		Payload: payload,

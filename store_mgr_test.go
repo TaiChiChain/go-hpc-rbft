@@ -66,9 +66,9 @@ func TestStoreMgr_getCert(t *testing.T) {
 	certDefault := &msgCert{
 		prePrepare:  nil,
 		sentPrepare: false,
-		prepare:     make(map[consensus.Prepare]bool),
+		prepare:     make(map[string]*consensus.Prepare),
 		sentCommit:  false,
-		commit:      make(map[consensus.Commit]bool),
+		commit:      make(map[string]*consensus.Commit),
 		sentExecute: false,
 	}
 
@@ -83,9 +83,9 @@ func TestStoreMgr_getCert(t *testing.T) {
 	certTmp := &msgCert{
 		prePrepare:  nil,
 		sentPrepare: true,
-		prepare:     make(map[consensus.Prepare]bool),
+		prepare:     make(map[string]*consensus.Prepare),
 		sentCommit:  true,
-		commit:      make(map[consensus.Commit]bool),
+		commit:      make(map[string]*consensus.Commit),
 		sentExecute: true,
 	}
 	s.certStore[msgIDTmp] = certTmp
@@ -114,9 +114,9 @@ func TestStoreMgr_existedDigest(t *testing.T) {
 	certTmp := &msgCert{
 		prePrepare:  prePrepareTmp,
 		sentPrepare: true,
-		prepare:     make(map[consensus.Prepare]bool),
+		prepare:     make(map[string]*consensus.Prepare),
 		sentCommit:  true,
-		commit:      make(map[consensus.Commit]bool),
+		commit:      make(map[string]*consensus.Commit),
 		sentExecute: true,
 	}
 	s.certStore[msgIDTmp] = certTmp

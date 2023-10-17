@@ -3,9 +3,14 @@ package consensus
 import (
 	"fmt"
 
-	"github.com/gogo/protobuf/proto"
 	"golang.org/x/crypto/sha3"
 )
+
+type Message interface {
+	MarshalVTStrict() (dAtA []byte, err error)
+	MarshalVT() (dAtA []byte, err error)
+	UnmarshalVT(dAtA []byte) error
+}
 
 func executeStateEquals(a, b *Checkpoint_ExecuteState) bool {
 	return a.GetHeight() == b.GetHeight() && a.GetDigest() == b.GetDigest()
@@ -18,7 +23,12 @@ func (m *Checkpoint) Hash() []byte {
 	if m == nil {
 		return nil
 	}
-	res, jErr := proto.Marshal(m)
+	c := &Checkpoint{
+		Epoch:           m.Epoch,
+		ExecuteState:    m.ExecuteState,
+		NeedUpdateEpoch: m.NeedUpdateEpoch,
+	}
+	res, jErr := c.MarshalVTStrict()
 	if jErr != nil {
 		panic(jErr)
 	}
@@ -56,12 +66,12 @@ func (m *Checkpoint) NextEpoch() uint64 {
 	return epoch
 }
 
-// String returns a formatted string for Checkpoint.
-func (m *Checkpoint) String() string {
+// Pretty returns a formatted string for Checkpoint.
+func (m *Checkpoint) Pretty() string {
 	if m == nil {
 		return "NIL"
 	}
-	return fmt.Sprintf("epoch: %d,  height: %d, hash: %s", m.GetEpoch(), m.Height(), m.Digest())
+	return fmt.Sprintf("{epoch: %d,  height: %d, hash: %s}", m.GetEpoch(), m.Height(), m.Digest())
 }
 
 // Equals compares two checkpoint instance and returns whether they are equal
@@ -92,12 +102,12 @@ func (m *SignedCheckpoint) Digest() string {
 	return m.GetCheckpoint().Digest()
 }
 
-// String returns a formatted string for SignedCheckpoint.
-func (m *SignedCheckpoint) String() string {
+// Pretty returns a formatted string for SignedCheckpoint.
+func (m *SignedCheckpoint) Pretty() string {
 	if m == nil {
 		return "NIL"
 	}
-	return fmt.Sprintf("Checkpoint %s signed by %d", m.GetCheckpoint(), m.GetAuthor())
+	return fmt.Sprintf("Checkpoint %s signed by %d", m.GetCheckpoint().Pretty(), m.GetAuthor())
 }
 
 // ======================= QuorumCheckpoint =======================
@@ -139,8 +149,8 @@ func (m *QuorumCheckpoint) AddSignature(validator uint64, signature []byte) {
 	m.Signatures[validator] = signature
 }
 
-// String returns a formatted string for LedgerInfoWithSignatures.
-func (m *QuorumCheckpoint) String() string {
+// Pretty returns a formatted string for LedgerInfoWithSignatures.
+func (m *QuorumCheckpoint) Pretty() string {
 	if m == nil {
 		return "NIL"
 	}
@@ -150,7 +160,7 @@ func (m *QuorumCheckpoint) String() string {
 		authors[i] = author
 		i++
 	}
-	return fmt.Sprintf("CheckpointInfo: %s signed by: %+v", m.GetCheckpoint(), authors)
+	return fmt.Sprintf("CheckpointInfo: %s signed by: %+v", m.GetCheckpoint().Pretty(), authors)
 }
 
 // ======================= EpochChangeProof =======================
@@ -189,10 +199,18 @@ func (m *EpochChangeProof) IsEmpty() bool {
 	return len(m.GetEpochChanges()) == 0
 }
 
-// String returns a formatted string for EpochChangeProof.
-func (m *EpochChangeProof) String() string {
+// Pretty returns a formatted string for EpochChangeProof.
+func (m *EpochChangeProof) Pretty() string {
 	if m == nil {
 		return "NIL"
 	}
 	return fmt.Sprintf("EpochChangeProof: epochChange:%v, more %d, author %d", m.GetEpochChanges(), m.GetMore(), m.GetAuthor())
+}
+
+func (x *Prepare) ID() string {
+	return fmt.Sprintf("replica=%d/view=%d/seq=%d/digest=%s", x.ReplicaId, x.View, x.SequenceNumber, x.BatchDigest)
+}
+
+func (x *Commit) ID() string {
+	return fmt.Sprintf("replica=%d/view=%d/seq=%d/digest=%s", x.ReplicaId, x.View, x.SequenceNumber, x.BatchDigest)
 }

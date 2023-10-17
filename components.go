@@ -22,8 +22,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/gogo/protobuf/proto"
-
 	"github.com/axiomesh/axiom-bft/common/consensus"
 )
 
@@ -161,15 +159,15 @@ func (s *RequestSet[T, Constraint]) Marshal() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return proto.Marshal(pbData)
+	return pbData.MarshalVTStrict()
 }
 
 func (s *RequestSet[T, Constraint]) Unmarshal(raw []byte) error {
-	var pbData consensus.RequestSet
-	if err := proto.Unmarshal(raw, &pbData); err != nil {
+	pbData := &consensus.RequestSet{}
+	if err := pbData.UnmarshalVT(raw); err != nil {
 		return err
 	}
-	return s.FromPB(&pbData)
+	return s.FromPB(pbData)
 }
 
 type RequestBatch[T any, Constraint consensus.TXConstraint[T]] struct {
@@ -218,15 +216,15 @@ func (b *RequestBatch[T, Constraint]) Marshal() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return proto.Marshal(pbData)
+	return pbData.MarshalVTStrict()
 }
 
 func (b *RequestBatch[T, Constraint]) Unmarshal(raw []byte) error {
-	var pbData consensus.RequestBatch
-	if err := proto.Unmarshal(raw, &pbData); err != nil {
+	pbData := &consensus.RequestBatch{}
+	if err := pbData.UnmarshalVT(raw); err != nil {
 		return err
 	}
-	return b.FromPB(&pbData)
+	return b.FromPB(pbData)
 }
 
 // LocalEvent represents event sent by local modules
@@ -261,17 +259,17 @@ type msgID struct {
 
 // cached consensus msgs related to batch
 type msgCert struct {
-	prePrepare      *consensus.PrePrepare      // pre-prepare msg
-	prePreparedTime int64                      // pre-prepared time
-	prePrepareCtx   context.Context            // prePrepareCtx can be used to continue tracing from prePrepare.
-	sentPrepare     bool                       // track whether broadcast prepare for this batch before or not
-	prepare         map[consensus.Prepare]bool // prepare msgs received from other nodes
-	preparedTime    int64                      // prepared time
-	sentCommit      bool                       // track whether broadcast commit for this batch before or not
-	commit          map[consensus.Commit]bool  // commit msgs received from other nodes
-	committedTime   int64                      // committed time
-	sentExecute     bool                       // track whether sent execute event to executor module before or not
-	isConfig        bool                       // track whether current batch is a config batch
+	prePrepare      *consensus.PrePrepare         // pre-prepare msg
+	prePreparedTime int64                         // pre-prepared time
+	prePrepareCtx   context.Context               // prePrepareCtx can be used to continue tracing from prePrepare.
+	sentPrepare     bool                          // track whether broadcast prepare for this batch before or not
+	prepare         map[string]*consensus.Prepare // prepare msgs received from other nodes
+	preparedTime    int64                         // prepared time
+	sentCommit      bool                          // track whether broadcast commit for this batch before or not
+	commit          map[string]*consensus.Commit  // commit msgs received from other nodes
+	committedTime   int64                         // committed time
+	sentExecute     bool                          // track whether sent execute event to executor module before or not
+	isConfig        bool                          // track whether current batch is a config batch
 }
 
 // ----------checkpoint related structs------------------

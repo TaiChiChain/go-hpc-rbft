@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gogo/protobuf/proto"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/axiomesh/axiom-bft/common/consensus"
@@ -131,10 +130,10 @@ func TestHelper_Check(t *testing.T) {
 		SequenceNumber: 20,
 		BatchDigest:    "msg",
 	}
-	var prepareMapTmp = map[consensus.Prepare]bool{
-		prepare1Tmp: true,
-		prepare2Tmp: true,
-		prepare3Tmp: true,
+	var prepareMapTmp = map[string]*consensus.Prepare{
+		prepare1Tmp.ID(): &prepare1Tmp,
+		prepare2Tmp.ID(): &prepare2Tmp,
+		prepare3Tmp.ID(): &prepare3Tmp,
 	}
 
 	var commit1Tmp = consensus.Commit{
@@ -155,10 +154,10 @@ func TestHelper_Check(t *testing.T) {
 		SequenceNumber: 20,
 		BatchDigest:    "msg",
 	}
-	var commitMapTmp = map[consensus.Commit]bool{
-		commit1Tmp: true,
-		commit2Tmp: true,
-		commit3Tmp: true,
+	var commitMapTmp = map[string]*consensus.Commit{
+		commit1Tmp.ID(): &commit1Tmp,
+		commit2Tmp.ID(): &commit2Tmp,
+		commit3Tmp.ID(): &commit3Tmp,
 	}
 
 	var certTmp = &msgCert{
@@ -514,10 +513,5 @@ func TestHelper_CheckIfNeedStateUpdate(t *testing.T) {
 }
 
 func unMarshalVcBasis(vc *consensus.ViewChange) *consensus.VcBasis {
-	vcBasis := &consensus.VcBasis{}
-	err := proto.Unmarshal(vc.Basis, vcBasis)
-	if err != nil {
-		return nil
-	}
-	return vcBasis
+	return vc.Basis
 }

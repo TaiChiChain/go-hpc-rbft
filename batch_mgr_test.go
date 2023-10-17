@@ -119,8 +119,8 @@ func TestBatchMgr_findNextPrepareBatch(t *testing.T) {
 
 	t.Run("Normal case, there are no batches in storeMgr", func(t *testing.T) {
 		// store the HashBatch which was input by certTmp
-		certTmp.prepare = map[consensus.Prepare]bool{prePareTmp: true}
-		certTmp.commit = map[consensus.Commit]bool{commitTmp: true}
+		certTmp.prepare = map[string]*consensus.Prepare{prePareTmp.ID(): &prePareTmp}
+		certTmp.commit = map[string]*consensus.Commit{commitTmp.ID(): &commitTmp}
 
 		assert.Nil(t, rbfts[0].findNextPrepareBatch(context.TODO(), 0, 20, "msg"))
 
@@ -161,9 +161,9 @@ func TestBatchMgr_findNextPrepareBatch(t *testing.T) {
 		certTmpNil := &msgCert{
 			prePrepare:  prePrepareTmpNil,
 			sentPrepare: false,
-			prepare:     map[consensus.Prepare]bool{prePareTmpNil: true},
+			prepare:     map[string]*consensus.Prepare{prePareTmpNil.ID(): &prePareTmpNil},
 			sentCommit:  false,
-			commit:      map[consensus.Commit]bool{commitTmpNil: true},
+			commit:      map[string]*consensus.Commit{commitTmpNil.ID(): &commitTmpNil},
 			sentExecute: false,
 		}
 		rbfts[0].setView(0)
@@ -188,9 +188,9 @@ func TestBatchMgr_findNextPrepareBatch(t *testing.T) {
 		certConfBatch := &msgCert{
 			prePrepare:  prePrepareConfBatch,
 			sentPrepare: false,
-			prepare:     map[consensus.Prepare]bool{prePareTmpNil: true},
+			prepare:     map[string]*consensus.Prepare{prePareTmpNil.ID(): &prePareTmpNil},
 			sentCommit:  false,
-			commit:      map[consensus.Commit]bool{commitTmpNil: true},
+			commit:      map[string]*consensus.Commit{commitTmpNil.ID(): &commitTmpNil},
 			sentExecute: false,
 		}
 		rbfts[0].storeMgr.certStore[msgIDConfBatch] = certConfBatch
