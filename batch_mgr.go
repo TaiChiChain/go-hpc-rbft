@@ -402,6 +402,11 @@ func (rbft *rbftImpl[T, Constraint]) primaryResubmitTransactions() {
 
 		// if primary has transactions in requestPool, generate batches of the transactions
 		for rbft.batchMgr.requestPool.HasPendingRequestInPool() {
+			// if not test, must generate a full txs batch
+			if !rbft.isTest && !rbft.batchMgr.requestPool.PendingRequestsNumberIsReady() {
+				break
+			}
+
 			if !rbft.isNormal() {
 				rbft.logger.Debugf("Primary %d is in abnormal, reject resubmit", rbft.peerMgr.selfID)
 				return

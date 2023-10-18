@@ -152,6 +152,7 @@ type rbftImpl[T any, Constraint consensus.TXConstraint[T]] struct {
 	logger  Logger       // write logger to record some info
 
 	isInited bool
+	isTest   bool
 }
 
 var once sync.Once
@@ -189,6 +190,7 @@ func newRBFT[T any, Constraint consensus.TXConstraint[T]](c Config, external Ext
 		flowControlMaxMem:    c.FlowControlMaxMem,
 		reusableRequestBatch: &consensus.FetchBatchResponse{},
 		tracer:               c.Tracer,
+		isTest:               isTest,
 	}
 
 	// new metrics instance

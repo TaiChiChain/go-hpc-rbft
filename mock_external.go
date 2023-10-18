@@ -5,6 +5,7 @@
 //
 //	mockgen -destination ./mock_external.go -package rbft -source ./external.go -typed
 //
+
 // Package rbft is a generated GoMock package.
 package rbft
 

@@ -42,6 +42,8 @@ type TxPool[T any, Constraint consensus.TXConstraint[T]] interface {
 	// HasPendingRequestInPool checks if there is non-batched tx(s) in tx pool or not
 	HasPendingRequestInPool() bool
 
+	PendingRequestsNumberIsReady () bool
+
 	// RestoreOneBatch moves one batch from batchStore back to non-batched txs.
 	RestoreOneBatch(hash string) error
 
