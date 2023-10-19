@@ -187,11 +187,28 @@ func (rbft *rbftImpl[T, Constraint]) handleCoreRbftEvent(e *LocalEvent) consensu
 		if rbft.batchMgr.requestPool.HasPendingRequestInPool() {
 			// call requestPool module to generate a tx batch
 			if rbft.inPrimaryTerm() {
-				batches := rbft.batchMgr.requestPool.GenerateRequestBatch()
 				now := time.Now().UnixNano()
+				interval := time.Duration(now - rbft.batchMgr.lastBatchTime).Seconds()
+
+				// this case is quite unusual, with the triggering condition being when the stop timer does not take effect in a timely manner.
+				// For Example: if the timeout is set to 500ms, and the stop timer is executed at 499ms
+				// the timeout event maybe still triggers.
+				// In such cases, the time interval for the timeout batch will be exceedingly short
+				// so we need to filter out these cases
+				if interval < rbft.config.BatchTimeout.Seconds() {
+					rbft.logger.Warningf("Replica %d batch timer expired, but the interval is less than batch timeout, "+
+						"so we don't generate a batch, interval: %f", rbft.peerMgr.selfID, interval)
+					return nil
+				}
+				batches := rbft.batchMgr.requestPool.GenerateRequestBatch()
 				if rbft.batchMgr.lastBatchTime != 0 {
-					interval := time.Duration(now - rbft.batchMgr.lastBatchTime).Seconds()
 					rbft.metrics.batchInterval.With("type", "timeout").Observe(interval)
+					if rbft.batchMgr.minTimeoutBatchTime == 0 || interval < rbft.batchMgr.minTimeoutBatchTime {
+						rbft.logger.Debugf("update min timeoutBatch Time[height:%d, interval:%f, lastBatchTime:%v]",
+							rbft.batchMgr.getSeqNo()+1, interval, time.Unix(0, rbft.batchMgr.lastBatchTime))
+						rbft.metrics.minBatchIntervalDuration.With("type", "timeout").Set(interval)
+						rbft.batchMgr.minTimeoutBatchTime = interval
+					}
 				}
 				rbft.batchMgr.lastBatchTime = now
 				rbft.postBatches(batches)
@@ -233,6 +250,16 @@ func (rbft *rbftImpl[T, Constraint]) handleCoreRbftEvent(e *LocalEvent) consensu
 		// call requestPool module to generate a tx batch
 		if rbft.inPrimaryTerm() {
 			batches := rbft.batchMgr.requestPool.GenerateRequestBatch()
+			now := time.Now().UnixNano()
+			if rbft.batchMgr.lastBatchTime != 0 {
+				interval := time.Duration(now - rbft.batchMgr.lastBatchTime).Seconds()
+				rbft.metrics.batchInterval.With("type", "timeout_no_tx").Observe(interval)
+				if rbft.batchMgr.minTimeoutNoBatchTime == 0 || interval < rbft.batchMgr.minTimeoutNoBatchTime {
+					rbft.metrics.minBatchIntervalDuration.With("type", "timeout_no_tx").Set(interval)
+					rbft.batchMgr.minTimeoutNoBatchTime = interval
+				}
+			}
+			rbft.batchMgr.lastBatchTime = now
 			rbft.postBatches(batches)
 		}
 

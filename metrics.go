@@ -70,6 +70,8 @@ type rbftMetrics struct {
 	// monitor the batch generation interval for primary.
 	batchInterval metrics.Summary
 
+	minBatchIntervalDuration metrics.Gauge
+
 	// monitor the batch persist time.
 	batchPersistDuration metrics.Summary
 
@@ -337,6 +339,16 @@ func newRBFTMetrics(metricsProv metrics.Provider) (*rbftMetrics, error) {
 		return m, err
 	}
 
+	m.minBatchIntervalDuration, err = metricsProv.NewGauge(
+		metrics.GaugeOpts{
+			Name:       "min_batch_interval_duration",
+			Help:       "min timeout interval duration of batch",
+			LabelNames: []string{"type"},
+		})
+	if err != nil {
+		return m, err
+	}
+
 	m.batchPersistDuration, err = metricsProv.NewSummary(
 		metrics.SummaryOpts{
 			Name:       "batch_persist_duration",
@@ -596,6 +608,9 @@ func (rm *rbftMetrics) unregisterMetrics() {
 	}
 	if rm.batchInterval != nil {
 		rm.batchInterval.Unregister()
+	}
+	if rm.minBatchIntervalDuration != nil {
+		rm.minBatchIntervalDuration.Unregister()
 	}
 	if rm.batchPersistDuration != nil {
 		rm.batchPersistDuration.Unregister()
