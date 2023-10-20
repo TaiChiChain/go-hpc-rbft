@@ -1012,10 +1012,7 @@ func (rbft *rbftImpl[T, Constraint]) recvRequestBatch(reqBatch *txpool.RequestHa
 			rbft.metrics.statusGaugeInConfChange.Set(InConfChange)
 		}
 		rbft.restartBatchTimer()
-		rbft.stopNoTxBatchTimer()
-		if !rbft.batchMgr.requestPool.HasPendingRequestInPool() {
-			rbft.restartNoTxBatchTimer()
-		}
+		rbft.restartNoTxBatchTimer()
 		rbft.timerMgr.stopTimer(nullRequestTimer)
 		if len(rbft.batchMgr.cacheBatch) > 0 {
 			rbft.batchMgr.cacheBatch = append(rbft.batchMgr.cacheBatch, batch)
@@ -2077,9 +2074,7 @@ func (rbft *rbftImpl[T, Constraint]) finishNormalCheckpoint(checkpointHeight uin
 	rbft.nullReqTimerReset()
 	rbft.restartBatchTimer()
 	rbft.stopNoTxBatchTimer()
-	if !rbft.batchMgr.requestPool.HasPendingRequestInPool() {
-		rbft.restartNoTxBatchTimer()
-	}
+
 	rbft.external.SendFilterEvent(types.InformTypeFilterStableCheckpoint, matchingCheckpoints)
 	rbft.logger.Trace(consensus.TagNameCheckpoint, consensus.TagStageFinish, consensus.TagContentCheckpoint{
 		Node:   rbft.peerMgr.selfID,
@@ -2097,6 +2092,9 @@ func (rbft *rbftImpl[T, Constraint]) finishNormalCheckpoint(checkpointHeight uin
 		// for primary, we can try to resubmit transactions after stable checkpoint as we
 		// may block pre-prepare before because of high watermark limit.
 		rbft.primaryResubmitTransactions()
+
+		// start noTx batch timer if there is no pending tx in pool
+		rbft.restartNoTxBatchTimer()
 	}
 	return nil
 }
