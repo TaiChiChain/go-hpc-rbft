@@ -1802,8 +1802,8 @@ func (rbft *rbftImpl[T, Constraint]) recvCheckpointBlockExecutedEvent(state *typ
 		if state.MetaState.Height == rbft.exec.lastExec {
 			rbft.logger.Debugf("Call the checkpoint for config batch, seqNo=%d", rbft.exec.lastExec)
 			rbft.epochMgr.configBatchToCheck = state.MetaState
-			rbft.checkpoint(state, true)
 			rbft.off(waitCheckpointBatchExecute)
+			rbft.checkpoint(state, true)
 
 			rbft.startTimerIfOutstandingRequests()
 
@@ -1824,8 +1824,8 @@ func (rbft *rbftImpl[T, Constraint]) recvCheckpointBlockExecutedEvent(state *typ
 	} else if state.MetaState.Height%rbft.chainConfig.EpochInfo.ConsensusParams.CheckpointPeriod == 0 {
 		if state.MetaState.Height == rbft.exec.lastExec {
 			rbft.logger.Debugf("Call the checkpoint for normal, seqNo=%d", rbft.exec.lastExec)
-			rbft.checkpoint(state, false)
 			rbft.off(waitCheckpointBatchExecute)
+			rbft.checkpoint(state, false)
 
 			rbft.startTimerIfOutstandingRequests()
 

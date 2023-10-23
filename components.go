@@ -20,6 +20,7 @@ This file defines the structs used in RBFT
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/axiomesh/axiom-bft/common/consensus"
@@ -255,6 +256,10 @@ type msgID struct {
 	v uint64 // view
 	n uint64 // seqNo
 	d string // digest
+}
+
+func (x *msgID) ID() string {
+	return fmt.Sprintf("view=%d/seq=%d/digest=%s", x.v, x.n, x.d)
 }
 
 // cached consensus msgs related to batch

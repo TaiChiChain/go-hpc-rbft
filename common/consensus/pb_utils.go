@@ -207,10 +207,23 @@ func (m *EpochChangeProof) Pretty() string {
 	return fmt.Sprintf("EpochChangeProof: epochChange:%v, more %d, author %d", m.GetEpochChanges(), m.GetMore(), m.GetAuthor())
 }
 
+func (x *PrePrepare) ID() string {
+	if x == nil {
+		return "NIL"
+	}
+	return fmt.Sprintf("replica=%d/view=%d/seq=%d/digest=%s", x.ReplicaId, x.View, x.SequenceNumber, x.BatchDigest)
+}
+
 func (x *Prepare) ID() string {
+	if x == nil {
+		return "NIL"
+	}
 	return fmt.Sprintf("replica=%d/view=%d/seq=%d/digest=%s", x.ReplicaId, x.View, x.SequenceNumber, x.BatchDigest)
 }
 
 func (x *Commit) ID() string {
+	if x == nil {
+		return "NIL"
+	}
 	return fmt.Sprintf("replica=%d/view=%d/seq=%d/digest=%s", x.ReplicaId, x.View, x.SequenceNumber, x.BatchDigest)
 }
