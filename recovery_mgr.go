@@ -58,7 +58,7 @@ func (rbft *rbftImpl[T, Constraint]) dispatchRecoveryMsg(e consensusEvent) conse
 
 // fetchRecoveryPQC always fetches PQC info after recovery done to fetch PQC info after target checkpoint
 func (rbft *rbftImpl[T, Constraint]) fetchRecoveryPQC() consensusEvent {
-	rbft.logger.Debugf("Replica %d fetch PQC", rbft.peerMgr.selfID)
+	rbft.logger.Debugf("Replica %d fetch PQC, h=%d", rbft.peerMgr.selfID, rbft.chainConfig.H)
 
 	fetch := &consensus.FetchPQCRequest{
 		H:         rbft.chainConfig.H,
@@ -81,7 +81,7 @@ func (rbft *rbftImpl[T, Constraint]) fetchRecoveryPQC() consensusEvent {
 
 // recvFetchPQCRequest returns all PQC info we have sent before to the sender
 func (rbft *rbftImpl[T, Constraint]) recvFetchPQCRequest(fetch *consensus.FetchPQCRequest) consensusEvent {
-	rbft.logger.Debugf("Replica %d received fetchPQCRequest from replica %d", rbft.peerMgr.selfID, fetch.ReplicaId)
+	rbft.logger.Debugf("Replica %d received fetchPQCRequest from replica %d, remote h=%d", rbft.peerMgr.selfID, fetch.ReplicaId, fetch.H)
 
 	remoteH := fetch.H
 	if remoteH >= rbft.chainConfig.H+rbft.chainConfig.L {
@@ -97,21 +97,32 @@ func (rbft *rbftImpl[T, Constraint]) recvFetchPQCRequest(fetch *consensus.FetchP
 	for idx, cert := range rbft.storeMgr.certStore {
 		// send all PQC that n > remoteH in current view, help remote node to advance.
 		if idx.n > remoteH && idx.v == rbft.chainConfig.View {
+			rbft.logger.Debugf("Replica %d find PQC response cert: %s, prePrepare==nil: %v, len(prepare): %d, len(commit): %d",
+				rbft.peerMgr.selfID,
+				idx.ID(),
+				cert.prePrepare == nil,
+				len(cert.prepare),
+				len(cert.commit),
+			)
+
 			// only response with messages we have sent.
 			if cert.prePrepare == nil {
 				rbft.logger.Warningf("Replica %d in finds nil prePrepare for view=%d/seqNo=%d",
 					rbft.peerMgr.selfID, idx.v, idx.n)
 			} else if cert.prePrepare.ReplicaId == rbft.peerMgr.selfID {
+				rbft.logger.Debugf("Replica %d find PQC response, found matched prePre: %s", rbft.peerMgr.selfID, cert.prePrepare.ID())
 				prePres = append(prePres, cert.prePrepare)
 			}
 			for _, pre := range cert.prepare {
 				if pre.ReplicaId == rbft.peerMgr.selfID {
+					rbft.logger.Debugf("Replica %d find PQC response, found matched prepare: %s", rbft.peerMgr.selfID, pre.ID())
 					prepare := pre
 					pres = append(pres, prepare)
 				}
 			}
 			for _, cmt := range cert.commit {
 				if cmt.ReplicaId == rbft.peerMgr.selfID {
+					rbft.logger.Debugf("Replica %d find PQC response, found matched commit: %s", rbft.peerMgr.selfID, cmt.ID())
 					commit := cmt
 					cmts = append(cmts, commit)
 				}
@@ -151,8 +162,8 @@ func (rbft *rbftImpl[T, Constraint]) recvFetchPQCRequest(fetch *consensus.FetchP
 		sequenceNumber = pqcResponse.PrepreSet[0].SequenceNumber
 		batchDigest = pqcResponse.PrepreSet[0].BatchDigest
 	}
-	rbft.logger.Debugf("Replica %d send PQC response to %d, detailed: {view:%d,seq:%d,digest:%s}", rbft.peerMgr.selfID,
-		fetch.ReplicaId, view, sequenceNumber, batchDigest)
+	rbft.logger.Debugf("Replica %d send PQC response to %d, detailed: {view:%d,seq:%d,digest:%s}, len(prePrepare): %d, len(prepare): %d, len(commit): %d", rbft.peerMgr.selfID,
+		fetch.ReplicaId, view, sequenceNumber, batchDigest, len(pqcResponse.PrepreSet), len(pqcResponse.PreSet), len(pqcResponse.CmtSet))
 
 	return nil
 }

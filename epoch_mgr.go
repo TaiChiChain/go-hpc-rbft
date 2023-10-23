@@ -290,7 +290,7 @@ func (em *epochManager) processEpochChangeRequest(request *consensus.EpochChange
 		return err
 	}
 	if proof != nil {
-		em.logger.Noticef("Replica %d send epoch change proof towards %d, info %s", em.peerMgr.selfID, request.GetAuthor(), proof)
+		em.logger.Noticef("Replica %d send epoch change proof towards %d, info %s", em.peerMgr.selfID, request.GetAuthor(), proof.Pretty())
 		proof.GenesisBlockDigest = em.config.GenesisBlockDigest
 		payload, mErr := proof.MarshalVTStrict()
 		if mErr != nil {
