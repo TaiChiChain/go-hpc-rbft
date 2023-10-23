@@ -473,11 +473,7 @@ func (rbft *rbftImpl[T, Constraint]) handleViewChangeEvent(e *LocalEvent) consen
 		if rbft.isPrimary(rbft.peerMgr.selfID) {
 			rbft.primaryResubmitTransactions()
 			// start noTx batch timer if there is no pending tx in pool
-			if rbft.chainConfig.EpochInfo.ConsensusParams.EnableTimedGenEmptyBlock && !rbft.batchMgr.requestPool.HasPendingRequestInPool() {
-				if !rbft.batchMgr.isNoTxBatchTimerActive() {
-					rbft.startNoTxBatchTimer()
-				}
-			}
+			rbft.restartNoTxBatchTimer()
 		} else {
 			// here, we always fetch PQC after finish recovery as we only recovery to the largest checkpoint which
 			// is lower or equal to the lastExec quorum of others.

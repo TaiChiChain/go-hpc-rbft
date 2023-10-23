@@ -102,12 +102,13 @@ func (rbft *rbftImpl[T, Constraint]) stopNoTxBatchTimer() {
 
 // restartNoTxBatchTimer restarts the no tx batch timer
 func (rbft *rbftImpl[T, Constraint]) restartNoTxBatchTimer() bool {
-	// if timed gen empty block is disabled, we do not need to restart the no tx batch timer
-	if !rbft.chainConfig.EpochInfo.ConsensusParams.EnableTimedGenEmptyBlock {
-		return false
-	}
 	rbft.timerMgr.stopTimer(noTxBatchTimer)
 
+	// if timed gen empty block is disabled, we do not need to restart the no tx batch timer
+	if !rbft.chainConfig.EpochInfo.ConsensusParams.EnableTimedGenEmptyBlock ||
+		rbft.batchMgr.requestPool.HasPendingRequestInPool() {
+		return false
+	}
 	localEvent := &LocalEvent{
 		Service:   CoreRbftService,
 		EventType: CoreNoTxBatchTimerEvent,
@@ -294,10 +295,8 @@ func (rbft *rbftImpl[T, Constraint]) maybeSendPrePrepare(batch *RequestBatch[T, 
 
 	if rbft.sendInW(nextSeqNo+1) && len(rbft.batchMgr.cacheBatch) > 0 {
 		rbft.restartBatchTimer()
-		rbft.stopNoTxBatchTimer()
-		if !rbft.batchMgr.requestPool.HasPendingRequestInPool() {
-			rbft.restartNoTxBatchTimer()
-		}
+		rbft.restartNoTxBatchTimer()
+
 		rbft.maybeSendPrePrepare(nil, true)
 	}
 }
@@ -401,10 +400,7 @@ func (rbft *rbftImpl[T, Constraint]) primaryResubmitTransactions() {
 		// try cached batches first if any.
 		if len(rbft.batchMgr.cacheBatch) > 0 {
 			rbft.restartBatchTimer()
-			rbft.stopNoTxBatchTimer()
-			if !rbft.batchMgr.requestPool.HasPendingRequestInPool() {
-				rbft.restartNoTxBatchTimer()
-			}
+			rbft.restartNoTxBatchTimer()
 			rbft.timerMgr.stopTimer(nullRequestTimer)
 			rbft.maybeSendPrePrepare(nil, true)
 		}
