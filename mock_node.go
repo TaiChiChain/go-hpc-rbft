@@ -5,6 +5,7 @@
 //
 //	mockgen -destination ./mock_node.go -package rbft -source ./node.go -typed
 //
+
 // Package rbft is a generated GoMock package.
 package rbft
 

@@ -5,6 +5,7 @@
 //
 //	mockgen -destination ./mock_txpool.go -package txpool -source ./txpool.go -typed
 //
+
 // Package txpool is a generated GoMock package.
 package txpool
 

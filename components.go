@@ -134,29 +134,29 @@ type RequestSet[T any, Constraint consensus.TXConstraint[T]] struct {
 	Local    bool
 }
 
-func (s *RequestSet[T, Constraint]) ToPB() (*consensus.RequestSet, error) {
+func (s *RequestSet[T, Constraint]) ToPB(localId uint64) (*consensus.ReBroadcastRequestSet, error) {
 	rawTxs, err := consensus.EncodeTxs[T, Constraint](s.Requests)
 	if err != nil {
 		return nil, err
 	}
-	return &consensus.RequestSet{
-		Requests: rawTxs,
-		Local:    s.Local,
+	return &consensus.ReBroadcastRequestSet{
+		Requests:  rawTxs,
+		ReplicaId: localId,
 	}, nil
 }
 
-func (s *RequestSet[T, Constraint]) FromPB(pb *consensus.RequestSet) error {
+func (s *RequestSet[T, Constraint]) FromPB(pb *consensus.ReBroadcastRequestSet) error {
 	txs, err := consensus.DecodeTxs[T, Constraint](pb.Requests)
 	if err != nil {
 		return err
 	}
 	s.Requests = txs
-	s.Local = pb.Local
+	s.Local = false
 	return nil
 }
 
-func (s *RequestSet[T, Constraint]) Marshal() ([]byte, error) {
-	pbData, err := s.ToPB()
+func (s *RequestSet[T, Constraint]) Marshal(localId uint64) ([]byte, error) {
+	pbData, err := s.ToPB(localId)
 	if err != nil {
 		return nil, err
 	}
@@ -164,7 +164,7 @@ func (s *RequestSet[T, Constraint]) Marshal() ([]byte, error) {
 }
 
 func (s *RequestSet[T, Constraint]) Unmarshal(raw []byte) error {
-	pbData := &consensus.RequestSet{}
+	pbData := &consensus.ReBroadcastRequestSet{}
 	if err := pbData.UnmarshalVT(raw); err != nil {
 		return err
 	}

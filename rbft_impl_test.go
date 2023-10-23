@@ -125,15 +125,12 @@ func TestRBFT_processReqSetEvent_PrimaryGenerateBatch(t *testing.T) {
 
 	// the batch size is 4
 	// it means we will generate a batch directly when we receive 4 transactions
-	var transactionSet [][]byte
+	var transactionSet []*consensus.FltTransaction
 	for i := 0; i < 4; i++ {
 		tx := newTx()
-		txBytes, err := tx.RbftMarshal()
-		assert.Nil(t, err)
-		transactionSet = append(transactionSet, txBytes)
+		transactionSet = append(transactionSet, tx)
 	}
-	req := &consensus.RequestSet{
-		Local:    true,
+	req := &RequestSet[consensus.FltTransaction, *consensus.FltTransaction]{
 		Requests: transactionSet,
 	}
 
@@ -149,11 +146,8 @@ func TestRBFT_processReqSetEvent(t *testing.T) {
 	unlockCluster(rbfts)
 
 	ctx := newTx()
-	ctxBytes, err := ctx.RbftMarshal()
-	assert.Nil(t, err)
-	req := &consensus.RequestSet{
-		Local:    true,
-		Requests: [][]byte{ctxBytes},
+	req := &RequestSet[consensus.FltTransaction, *consensus.FltTransaction]{
+		Requests: []*consensus.FltTransaction{ctx},
 	}
 
 	rbfts[1].atomicOn(InConfChange)

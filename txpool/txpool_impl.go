@@ -72,7 +72,10 @@ func (p *txPoolImpl[T, Constraint]) addNewRequests(txs []*T, isPrimary, local, i
 		if txNonce < currentSeqNo {
 			ready = true
 			if !isReplace {
-				p.logger.Warningf("Receive transaction [account: %s, nonce: %d, hash: %s], but we required %d", txAccount, txNonce, txHash, currentSeqNo)
+				// just log tx warning message from api
+				if local {
+					p.logger.Warningf("Receive transaction [account: %s, nonce: %d, hash: %s], but we required %d", txAccount, txNonce, txHash, currentSeqNo)
+				}
 				continue
 			} else {
 				p.logger.Warningf("Receive transaction [account: %s, nonce: %d, hash: %s], but we required %d,"+

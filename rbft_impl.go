@@ -619,25 +619,6 @@ func (rbft *rbftImpl[T, Constraint]) processEvent(ee consensusEvent) consensusEv
 		rbft.metrics.processEventDuration.With("event", "request_set").Observe(time.Since(start).Seconds())
 		return nil
 
-	case *consensus.RequestSet:
-		// handle reBroadcast requestSet
-		if e.Local {
-			rbft.metrics.incomingLocalTxSets.Add(float64(1))
-			rbft.metrics.incomingLocalTxs.Add(float64(len(e.Requests)))
-		} else {
-			rbft.metrics.incomingRemoteTxSets.Add(float64(1))
-			rbft.metrics.incomingRemoteTxs.Add(float64(len(e.Requests)))
-		}
-
-		var requestSet RequestSet[T, Constraint]
-		if err := requestSet.FromPB(e); err != nil {
-			rbft.logger.Errorf("RequestSet unmarshal error: %v", err)
-			return nil
-		}
-		rbft.processReqSetEvent(&requestSet)
-		rbft.metrics.processEventDuration.With("event", "rebroadcast_request_set").Observe(time.Since(start).Seconds())
-		return nil
-
 	case *LocalEvent:
 		if !rbft.checkEventCanProcessWhenWaitCheckpoint(e.EventType, e) {
 			rbft.metrics.processEventDuration.With("event", "local_event").Observe(time.Since(start).Seconds())
@@ -707,6 +688,8 @@ func (rbft *rbftImpl[T, Constraint]) dispatchCoreRbftMsg(ctx context.Context, e 
 		return rbft.recvFetchMissingResponse(ctx, et)
 	case *consensus.SignedCheckpoint:
 		return rbft.recvCheckpoint(et, false)
+	case *consensus.ReBroadcastRequestSet:
+		return rbft.recvReBroadcastRequestSet(et)
 	}
 	return nil
 }
@@ -837,7 +820,6 @@ func (rbft *rbftImpl[T, Constraint]) processReqSetEvent(req *RequestSet[T, Const
 			// start batch timer and stop no tx batch timer when this node receives the first transaction of a batch
 			if !rbft.batchMgr.isBatchTimerActive() {
 				rbft.startBatchTimer()
-				rbft.stopNoTxBatchTimer()
 			}
 
 			batches, _ := rbft.batchMgr.requestPool.AddNewRequests(req.Requests, true, req.Local, false, rbft.inPrimaryTerm())
@@ -851,6 +833,11 @@ func (rbft *rbftImpl[T, Constraint]) processReqSetEvent(req *RequestSet[T, Const
 				}
 				rbft.batchMgr.lastBatchTime = now
 				rbft.postBatches(batches)
+			}
+			// if received txs but it is not match generate batch, stop no tx batch timer
+			if rbft.config.GenesisEpochInfo.ConsensusParams.EnableTimedGenEmptyBlock &&
+				rbft.batchMgr.requestPool.HasPendingRequestInPool() && rbft.batchMgr.noTxBatchTimerActive {
+				rbft.stopNoTxBatchTimer()
 			}
 		} else {
 			_, completionMissingBatchHashes := rbft.batchMgr.requestPool.AddNewRequests(req.Requests, false, req.Local, false, false)
@@ -2072,8 +2059,14 @@ func (rbft *rbftImpl[T, Constraint]) finishNormalCheckpoint(checkpointHeight uin
 	}
 
 	rbft.nullReqTimerReset()
-	rbft.restartBatchTimer()
-	rbft.stopNoTxBatchTimer()
+	if !rbft.isPrimary(rbft.peerMgr.selfID) || !rbft.isNormal() {
+		if rbft.batchMgr.batchTimerActive {
+			rbft.stopBatchTimer()
+		}
+	}
+	if rbft.batchMgr.noTxBatchTimerActive {
+		rbft.stopNoTxBatchTimer()
+	}
 
 	rbft.external.SendFilterEvent(types.InformTypeFilterStableCheckpoint, matchingCheckpoints)
 	rbft.logger.Trace(consensus.TagNameCheckpoint, consensus.TagStageFinish, consensus.TagContentCheckpoint{
@@ -2092,6 +2085,8 @@ func (rbft *rbftImpl[T, Constraint]) finishNormalCheckpoint(checkpointHeight uin
 		// for primary, we can try to resubmit transactions after stable checkpoint as we
 		// may block pre-prepare before because of high watermark limit.
 		rbft.primaryResubmitTransactions()
+
+		rbft.restartBatchTimer()
 
 		// start noTx batch timer if there is no pending tx in pool
 		rbft.restartNoTxBatchTimer()
@@ -2548,4 +2543,21 @@ func (rbft *rbftImpl[T, Constraint]) recvStateUpdatedEvent(ss *types.ServiceSync
 	// here, we always fetch PQC after finish state update as we only recovery to the largest checkpoint which
 	// is lower or equal to the lastExec quorum of others.
 	return rbft.fetchRecoveryPQC()
+}
+
+func (rbft *rbftImpl[T, Constraint]) recvReBroadcastRequestSet(e *consensus.ReBroadcastRequestSet) consensusEvent {
+	rbft.logger.Debugf("Replica %d recv ReBroadcastRequestSet from remote node: %d", rbft.peerMgr.selfID, e.GetReplicaId())
+	start := time.Now()
+	// handle reBroadcast requestSet
+	rbft.metrics.incomingRemoteTxSets.Add(float64(1))
+	rbft.metrics.incomingRemoteTxs.Add(float64(len(e.Requests)))
+
+	var requestSet RequestSet[T, Constraint]
+	if err := requestSet.FromPB(e); err != nil {
+		rbft.logger.Errorf("RequestSet unmarshal error: %v", err)
+		return nil
+	}
+	rbft.processReqSetEvent(&requestSet)
+	rbft.metrics.processEventDuration.With("event", "rebroadcast_request_set").Observe(time.Since(start).Seconds())
+	return nil
 }

@@ -73,6 +73,7 @@ func executeExceptN[T any, Constraint consensus.TXConstraint[T]](t *testing.T, r
 		Service:   CoreRbftService,
 		EventType: CoreBatchTimerEvent,
 	}
+	rbfts[primaryIndex].config.BatchTimeout = 0
 	// primary start generate batch
 	rbfts[primaryIndex].processEvent(batchTimerEvent)
 
@@ -271,8 +272,8 @@ func (rbft *rbftImpl[T, Constraint]) consensusMessagePacker(e consensusEvent) *c
 	case *consensus.Commit:
 		eventType = consensus.Type_COMMIT
 		payload, err = et.MarshalVTStrict()
-	case *consensus.RequestSet:
-		eventType = consensus.Type_REQUEST_SET
+	case *consensus.ReBroadcastRequestSet:
+		eventType = consensus.Type_REBROADCAST_REQUEST_SET
 		payload, err = et.MarshalVTStrict()
 	case *consensus.SignedCheckpoint:
 		eventType = consensus.Type_SIGNED_CHECKPOINT

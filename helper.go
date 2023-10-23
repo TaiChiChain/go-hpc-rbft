@@ -174,13 +174,13 @@ func (rbft *rbftImpl[T, Constraint]) committed(v uint64, n uint64, d string) boo
 
 // broadcastReqSet helps broadcast requestSet to others.
 func (rbft *rbftImpl[T, Constraint]) broadcastReqSet(set *RequestSet[T, Constraint]) {
-	payload, err := set.Marshal()
+	payload, err := set.Marshal(rbft.peerMgr.selfID)
 	if err != nil {
 		rbft.logger.Errorf("ConsensusMessage_TRANSACTION_SET Marshal Error: %s", err)
 		return
 	}
 	consensusMsg := &consensus.ConsensusMessage{
-		Type:    consensus.Type_REQUEST_SET,
+		Type:    consensus.Type_REBROADCAST_REQUEST_SET,
 		Payload: payload,
 	}
 	rbft.peerMgr.broadcast(context.TODO(), consensusMsg)

@@ -128,12 +128,12 @@ func (m *Commit) CloneMessageVT() proto.Message {
 	return m.CloneVT()
 }
 
-func (m *RequestSet) CloneVT() *RequestSet {
+func (m *ReBroadcastRequestSet) CloneVT() *ReBroadcastRequestSet {
 	if m == nil {
-		return (*RequestSet)(nil)
+		return (*ReBroadcastRequestSet)(nil)
 	}
-	r := &RequestSet{
-		Local: m.Local,
+	r := &ReBroadcastRequestSet{
+		ReplicaId: m.ReplicaId,
 	}
 	if rhs := m.Requests; rhs != nil {
 		tmpContainer := make([][]byte, len(rhs))
@@ -151,7 +151,7 @@ func (m *RequestSet) CloneVT() *RequestSet {
 	return r
 }
 
-func (m *RequestSet) CloneMessageVT() proto.Message {
+func (m *ReBroadcastRequestSet) CloneMessageVT() proto.Message {
 	return m.CloneVT()
 }
 
@@ -979,10 +979,13 @@ func (this *Commit) EqualMessageVT(thatMsg proto.Message) bool {
 	}
 	return this.EqualVT(that)
 }
-func (this *RequestSet) EqualVT(that *RequestSet) bool {
+func (this *ReBroadcastRequestSet) EqualVT(that *ReBroadcastRequestSet) bool {
 	if this == that {
 		return true
 	} else if this == nil || that == nil {
+		return false
+	}
+	if this.ReplicaId != that.ReplicaId {
 		return false
 	}
 	if len(this.Requests) != len(that.Requests) {
@@ -994,14 +997,11 @@ func (this *RequestSet) EqualVT(that *RequestSet) bool {
 			return false
 		}
 	}
-	if this.Local != that.Local {
-		return false
-	}
 	return string(this.unknownFields) == string(that.unknownFields)
 }
 
-func (this *RequestSet) EqualMessageVT(thatMsg proto.Message) bool {
-	that, ok := thatMsg.(*RequestSet)
+func (this *ReBroadcastRequestSet) EqualMessageVT(thatMsg proto.Message) bool {
+	that, ok := thatMsg.(*ReBroadcastRequestSet)
 	if !ok {
 		return false
 	}
@@ -2218,7 +2218,7 @@ func (m *Commit) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
-func (m *RequestSet) MarshalVT() (dAtA []byte, err error) {
+func (m *ReBroadcastRequestSet) MarshalVT() (dAtA []byte, err error) {
 	if m == nil {
 		return nil, nil
 	}
@@ -2231,12 +2231,12 @@ func (m *RequestSet) MarshalVT() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *RequestSet) MarshalToVT(dAtA []byte) (int, error) {
+func (m *ReBroadcastRequestSet) MarshalToVT(dAtA []byte) (int, error) {
 	size := m.SizeVT()
 	return m.MarshalToSizedBufferVT(dAtA[:size])
 }
 
-func (m *RequestSet) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
+func (m *ReBroadcastRequestSet) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 	if m == nil {
 		return 0, nil
 	}
@@ -2248,24 +2248,19 @@ func (m *RequestSet) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 		i -= len(m.unknownFields)
 		copy(dAtA[i:], m.unknownFields)
 	}
-	if m.Local {
-		i--
-		if m.Local {
-			dAtA[i] = 1
-		} else {
-			dAtA[i] = 0
-		}
-		i--
-		dAtA[i] = 0x10
-	}
 	if len(m.Requests) > 0 {
 		for iNdEx := len(m.Requests) - 1; iNdEx >= 0; iNdEx-- {
 			i -= len(m.Requests[iNdEx])
 			copy(dAtA[i:], m.Requests[iNdEx])
 			i = encodeVarint(dAtA, i, uint64(len(m.Requests[iNdEx])))
 			i--
-			dAtA[i] = 0xa
+			dAtA[i] = 0x12
 		}
+	}
+	if m.ReplicaId != 0 {
+		i = encodeVarint(dAtA, i, uint64(m.ReplicaId))
+		i--
+		dAtA[i] = 0x8
 	}
 	return len(dAtA) - i, nil
 }
@@ -4146,7 +4141,7 @@ func (m *Commit) MarshalToSizedBufferVTStrict(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
-func (m *RequestSet) MarshalVTStrict() (dAtA []byte, err error) {
+func (m *ReBroadcastRequestSet) MarshalVTStrict() (dAtA []byte, err error) {
 	if m == nil {
 		return nil, nil
 	}
@@ -4159,12 +4154,12 @@ func (m *RequestSet) MarshalVTStrict() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *RequestSet) MarshalToVTStrict(dAtA []byte) (int, error) {
+func (m *ReBroadcastRequestSet) MarshalToVTStrict(dAtA []byte) (int, error) {
 	size := m.SizeVT()
 	return m.MarshalToSizedBufferVTStrict(dAtA[:size])
 }
 
-func (m *RequestSet) MarshalToSizedBufferVTStrict(dAtA []byte) (int, error) {
+func (m *ReBroadcastRequestSet) MarshalToSizedBufferVTStrict(dAtA []byte) (int, error) {
 	if m == nil {
 		return 0, nil
 	}
@@ -4176,24 +4171,19 @@ func (m *RequestSet) MarshalToSizedBufferVTStrict(dAtA []byte) (int, error) {
 		i -= len(m.unknownFields)
 		copy(dAtA[i:], m.unknownFields)
 	}
-	if m.Local {
-		i--
-		if m.Local {
-			dAtA[i] = 1
-		} else {
-			dAtA[i] = 0
-		}
-		i--
-		dAtA[i] = 0x10
-	}
 	if len(m.Requests) > 0 {
 		for iNdEx := len(m.Requests) - 1; iNdEx >= 0; iNdEx-- {
 			i -= len(m.Requests[iNdEx])
 			copy(dAtA[i:], m.Requests[iNdEx])
 			i = encodeVarint(dAtA, i, uint64(len(m.Requests[iNdEx])))
 			i--
-			dAtA[i] = 0xa
+			dAtA[i] = 0x12
 		}
+	}
+	if m.ReplicaId != 0 {
+		i = encodeVarint(dAtA, i, uint64(m.ReplicaId))
+		i--
+		dAtA[i] = 0x8
 	}
 	return len(dAtA) - i, nil
 }
@@ -5909,20 +5899,20 @@ func (m *Commit) SizeVT() (n int) {
 	return n
 }
 
-func (m *RequestSet) SizeVT() (n int) {
+func (m *ReBroadcastRequestSet) SizeVT() (n int) {
 	if m == nil {
 		return 0
 	}
 	var l int
 	_ = l
+	if m.ReplicaId != 0 {
+		n += 1 + sov(uint64(m.ReplicaId))
+	}
 	if len(m.Requests) > 0 {
 		for _, b := range m.Requests {
 			l = len(b)
 			n += 1 + l + sov(uint64(l))
 		}
-	}
-	if m.Local {
-		n += 2
 	}
 	n += len(m.unknownFields)
 	return n
@@ -7287,7 +7277,7 @@ func (m *Commit) UnmarshalVT(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *RequestSet) UnmarshalVT(dAtA []byte) error {
+func (m *ReBroadcastRequestSet) UnmarshalVT(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -7310,13 +7300,32 @@ func (m *RequestSet) UnmarshalVT(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: RequestSet: wiretype end group for non-group")
+			return fmt.Errorf("proto: ReBroadcastRequestSet: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: RequestSet: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: ReBroadcastRequestSet: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ReplicaId", wireType)
+			}
+			m.ReplicaId = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflow
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ReplicaId |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Requests", wireType)
 			}
@@ -7348,26 +7357,6 @@ func (m *RequestSet) UnmarshalVT(dAtA []byte) error {
 			m.Requests = append(m.Requests, make([]byte, postIndex-iNdEx))
 			copy(m.Requests[len(m.Requests)-1], dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
-		case 2:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Local", wireType)
-			}
-			var v int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflow
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				v |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			m.Local = bool(v != 0)
 		default:
 			iNdEx = preIndex
 			skippy, err := skip(dAtA[iNdEx:])

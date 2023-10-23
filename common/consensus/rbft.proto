@@ -23,7 +23,7 @@ enum Type {
     PRE_PREPARE = 1;
     PREPARE = 2;
     COMMIT = 3;
-    REQUEST_SET = 4;
+    REBROADCAST_REQUEST_SET = 4;
     SIGNED_CHECKPOINT = 5;
     FETCH_CHECKPOINT = 6;
     VIEW_CHANGE = 7;
@@ -79,9 +79,9 @@ message Commit {
     string batch_digest = 4;
 }
 
-message RequestSet {
-    repeated bytes requests = 1;
-    bool local = 2;
+message ReBroadcastRequestSet {
+    uint64 replica_id = 1;
+    repeated bytes requests = 2;
 }
 
 message HashBatch {
