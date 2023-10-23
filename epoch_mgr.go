@@ -51,10 +51,13 @@ type epochManager struct {
 	logger common.Logger
 
 	config Config
+
+	chainConfig *ChainConfig
 }
 
-func newEpochManager(c Config, pp *peerManager, epochService EpochService, storage Storage) *epochManager {
+func newEpochManager(chainConfig *ChainConfig, c Config, pp *peerManager, epochService EpochService, storage Storage) *epochManager {
 	em := &epochManager{
+		chainConfig:          chainConfig,
 		configBatchToCheck:   nil,
 		configBatchToExecute: uint64(0),
 		epochService:         epochService,
@@ -75,22 +78,22 @@ func (rbft *rbftImpl[T, Constraint]) dispatchEpochMsg(e consensusEvent) consensu
 		return rbft.recvFetchCheckpoint(et)
 	case *consensus.EpochChangeRequest:
 		rbft.logger.Debugf("Replica %d don't process epoch change request from %d in same epoch",
-			rbft.peerMgr.selfID, et)
+			rbft.chainConfig.SelfID, et)
 	case *consensus.EpochChangeProof:
 		rbft.logger.Debugf("Replica %d don't process epoch change proof from %d in same epoch",
-			rbft.peerMgr.selfID, et.GetAuthor())
+			rbft.chainConfig.SelfID, et.GetAuthor())
 	}
 	return nil
 }
 
 func (rbft *rbftImpl[T, Constraint]) fetchCheckpoint() consensusEvent {
 	if rbft.epochMgr.configBatchToCheck == nil {
-		rbft.logger.Debugf("Replica %d doesn't need to check any batches", rbft.peerMgr.selfID)
+		rbft.logger.Debugf("Replica %d doesn't need to check any batches", rbft.chainConfig.SelfID)
 		return nil
 	}
 
 	fetch := &consensus.FetchCheckpoint{
-		ReplicaId:      rbft.peerMgr.selfID,
+		ReplicaId:      rbft.chainConfig.SelfID,
 		SequenceNumber: rbft.epochMgr.configBatchToCheck.Height,
 	}
 	rbft.startFetchCheckpointTimer()
@@ -105,7 +108,7 @@ func (rbft *rbftImpl[T, Constraint]) fetchCheckpoint() consensusEvent {
 		Payload: payload,
 	}
 
-	rbft.logger.Debugf("Replica %d is fetching checkpoint %d", rbft.peerMgr.selfID, fetch.SequenceNumber)
+	rbft.logger.Debugf("Replica %d is fetching checkpoint %d", rbft.chainConfig.SelfID, fetch.SequenceNumber)
 	rbft.peerMgr.broadcast(context.TODO(), consensusMsg)
 	return nil
 }
@@ -119,7 +122,7 @@ func (rbft *rbftImpl[T, Constraint]) recvFetchCheckpoint(fetch *consensus.FetchC
 		signedCheckpoint, ok = rbft.storeMgr.localCheckpoints[rbft.chainConfig.H]
 		if !ok {
 			rbft.logger.Warningf("Replica %d cannot find digest of its low watermark %d, "+
-				"current node may fall behind", rbft.peerMgr.selfID, rbft.chainConfig.H)
+				"current node may fall behind", rbft.chainConfig.SelfID, rbft.chainConfig.H)
 			return nil
 		}
 	}
@@ -146,7 +149,7 @@ func (rbft *rbftImpl[T, Constraint]) turnIntoEpoch() {
 	// validator set has been changed, start a new epoch and check new epoch
 	newEpoch, err := rbft.external.GetCurrentEpochInfo()
 	if err != nil {
-		rbft.logger.Errorf("Replica %d failed to get current epoch from ledger: %v", rbft.peerMgr.selfID, err)
+		rbft.logger.Errorf("Replica %d failed to get current epoch from ledger: %v", rbft.chainConfig.SelfID, err)
 		rbft.stopNamespace()
 		return
 	}
@@ -161,11 +164,11 @@ func (rbft *rbftImpl[T, Constraint]) turnIntoEpoch() {
 	rbft.recoveryMgr = newRecoveryMgr(rbft.config)
 
 	// set the latest epoch
-	rbft.setEpochInfo(newEpoch)
+	rbft.updateEpochInfo(newEpoch)
 
 	// initial view 0 in new epoch.
 	rbft.persistNewView(initialNewView)
-	rbft.logger.Infof("Replica %d persist view=%d after epoch change", rbft.peerMgr.selfID, rbft.chainConfig.View)
+	rbft.logger.Infof("Replica %d persist view=%d after epoch change", rbft.chainConfig.SelfID, rbft.chainConfig.View)
 
 	// clean cached old epoch proof
 	for epoch := range rbft.epochMgr.epochProofCache {
@@ -178,7 +181,7 @@ func (rbft *rbftImpl[T, Constraint]) turnIntoEpoch() {
 	rbft.metrics.quorumSizeGauge.Set(float64(rbft.commonCaseQuorum()))
 
 	rbft.logger.Debugf("======== Replica %d turn into a new epoch, epoch=%d/N=%d/view=%d/height=%d.",
-		rbft.peerMgr.selfID, rbft.chainConfig.EpochInfo.Epoch, rbft.chainConfig.N, rbft.chainConfig.View, rbft.exec.lastExec)
+		rbft.chainConfig.SelfID, rbft.chainConfig.EpochInfo.Epoch, rbft.chainConfig.N, rbft.chainConfig.View, rbft.exec.lastExec)
 	rbft.logger.Notice(`
 
   +==============================================+
@@ -191,11 +194,19 @@ func (rbft *rbftImpl[T, Constraint]) turnIntoEpoch() {
 }
 
 // setEpoch sets the epoch with the epochLock.
-func (rbft *rbftImpl[T, Constraint]) setEpochInfo(epochInfo *EpochInfo) {
+func (rbft *rbftImpl[T, Constraint]) updateEpochInfo(epochInfo *EpochInfo) {
 	rbft.epochLock.Lock()
+	oldRole := rbft.chainConfig.SelfRole
 	rbft.chainConfig.EpochInfo = epochInfo
 	rbft.epochMgr.epoch = epochInfo.Epoch
-	rbft.chainConfig.updateDerivedData()
+	if err := rbft.chainConfig.updateDerivedData(); err != nil {
+		rbft.logger.Criticalf("Replica %d failed to check epoch info for epoch %d from ledger: %v", rbft.chainConfig.SelfID, epochInfo.Epoch, err)
+		return
+	}
+	newRole := rbft.chainConfig.SelfRole
+	if oldRole != newRole {
+		rbft.logger.Infof("Replica %d change role from %s to %s", rbft.chainConfig.SelfID, oldRole.String(), newRole.String())
+	}
 	rbft.epochLock.Unlock()
 	rbft.metrics.epochGauge.Set(float64(epochInfo.Epoch))
 }
@@ -226,7 +237,7 @@ func (em *epochManager) checkEpoch(msg *consensus.ConsensusMessage) consensusEve
 	remoteEpoch := msg.Epoch
 	if remoteEpoch > currentEpoch {
 		em.logger.Debugf("Replica %d received message type %s from %d with larger epoch, "+
-			"current epoch %d, remote epoch %d", em.peerMgr.selfID, msg.Type, msg.From, currentEpoch, remoteEpoch)
+			"current epoch %d, remote epoch %d", em.chainConfig.SelfID, msg.Type, msg.From, currentEpoch, remoteEpoch)
 		// first process epoch sync response with higher epoch.
 		if msg.Type == consensus.Type_EPOCH_CHANGE_PROOF {
 			proof := &consensus.EpochChangeProof{}
@@ -241,7 +252,7 @@ func (em *epochManager) checkEpoch(msg *consensus.ConsensusMessage) consensusEve
 
 	if remoteEpoch < currentEpoch {
 		em.logger.Debugf("Replica %d received message type %s from %d with lower epoch, "+
-			"current epoch %d, remote epoch %d", em.peerMgr.selfID, msg.Type, msg.From, currentEpoch, remoteEpoch)
+			"current epoch %d, remote epoch %d", em.chainConfig.SelfID, msg.Type, msg.From, currentEpoch, remoteEpoch)
 		// first process epoch sync request with lower epoch.
 		if msg.Type == consensus.Type_EPOCH_CHANGE_REQUEST {
 			request := &consensus.EpochChangeRequest{}
@@ -258,9 +269,9 @@ func (em *epochManager) checkEpoch(msg *consensus.ConsensusMessage) consensusEve
 }
 
 func (em *epochManager) retrieveEpochChange(start, target uint64, recipient uint64) error {
-	em.logger.Debugf("Replica %d request epoch changes %d to %d from %d", em.peerMgr.selfID, start, target, recipient)
+	em.logger.Debugf("Replica %d request epoch changes %d to %d from %d", em.chainConfig.SelfID, start, target, recipient)
 	req := &consensus.EpochChangeRequest{
-		Author:      em.peerMgr.selfID,
+		Author:      em.chainConfig.SelfID,
 		StartEpoch:  start,
 		TargetEpoch: target,
 	}
@@ -278,7 +289,7 @@ func (em *epochManager) retrieveEpochChange(start, target uint64, recipient uint
 }
 
 func (em *epochManager) processEpochChangeRequest(request *consensus.EpochChangeRequest) error {
-	em.logger.Debugf("Replica %d received epoch change request %s", em.peerMgr.selfID, request)
+	em.logger.Debugf("Replica %d received epoch change request %s", em.chainConfig.SelfID, request)
 
 	if err := em.verifyEpochChangeRequest(request); err != nil {
 		em.logger.Warningf("Verify epoch change request failed: %s", err)
@@ -290,7 +301,7 @@ func (em *epochManager) processEpochChangeRequest(request *consensus.EpochChange
 		return err
 	}
 	if proof != nil {
-		em.logger.Noticef("Replica %d send epoch change proof towards %d, info %s", em.peerMgr.selfID, request.GetAuthor(), proof.Pretty())
+		em.logger.Noticef("Replica %d send epoch change proof towards %d, info %s", em.chainConfig.SelfID, request.GetAuthor(), proof.Pretty())
 		proof.GenesisBlockDigest = em.config.GenesisBlockDigest
 		payload, mErr := proof.MarshalVTStrict()
 		if mErr != nil {
@@ -308,7 +319,7 @@ func (em *epochManager) processEpochChangeRequest(request *consensus.EpochChange
 }
 
 func (em *epochManager) processEpochChangeProof(proof *consensus.EpochChangeProof) consensusEvent {
-	em.logger.Debugf("Replica %d received epoch change proof from %d", em.peerMgr.selfID, proof.Author)
+	em.logger.Debugf("Replica %d received epoch change proof from %d", em.chainConfig.SelfID, proof.Author)
 
 	if changeTo := proof.NextEpoch(); changeTo <= em.epoch {
 		// ignore proof old epoch which we have already started
@@ -318,7 +329,7 @@ func (em *epochManager) processEpochChangeProof(proof *consensus.EpochChangeProo
 
 	if proof.GenesisBlockDigest != em.config.GenesisBlockDigest {
 		em.logger.Criticalf("Replica %d reject epoch change proof, because self genesis config is not consistent with most nodes, expected genesis block hash: %s, self genesis block hash: %s",
-			em.peerMgr.selfID, proof.GenesisBlockDigest, em.config.GenesisBlockDigest)
+			em.chainConfig.SelfID, proof.GenesisBlockDigest, em.config.GenesisBlockDigest)
 		return nil
 	}
 
@@ -385,7 +396,7 @@ func (em *epochManager) pagingGetEpochChangeProof(startEpoch, endEpoch, pageLimi
 	return &consensus.EpochChangeProof{
 		EpochChanges: epochChanges,
 		More:         more,
-		Author:       em.peerMgr.selfID,
+		Author:       em.chainConfig.SelfID,
 	}, nil
 }
 

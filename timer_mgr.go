@@ -321,7 +321,7 @@ func (tm *timerManager) makeSyncStateTimeoutLegal() {
 // 3) replica is trying to send checkpoint equal to high-watermark
 // 4) replica received f+1 checkpoints out of range, but it has already executed blocks larger than these checkpoints
 func (rbft *rbftImpl[T, Constraint]) softStartHighWatermarkTimer(reason string) {
-	rbft.logger.Debugf("Replica %d soft start high-watermark timer, current low-watermark is %d, reason: %s", rbft.peerMgr.selfID, rbft.chainConfig.H, reason)
+	rbft.logger.Debugf("Replica %d soft start high-watermark timer, current low-watermark is %d, reason: %s", rbft.chainConfig.SelfID, rbft.chainConfig.H, reason)
 
 	event := &LocalEvent{
 		Service:   CoreRbftService,
@@ -331,7 +331,7 @@ func (rbft *rbftImpl[T, Constraint]) softStartHighWatermarkTimer(reason string) 
 
 	hasStarted, _ := rbft.timerMgr.softStartTimerWithNewTT(highWatermarkTimer, rbft.timerMgr.getTimeoutValue(highWatermarkTimer), event)
 	if hasStarted {
-		rbft.logger.Debugf("Replica %d has started new view timer before", rbft.peerMgr.selfID)
+		rbft.logger.Debugf("Replica %d has started new view timer before", rbft.chainConfig.SelfID)
 	} else {
 		rbft.highWatermarkTimerReason = reason
 	}
@@ -339,7 +339,7 @@ func (rbft *rbftImpl[T, Constraint]) softStartHighWatermarkTimer(reason string) 
 
 // stopHighWatermarkTimer stops a high-watermark timer
 func (rbft *rbftImpl[T, Constraint]) stopHighWatermarkTimer() {
-	rbft.logger.Debugf("Replica %d stop high-watermark timer", rbft.peerMgr.selfID)
+	rbft.logger.Debugf("Replica %d stop high-watermark timer", rbft.chainConfig.SelfID)
 	rbft.timerMgr.stopTimer(highWatermarkTimer)
 }
 
@@ -357,7 +357,7 @@ func (rbft *rbftImpl[T, Constraint]) stopFetchCheckpointTimer() {
 }
 
 func (rbft *rbftImpl[T, Constraint]) startFetchViewTimer() {
-	rbft.logger.Debugf("Replica %d start a fetchView timer", rbft.peerMgr.selfID)
+	rbft.logger.Debugf("Replica %d start a fetchView timer", rbft.chainConfig.SelfID)
 	event := &LocalEvent{
 		Service:   ViewChangeService,
 		EventType: FetchViewEvent,
@@ -367,6 +367,6 @@ func (rbft *rbftImpl[T, Constraint]) startFetchViewTimer() {
 }
 
 func (rbft *rbftImpl[T, Constraint]) stopFetchViewTimer() {
-	rbft.logger.Debugf("Replica %d stop a running fetchView timer", rbft.peerMgr.selfID)
+	rbft.logger.Debugf("Replica %d stop a running fetchView timer", rbft.chainConfig.SelfID)
 	rbft.timerMgr.stopTimer(fetchViewTimer)
 }

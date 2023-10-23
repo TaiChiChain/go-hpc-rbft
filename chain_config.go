@@ -95,6 +95,8 @@ type EpochInfo struct {
 
 	// Validator set(Participation consensus)
 	ValidatorSet []*NodeInfo `mapstructure:"validator_set" toml:"validator_set" json:"validator_set"`
+
+	DataSyncerSet []*NodeInfo `mapstructure:"data_syncer_set" toml:"data_syncer_set" json:"data_syncer_set"`
 }
 
 func (e *EpochInfo) Clone() *EpochInfo {
@@ -197,22 +199,42 @@ func (e *EpochInfo) Unmarshal(raw []byte) error {
 	return json.Unmarshal(raw, e)
 }
 
-// Chain config, tracking each view.
-type ChainConfig struct {
-	// Epoch info.
-	EpochInfo *EpochInfo
+type NodeRole uint8
 
+const (
+	NodeRoleUnknown NodeRole = iota
+	// NodeRoleDataSyncer only syncer data
+	NodeRoleDataSyncer
+	NodeRoleCandidate
+	NodeRoleValidator
+)
+
+func (n NodeRole) String() string {
+	return [...]string{"Unknown", "DataSyncer", "Candidate", "Validator"}[n]
+}
+
+type EpochDerivedData struct {
 	// Validator set size.
 	N int
 
 	// The maximum number of Byzantine nodes that can be tolerated in the verifier node set.
 	F int
 
-	// Low watermark block number.
-	H uint64
-
 	// High watermark perid block number.
 	L uint64
+
+	SelfID uint64
+
+	SelfRole NodeRole
+
+	NodeRoleMap map[uint64]NodeRole
+
+	NodeInfoMap map[uint64]*NodeInfo
+}
+
+type DynamicChainConfig struct {
+	// Low watermark block number.
+	H uint64
 
 	// Current view(auto-increment), change by ViewChange and Checkpoint.
 	View uint64
@@ -224,14 +246,57 @@ type ChainConfig struct {
 	PrimaryID uint64
 }
 
+// Chain config, tracking each view.
+type ChainConfig struct {
+	// Epoch info.
+	EpochInfo *EpochInfo
+
+	EpochDerivedData
+
+	DynamicChainConfig
+
+	SelfAccountAddress string
+}
+
 func (c *ChainConfig) isWRF() bool {
 	return c.EpochInfo.ConsensusParams.ProposerElectionType == ProposerElectionTypeWRF
 }
 
-func (c *ChainConfig) updateDerivedData() {
+func (c *ChainConfig) isValidator() bool {
+	return c.SelfRole == NodeRoleValidator
+}
+
+func (c *ChainConfig) updateDerivedData() error {
+	if len(c.EpochInfo.ValidatorSet) < 4 {
+		return errors.New("at least 4 validators")
+	}
+	if len(lo.Intersect(c.EpochInfo.ValidatorSet, c.EpochInfo.CandidateSet)) != 0 ||
+		len(lo.Intersect(c.EpochInfo.ValidatorSet, c.EpochInfo.DataSyncerSet)) != 0 ||
+		len(lo.Intersect(c.EpochInfo.CandidateSet, c.EpochInfo.DataSyncerSet)) != 0 {
+		return errors.New("validator_set, candidate_set, data_syncer_set cannot overlap(A node can only have one role at a time)")
+	}
+
+	c.NodeInfoMap = make(map[uint64]*NodeInfo)
+	c.NodeRoleMap = make(map[uint64]NodeRole)
+	fillNodes := func(nodes []*NodeInfo, role NodeRole) {
+		for _, p := range nodes {
+			if p.AccountAddress == c.SelfAccountAddress {
+				c.SelfID = p.ID
+				c.SelfRole = role
+			}
+			c.NodeInfoMap[p.ID] = p
+			c.NodeRoleMap[p.ID] = role
+		}
+	}
+	fillNodes(c.EpochInfo.ValidatorSet, NodeRoleValidator)
+	fillNodes(c.EpochInfo.CandidateSet, NodeRoleCandidate)
+	fillNodes(c.EpochInfo.DataSyncerSet, NodeRoleDataSyncer)
+
 	c.N = len(c.EpochInfo.ValidatorSet)
 	c.F = (c.N - 1) / 3
 	c.L = c.EpochInfo.ConsensusParams.CheckpointPeriod * c.EpochInfo.ConsensusParams.HighWatermarkCheckpointPeriod
+
+	return nil
 }
 
 func (c *ChainConfig) wrfCalPrimaryIDByView(v uint64) uint64 {

@@ -394,7 +394,7 @@ func TestRBFT_sendNullRequest(t *testing.T) {
 	rbfts[0].sendNullRequest()
 
 	nullRequest := &consensus.NullRequest{
-		ReplicaId: rbfts[0].peerMgr.selfID,
+		ReplicaId: rbfts[0].chainConfig.SelfID,
 	}
 	consensusMsg := rbfts[0].consensusMessagePacker(nullRequest)
 	assert.Equal(t, consensusMsg, nodes[0].broadcastMessageCache.ConsensusMessage)
@@ -417,7 +417,7 @@ func TestRBFT_recvPrePrepare_WrongDigest(t *testing.T) {
 		SequenceNumber: uint64(1),
 		BatchDigest:    "wrong hash",
 		HashBatch:      hashBatch,
-		ReplicaId:      rbfts[0].peerMgr.selfID,
+		ReplicaId:      rbfts[0].chainConfig.SelfID,
 	}
 	err := rbfts[1].recvPrePrepare(context.TODO(), preprep1)
 	assert.Nil(t, err)
@@ -434,7 +434,7 @@ func TestRBFT_recvPrePrepare_EmptyDigest(t *testing.T) {
 		SequenceNumber: uint64(1),
 		BatchDigest:    "",
 		HashBatch:      hashBatch,
-		ReplicaId:      rbfts[0].peerMgr.selfID,
+		ReplicaId:      rbfts[0].chainConfig.SelfID,
 	}
 	err := rbfts[1].recvPrePrepare(context.TODO(), preprep1)
 	assert.Nil(t, err)
@@ -455,7 +455,7 @@ func TestRBFT_recvPrePrepare_WrongSeqNo(t *testing.T) {
 		View:           rbfts[0].chainConfig.View,
 		SequenceNumber: uint64(1),
 		HashBatch:      hashBatch,
-		ReplicaId:      rbfts[0].peerMgr.selfID,
+		ReplicaId:      rbfts[0].chainConfig.SelfID,
 	}
 	batchHash := calculateMD5Hash(preprep.HashBatch.RequestHashList, preprep.HashBatch.Timestamp)
 	preprep.BatchDigest = batchHash
@@ -465,7 +465,7 @@ func TestRBFT_recvPrePrepare_WrongSeqNo(t *testing.T) {
 	assert.Equal(t, consensus.Type_FETCH_MISSING_REQUEST, nodes[1].unicastMessageCache.Type) // fetching missing tx for preprepare message
 
 	rbfts[1].recvFetchMissingResponse(context.TODO(), &consensus.FetchMissingResponse{
-		ReplicaId:      rbfts[0].peerMgr.selfID,
+		ReplicaId:      rbfts[0].chainConfig.SelfID,
 		View:           rbfts[0].chainConfig.View,
 		SequenceNumber: uint64(1),
 		BatchDigest:    batchHash,
@@ -486,7 +486,7 @@ func TestRBFT_recvPrePrepare_WrongSeqNo(t *testing.T) {
 		View:           rbfts[0].chainConfig.View,
 		SequenceNumber: uint64(1),
 		HashBatch:      hashBatchWrong,
-		ReplicaId:      rbfts[0].peerMgr.selfID,
+		ReplicaId:      rbfts[0].chainConfig.SelfID,
 	}
 	preprepDup.BatchDigest = calculateMD5Hash(preprepDup.HashBatch.RequestHashList, preprepDup.HashBatch.Timestamp)
 	err = rbfts[1].recvPrePrepare(context.TODO(), preprepDup)
@@ -510,7 +510,7 @@ func TestRBFT_recvFetchMissingResponse(t *testing.T) {
 		View:           rbfts[0].chainConfig.View,
 		SequenceNumber: uint64(1),
 		HashBatch:      hashBatch,
-		ReplicaId:      rbfts[0].peerMgr.selfID,
+		ReplicaId:      rbfts[0].chainConfig.SelfID,
 	}
 	preprep.BatchDigest = calculateMD5Hash(preprep.HashBatch.RequestHashList, preprep.HashBatch.Timestamp)
 
@@ -519,7 +519,7 @@ func TestRBFT_recvFetchMissingResponse(t *testing.T) {
 		SequenceNumber:       preprep.SequenceNumber,
 		BatchDigest:          preprep.BatchDigest,
 		MissingRequestHashes: map[uint64]string{0: txHash},
-		ReplicaId:            rbfts[1].peerMgr.selfID,
+		ReplicaId:            rbfts[1].chainConfig.SelfID,
 	}
 
 	err = rbfts[0].recvFetchMissingRequest(context.TODO(), fetch)
@@ -542,7 +542,7 @@ func TestRBFT_recvFetchMissingResponse(t *testing.T) {
 		BatchDigest:          fetch.BatchDigest,
 		MissingRequestHashes: fetch.MissingRequestHashes,
 		MissingRequests:      map[uint64][]byte{0: txBytes},
-		ReplicaId:            rbfts[0].peerMgr.selfID,
+		ReplicaId:            rbfts[0].chainConfig.SelfID,
 	}
 
 	var ret consensusEvent

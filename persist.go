@@ -30,13 +30,13 @@ import (
 // persistQSet persists marshaled pre-prepare message to database
 func (rbft *rbftImpl[T, Constraint]) persistQSet(preprep *consensus.PrePrepare) {
 	if preprep == nil {
-		rbft.logger.Debugf("Replica %d ignore nil prePrepare", rbft.peerMgr.selfID)
+		rbft.logger.Debugf("Replica %d ignore nil prePrepare", rbft.chainConfig.SelfID)
 		return
 	}
 
 	raw, err := preprep.MarshalVTStrict()
 	if err != nil {
-		rbft.logger.Warningf("Replica %d could not persist qset: %s", rbft.peerMgr.selfID, err)
+		rbft.logger.Warningf("Replica %d could not persist qset: %s", rbft.chainConfig.SelfID, err)
 		return
 	}
 	key := fmt.Sprintf("qset.%d.%d.%s", preprep.View, preprep.SequenceNumber, preprep.BatchDigest)
@@ -57,7 +57,7 @@ func (rbft *rbftImpl[T, Constraint]) persistPSet(v uint64, n uint64, d string) {
 
 	raw, err := pset.MarshalVTStrict()
 	if err != nil {
-		rbft.logger.Warningf("Replica %d could not persist pset: %s", rbft.peerMgr.selfID, err)
+		rbft.logger.Warningf("Replica %d could not persist pset: %s", rbft.chainConfig.SelfID, err)
 		return
 	}
 	key := fmt.Sprintf("pset.%d.%d.%s", v, n, d)
@@ -78,7 +78,7 @@ func (rbft *rbftImpl[T, Constraint]) persistCSet(v uint64, n uint64, d string) {
 
 	raw, err := cset.MarshalVTStrict()
 	if err != nil {
-		rbft.logger.Warningf("Replica %d could not persist cset: %s", rbft.peerMgr.selfID, err)
+		rbft.logger.Warningf("Replica %d could not persist cset: %s", rbft.chainConfig.SelfID, err)
 		return
 	}
 	key := fmt.Sprintf("cset.%d.%d.%s", v, n, d)
@@ -123,7 +123,7 @@ func (rbft *rbftImpl[T, Constraint]) restoreQSet() (map[msgID]*consensus.PrePrep
 			var d string
 			v, n, d, err = rbft.parseQPCKey(key, "qset")
 			if err != nil {
-				rbft.logger.Warningf("Replica %d could not restore qset key %s, err: %s", rbft.peerMgr.selfID, key, err)
+				rbft.logger.Warningf("Replica %d could not restore qset key %s, err: %s", rbft.chainConfig.SelfID, key, err)
 			} else {
 				preprep := &consensus.PrePrepare{}
 				err = preprep.UnmarshalVT(set)
@@ -131,12 +131,12 @@ func (rbft *rbftImpl[T, Constraint]) restoreQSet() (map[msgID]*consensus.PrePrep
 					idx := msgID{v: v, n: n, d: d}
 					qset[idx] = preprep
 				} else {
-					rbft.logger.Warningf("Replica %d could not restore prePrepare %v, err: %v", rbft.peerMgr.selfID, set, err)
+					rbft.logger.Warningf("Replica %d could not restore prePrepare %v, err: %v", rbft.chainConfig.SelfID, set, err)
 				}
 			}
 		}
 	} else {
-		rbft.logger.Debugf("Replica %d could not restore qset: %s", rbft.peerMgr.selfID, err)
+		rbft.logger.Debugf("Replica %d could not restore qset: %s", rbft.chainConfig.SelfID, err)
 	}
 
 	return qset, err
@@ -152,7 +152,7 @@ func (rbft *rbftImpl[T, Constraint]) restorePSet() (map[msgID]*consensus.Pset, e
 			var d string
 			v, n, d, err = rbft.parseQPCKey(key, "pset")
 			if err != nil {
-				rbft.logger.Warningf("Replica %d could not restore pset key %s, err: %s", rbft.peerMgr.selfID, key, err)
+				rbft.logger.Warningf("Replica %d could not restore pset key %s, err: %s", rbft.chainConfig.SelfID, key, err)
 			} else {
 				prepares := &consensus.Pset{}
 				err = prepares.UnmarshalVT(set)
@@ -160,12 +160,12 @@ func (rbft *rbftImpl[T, Constraint]) restorePSet() (map[msgID]*consensus.Pset, e
 					idx := msgID{v: v, n: n, d: d}
 					pset[idx] = prepares
 				} else {
-					rbft.logger.Warningf("Replica %d could not restore prepares %v", rbft.peerMgr.selfID, set)
+					rbft.logger.Warningf("Replica %d could not restore prepares %v", rbft.chainConfig.SelfID, set)
 				}
 			}
 		}
 	} else {
-		rbft.logger.Debugf("Replica %d could not restore pset: %s", rbft.peerMgr.selfID, err)
+		rbft.logger.Debugf("Replica %d could not restore pset: %s", rbft.chainConfig.SelfID, err)
 	}
 
 	return pset, err
@@ -182,7 +182,7 @@ func (rbft *rbftImpl[T, Constraint]) restoreCSet() (map[msgID]*consensus.Cset, e
 			var d string
 			v, n, d, err = rbft.parseQPCKey(key, "cset")
 			if err != nil {
-				rbft.logger.Warningf("Replica %d could not restore pset key %s, err: %s", rbft.peerMgr.selfID, key, err)
+				rbft.logger.Warningf("Replica %d could not restore pset key %s, err: %s", rbft.chainConfig.SelfID, key, err)
 			} else {
 				commits := &consensus.Cset{}
 				err = commits.UnmarshalVT(set)
@@ -190,12 +190,12 @@ func (rbft *rbftImpl[T, Constraint]) restoreCSet() (map[msgID]*consensus.Cset, e
 					idx := msgID{v: v, n: n, d: d}
 					cset[idx] = commits
 				} else {
-					rbft.logger.Warningf("Replica %d could not restore commits %v", rbft.peerMgr.selfID, set)
+					rbft.logger.Warningf("Replica %d could not restore commits %v", rbft.chainConfig.SelfID, set)
 				}
 			}
 		}
 	} else {
-		rbft.logger.Debugf("Replica %d could not restore cset: %s", rbft.peerMgr.selfID, err)
+		rbft.logger.Debugf("Replica %d could not restore cset: %s", rbft.chainConfig.SelfID, err)
 	}
 
 	return cset, err
@@ -206,7 +206,7 @@ func (rbft *rbftImpl[T, Constraint]) persistQList(ql map[qidx]*consensus.VcPq) {
 	for idx, q := range ql {
 		raw, err := q.MarshalVTStrict()
 		if err != nil {
-			rbft.logger.Warningf("Replica %d could not persist qlist with index %+v, error : %s", rbft.peerMgr.selfID, idx, err)
+			rbft.logger.Warningf("Replica %d could not persist qlist with index %+v, error : %s", rbft.chainConfig.SelfID, idx, err)
 			continue
 		}
 		key := fmt.Sprintf("qlist.%d.%s", idx.n, idx.d)
@@ -222,7 +222,7 @@ func (rbft *rbftImpl[T, Constraint]) persistPList(pl map[uint64]*consensus.VcPq)
 	for idx, p := range pl {
 		raw, err := p.MarshalVTStrict()
 		if err != nil {
-			rbft.logger.Warningf("Replica %d could not persist plist with index %+v, error : %s", rbft.peerMgr.selfID, idx, err)
+			rbft.logger.Warningf("Replica %d could not persist plist with index %+v, error : %s", rbft.chainConfig.SelfID, idx, err)
 			continue
 		}
 		key := fmt.Sprintf("plist.%d", idx)
@@ -264,18 +264,18 @@ func (rbft *rbftImpl[T, Constraint]) restoreQList() (map[qidx]*consensus.VcPq, e
 			var d string
 			splitKeys := strings.Split(key, ".")
 			if len(splitKeys) != 3 {
-				rbft.logger.Warningf("Replica %d could not restore key %s", rbft.peerMgr.selfID, key)
+				rbft.logger.Warningf("Replica %d could not restore key %s", rbft.chainConfig.SelfID, key)
 				return nil, errors.New("incorrect format")
 			}
 
 			if splitKeys[0] != "qlist" {
-				rbft.logger.Errorf("Replica %d finds error key prefix when restore qList using %s", rbft.peerMgr.selfID, key)
+				rbft.logger.Errorf("Replica %d finds error key prefix when restore qList using %s", rbft.chainConfig.SelfID, key)
 				return nil, errors.New("incorrect prefix")
 			}
 
 			n, err = strconv.Atoi(splitKeys[1])
 			if err != nil {
-				rbft.logger.Errorf("Replica %d could not parse key %s to int", rbft.peerMgr.selfID, splitKeys[1])
+				rbft.logger.Errorf("Replica %d could not parse key %s to int", rbft.chainConfig.SelfID, splitKeys[1])
 				return nil, errors.New("parse failed")
 			}
 
@@ -284,15 +284,15 @@ func (rbft *rbftImpl[T, Constraint]) restoreQList() (map[qidx]*consensus.VcPq, e
 			q := &consensus.VcPq{}
 			err = q.UnmarshalVT(value)
 			if err == nil {
-				rbft.logger.Debugf("Replica %d restore qList %+v", rbft.peerMgr.selfID, q)
+				rbft.logger.Debugf("Replica %d restore qList %+v", rbft.chainConfig.SelfID, q)
 				idx := qidx{d: d, n: uint64(n)}
 				qList[idx] = q
 			} else {
-				rbft.logger.Warningf("Replica %d could not restore qList %v", rbft.peerMgr.selfID, value)
+				rbft.logger.Warningf("Replica %d could not restore qList %v", rbft.chainConfig.SelfID, value)
 			}
 		}
 	} else {
-		rbft.logger.Debugf("Replica %d could not restore qList: %s", rbft.peerMgr.selfID, err)
+		rbft.logger.Debugf("Replica %d could not restore qList: %s", rbft.chainConfig.SelfID, err)
 	}
 	return qList, err
 }
@@ -306,32 +306,32 @@ func (rbft *rbftImpl[T, Constraint]) restorePList() (map[uint64]*consensus.VcPq,
 			var n int
 			splitKeys := strings.Split(key, ".")
 			if len(splitKeys) != 2 {
-				rbft.logger.Warningf("Replica %d could not restore key %s", rbft.peerMgr.selfID, key)
+				rbft.logger.Warningf("Replica %d could not restore key %s", rbft.chainConfig.SelfID, key)
 				return nil, errors.New("incorrect format")
 			}
 
 			if splitKeys[0] != "plist" {
-				rbft.logger.Errorf("Replica %d finds error key prefix when restore pList using %s", rbft.peerMgr.selfID, key)
+				rbft.logger.Errorf("Replica %d finds error key prefix when restore pList using %s", rbft.chainConfig.SelfID, key)
 				return nil, errors.New("incorrect prefix")
 			}
 
 			n, err = strconv.Atoi(splitKeys[1])
 			if err != nil {
-				rbft.logger.Errorf("Replica %d could not parse key %s to int", rbft.peerMgr.selfID, splitKeys[1])
+				rbft.logger.Errorf("Replica %d could not parse key %s to int", rbft.chainConfig.SelfID, splitKeys[1])
 				return nil, errors.New("parse failed")
 			}
 
 			p := &consensus.VcPq{}
 			err = p.UnmarshalVT(value)
 			if err == nil {
-				rbft.logger.Debugf("Replica %d restore pList %+v", rbft.peerMgr.selfID, p)
+				rbft.logger.Debugf("Replica %d restore pList %+v", rbft.chainConfig.SelfID, p)
 				pList[uint64(n)] = p
 			} else {
-				rbft.logger.Warningf("Replica %d could not restore pList %v", rbft.peerMgr.selfID, value)
+				rbft.logger.Warningf("Replica %d could not restore pList %v", rbft.chainConfig.SelfID, value)
 			}
 		}
 	} else {
-		rbft.logger.Debugf("Replica %d could not restore pList: %s", rbft.peerMgr.selfID, err)
+		rbft.logger.Debugf("Replica %d could not restore pList: %s", rbft.chainConfig.SelfID, err)
 	}
 	return pList, err
 }
@@ -341,7 +341,7 @@ func (rbft *rbftImpl[T, Constraint]) restoreCert() {
 	qset, _ := rbft.restoreQSet()
 	for idx, q := range qset {
 		if idx.n > rbft.exec.lastExec {
-			rbft.logger.Debugf("Replica %d restore qSet with seqNo %d > lastExec %d", rbft.peerMgr.selfID, idx.n, rbft.exec.lastExec)
+			rbft.logger.Debugf("Replica %d restore qSet with seqNo %d > lastExec %d", rbft.chainConfig.SelfID, idx.n, rbft.exec.lastExec)
 		}
 		cert := rbft.storeMgr.getCert(idx.v, idx.n, idx.d)
 		cert.prePrepare = q
@@ -356,12 +356,12 @@ func (rbft *rbftImpl[T, Constraint]) restoreCert() {
 	pset, _ := rbft.restorePSet()
 	for idx, prepares := range pset {
 		if idx.n > rbft.exec.lastExec {
-			rbft.logger.Debugf("Replica %d restore pSet with seqNo %d > lastExec %d", rbft.peerMgr.selfID, idx.n, rbft.exec.lastExec)
+			rbft.logger.Debugf("Replica %d restore pSet with seqNo %d > lastExec %d", rbft.chainConfig.SelfID, idx.n, rbft.exec.lastExec)
 		}
 		cert := rbft.storeMgr.getCert(idx.v, idx.n, idx.d)
 		for _, p := range prepares.Set {
 			cert.prepare[p.ID()] = p
-			if p.ReplicaId == rbft.peerMgr.selfID && idx.n <= rbft.exec.lastExec {
+			if p.ReplicaId == rbft.chainConfig.SelfID && idx.n <= rbft.exec.lastExec {
 				cert.sentPrepare = true
 			}
 		}
@@ -370,12 +370,12 @@ func (rbft *rbftImpl[T, Constraint]) restoreCert() {
 	cset, _ := rbft.restoreCSet()
 	for idx, commits := range cset {
 		if idx.n > rbft.exec.lastExec {
-			rbft.logger.Debugf("Replica %d restore cSet with seqNo %d > lastExec %d", rbft.peerMgr.selfID, idx.n, rbft.exec.lastExec)
+			rbft.logger.Debugf("Replica %d restore cSet with seqNo %d > lastExec %d", rbft.chainConfig.SelfID, idx.n, rbft.exec.lastExec)
 		}
 		cert := rbft.storeMgr.getCert(idx.v, idx.n, idx.d)
 		for _, c := range commits.Set {
 			cert.commit[c.ID()] = c
-			if c.ReplicaId == rbft.peerMgr.selfID && idx.n <= rbft.exec.lastExec {
+			if c.ReplicaId == rbft.chainConfig.SelfID && idx.n <= rbft.exec.lastExec {
 				cert.sentCommit = true
 			}
 		}
@@ -403,7 +403,7 @@ func (rbft *rbftImpl[T, Constraint]) persistBatch(digest string) {
 	batch := rbft.storeMgr.batchStore[digest]
 	batchPacked, err := batch.Marshal()
 	if err != nil {
-		rbft.logger.Warningf("Replica %d could not persist request batch %s: %s", rbft.peerMgr.selfID, digest, err)
+		rbft.logger.Warningf("Replica %d could not persist request batch %s: %s", rbft.chainConfig.SelfID, digest, err)
 		return
 	}
 	start := time.Now()
@@ -448,7 +448,7 @@ func (rbft *rbftImpl[T, Constraint]) persistNewView(nv *consensus.NewView) {
 	key := "new-view"
 	raw, err := nv.MarshalVTStrict()
 	if err != nil {
-		rbft.logger.Warningf("Replica %d could not persist NewView, error : %s", rbft.peerMgr.selfID, err)
+		rbft.logger.Warningf("Replica %d could not persist NewView, error : %s", rbft.chainConfig.SelfID, err)
 		rbft.stopNamespace()
 		return
 	}
@@ -469,14 +469,14 @@ func (rbft *rbftImpl[T, Constraint]) restoreView() {
 		nv := &consensus.NewView{}
 		err = nv.UnmarshalVT(raw)
 		if err == nil {
-			rbft.logger.Debugf("Replica %d restore view %d", rbft.peerMgr.selfID, nv.View)
+			rbft.logger.Debugf("Replica %d restore view %d", rbft.chainConfig.SelfID, nv.View)
 			rbft.vcMgr.latestNewView = nv
 			rbft.setView(nv.View)
 			rbft.logger.Noticef("========= restore view %d =======", rbft.chainConfig.View)
 			return
 		}
 	} else {
-		rbft.logger.Debugf("Replica %d could not restore view: %s, set to 0", rbft.peerMgr.selfID, err)
+		rbft.logger.Debugf("Replica %d could not restore view: %s, set to 0", rbft.chainConfig.SelfID, err)
 	}
 	// initial view 0 in new epoch.
 	rbft.vcMgr.latestNewView = initialNewView
@@ -490,28 +490,28 @@ func (rbft *rbftImpl[T, Constraint]) restoreBatchStore() {
 		for key, set := range payload {
 			var digest string
 			if _, err = fmt.Sscanf(key, "batch.%s", &digest); err != nil {
-				rbft.logger.Warningf("Replica %d could not restore pset key %s", rbft.peerMgr.selfID, key)
+				rbft.logger.Warningf("Replica %d could not restore pset key %s", rbft.chainConfig.SelfID, key)
 			} else {
 				batch := &RequestBatch[T, Constraint]{}
 				err = batch.Unmarshal(set)
 				if err == nil {
-					rbft.logger.Debugf("Replica %d restore batch %s", rbft.peerMgr.selfID, digest)
+					rbft.logger.Debugf("Replica %d restore batch %s", rbft.chainConfig.SelfID, digest)
 					rbft.storeMgr.batchStore[digest] = batch
 					rbft.metrics.batchesGauge.Add(float64(1))
 				} else {
-					rbft.logger.Warningf("Replica %d could not unmarshal batch key %s for error: %v", rbft.peerMgr.selfID, key, err)
+					rbft.logger.Warningf("Replica %d could not unmarshal batch key %s for error: %v", rbft.chainConfig.SelfID, key, err)
 				}
 			}
 		}
 	} else {
-		rbft.logger.Debugf("Replica %d could not restore batch: %v", rbft.peerMgr.selfID, err)
+		rbft.logger.Debugf("Replica %d could not restore batch: %v", rbft.chainConfig.SelfID, err)
 	}
 }
 
 func (rbft *rbftImpl[T, Constraint]) restoreEpochInfo() {
 	e, err := rbft.external.GetCurrentEpochInfo()
 	if err != nil {
-		rbft.logger.Debugf("Replica %d failed to get current epoch from ledger: %v, will use genesis epoch info", rbft.peerMgr.selfID, err)
+		rbft.logger.Debugf("Replica %d failed to get current epoch from ledger: %v, will use genesis epoch info", rbft.chainConfig.SelfID, err)
 		rbft.chainConfig.EpochInfo = rbft.config.GenesisEpochInfo
 	} else {
 		rbft.chainConfig.EpochInfo = e
@@ -525,11 +525,10 @@ func (rbft *rbftImpl[T, Constraint]) restoreEpochInfo() {
 // params from database
 func (rbft *rbftImpl[T, Constraint]) restoreState() error {
 	rbft.restoreEpochInfo()
-	rbft.chainConfig.updateDerivedData()
-	rbft.batchMgr.setSeqNo(rbft.exec.lastExec)
-	if err := rbft.peerMgr.updateRoutingTable(rbft.chainConfig); err != nil {
+	if err := rbft.chainConfig.updateDerivedData(); err != nil {
 		return err
 	}
+	rbft.batchMgr.setSeqNo(rbft.exec.lastExec)
 	rbft.restoreView()
 	rbft.restoreBatchStore()
 	rbft.restoreCert()
@@ -540,10 +539,10 @@ func (rbft *rbftImpl[T, Constraint]) restoreState() error {
 		for key, id := range chkpts {
 			var seqNo uint64
 			if _, err = fmt.Sscanf(key, "chkpt.%d", &seqNo); err != nil {
-				rbft.logger.Warningf("Replica %d could not restore checkpoint key %s", rbft.peerMgr.selfID, key)
+				rbft.logger.Warningf("Replica %d could not restore checkpoint key %s", rbft.chainConfig.SelfID, key)
 			} else {
 				digest := string(id)
-				rbft.logger.Debugf("Replica %d found checkpoint %s for seqNo %d", rbft.peerMgr.selfID, digest, seqNo)
+				rbft.logger.Debugf("Replica %d found checkpoint %s for seqNo %d", rbft.chainConfig.SelfID, digest, seqNo)
 				state := &types.ServiceState{
 					MetaState: &types.MetaState{Height: seqNo, Digest: digest},
 					Epoch:     rbft.chainConfig.EpochInfo.Epoch,
@@ -560,7 +559,7 @@ func (rbft *rbftImpl[T, Constraint]) restoreState() error {
 			}
 		}
 	} else {
-		rbft.logger.Debugf("Replica %d could not restore checkpoints: %s", rbft.peerMgr.selfID, err)
+		rbft.logger.Debugf("Replica %d could not restore checkpoints: %s", rbft.chainConfig.SelfID, err)
 		lastCheckpointBlockNumber := rbft.config.Applied / rbft.config.GenesisEpochInfo.ConsensusParams.CheckpointPeriod * rbft.config.GenesisEpochInfo.ConsensusParams.CheckpointPeriod
 		if rbft.config.GenesisEpochInfo.StartBlock != rbft.config.Applied && lastCheckpointBlockNumber != 0 {
 			// find last checkpoint
@@ -577,7 +576,7 @@ func (rbft *rbftImpl[T, Constraint]) restoreState() error {
 			}
 			rbft.chainConfig.LastCheckpointExecBlockHash = rbft.config.LastCheckpointBlockDigest
 			rbft.storeMgr.saveCheckpoint(lastCheckpointState.MetaState.Height, lastCheckpoint)
-			rbft.logger.Debugf("Replica %d construct last checkpoint %s for seqNo %d", rbft.peerMgr.selfID, rbft.config.LastCheckpointBlockDigest, lastCheckpointBlockNumber)
+			rbft.logger.Debugf("Replica %d construct last checkpoint %s for seqNo %d", rbft.chainConfig.SelfID, rbft.config.LastCheckpointBlockDigest, lastCheckpointBlockNumber)
 		} else {
 			// generate genesis checkpoint
 			state := &types.ServiceState{
@@ -593,14 +592,14 @@ func (rbft *rbftImpl[T, Constraint]) restoreState() error {
 			}
 			rbft.chainConfig.LastCheckpointExecBlockHash = rbft.config.GenesisBlockDigest
 			rbft.storeMgr.saveCheckpoint(state.MetaState.Height, genesisCheckpoint)
-			rbft.logger.Debugf("Replica %d construct genesis checkpoint %s for seqNo %d", rbft.peerMgr.selfID, state.MetaState.Digest, state.MetaState.Height)
+			rbft.logger.Debugf("Replica %d construct genesis checkpoint %s for seqNo %d", rbft.chainConfig.SelfID, state.MetaState.Digest, state.MetaState.Height)
 		}
 	}
 	rbft.chainConfig.updatePrimaryID()
 
 	hstr, rErr := rbft.storage.ReadState("rbft.h")
 	if rErr != nil {
-		rbft.logger.Debugf("Replica %d could not restore h: %s", rbft.peerMgr.selfID, rErr)
+		rbft.logger.Debugf("Replica %d could not restore h: %s", rbft.chainConfig.SelfID, rErr)
 	} else {
 		h, err := strconv.ParseUint(string(hstr), 10, 64)
 		if err != nil {
@@ -611,7 +610,7 @@ func (rbft *rbftImpl[T, Constraint]) restoreState() error {
 	}
 
 	rbft.logger.Infof("Replica %d restored state: epoch: %d, view: %d, seqNo: %d, "+
-		"reqBatches: %d, localCheckpoints: %d", rbft.peerMgr.selfID, rbft.chainConfig.EpochInfo.Epoch, rbft.chainConfig.View, rbft.exec.lastExec,
+		"reqBatches: %d, localCheckpoints: %d", rbft.chainConfig.SelfID, rbft.chainConfig.EpochInfo.Epoch, rbft.chainConfig.View, rbft.exec.lastExec,
 		len(rbft.storeMgr.batchStore), len(rbft.storeMgr.localCheckpoints))
 
 	return nil
@@ -627,24 +626,24 @@ func (rbft *rbftImpl[T, Constraint]) parseQPCKey(key, prefix string) (uint64, ui
 
 	splitKeys := strings.Split(key, ".")
 	if len(splitKeys) != 4 {
-		rbft.logger.Warningf("Replica %d could not restore key %s with prefix %s", rbft.peerMgr.selfID, key, prefix)
+		rbft.logger.Warningf("Replica %d could not restore key %s with prefix %s", rbft.chainConfig.SelfID, key, prefix)
 		return 0, 0, "", errors.New("incorrect format")
 	}
 
 	if splitKeys[0] != prefix {
-		rbft.logger.Errorf("Replica %d finds error key prefix when restore %s using %s", rbft.peerMgr.selfID, prefix, key)
+		rbft.logger.Errorf("Replica %d finds error key prefix when restore %s using %s", rbft.chainConfig.SelfID, prefix, key)
 		return 0, 0, "", errors.New("incorrect prefix")
 	}
 
 	v, err = strconv.Atoi(splitKeys[1])
 	if err != nil {
-		rbft.logger.Errorf("Replica %d could not parse key %s to int", rbft.peerMgr.selfID, splitKeys[1])
+		rbft.logger.Errorf("Replica %d could not parse key %s to int", rbft.chainConfig.SelfID, splitKeys[1])
 		return 0, 0, "", errors.New("parse failed")
 	}
 
 	n, err = strconv.Atoi(splitKeys[2])
 	if err != nil {
-		rbft.logger.Errorf("Replica %d could not parse key %s to int", rbft.peerMgr.selfID, splitKeys[2])
+		rbft.logger.Errorf("Replica %d could not parse key %s to int", rbft.chainConfig.SelfID, splitKeys[2])
 		return 0, 0, "", errors.New("parse failed")
 	}
 

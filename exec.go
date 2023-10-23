@@ -53,7 +53,7 @@ func (rbft *rbftImpl[T, Constraint]) msgToEvent(msg *consensus.ConsensusMessage)
 		if _, ok := rbft.storeMgr.missingReqBatches[digest]; !ok {
 			// either the wrong digest, or we got it already from someone else
 			rbft.logger.Debugf("Replica %d received missing request batch: %s, but we don't miss "+
-				"this request, ignore it", rbft.peerMgr.selfID, digest)
+				"this request, ignore it", rbft.chainConfig.SelfID, digest)
 			return nil, fmt.Errorf("useless request batch with %s", digest)
 		}
 	}
@@ -160,20 +160,26 @@ func (rbft *rbftImpl[T, Constraint]) handleReqGetWatermarkEvent(e *ReqGetWaterma
 func (rbft *rbftImpl[T, Constraint]) handleCoreRbftEvent(e *LocalEvent) consensusEvent {
 	switch e.EventType {
 	case CoreBatchTimerEvent:
+		if !rbft.chainConfig.isValidator() {
+			rbft.logger.Debugf("Replica %d is not validator, not process CoreBatchTimerEvent",
+				rbft.chainConfig.SelfID)
+			return nil
+		}
+
 		if !rbft.isNormal() {
-			rbft.logger.Debugf("Replica %d is in abnormal, not try to create a batch", rbft.peerMgr.selfID)
+			rbft.logger.Debugf("Replica %d is in abnormal, not try to create a batch", rbft.chainConfig.SelfID)
 			rbft.stopBatchTimer()
 			return nil
 		}
-		if !rbft.isPrimary(rbft.peerMgr.selfID) {
-			rbft.logger.Debugf("Replica %d is not primary, not try to create a batch", rbft.peerMgr.selfID)
+		if !rbft.isPrimary(rbft.chainConfig.SelfID) {
+			rbft.logger.Debugf("Replica %d is not primary, not try to create a batch", rbft.chainConfig.SelfID)
 			rbft.stopBatchTimer()
 			return nil
 		}
-		rbft.logger.Debugf("Primary %d batch timer expired, try to create a batch", rbft.peerMgr.selfID)
+		rbft.logger.Debugf("Primary %d batch timer expired, try to create a batch", rbft.chainConfig.SelfID)
 
 		if rbft.atomicIn(InConfChange) {
-			rbft.logger.Debugf("Replica %d is processing a config transaction, cannot generate batches", rbft.peerMgr.selfID)
+			rbft.logger.Debugf("Replica %d is processing a config transaction, cannot generate batches", rbft.chainConfig.SelfID)
 			rbft.restartBatchTimer()
 			return nil
 		}
@@ -198,7 +204,7 @@ func (rbft *rbftImpl[T, Constraint]) handleCoreRbftEvent(e *LocalEvent) consensu
 				// so we need to filter out these cases
 				if interval < rbft.config.BatchTimeout.Seconds() {
 					rbft.logger.Warningf("Replica %d batch timer expired, but the interval is less than batch timeout, "+
-						"so we don't generate a batch, interval: %f", rbft.peerMgr.selfID, interval)
+						"so we don't generate a batch, interval: %f", rbft.chainConfig.SelfID, interval)
 					return nil
 				}
 				batches := rbft.batchMgr.requestPool.GenerateRequestBatch()
@@ -223,34 +229,40 @@ func (rbft *rbftImpl[T, Constraint]) handleCoreRbftEvent(e *LocalEvent) consensu
 		return nil
 
 	case CoreNoTxBatchTimerEvent:
+		if !rbft.chainConfig.isValidator() {
+			rbft.logger.Debugf("Replica %d is not validator, not process CoreNoTxBatchTimerEvent",
+				rbft.chainConfig.SelfID)
+			return nil
+		}
+
 		if !rbft.isNormal() {
-			rbft.logger.Debugf("Replica %d is in abnormal, not try to create a no-tx batch", rbft.peerMgr.selfID)
+			rbft.logger.Debugf("Replica %d is in abnormal, not try to create a no-tx batch", rbft.chainConfig.SelfID)
 			rbft.stopNoTxBatchTimer()
 			return nil
 		}
-		if !rbft.isPrimary(rbft.peerMgr.selfID) {
-			rbft.logger.Debugf("Replica %d is not primary, not try to create a no-tx batch", rbft.peerMgr.selfID)
+		if !rbft.isPrimary(rbft.chainConfig.SelfID) {
+			rbft.logger.Debugf("Replica %d is not primary, not try to create a no-tx batch", rbft.chainConfig.SelfID)
 			rbft.stopNoTxBatchTimer()
 			return nil
 		}
 		if !rbft.chainConfig.EpochInfo.ConsensusParams.EnableTimedGenEmptyBlock {
-			rbft.logger.Debugf("Replica %d is not support generate no-tx batch", rbft.peerMgr.selfID)
+			rbft.logger.Debugf("Replica %d is not support generate no-tx batch", rbft.chainConfig.SelfID)
 			rbft.stopNoTxBatchTimer()
 			return nil
 		}
 
 		if rbft.atomicIn(InConfChange) {
-			rbft.logger.Debugf("Replica %d is processing a config transaction, cannot generate no-tx batches", rbft.peerMgr.selfID)
+			rbft.logger.Debugf("Replica %d is processing a config transaction, cannot generate no-tx batches", rbft.chainConfig.SelfID)
 			rbft.restartNoTxBatchTimer()
 			return nil
 		}
 
 		if len(rbft.batchMgr.cacheBatch) > 0 || rbft.batchMgr.requestPool.HasPendingRequestInPool() {
-			rbft.logger.Warningf("txpool is not empty, cannot generate no-tx batches", rbft.peerMgr.selfID)
+			rbft.logger.Warningf("txpool is not empty, cannot generate no-tx batches", rbft.chainConfig.SelfID)
 			rbft.stopNoTxBatchTimer()
 			return nil
 		}
-		rbft.logger.Debugf("Primary %d no-tx batch timer expired, try to create a no-tx batch", rbft.peerMgr.selfID)
+		rbft.logger.Debugf("Primary %d no-tx batch timer expired, try to create a no-tx batch", rbft.chainConfig.SelfID)
 		rbft.stopNoTxBatchTimer()
 
 		// call requestPool module to generate a tx batch
@@ -295,7 +307,7 @@ func (rbft *rbftImpl[T, Constraint]) handleCoreRbftEvent(e *LocalEvent) consensu
 		completionMissingBatchIdxs := e.Event.([]msgID)
 		for _, idx := range completionMissingBatchIdxs {
 			rbft.logger.Infof("Replica %d completion batch with hash %s when wait checkpoint, try to prepare this batch",
-				rbft.peerMgr.selfID, idx.d)
+				rbft.chainConfig.SelfID, idx.d)
 			_ = rbft.findNextPrepareBatch(ctx, idx.v, idx.n, idx.d)
 		}
 		return nil
@@ -315,12 +327,12 @@ func (rbft *rbftImpl[T, Constraint]) handleCoreRbftEvent(e *LocalEvent) consensu
 
 		// if the watermark has already been updated, just finish the timeout process
 		if preLowWatermark < rbft.chainConfig.H {
-			rbft.logger.Debugf("Replica %d has already updated low-watermark to %d, just return", rbft.peerMgr.selfID, rbft.chainConfig.H)
+			rbft.logger.Debugf("Replica %d has already updated low-watermark to %d, just return", rbft.chainConfig.SelfID, rbft.chainConfig.H)
 			return nil
 		}
 
 		rbft.logger.Infof("Replica %d high-watermark timer expired, send view change: %s",
-			rbft.peerMgr.selfID, rbft.highWatermarkTimerReason)
+			rbft.chainConfig.SelfID, rbft.highWatermarkTimerReason)
 		return rbft.sendViewChange()
 
 	case CoreCheckPoolRemoveTimerEvent:
@@ -340,32 +352,32 @@ func (rbft *rbftImpl[T, Constraint]) handleRecoveryEvent(e *LocalEvent) consensu
 	case RecoveryInitEvent:
 		preView, ok := e.Event.(uint64)
 		if !ok {
-			rbft.logger.Errorf("Replica %d parsing error, rbft.chainConfig.View", rbft.peerMgr.selfID)
+			rbft.logger.Errorf("Replica %d parsing error, rbft.chainConfig.View", rbft.chainConfig.SelfID)
 			rbft.stopNamespace()
 			return nil
 		}
 
 		if preView < rbft.chainConfig.View {
-			rbft.logger.Debugf("Replica %d has initiated recovery, ignore the event", rbft.peerMgr.selfID)
+			rbft.logger.Debugf("Replica %d has initiated recovery, ignore the event", rbft.chainConfig.SelfID)
 			return nil
 		}
 
-		rbft.logger.Debugf("Replica %d init recovery", rbft.peerMgr.selfID)
+		rbft.logger.Debugf("Replica %d init recovery", rbft.chainConfig.SelfID)
 		return rbft.initRecovery()
 
 	case RecoverySyncStateRspTimerEvent:
-		rbft.logger.Noticef("Replica %d sync state response timer expired", rbft.peerMgr.selfID)
+		rbft.logger.Noticef("Replica %d sync state response timer expired", rbft.chainConfig.SelfID)
 		rbft.exitSyncState()
 		if !rbft.isNormal() {
-			rbft.logger.Noticef("Replica %d is in abnormal, not try view change", rbft.peerMgr.selfID)
+			rbft.logger.Noticef("Replica %d is in abnormal, not try view change", rbft.chainConfig.SelfID)
 			return nil
 		}
 		return rbft.initRecovery()
 	case RecoverySyncStateRestartTimerEvent:
-		rbft.logger.Debugf("Replica %d sync state restart timer expired", rbft.peerMgr.selfID)
+		rbft.logger.Debugf("Replica %d sync state restart timer expired", rbft.chainConfig.SelfID)
 		rbft.exitSyncState()
 		if !rbft.isNormal() {
-			rbft.logger.Debugf("Replica %d is in abnormal, not restart sync state", rbft.peerMgr.selfID)
+			rbft.logger.Debugf("Replica %d is in abnormal, not restart sync state", rbft.chainConfig.SelfID)
 			return nil
 		}
 		return rbft.restartSyncState()
@@ -383,16 +395,16 @@ func (rbft *rbftImpl[T, Constraint]) handleViewChangeEvent(e *LocalEvent) consen
 		if ok {
 			if rbft.chainConfig.View > uint64(demand) {
 				rbft.logger.Debugf("Replica %d received viewChangeTimerEvent, but we"+
-					"have sent the next viewChange maybe just before a moment.", rbft.peerMgr.selfID)
+					"have sent the next viewChange maybe just before a moment.", rbft.chainConfig.SelfID)
 				return nil
 			}
 		} else if rbft.atomicIn(InViewChange) {
 			rbft.logger.Debugf("Replica %d received viewChangeTimerEvent, but we"+
-				"are already in view-change and it has not reached quorum.", rbft.peerMgr.selfID)
+				"are already in view-change and it has not reached quorum.", rbft.chainConfig.SelfID)
 			return nil
 		}
 
-		rbft.logger.Infof("Replica %d viewChange timer expired, sending viewChange: %s", rbft.peerMgr.selfID, rbft.vcMgr.newViewTimerReason)
+		rbft.logger.Infof("Replica %d viewChange timer expired, sending viewChange: %s", rbft.chainConfig.SelfID, rbft.vcMgr.newViewTimerReason)
 
 		// Here, we directly send viewchange with a bigger target view (which is rbft.chainConfig.View+1) because it is the
 		// new view timer who triggered this ViewChangeTimerEvent so we send a new viewchange request
@@ -416,7 +428,7 @@ func (rbft *rbftImpl[T, Constraint]) handleViewChangeEvent(e *LocalEvent) consen
 			rbft.atomicOff(InRecovery)
 			rbft.metrics.statusGaugeInRecovery.Set(0)
 			rbft.logger.Noticef("======== Replica %d finished recovery, primary=%d, "+
-				"epoch=%d/n=%d/f=%d/view=%d/h=%d/lastExec=%d/lastCkpDigest=%s", rbft.peerMgr.selfID, rbft.chainConfig.PrimaryID,
+				"epoch=%d/n=%d/f=%d/view=%d/h=%d/lastExec=%d/lastCkpDigest=%s", rbft.chainConfig.SelfID, rbft.chainConfig.PrimaryID,
 				rbft.chainConfig.EpochInfo.Epoch, rbft.chainConfig.N, rbft.chainConfig.F, rbft.chainConfig.View, rbft.chainConfig.H, rbft.exec.lastExec, rbft.chainConfig.LastCheckpointExecBlockHash)
 
 			rbft.logger.Notice(`
@@ -429,22 +441,22 @@ func (rbft *rbftImpl[T, Constraint]) handleViewChangeEvent(e *LocalEvent) consen
 
 `)
 			finishMsg = fmt.Sprintf("======== Replica %d finished recovery, primary=%d, "+
-				"epoch=%d/n=%d/f=%d/view=%d/h=%d/lastExec=%d", rbft.peerMgr.selfID, rbft.chainConfig.PrimaryID,
+				"epoch=%d/n=%d/f=%d/view=%d/h=%d/lastExec=%d", rbft.chainConfig.SelfID, rbft.chainConfig.PrimaryID,
 				rbft.chainConfig.EpochInfo.Epoch, rbft.chainConfig.N, rbft.chainConfig.F, rbft.chainConfig.View, rbft.chainConfig.H, rbft.exec.lastExec)
 			rbft.external.SendFilterEvent(types.InformTypeFilterFinishRecovery, finishMsg)
 		} else {
 			rbft.logger.Noticef("======== Replica %d finished viewChange, primary=%d, "+
-				"epoch=%d/n=%d/f=%d/view=%d/h=%d/lastExec=%d", rbft.peerMgr.selfID, rbft.chainConfig.PrimaryID,
+				"epoch=%d/n=%d/f=%d/view=%d/h=%d/lastExec=%d", rbft.chainConfig.SelfID, rbft.chainConfig.PrimaryID,
 				rbft.chainConfig.EpochInfo.Epoch, rbft.chainConfig.N, rbft.chainConfig.F, rbft.chainConfig.View, rbft.chainConfig.H, rbft.exec.lastExec)
 
 			finishMsg = fmt.Sprintf("======== Replica %d finished viewChange, primary=%d, "+
-				"epoch=%d/n=%d/f=%d/view=%d/h=%d/lastExec=%d", rbft.peerMgr.selfID, rbft.chainConfig.PrimaryID,
+				"epoch=%d/n=%d/f=%d/view=%d/h=%d/lastExec=%d", rbft.chainConfig.SelfID, rbft.chainConfig.PrimaryID,
 				rbft.chainConfig.EpochInfo.Epoch, rbft.chainConfig.N, rbft.chainConfig.F, rbft.chainConfig.View, rbft.chainConfig.H, rbft.exec.lastExec)
 			rbft.external.SendFilterEvent(types.InformTypeFilterFinishViewChange, finishMsg)
 		}
 		rbft.maybeSetNormal()
 		rbft.logger.Trace(consensus.TagNameViewChange, consensus.TagStageFinish, consensus.TagContentViewChange{
-			Node: rbft.peerMgr.selfID,
+			Node: rbft.chainConfig.SelfID,
 			View: rbft.chainConfig.View,
 		})
 
@@ -471,12 +483,12 @@ func (rbft *rbftImpl[T, Constraint]) handleViewChangeEvent(e *LocalEvent) consen
 		// after epoch change to find correct view-number
 		epochChanged := rbft.syncEpoch()
 		if epochChanged {
-			rbft.logger.Debugf("Replica %d sending view change again because of epoch change", rbft.peerMgr.selfID)
+			rbft.logger.Debugf("Replica %d sending view change again because of epoch change", rbft.chainConfig.SelfID)
 			// trigger another round of view change after epoch change to find correct view-number
 			return rbft.initRecovery()
 		}
 
-		if rbft.isPrimary(rbft.peerMgr.selfID) {
+		if rbft.isPrimary(rbft.chainConfig.SelfID) {
 			rbft.primaryResubmitTransactions()
 			// start noTx batch timer if there is no pending tx in pool
 			rbft.restartNoTxBatchTimer()
@@ -489,11 +501,11 @@ func (rbft *rbftImpl[T, Constraint]) handleViewChangeEvent(e *LocalEvent) consen
 	case ViewChangeResendTimerEvent:
 		if !rbft.atomicIn(InViewChange) {
 			rbft.logger.Warningf("Replica %d had its viewChange resend timer expired but it's "+
-				"not in viewChange, ignore it", rbft.peerMgr.selfID)
+				"not in viewChange, ignore it", rbft.chainConfig.SelfID)
 			return nil
 		}
 		rbft.logger.Infof("Replica %d viewChange resend timer expired before viewChange quorum "+
-			"was reached, try recovery", rbft.peerMgr.selfID)
+			"was reached, try recovery", rbft.chainConfig.SelfID)
 
 		// if viewChange resend timer expired, directly enter recovery status,
 		// decrease view first as we may increase view when send view change.
@@ -503,24 +515,24 @@ func (rbft *rbftImpl[T, Constraint]) handleViewChangeEvent(e *LocalEvent) consen
 		return rbft.initRecovery()
 
 	case ViewChangeQuorumEvent:
-		if rbft.isPrimary(rbft.peerMgr.selfID) {
-			rbft.logger.Infof("Replica %d received viewChange quorum, primary send new view", rbft.peerMgr.selfID)
+		if rbft.isPrimary(rbft.chainConfig.SelfID) {
+			rbft.logger.Infof("Replica %d received viewChange quorum, primary send new view", rbft.chainConfig.SelfID)
 			// if we are catching up, don't send new view as a primary and after a while, other nodes will
 			// send a new viewchange whose seqNo=previous viewchange's seqNo + 1 because of new view timeout
 			// and eventually others will finish viewchange with a new view in which primary is not in
 			// skipInProgress
 			if rbft.in(SkipInProgress) {
-				rbft.logger.Infof("Replica %d is in catching up, don't send new view", rbft.peerMgr.selfID)
+				rbft.logger.Infof("Replica %d is in catching up, don't send new view", rbft.chainConfig.SelfID)
 				return nil
 			}
 			// primary construct and send new view message
 			return rbft.sendNewView()
 		}
-		rbft.logger.Infof("Replica %d received viewChange quorum, replica check newView", rbft.peerMgr.selfID)
+		rbft.logger.Infof("Replica %d received viewChange quorum, replica check newView", rbft.chainConfig.SelfID)
 		return rbft.replicaCheckNewView()
 
 	case FetchViewEvent:
-		rbft.logger.Debugf("Replica %d fetch view timer expired", rbft.peerMgr.selfID)
+		rbft.logger.Debugf("Replica %d fetch view timer expired", rbft.chainConfig.SelfID)
 		rbft.tryFetchView()
 
 	default:
@@ -534,7 +546,7 @@ func (rbft *rbftImpl[T, Constraint]) handleViewChangeEvent(e *LocalEvent) consen
 func (rbft *rbftImpl[T, Constraint]) handleEpochMgrEvent(e *LocalEvent) consensusEvent {
 	switch e.EventType {
 	case FetchCheckpointEvent:
-		rbft.logger.Debugf("Replica %d fetch checkpoint timer expired", rbft.peerMgr.selfID)
+		rbft.logger.Debugf("Replica %d fetch checkpoint timer expired", rbft.chainConfig.SelfID)
 		rbft.stopFetchCheckpointTimer()
 		rbft.fetchCheckpoint()
 
@@ -545,7 +557,7 @@ func (rbft *rbftImpl[T, Constraint]) handleEpochMgrEvent(e *LocalEvent) consensu
 			// TODO: support restore
 			rbft.epochMgr.epochProofCache[ec.Checkpoint.Epoch()] = ec
 		}
-		rbft.logger.Noticef("Replica %d try epoch sync to height %d, epoch %d", rbft.peerMgr.selfID,
+		rbft.logger.Noticef("Replica %d try epoch sync to height %d, epoch %d", rbft.chainConfig.SelfID,
 			quorumCheckpoint.Height(), quorumCheckpoint.NextEpoch())
 
 		// block consensus progress until sync to epoch change height.
