@@ -227,7 +227,7 @@ func (tf *testFramework[T, Constraint]) newNodeConfig(
 		SelfAccountAddress:      p2pNodeID,
 		SetSize:                 25,
 		SetTimeout:              100 * time.Millisecond,
-		BatchTimeout:            500 * time.Millisecond,
+		BatchTimeout:            2 * time.Second, // make sure the batch is too large to not trigger generate batch timer
 		RequestTimeout:          6 * time.Second,
 		NullRequestTimeout:      9 * time.Second,
 		VcResendTimeout:         10 * time.Second,
@@ -459,17 +459,20 @@ func (ext *testExternal[T, Constraint]) Execute(requests []*T, _ []bool, seqNo u
 }
 
 func (ext *testExternal[T, Constraint]) StateUpdate(localLowWatermark, seqNo uint64, digest string, signedCheckpoints []*consensus.SignedCheckpoint, epochChanges ...*consensus.EpochChange) {
+	localApplyId := ext.testNode.Applied
+	updateCount := uint64(0)
 	for key, val := range ext.tf.TestNode[0].blocks {
-		if key <= seqNo && key > ext.testNode.Applied {
+		if key <= seqNo && key > localApplyId {
 			ext.testNode.blocks[key] = val
 			ext.testNode.n.logger.Debugf("Block Number %d", key)
 			ext.testNode.n.logger.Debugf("Block Hash %s", val)
 
-			if key > ext.testNode.Applied {
-				ext.testNode.Applied = key
-				ext.testNode.Digest = val
-			}
+			updateCount++
 		}
+	}
+	if updateCount == seqNo-localApplyId {
+		ext.testNode.Applied = seqNo
+		ext.testNode.Digest = ext.testNode.blocks[seqNo]
 	}
 	ext.testNode.Epoch = ext.tf.TestNode[0].Epoch
 

@@ -99,6 +99,7 @@ func initMsgEventMap() {
 	eventCreators[consensus.Type_SYNC_STATE_RESPONSE] = func() consensus.Message { return &consensus.SyncStateResponse{} }
 	eventCreators[consensus.Type_EPOCH_CHANGE_REQUEST] = func() consensus.Message { return &consensus.EpochChangeRequest{} }
 	eventCreators[consensus.Type_EPOCH_CHANGE_PROOF] = func() consensus.Message { return &consensus.EpochChangeProof{} }
+	eventCreators[consensus.Type_REBROADCAST_REQUEST_SET] = func() consensus.Message { return &consensus.ReBroadcastRequestSet{} }
 }
 
 // dispatchLocalEvent dispatches local Event to corresponding handles using its service type
@@ -212,6 +213,11 @@ func (rbft *rbftImpl[T, Constraint]) handleCoreRbftEvent(e *LocalEvent) consensu
 				}
 				rbft.batchMgr.lastBatchTime = now
 				rbft.postBatches(batches)
+			}
+		} else {
+			// has no pending request, it means no tx match the condition of generate batch, restart no tx batch timer
+			if rbft.config.GenesisEpochInfo.ConsensusParams.EnableTimedGenEmptyBlock && rbft.batchMgr.noTxBatchTimerActive {
+				rbft.startNoTxBatchTimer()
 			}
 		}
 		return nil
@@ -605,6 +611,8 @@ func (rbft *rbftImpl[T, Constraint]) dispatchMsgToService(e consensusEvent) int 
 	case *consensus.FetchMissingResponse:
 		return CoreRbftService
 	case *consensus.SignedCheckpoint:
+		return CoreRbftService
+	case *consensus.ReBroadcastRequestSet:
 		return CoreRbftService
 
 		// view change service
