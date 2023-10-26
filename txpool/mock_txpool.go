@@ -155,6 +155,82 @@ func (c *TxPoolGenerateRequestBatchCall[T, Constraint]) DoAndReturn(f func() []*
 	return c
 }
 
+// GetAccountMeta mocks base method.
+func (m *MockTxPool[T, Constraint]) GetAccountMeta(account string, full bool) *AccountMeta[T, Constraint] {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetAccountMeta", account, full)
+	ret0, _ := ret[0].(*AccountMeta[T, Constraint])
+	return ret0
+}
+
+// GetAccountMeta indicates an expected call of GetAccountMeta.
+func (mr *MockTxPoolMockRecorder[T, Constraint]) GetAccountMeta(account, full any) *TxPoolGetAccountMetaCall[T, Constraint] {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAccountMeta", reflect.TypeOf((*MockTxPool[T, Constraint])(nil).GetAccountMeta), account, full)
+	return &TxPoolGetAccountMetaCall[T, Constraint]{Call: call}
+}
+
+// TxPoolGetAccountMetaCall wrap *gomock.Call
+type TxPoolGetAccountMetaCall[T any, Constraint consensus.TXConstraint[T]] struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *TxPoolGetAccountMetaCall[T, Constraint]) Return(arg0 *AccountMeta[T, Constraint]) *TxPoolGetAccountMetaCall[T, Constraint] {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *TxPoolGetAccountMetaCall[T, Constraint]) Do(f func(string, bool) *AccountMeta[T, Constraint]) *TxPoolGetAccountMetaCall[T, Constraint] {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *TxPoolGetAccountMetaCall[T, Constraint]) DoAndReturn(f func(string, bool) *AccountMeta[T, Constraint]) *TxPoolGetAccountMetaCall[T, Constraint] {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// GetMeta mocks base method.
+func (m *MockTxPool[T, Constraint]) GetMeta(full bool) *Meta[T, Constraint] {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetMeta", full)
+	ret0, _ := ret[0].(*Meta[T, Constraint])
+	return ret0
+}
+
+// GetMeta indicates an expected call of GetMeta.
+func (mr *MockTxPoolMockRecorder[T, Constraint]) GetMeta(full any) *TxPoolGetMetaCall[T, Constraint] {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMeta", reflect.TypeOf((*MockTxPool[T, Constraint])(nil).GetMeta), full)
+	return &TxPoolGetMetaCall[T, Constraint]{Call: call}
+}
+
+// TxPoolGetMetaCall wrap *gomock.Call
+type TxPoolGetMetaCall[T any, Constraint consensus.TXConstraint[T]] struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *TxPoolGetMetaCall[T, Constraint]) Return(arg0 *Meta[T, Constraint]) *TxPoolGetMetaCall[T, Constraint] {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *TxPoolGetMetaCall[T, Constraint]) Do(f func(bool) *Meta[T, Constraint]) *TxPoolGetMetaCall[T, Constraint] {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *TxPoolGetMetaCall[T, Constraint]) DoAndReturn(f func(bool) *Meta[T, Constraint]) *TxPoolGetMetaCall[T, Constraint] {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // GetPendingTxByHash mocks base method.
 func (m *MockTxPool[T, Constraint]) GetPendingTxByHash(hash string) *T {
 	m.ctrl.T.Helper()
@@ -875,31 +951,107 @@ func (c *TxPoolStopCall[T, Constraint]) DoAndReturn(f func()) *TxPoolStopCall[T,
 	return c
 }
 
-// MockExternal is a mock of External interface.
-type MockExternal[T any, Constraint consensus.TXConstraint[T]] struct {
+// MockQuery is a mock of Query interface.
+type MockQuery[T any, Constraint consensus.TXConstraint[T]] struct {
 	ctrl     *gomock.Controller
-	recorder *MockExternalMockRecorder[T, Constraint]
+	recorder *MockQueryMockRecorder[T, Constraint]
 }
 
-// MockExternalMockRecorder is the mock recorder for MockExternal.
-type MockExternalMockRecorder[T any, Constraint consensus.TXConstraint[T]] struct {
-	mock *MockExternal[T, Constraint]
+// MockQueryMockRecorder is the mock recorder for MockQuery.
+type MockQueryMockRecorder[T any, Constraint consensus.TXConstraint[T]] struct {
+	mock *MockQuery[T, Constraint]
 }
 
-// NewMockExternal creates a new mock instance.
-func NewMockExternal[T any, Constraint consensus.TXConstraint[T]](ctrl *gomock.Controller) *MockExternal[T, Constraint] {
-	mock := &MockExternal[T, Constraint]{ctrl: ctrl}
-	mock.recorder = &MockExternalMockRecorder[T, Constraint]{mock}
+// NewMockQuery creates a new mock instance.
+func NewMockQuery[T any, Constraint consensus.TXConstraint[T]](ctrl *gomock.Controller) *MockQuery[T, Constraint] {
+	mock := &MockQuery[T, Constraint]{ctrl: ctrl}
+	mock.recorder = &MockQueryMockRecorder[T, Constraint]{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockExternal[T, Constraint]) EXPECT() *MockExternalMockRecorder[T, Constraint] {
+func (m *MockQuery[T, Constraint]) EXPECT() *MockQueryMockRecorder[T, Constraint] {
 	return m.recorder
 }
 
+// GetAccountMeta mocks base method.
+func (m *MockQuery[T, Constraint]) GetAccountMeta(account string, full bool) *AccountMeta[T, Constraint] {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetAccountMeta", account, full)
+	ret0, _ := ret[0].(*AccountMeta[T, Constraint])
+	return ret0
+}
+
+// GetAccountMeta indicates an expected call of GetAccountMeta.
+func (mr *MockQueryMockRecorder[T, Constraint]) GetAccountMeta(account, full any) *QueryGetAccountMetaCall[T, Constraint] {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAccountMeta", reflect.TypeOf((*MockQuery[T, Constraint])(nil).GetAccountMeta), account, full)
+	return &QueryGetAccountMetaCall[T, Constraint]{Call: call}
+}
+
+// QueryGetAccountMetaCall wrap *gomock.Call
+type QueryGetAccountMetaCall[T any, Constraint consensus.TXConstraint[T]] struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *QueryGetAccountMetaCall[T, Constraint]) Return(arg0 *AccountMeta[T, Constraint]) *QueryGetAccountMetaCall[T, Constraint] {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *QueryGetAccountMetaCall[T, Constraint]) Do(f func(string, bool) *AccountMeta[T, Constraint]) *QueryGetAccountMetaCall[T, Constraint] {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *QueryGetAccountMetaCall[T, Constraint]) DoAndReturn(f func(string, bool) *AccountMeta[T, Constraint]) *QueryGetAccountMetaCall[T, Constraint] {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// GetMeta mocks base method.
+func (m *MockQuery[T, Constraint]) GetMeta(full bool) *Meta[T, Constraint] {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetMeta", full)
+	ret0, _ := ret[0].(*Meta[T, Constraint])
+	return ret0
+}
+
+// GetMeta indicates an expected call of GetMeta.
+func (mr *MockQueryMockRecorder[T, Constraint]) GetMeta(full any) *QueryGetMetaCall[T, Constraint] {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMeta", reflect.TypeOf((*MockQuery[T, Constraint])(nil).GetMeta), full)
+	return &QueryGetMetaCall[T, Constraint]{Call: call}
+}
+
+// QueryGetMetaCall wrap *gomock.Call
+type QueryGetMetaCall[T any, Constraint consensus.TXConstraint[T]] struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *QueryGetMetaCall[T, Constraint]) Return(arg0 *Meta[T, Constraint]) *QueryGetMetaCall[T, Constraint] {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *QueryGetMetaCall[T, Constraint]) Do(f func(bool) *Meta[T, Constraint]) *QueryGetMetaCall[T, Constraint] {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *QueryGetMetaCall[T, Constraint]) DoAndReturn(f func(bool) *Meta[T, Constraint]) *QueryGetMetaCall[T, Constraint] {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // GetPendingTxByHash mocks base method.
-func (m *MockExternal[T, Constraint]) GetPendingTxByHash(hash string) *T {
+func (m *MockQuery[T, Constraint]) GetPendingTxByHash(hash string) *T {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetPendingTxByHash", hash)
 	ret0, _ := ret[0].(*T)
@@ -907,37 +1059,37 @@ func (m *MockExternal[T, Constraint]) GetPendingTxByHash(hash string) *T {
 }
 
 // GetPendingTxByHash indicates an expected call of GetPendingTxByHash.
-func (mr *MockExternalMockRecorder[T, Constraint]) GetPendingTxByHash(hash any) *ExternalGetPendingTxByHashCall[T, Constraint] {
+func (mr *MockQueryMockRecorder[T, Constraint]) GetPendingTxByHash(hash any) *QueryGetPendingTxByHashCall[T, Constraint] {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPendingTxByHash", reflect.TypeOf((*MockExternal[T, Constraint])(nil).GetPendingTxByHash), hash)
-	return &ExternalGetPendingTxByHashCall[T, Constraint]{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPendingTxByHash", reflect.TypeOf((*MockQuery[T, Constraint])(nil).GetPendingTxByHash), hash)
+	return &QueryGetPendingTxByHashCall[T, Constraint]{Call: call}
 }
 
-// ExternalGetPendingTxByHashCall wrap *gomock.Call
-type ExternalGetPendingTxByHashCall[T any, Constraint consensus.TXConstraint[T]] struct {
+// QueryGetPendingTxByHashCall wrap *gomock.Call
+type QueryGetPendingTxByHashCall[T any, Constraint consensus.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *ExternalGetPendingTxByHashCall[T, Constraint]) Return(arg0 *T) *ExternalGetPendingTxByHashCall[T, Constraint] {
+func (c *QueryGetPendingTxByHashCall[T, Constraint]) Return(arg0 *T) *QueryGetPendingTxByHashCall[T, Constraint] {
 	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *ExternalGetPendingTxByHashCall[T, Constraint]) Do(f func(string) *T) *ExternalGetPendingTxByHashCall[T, Constraint] {
+func (c *QueryGetPendingTxByHashCall[T, Constraint]) Do(f func(string) *T) *QueryGetPendingTxByHashCall[T, Constraint] {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *ExternalGetPendingTxByHashCall[T, Constraint]) DoAndReturn(f func(string) *T) *ExternalGetPendingTxByHashCall[T, Constraint] {
+func (c *QueryGetPendingTxByHashCall[T, Constraint]) DoAndReturn(f func(string) *T) *QueryGetPendingTxByHashCall[T, Constraint] {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
 
 // GetPendingTxCountByAccount mocks base method.
-func (m *MockExternal[T, Constraint]) GetPendingTxCountByAccount(account string) uint64 {
+func (m *MockQuery[T, Constraint]) GetPendingTxCountByAccount(account string) uint64 {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetPendingTxCountByAccount", account)
 	ret0, _ := ret[0].(uint64)
@@ -945,37 +1097,37 @@ func (m *MockExternal[T, Constraint]) GetPendingTxCountByAccount(account string)
 }
 
 // GetPendingTxCountByAccount indicates an expected call of GetPendingTxCountByAccount.
-func (mr *MockExternalMockRecorder[T, Constraint]) GetPendingTxCountByAccount(account any) *ExternalGetPendingTxCountByAccountCall[T, Constraint] {
+func (mr *MockQueryMockRecorder[T, Constraint]) GetPendingTxCountByAccount(account any) *QueryGetPendingTxCountByAccountCall[T, Constraint] {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPendingTxCountByAccount", reflect.TypeOf((*MockExternal[T, Constraint])(nil).GetPendingTxCountByAccount), account)
-	return &ExternalGetPendingTxCountByAccountCall[T, Constraint]{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPendingTxCountByAccount", reflect.TypeOf((*MockQuery[T, Constraint])(nil).GetPendingTxCountByAccount), account)
+	return &QueryGetPendingTxCountByAccountCall[T, Constraint]{Call: call}
 }
 
-// ExternalGetPendingTxCountByAccountCall wrap *gomock.Call
-type ExternalGetPendingTxCountByAccountCall[T any, Constraint consensus.TXConstraint[T]] struct {
+// QueryGetPendingTxCountByAccountCall wrap *gomock.Call
+type QueryGetPendingTxCountByAccountCall[T any, Constraint consensus.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *ExternalGetPendingTxCountByAccountCall[T, Constraint]) Return(arg0 uint64) *ExternalGetPendingTxCountByAccountCall[T, Constraint] {
+func (c *QueryGetPendingTxCountByAccountCall[T, Constraint]) Return(arg0 uint64) *QueryGetPendingTxCountByAccountCall[T, Constraint] {
 	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *ExternalGetPendingTxCountByAccountCall[T, Constraint]) Do(f func(string) uint64) *ExternalGetPendingTxCountByAccountCall[T, Constraint] {
+func (c *QueryGetPendingTxCountByAccountCall[T, Constraint]) Do(f func(string) uint64) *QueryGetPendingTxCountByAccountCall[T, Constraint] {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *ExternalGetPendingTxCountByAccountCall[T, Constraint]) DoAndReturn(f func(string) uint64) *ExternalGetPendingTxCountByAccountCall[T, Constraint] {
+func (c *QueryGetPendingTxCountByAccountCall[T, Constraint]) DoAndReturn(f func(string) uint64) *QueryGetPendingTxCountByAccountCall[T, Constraint] {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
 
 // GetTotalPendingTxCount mocks base method.
-func (m *MockExternal[T, Constraint]) GetTotalPendingTxCount() uint64 {
+func (m *MockQuery[T, Constraint]) GetTotalPendingTxCount() uint64 {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetTotalPendingTxCount")
 	ret0, _ := ret[0].(uint64)
@@ -983,70 +1135,31 @@ func (m *MockExternal[T, Constraint]) GetTotalPendingTxCount() uint64 {
 }
 
 // GetTotalPendingTxCount indicates an expected call of GetTotalPendingTxCount.
-func (mr *MockExternalMockRecorder[T, Constraint]) GetTotalPendingTxCount() *ExternalGetTotalPendingTxCountCall[T, Constraint] {
+func (mr *MockQueryMockRecorder[T, Constraint]) GetTotalPendingTxCount() *QueryGetTotalPendingTxCountCall[T, Constraint] {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTotalPendingTxCount", reflect.TypeOf((*MockExternal[T, Constraint])(nil).GetTotalPendingTxCount))
-	return &ExternalGetTotalPendingTxCountCall[T, Constraint]{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTotalPendingTxCount", reflect.TypeOf((*MockQuery[T, Constraint])(nil).GetTotalPendingTxCount))
+	return &QueryGetTotalPendingTxCountCall[T, Constraint]{Call: call}
 }
 
-// ExternalGetTotalPendingTxCountCall wrap *gomock.Call
-type ExternalGetTotalPendingTxCountCall[T any, Constraint consensus.TXConstraint[T]] struct {
+// QueryGetTotalPendingTxCountCall wrap *gomock.Call
+type QueryGetTotalPendingTxCountCall[T any, Constraint consensus.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *ExternalGetTotalPendingTxCountCall[T, Constraint]) Return(arg0 uint64) *ExternalGetTotalPendingTxCountCall[T, Constraint] {
+func (c *QueryGetTotalPendingTxCountCall[T, Constraint]) Return(arg0 uint64) *QueryGetTotalPendingTxCountCall[T, Constraint] {
 	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *ExternalGetTotalPendingTxCountCall[T, Constraint]) Do(f func() uint64) *ExternalGetTotalPendingTxCountCall[T, Constraint] {
+func (c *QueryGetTotalPendingTxCountCall[T, Constraint]) Do(f func() uint64) *QueryGetTotalPendingTxCountCall[T, Constraint] {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *ExternalGetTotalPendingTxCountCall[T, Constraint]) DoAndReturn(f func() uint64) *ExternalGetTotalPendingTxCountCall[T, Constraint] {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// RemoveTimeoutRequests mocks base method.
-func (m *MockExternal[T, Constraint]) RemoveTimeoutRequests() (uint64, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RemoveTimeoutRequests")
-	ret0, _ := ret[0].(uint64)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// RemoveTimeoutRequests indicates an expected call of RemoveTimeoutRequests.
-func (mr *MockExternalMockRecorder[T, Constraint]) RemoveTimeoutRequests() *ExternalRemoveTimeoutRequestsCall[T, Constraint] {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveTimeoutRequests", reflect.TypeOf((*MockExternal[T, Constraint])(nil).RemoveTimeoutRequests))
-	return &ExternalRemoveTimeoutRequestsCall[T, Constraint]{Call: call}
-}
-
-// ExternalRemoveTimeoutRequestsCall wrap *gomock.Call
-type ExternalRemoveTimeoutRequestsCall[T any, Constraint consensus.TXConstraint[T]] struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *ExternalRemoveTimeoutRequestsCall[T, Constraint]) Return(arg0 uint64, arg1 error) *ExternalRemoveTimeoutRequestsCall[T, Constraint] {
-	c.Call = c.Call.Return(arg0, arg1)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *ExternalRemoveTimeoutRequestsCall[T, Constraint]) Do(f func() (uint64, error)) *ExternalRemoveTimeoutRequestsCall[T, Constraint] {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *ExternalRemoveTimeoutRequestsCall[T, Constraint]) DoAndReturn(f func() (uint64, error)) *ExternalRemoveTimeoutRequestsCall[T, Constraint] {
+func (c *QueryGetTotalPendingTxCountCall[T, Constraint]) DoAndReturn(f func() uint64) *QueryGetTotalPendingTxCountCall[T, Constraint] {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

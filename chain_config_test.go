@@ -50,7 +50,7 @@ func TestEpochInfo_ElectValidators(t *testing.T) {
 		DataSyncerSet: nil,
 	}
 
-	err := e.ElectValidators()
+	err := e.ElectValidators([]byte("test seed"))
 	require.Nil(t, err)
 	require.Equal(t, uint64(1), e.ValidatorSet[0].ID)
 	require.Equal(t, uint64(2), e.ValidatorSet[1].ID)

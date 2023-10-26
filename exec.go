@@ -130,6 +130,10 @@ func (rbft *rbftImpl[T, Constraint]) dispatchMiscEvent(e *MiscEvent) consensusEv
 		return rbft.handleReqPendingTxCountEvent(e.Event.(*ReqPendingTxCountMsg))
 	case ReqGetWatermarkEvent:
 		return rbft.handleReqGetWatermarkEvent(e.Event.(*ReqGetWatermarkMsg))
+	case ReqGetPoolMetaEvent:
+		return rbft.handleReqGetPoolMetaEvent(e.Event.(*ReqGetPoolMetaMsg[T, Constraint]))
+	case ReqGetAccountMetaEvent:
+		return rbft.handleReqGetAccountMetaEvent(e.Event.(*ReqGetAccountPoolMetaMsg[T, Constraint]))
 	default:
 		rbft.logger.Errorf("Not Supported event: %v", e)
 		return nil
@@ -153,6 +157,16 @@ func (rbft *rbftImpl[T, Constraint]) handleReqPendingTxCountEvent(e *ReqPendingT
 
 func (rbft *rbftImpl[T, Constraint]) handleReqGetWatermarkEvent(e *ReqGetWatermarkMsg) consensusEvent {
 	e.ch <- rbft.chainConfig.H
+	return nil
+}
+
+func (rbft *rbftImpl[T, Constraint]) handleReqGetPoolMetaEvent(e *ReqGetPoolMetaMsg[T, Constraint]) consensusEvent {
+	e.ch <- rbft.batchMgr.requestPool.GetMeta(e.full)
+	return nil
+}
+
+func (rbft *rbftImpl[T, Constraint]) handleReqGetAccountMetaEvent(e *ReqGetAccountPoolMetaMsg[T, Constraint]) consensusEvent {
+	e.ch <- rbft.batchMgr.requestPool.GetAccountMeta(e.account, e.full)
 	return nil
 }
 

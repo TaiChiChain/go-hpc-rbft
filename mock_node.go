@@ -14,6 +14,7 @@ import (
 	reflect "reflect"
 
 	consensus "github.com/axiomesh/axiom-bft/common/consensus"
+	txpool "github.com/axiomesh/axiom-bft/txpool"
 	types "github.com/axiomesh/axiom-bft/types"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -39,6 +40,44 @@ func NewMockNode[T any, Constraint consensus.TXConstraint[T]](ctrl *gomock.Contr
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockNode[T, Constraint]) EXPECT() *MockNodeMockRecorder[T, Constraint] {
 	return m.recorder
+}
+
+// GetAccountPoolMeta mocks base method.
+func (m *MockNode[T, Constraint]) GetAccountPoolMeta(account string, full bool) *txpool.AccountMeta[T, Constraint] {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetAccountPoolMeta", account, full)
+	ret0, _ := ret[0].(*txpool.AccountMeta[T, Constraint])
+	return ret0
+}
+
+// GetAccountPoolMeta indicates an expected call of GetAccountPoolMeta.
+func (mr *MockNodeMockRecorder[T, Constraint]) GetAccountPoolMeta(account, full any) *NodeGetAccountPoolMetaCall[T, Constraint] {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAccountPoolMeta", reflect.TypeOf((*MockNode[T, Constraint])(nil).GetAccountPoolMeta), account, full)
+	return &NodeGetAccountPoolMetaCall[T, Constraint]{Call: call}
+}
+
+// NodeGetAccountPoolMetaCall wrap *gomock.Call
+type NodeGetAccountPoolMetaCall[T any, Constraint consensus.TXConstraint[T]] struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *NodeGetAccountPoolMetaCall[T, Constraint]) Return(arg0 *txpool.AccountMeta[T, Constraint]) *NodeGetAccountPoolMetaCall[T, Constraint] {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *NodeGetAccountPoolMetaCall[T, Constraint]) Do(f func(string, bool) *txpool.AccountMeta[T, Constraint]) *NodeGetAccountPoolMetaCall[T, Constraint] {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *NodeGetAccountPoolMetaCall[T, Constraint]) DoAndReturn(f func(string, bool) *txpool.AccountMeta[T, Constraint]) *NodeGetAccountPoolMetaCall[T, Constraint] {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
 }
 
 // GetLowWatermark mocks base method.
@@ -151,6 +190,44 @@ func (c *NodeGetPendingTxCountByAccountCall[T, Constraint]) Do(f func(string) ui
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *NodeGetPendingTxCountByAccountCall[T, Constraint]) DoAndReturn(f func(string) uint64) *NodeGetPendingTxCountByAccountCall[T, Constraint] {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// GetPoolMeta mocks base method.
+func (m *MockNode[T, Constraint]) GetPoolMeta(full bool) *txpool.Meta[T, Constraint] {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPoolMeta", full)
+	ret0, _ := ret[0].(*txpool.Meta[T, Constraint])
+	return ret0
+}
+
+// GetPoolMeta indicates an expected call of GetPoolMeta.
+func (mr *MockNodeMockRecorder[T, Constraint]) GetPoolMeta(full any) *NodeGetPoolMetaCall[T, Constraint] {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPoolMeta", reflect.TypeOf((*MockNode[T, Constraint])(nil).GetPoolMeta), full)
+	return &NodeGetPoolMetaCall[T, Constraint]{Call: call}
+}
+
+// NodeGetPoolMetaCall wrap *gomock.Call
+type NodeGetPoolMetaCall[T any, Constraint consensus.TXConstraint[T]] struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *NodeGetPoolMetaCall[T, Constraint]) Return(arg0 *txpool.Meta[T, Constraint]) *NodeGetPoolMetaCall[T, Constraint] {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *NodeGetPoolMetaCall[T, Constraint]) Do(f func(bool) *txpool.Meta[T, Constraint]) *NodeGetPoolMetaCall[T, Constraint] {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *NodeGetPoolMetaCall[T, Constraint]) DoAndReturn(f func(bool) *txpool.Meta[T, Constraint]) *NodeGetPoolMetaCall[T, Constraint] {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -552,6 +629,44 @@ func (m *MockExternal[T, Constraint]) EXPECT() *MockExternalMockRecorder[T, Cons
 	return m.recorder
 }
 
+// GetAccountPoolMeta mocks base method.
+func (m *MockExternal[T, Constraint]) GetAccountPoolMeta(account string, full bool) *txpool.AccountMeta[T, Constraint] {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetAccountPoolMeta", account, full)
+	ret0, _ := ret[0].(*txpool.AccountMeta[T, Constraint])
+	return ret0
+}
+
+// GetAccountPoolMeta indicates an expected call of GetAccountPoolMeta.
+func (mr *MockExternalMockRecorder[T, Constraint]) GetAccountPoolMeta(account, full any) *ExternalGetAccountPoolMetaCall[T, Constraint] {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAccountPoolMeta", reflect.TypeOf((*MockExternal[T, Constraint])(nil).GetAccountPoolMeta), account, full)
+	return &ExternalGetAccountPoolMetaCall[T, Constraint]{Call: call}
+}
+
+// ExternalGetAccountPoolMetaCall wrap *gomock.Call
+type ExternalGetAccountPoolMetaCall[T any, Constraint consensus.TXConstraint[T]] struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *ExternalGetAccountPoolMetaCall[T, Constraint]) Return(arg0 *txpool.AccountMeta[T, Constraint]) *ExternalGetAccountPoolMetaCall[T, Constraint] {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *ExternalGetAccountPoolMetaCall[T, Constraint]) Do(f func(string, bool) *txpool.AccountMeta[T, Constraint]) *ExternalGetAccountPoolMetaCall[T, Constraint] {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *ExternalGetAccountPoolMetaCall[T, Constraint]) DoAndReturn(f func(string, bool) *txpool.AccountMeta[T, Constraint]) *ExternalGetAccountPoolMetaCall[T, Constraint] {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // GetLowWatermark mocks base method.
 func (m *MockExternal[T, Constraint]) GetLowWatermark() uint64 {
 	m.ctrl.T.Helper()
@@ -662,6 +777,44 @@ func (c *ExternalGetPendingTxCountByAccountCall[T, Constraint]) Do(f func(string
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *ExternalGetPendingTxCountByAccountCall[T, Constraint]) DoAndReturn(f func(string) uint64) *ExternalGetPendingTxCountByAccountCall[T, Constraint] {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// GetPoolMeta mocks base method.
+func (m *MockExternal[T, Constraint]) GetPoolMeta(full bool) *txpool.Meta[T, Constraint] {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPoolMeta", full)
+	ret0, _ := ret[0].(*txpool.Meta[T, Constraint])
+	return ret0
+}
+
+// GetPoolMeta indicates an expected call of GetPoolMeta.
+func (mr *MockExternalMockRecorder[T, Constraint]) GetPoolMeta(full any) *ExternalGetPoolMetaCall[T, Constraint] {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPoolMeta", reflect.TypeOf((*MockExternal[T, Constraint])(nil).GetPoolMeta), full)
+	return &ExternalGetPoolMetaCall[T, Constraint]{Call: call}
+}
+
+// ExternalGetPoolMetaCall wrap *gomock.Call
+type ExternalGetPoolMetaCall[T any, Constraint consensus.TXConstraint[T]] struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *ExternalGetPoolMetaCall[T, Constraint]) Return(arg0 *txpool.Meta[T, Constraint]) *ExternalGetPoolMetaCall[T, Constraint] {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *ExternalGetPoolMetaCall[T, Constraint]) Do(f func(bool) *txpool.Meta[T, Constraint]) *ExternalGetPoolMetaCall[T, Constraint] {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *ExternalGetPoolMetaCall[T, Constraint]) DoAndReturn(f func(bool) *txpool.Meta[T, Constraint]) *ExternalGetPoolMetaCall[T, Constraint] {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

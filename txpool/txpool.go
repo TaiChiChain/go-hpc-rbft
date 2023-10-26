@@ -92,6 +92,9 @@ type TxPool[T any, Constraint consensus.TXConstraint[T]] interface {
 	// GetUncommittedTransactions returns all transactions that have not been committed to the ledger
 	GetUncommittedTransactions(maxsize uint64) []*T
 
+	// RemoveTimeoutRequests get the remained local txs in timeoutIndex and removeTxs in txpool by tolerance time.
+	RemoveTimeoutRequests() (uint64, error)
+
 	// Start starts txPool service
 	Start() error
 
@@ -100,14 +103,11 @@ type TxPool[T any, Constraint consensus.TXConstraint[T]] interface {
 
 	Init(selfID uint64) error
 
-	External[T, Constraint]
+	Query[T, Constraint]
 }
 
-// External interface called concurrently by client.
-type External[T any, Constraint consensus.TXConstraint[T]] interface {
-	// RemoveTimeoutRequests get the remained local txs in timeoutIndex and removeTxs in txpool by tolerance time.
-	RemoveTimeoutRequests() (uint64, error)
-
+// Query interface called concurrently by client.
+type Query[T any, Constraint consensus.TXConstraint[T]] interface {
 	// GetPendingTxCountByAccount returns transaction count by given account.
 	GetPendingTxCountByAccount(account string) uint64
 
@@ -115,6 +115,10 @@ type External[T any, Constraint consensus.TXConstraint[T]] interface {
 
 	// GetTotalPendingTxCount return the current tx count of txpool
 	GetTotalPendingTxCount() uint64
+
+	GetAccountMeta(account string, full bool) *AccountMeta[T, Constraint]
+
+	GetMeta(full bool) *Meta[T, Constraint]
 }
 
 // NewTxPool returns the txpool instance.

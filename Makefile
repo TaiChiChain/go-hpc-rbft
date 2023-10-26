@@ -17,7 +17,7 @@ help: Makefile
 prepare:
 	${GO_BIN} install go.uber.org/mock/mockgen@main
 	${GO_BIN} install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.53.3
-	${GO_BIN} install github.com/fsgo/go_fmt@v0.5.0
+	${GO_BIN} install github.com/fsgo/go_fmt/cmd/gorgeous@latest
 	${GO_BIN} install google.golang.org/protobuf/cmd/protoc-gen-go@v1.31.0
 	${GO_BIN} install github.com/planetscale/vtprotobuf/cmd/protoc-gen-go-vtproto@main
 
@@ -41,7 +41,7 @@ compile-pb: clean-pb
 
 ## make fmt: Formats go source code
 fmt:
-	go_fmt -local github.com/axiomesh -mi
+	gorgeous -local github.com/axiomesh -mi
 
 ## make test: Run go unittest
 test:
