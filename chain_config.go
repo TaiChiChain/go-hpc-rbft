@@ -13,6 +13,11 @@ import (
 )
 
 const (
+	ValidatorElectionTypeWRF                 uint64 = 0
+	ValidatorElectionTypeVotingPowerPriority uint64 = 1
+)
+
+const (
 	ProposerElectionTypeWRF      uint64 = 0
 	ProposerElectionTypeRotating uint64 = 1
 )
@@ -34,6 +39,48 @@ type NodeInfo struct {
 	ConsensusVotingPower int64 `mapstructure:"consensus_voting_power" toml:"consensus_voting_power" json:"consensus_voting_power"`
 }
 
+func wrfSelectNodeByVotingPower(seed []byte, nodes []*NodeInfo) *NodeInfo {
+	h := sha256.New()
+	_, err := h.Write(seed)
+	if err != nil {
+		panic(err)
+	}
+	seedHash := h.Sum(nil)
+
+	// clone
+	nodeSet := lo.Map(nodes, func(item *NodeInfo, idx int) *NodeInfo {
+		return item.Clone()
+	})
+	// sort by id
+	sort.Slice(nodeSet, func(i, j int) bool {
+		return nodeSet[i].ID < nodeSet[j].ID
+	})
+
+	var totalVotingPower uint64
+	// calculate totalVotingPower and cumulative VotingPower
+	// |    a(VotingPower 2)    |    b(VotingPower 3)    |    c(VotingPower 1)    |     b(VotingPower 4)    |
+	// 0                        2                        5                        6                         10
+	// rand select from 0 - totalVotingPower
+	cumulativeVotingPowers := lo.Map(nodeSet, func(item *NodeInfo, idx int) uint64 {
+		totalVotingPower += uint64(item.ConsensusVotingPower)
+		return totalVotingPower
+	})
+
+	seedInt := big.NewInt(0).SetBytes(seedHash)
+	selectedCumulativeVotingPower := seedInt.Mod(seedInt, big.NewInt(int64(totalVotingPower))).Uint64()
+	selectedIndex := binarySearch(cumulativeVotingPowers, selectedCumulativeVotingPower)
+	return nodeSet[selectedIndex]
+}
+
+func sortNodesByVotingPower(nodes []*NodeInfo) {
+	sort.Slice(nodes, func(i, j int) bool {
+		if nodes[i].ConsensusVotingPower != nodes[j].ConsensusVotingPower {
+			return nodes[i].ConsensusVotingPower > nodes[j].ConsensusVotingPower
+		}
+		return nodes[i].ID < nodes[j].ID
+	})
+}
+
 func (n *NodeInfo) Clone() *NodeInfo {
 	return &NodeInfo{
 		ID:                   n.ID,
@@ -44,6 +91,8 @@ func (n *NodeInfo) Clone() *NodeInfo {
 }
 
 type ConsensusParams struct {
+	ValidatorElectionType uint64 `mapstructure:"validator_election_type" toml:"validator_election_type" json:"validator_election_type"`
+
 	// The number of sustained blocks per Checkpoint.
 	CheckpointPeriod uint64 `mapstructure:"checkpoint_period" toml:"checkpoint_period" json:"checkpoint_period"`
 
@@ -152,8 +201,8 @@ func (e *EpochInfo) Check() error {
 		return errors.New("epoch info error: high_watermark_checkpoint_period cannot be 0")
 	}
 
-	if e.ConsensusParams.MaxValidatorNum == 0 {
-		return errors.New("epoch info error: max_validator_num cannot be 0")
+	if e.ConsensusParams.MaxValidatorNum < 4 {
+		return errors.New("epoch info error: max_validator_num must be greater than or equal to 4")
 	}
 
 	if e.ConsensusParams.BlockMaxTxNum == 0 {
@@ -187,6 +236,9 @@ func (e *EpochInfo) Check() error {
 	if e.ConsensusParams.ProposerElectionType != ProposerElectionTypeWRF && e.ConsensusParams.ProposerElectionType != ProposerElectionTypeRotating {
 		return fmt.Errorf("epoch info error: unsupported proposer_election_type: %d", e.ConsensusParams.ProposerElectionType)
 	}
+	if e.ConsensusParams.ValidatorElectionType != ValidatorElectionTypeWRF && e.ConsensusParams.ValidatorElectionType != ValidatorElectionTypeVotingPowerPriority {
+		return fmt.Errorf("epoch info error: unsupported validator_election_type: %d", e.ConsensusParams.ValidatorElectionType)
+	}
 
 	return nil
 }
@@ -197,6 +249,77 @@ func (e *EpochInfo) Marshal() ([]byte, error) {
 
 func (e *EpochInfo) Unmarshal(raw []byte) error {
 	return json.Unmarshal(raw, e)
+}
+
+func (e *EpochInfo) electValidatorsByWrf(electValidatorsByWrfSeed []byte, allEligibleNodes []*NodeInfo) []*NodeInfo {
+	var i uint64 = 0
+	var validators []*NodeInfo
+	for ; i < e.ConsensusParams.MaxValidatorNum; i++ {
+		validator := wrfSelectNodeByVotingPower(electValidatorsByWrfSeed, allEligibleNodes)
+		// exclude selected
+		allEligibleNodes = lo.Reject(allEligibleNodes, func(item *NodeInfo, index int) bool {
+			return item.ID == validator.ID
+		})
+		validators = append(validators, validator)
+	}
+
+	return validators
+}
+
+func (e *EpochInfo) ElectValidators(electValidatorsByWrfSeed []byte) error {
+	err := func() error {
+		var allEligibleNodes []*NodeInfo
+		var allNodes []*NodeInfo
+		for _, info := range e.ValidatorSet {
+			allNodes = append(allNodes, info.Clone())
+			if info.ConsensusVotingPower > 0 {
+				allEligibleNodes = append(allEligibleNodes, info.Clone())
+			}
+		}
+		for _, info := range e.CandidateSet {
+			allNodes = append(allNodes, info.Clone())
+			if info.ConsensusVotingPower > 0 {
+				allEligibleNodes = append(allEligibleNodes, info.Clone())
+			}
+		}
+		if len(allEligibleNodes) < 4 {
+			return errors.New("at least 4 nodes with voting weight greater than 0")
+		}
+
+		var validatorSet []*NodeInfo
+		if len(allEligibleNodes) <= int(e.ConsensusParams.MaxValidatorNum) {
+			sortNodesByVotingPower(allEligibleNodes)
+			validatorSet = allEligibleNodes
+		} else {
+			switch e.ConsensusParams.ValidatorElectionType {
+			case ValidatorElectionTypeWRF:
+				validatorSet = e.electValidatorsByWrf(electValidatorsByWrfSeed, allEligibleNodes)
+				sortNodesByVotingPower(validatorSet)
+			case ValidatorElectionTypeVotingPowerPriority:
+				sortNodesByVotingPower(allEligibleNodes)
+				validatorSet = allEligibleNodes[:int(e.ConsensusParams.MaxValidatorNum)]
+			default:
+				return fmt.Errorf("epoch info error: unsupported validator_election_type: %d", e.ConsensusParams.ValidatorElectionType)
+			}
+		}
+		e.ValidatorSet = validatorSet
+		validatorMap := lo.SliceToMap(validatorSet, func(info *NodeInfo) (uint64, struct{}) {
+			return info.ID, struct{}{}
+		})
+		e.CandidateSet = lo.Filter(allNodes, func(item *NodeInfo, index int) bool {
+			_, ok := validatorMap[item.ID]
+			return !ok
+		})
+		sort.Slice(e.CandidateSet, func(i, j int) bool {
+			return e.CandidateSet[i].ID < e.CandidateSet[j].ID
+		})
+
+		return nil
+	}()
+	if err != nil {
+		return errors.Wrap(err, "failed to elect validators")
+	}
+	return nil
 }
 
 type NodeRole uint8
@@ -230,6 +353,9 @@ type EpochDerivedData struct {
 	NodeRoleMap map[uint64]NodeRole
 
 	NodeInfoMap map[uint64]*NodeInfo
+
+	// will track validator consensusVotingPower
+	ValidatorMap map[uint64]*NodeInfo
 }
 
 type DynamicChainConfig struct {
@@ -258,7 +384,7 @@ type ChainConfig struct {
 	SelfAccountAddress string
 }
 
-func (c *ChainConfig) isWRF() bool {
+func (c *ChainConfig) isProposerElectionTypeWRF() bool {
 	return c.EpochInfo.ConsensusParams.ProposerElectionType == ProposerElectionTypeWRF
 }
 
@@ -292,6 +418,10 @@ func (c *ChainConfig) updateDerivedData() error {
 	fillNodes(c.EpochInfo.CandidateSet, NodeRoleCandidate)
 	fillNodes(c.EpochInfo.DataSyncerSet, NodeRoleDataSyncer)
 
+	c.ValidatorMap = lo.SliceToMap(c.EpochInfo.ValidatorSet, func(item *NodeInfo) (uint64, *NodeInfo) {
+		return item.ID, item.Clone()
+	})
+
 	c.N = len(c.EpochInfo.ValidatorSet)
 	c.F = (c.N - 1) / 3
 	c.L = c.EpochInfo.ConsensusParams.CheckpointPeriod * c.EpochInfo.ConsensusParams.HighWatermarkCheckpointPeriod
@@ -300,39 +430,11 @@ func (c *ChainConfig) updateDerivedData() error {
 }
 
 func (c *ChainConfig) wrfCalPrimaryIDByView(v uint64) uint64 {
-	// clone validatorSet
-	validatorSet := lo.Map(c.EpochInfo.ValidatorSet, func(item *NodeInfo, idx int) *NodeInfo {
-		return item.Clone()
-	})
-	// sort validators by id
-	sort.Slice(validatorSet, func(i, j int) bool {
-		return validatorSet[i].ID < validatorSet[j].ID
-	})
-
-	var totalVotingPower uint64
-	// calculate totalVotingPower and cumulative VotingPower
-	// |    a(VotingPower 2)    |    b(VotingPower 3)    |    c(VotingPower 1)    |     b(VotingPower 4)    |
-	// 0                        2                        5                        6                         10
-	// rand select from 0 - totalVotingPower
-	cumulativeVotingPowers := lo.Map(validatorSet, func(item *NodeInfo, idx int) uint64 {
-		totalVotingPower += uint64(item.ConsensusVotingPower)
-		return totalVotingPower
-	})
-
 	// generate random number by last blockhash + view + epoch
-	var state = []byte(c.LastCheckpointExecBlockHash)
-	state = binary.BigEndian.AppendUint64(state, c.EpochInfo.Epoch)
-	state = binary.BigEndian.AppendUint64(state, v)
-	h := sha256.New()
-	_, err := h.Write(state)
-	if err != nil {
-		panic(err)
-	}
-
-	seed := big.NewInt(0).SetBytes(h.Sum(nil))
-	selectedCumulativeVotingPower := seed.Mod(seed, big.NewInt(int64(totalVotingPower))).Uint64()
-	selectedIndex := binarySearch(cumulativeVotingPowers, selectedCumulativeVotingPower)
-	return validatorSet[selectedIndex].ID
+	var seed = []byte(c.LastCheckpointExecBlockHash)
+	seed = binary.BigEndian.AppendUint64(seed, c.EpochInfo.Epoch)
+	seed = binary.BigEndian.AppendUint64(seed, v)
+	return wrfSelectNodeByVotingPower(seed, c.EpochInfo.ValidatorSet).ID
 }
 
 // primaryID returns the expected primary id with the given view v

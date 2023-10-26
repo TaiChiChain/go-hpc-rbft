@@ -369,7 +369,7 @@ func (rbft *rbftImpl[T, Constraint]) recvViewChange(vc *consensus.ViewChange, ve
 	}
 
 	if rbft.isNormal() {
-		if rbft.chainConfig.isWRF() {
+		if rbft.chainConfig.isProposerElectionTypeWRF() {
 			if vc.Recovery {
 				rbft.logger.Warningf("Replica %d found viewChange message for higher view from "+
 					"replica %d, help remote recovery", rbft.chainConfig.SelfID, remoteReplicaID)
@@ -610,7 +610,7 @@ func (rbft *rbftImpl[T, Constraint]) checkNewView(nv *consensus.NewView) (uint64
 	}
 
 	// wrf recovery cannot check the PrimaryID
-	if !rbft.chainConfig.isWRF() {
+	if !rbft.chainConfig.isProposerElectionTypeWRF() {
 		expectedPrimaryID := rbft.chainConfig.calPrimaryIDByView(nv.View)
 		if expectedPrimaryID != nv.ReplicaId {
 			rbft.logger.Warningf("Replica %d reject invalid newView from %d, v:%d, expected primary: %d",

@@ -180,8 +180,8 @@ func (rbft *rbftImpl[T, Constraint]) turnIntoEpoch() {
 	rbft.metrics.clusterSizeGauge.Set(float64(rbft.chainConfig.N))
 	rbft.metrics.quorumSizeGauge.Set(float64(rbft.commonCaseQuorum()))
 
-	rbft.logger.Debugf("======== Replica %d turn into a new epoch, epoch=%d/N=%d/view=%d/height=%d.",
-		rbft.chainConfig.SelfID, rbft.chainConfig.EpochInfo.Epoch, rbft.chainConfig.N, rbft.chainConfig.View, rbft.exec.lastExec)
+	rbft.logger.Debugf("======== Replica %d turn into a new epoch, epoch=%d/N=%d/view=%d/height=%d, new primary=%d",
+		rbft.chainConfig.SelfID, rbft.chainConfig.EpochInfo.Epoch, rbft.chainConfig.N, rbft.chainConfig.View, rbft.exec.lastExec, rbft.chainConfig.PrimaryID)
 	rbft.logger.Notice(`
 
   +==============================================+

@@ -83,7 +83,7 @@ func (rbft *rbftImpl[T, Constraint]) beyondRange(n uint64) bool {
 
 // inPrimaryTerm check is in primary term, only true can generate batch and send prePrepare
 func (rbft *rbftImpl[T, Constraint]) inPrimaryTerm() bool {
-	if !rbft.chainConfig.isWRF() {
+	if !rbft.chainConfig.isProposerElectionTypeWRF() {
 		return true
 	}
 	return rbft.batchMgr.seqNo < rbft.chainConfig.H+rbft.chainConfig.EpochInfo.ConsensusParams.CheckpointPeriod
@@ -751,7 +751,7 @@ func (rbft *rbftImpl[T, Constraint]) generateSignedCheckpoint(state *types.Servi
 			Digest: state.MetaState.Digest,
 		},
 	}
-	if rbft.chainConfig.isWRF() {
+	if rbft.chainConfig.isProposerElectionTypeWRF() {
 		// proof viewchanged by term update
 
 		// create viewChange message

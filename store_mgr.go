@@ -184,7 +184,7 @@ func (rbft *rbftImpl[T, Constraint]) isPrePrepareLegal(preprep *consensus.PrePre
 
 	if !rbft.inWV(preprep.View, preprep.SequenceNumber) {
 		if preprep.SequenceNumber != rbft.chainConfig.H && !rbft.in(SkipInProgress) {
-			if !rbft.chainConfig.isWRF() {
+			if !rbft.chainConfig.isProposerElectionTypeWRF() {
 				rbft.logger.Warningf("Replica %d received prePrepare with a different view or sequence "+
 					"number outside watermarks: prePrep.View %d, expected.View %d, seqNo %d, low water mark %d",
 					rbft.chainConfig.SelfID, preprep.View, rbft.chainConfig.View, preprep.SequenceNumber, rbft.chainConfig.H)
@@ -226,7 +226,7 @@ func (rbft *rbftImpl[T, Constraint]) isPrePrepareLegal(preprep *consensus.PrePre
 func (rbft *rbftImpl[T, Constraint]) isPrepareLegal(prep *consensus.Prepare) bool {
 	if !rbft.inWV(prep.View, prep.SequenceNumber) {
 		if prep.SequenceNumber != rbft.chainConfig.H && !rbft.in(SkipInProgress) {
-			if !rbft.chainConfig.isWRF() {
+			if !rbft.chainConfig.isProposerElectionTypeWRF() {
 				rbft.logger.Warningf("Replica %d ignore prepare from replica %d for view=%d/seqNo=%d: not inWv, in view: %d, h: %d",
 					rbft.chainConfig.SelfID, prep.ReplicaId, prep.View, prep.SequenceNumber, rbft.chainConfig.View, rbft.chainConfig.H)
 			}
@@ -252,7 +252,7 @@ func (rbft *rbftImpl[T, Constraint]) isPrepareLegal(prep *consensus.Prepare) boo
 func (rbft *rbftImpl[T, Constraint]) isCommitLegal(commit *consensus.Commit) bool {
 	if !rbft.inWV(commit.View, commit.SequenceNumber) {
 		if commit.SequenceNumber != rbft.chainConfig.H && !rbft.in(SkipInProgress) {
-			if !rbft.chainConfig.isWRF() {
+			if !rbft.chainConfig.isProposerElectionTypeWRF() {
 				rbft.logger.Warningf("Replica %d ignore commit from replica %d for view=%d/seqNo=%d: not inWv, in view: %d, h: %d",
 					rbft.chainConfig.SelfID, commit.ReplicaId, commit.View, commit.SequenceNumber, rbft.chainConfig.View, rbft.chainConfig.H)
 			}

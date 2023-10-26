@@ -277,7 +277,7 @@ func (rbft *rbftImpl[T, Constraint]) init() error {
 	rbft.metrics.clusterSizeGauge.Set(float64(rbft.chainConfig.N))
 	rbft.metrics.quorumSizeGauge.Set(float64(rbft.commonCaseQuorum()))
 
-	rbft.logger.Infof("RBFT enable wrf = %v", rbft.chainConfig.isWRF())
+	rbft.logger.Infof("RBFT enable wrf = %v", rbft.chainConfig.isProposerElectionTypeWRF())
 	rbft.logger.Infof("RBFT epoch period = %v", rbft.chainConfig.EpochInfo.EpochPeriod)
 	rbft.logger.Infof("RBFT current epoch = %v", rbft.chainConfig.EpochInfo.Epoch)
 	rbft.logger.Infof("RBFT current view = %v", rbft.chainConfig.View)
@@ -1106,7 +1106,7 @@ func (rbft *rbftImpl[T, Constraint]) recvPrePrepare(ctx context.Context, preprep
 		rbft.chainConfig.SelfID, preprep.ReplicaId, preprep.View, preprep.SequenceNumber, preprep.BatchDigest)
 
 	if !rbft.isPrePrepareLegal(preprep) {
-		if rbft.chainConfig.isWRF() &&
+		if rbft.chainConfig.isProposerElectionTypeWRF() &&
 			preprep.View > rbft.chainConfig.View &&
 			!rbft.beyondRange(preprep.SequenceNumber) {
 			// only for wrf: cache messages that are higher in the view and do not exceed the high watermark, recommit after checkpoint
@@ -1242,7 +1242,7 @@ func (rbft *rbftImpl[T, Constraint]) recvPrepare(ctx context.Context, prep *cons
 		rbft.chainConfig.SelfID, prep.ReplicaId, prep.View, prep.SequenceNumber)
 
 	if !rbft.isPrepareLegal(prep) {
-		if rbft.chainConfig.isWRF() &&
+		if rbft.chainConfig.isProposerElectionTypeWRF() &&
 			prep.View > rbft.chainConfig.View &&
 			!rbft.beyondRange(prep.SequenceNumber) {
 			// only for wrf: cache messages that are higher in the view and do not exceed the high watermark, recommit after checkpoint
@@ -1368,7 +1368,7 @@ func (rbft *rbftImpl[T, Constraint]) recvCommit(ctx context.Context, commit *con
 		rbft.chainConfig.SelfID, commit.ReplicaId, commit.View, commit.SequenceNumber)
 
 	if !rbft.isCommitLegal(commit) {
-		if rbft.chainConfig.isWRF() &&
+		if rbft.chainConfig.isProposerElectionTypeWRF() &&
 			commit.View > rbft.chainConfig.View &&
 			!rbft.beyondRange(commit.SequenceNumber) {
 			// only for wrf: cache messages that are higher in the view and do not exceed the high watermark, recommit after checkpoint
@@ -1902,7 +1902,7 @@ func (rbft *rbftImpl[T, Constraint]) checkpoint(state *types.ServiceState, isCon
 	} else {
 		// if our lastExec is equal to high watermark, it means there is something wrong with checkpoint procedure, so that
 		// we need to start a high-watermark timer for checkpoint, and trigger view-change when high-watermark timer expired
-		if rbft.exec.lastExec == rbft.chainConfig.H+rbft.chainConfig.L && !rbft.chainConfig.isWRF() {
+		if rbft.exec.lastExec == rbft.chainConfig.H+rbft.chainConfig.L && !rbft.chainConfig.isProposerElectionTypeWRF() {
 			rbft.logger.Warningf("Replica %d try to send checkpoint equal to high watermark, "+
 				"there may be something wrong with checkpoint", rbft.chainConfig.SelfID)
 			rbft.softStartHighWatermarkTimer("replica send checkpoint equal to high-watermark")
@@ -2069,7 +2069,7 @@ func (rbft *rbftImpl[T, Constraint]) finishNormalCheckpoint(checkpointHeight uin
 
 	rbft.moveWatermarks(checkpointHeight, false)
 
-	if rbft.chainConfig.isWRF() {
+	if rbft.chainConfig.isProposerElectionTypeWRF() {
 		localCheckpoint := rbft.storeMgr.localCheckpoints[checkpointHeight]
 
 		newView := rbft.chainConfig.View + 1
@@ -2109,7 +2109,7 @@ func (rbft *rbftImpl[T, Constraint]) finishNormalCheckpoint(checkpointHeight uin
 
 		// Slave -> Primary： need update self seqNo(because only primary will update)
 		rbft.batchMgr.setSeqNo(checkpointHeight)
-		rbft.logger.Infof("Replica %d post stable checkpoint event for seqNo %d, update to new view: %d, epoch:%d, last checkpoint digest: %s, new primary ID: %d", rbft.chainConfig.SelfID, rbft.chainConfig.H, rbft.chainConfig.View, rbft.chainConfig.EpochInfo.Epoch, rbft.chainConfig.LastCheckpointExecBlockHash, rbft.chainConfig.PrimaryID)
+		rbft.logger.Infof("Replica %d post stable checkpoint event for seqNo %d, update to new view: %d, new primary ID: %d,  epoch:%d, last checkpoint digest: %s", rbft.chainConfig.SelfID, rbft.chainConfig.H, rbft.chainConfig.View, rbft.chainConfig.PrimaryID, rbft.chainConfig.EpochInfo.Epoch, rbft.chainConfig.LastCheckpointExecBlockHash)
 	} else {
 		rbft.logger.Infof("Replica %d post stable checkpoint event for seqNo %d", rbft.chainConfig.SelfID, rbft.chainConfig.H)
 	}
@@ -2131,7 +2131,7 @@ func (rbft *rbftImpl[T, Constraint]) finishNormalCheckpoint(checkpointHeight uin
 		Config: false,
 	})
 
-	if rbft.chainConfig.isWRF() {
+	if rbft.chainConfig.isProposerElectionTypeWRF() {
 		rbft.processWRFHighViewMsgs()
 	}
 
