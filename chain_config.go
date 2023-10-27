@@ -183,6 +183,14 @@ func (e *EpochInfo) Clone() *EpochInfo {
 				ConsensusVotingPower: item.ConsensusVotingPower,
 			}
 		}),
+		DataSyncerSet: lo.Map(e.DataSyncerSet, func(item *NodeInfo, idx int) *NodeInfo {
+			return &NodeInfo{
+				ID:                   item.ID,
+				AccountAddress:       item.AccountAddress,
+				P2PNodeID:            item.P2PNodeID,
+				ConsensusVotingPower: item.ConsensusVotingPower,
+			}
+		}),
 	}
 }
 
