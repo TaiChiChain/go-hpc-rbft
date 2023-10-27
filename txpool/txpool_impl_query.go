@@ -34,12 +34,23 @@ func (p *txPoolImpl[T, Constraint]) GetPendingTxByHash(hash string) *T {
 }
 
 func (p *txPoolImpl[T, Constraint]) GetAccountMeta(account string, full bool) *AccountMeta[T, Constraint] {
+	if p.txStore.allTxs[account] == nil {
+		return &AccountMeta[T, Constraint]{
+			CommitNonce:  p.txStore.nonceCache.getCommitNonce(account),
+			PendingNonce: p.txStore.nonceCache.getPendingNonce(account),
+			TxCount:      0,
+			Txs:          []*TxInfo[T, Constraint]{},
+			SimpleTxs:    []*TxSimpleInfo{},
+		}
+	}
+
 	fullTxs := p.txStore.allTxs[account].items
 	res := &AccountMeta[T, Constraint]{
 		CommitNonce:  p.txStore.nonceCache.getCommitNonce(account),
 		PendingNonce: p.txStore.nonceCache.getPendingNonce(account),
 		TxCount:      uint64(len(fullTxs)),
 	}
+
 	if full {
 		res.Txs = make([]*TxInfo[T, Constraint], 0, len(fullTxs))
 		for _, tx := range fullTxs {

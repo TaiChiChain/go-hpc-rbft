@@ -812,3 +812,66 @@ func TestGetPendingTxCount(t *testing.T) {
 	pool.AddNewRequests([]*consensus.FltTransaction{tx1, tx2}, false, true, false, false)
 	ast.Equal(uint64(2), pool.GetTotalPendingTxCount())
 }
+
+func TestGetMeta(t *testing.T) {
+	ast := assert.New(t)
+
+	t.Run("GetMeta with empty txpool", func(t *testing.T) {
+		pool := mockTxPoolImpl[consensus.FltTransaction, *consensus.FltTransaction]()
+		m := pool.GetMeta(false)
+		ast.NotNil(m)
+		ast.Equal(uint64(0), m.TxCount)
+		ast.Equal(uint64(0), m.ReadyTxCount)
+		ast.Equal(0, len(m.Batches))
+		ast.Equal(0, len(m.MissingBatchTxs))
+		ast.Equal(0, len(m.Accounts))
+	})
+
+	t.Run("GetAccountMeta with empty txpool", func(t *testing.T) {
+		pool := mockTxPoolImpl[consensus.FltTransaction, *consensus.FltTransaction]()
+		am := pool.GetAccountMeta("", false)
+		ast.NotNil(am)
+		ast.Equal(uint64(0), am.CommitNonce)
+		ast.Equal(uint64(0), am.PendingNonce)
+		ast.Equal(uint64(0), am.TxCount)
+		ast.Equal(0, len(am.Txs))
+		ast.Equal(0, len(am.SimpleTxs))
+	})
+
+	t.Run("GetMeta with not empty txpool", func(t *testing.T) {
+		pool := mockTxPoolImpl[consensus.FltTransaction, *consensus.FltTransaction]()
+		tx := ConstructTxByAccountAndNonce("account1", uint64(0))
+		pool.batchSize = 1
+		pool.AddNewRequests([]*consensus.FltTransaction{tx}, true, true, false, true)
+		m := pool.GetMeta(false)
+		ast.NotNil(m)
+		ast.Equal(uint64(1), m.TxCount)
+		ast.Equal(uint64(0), m.ReadyTxCount)
+		ast.Equal(1, len(m.Batches))
+		ast.Equal(0, len(m.MissingBatchTxs))
+		ast.Equal(1, len(m.Accounts))
+	})
+
+	t.Run("GetMeta with not empty txpool", func(t *testing.T) {
+		pool := mockTxPoolImpl[consensus.FltTransaction, *consensus.FltTransaction]()
+		tx := ConstructTxByAccountAndNonce("account1", uint64(0))
+		pool.batchSize = 2
+		pool.AddNewRequests([]*consensus.FltTransaction{tx}, true, true, false, true)
+
+		am := pool.GetAccountMeta(tx.RbftGetFrom(), false)
+		ast.NotNil(am)
+		ast.Equal(uint64(0), am.CommitNonce)
+		ast.Equal(uint64(1), am.PendingNonce)
+		ast.Equal(uint64(1), am.TxCount)
+		ast.Equal(0, len(am.Txs))
+		ast.Equal(1, len(am.SimpleTxs))
+
+		am = pool.GetAccountMeta(tx.RbftGetFrom(), true)
+		ast.NotNil(am)
+		ast.Equal(uint64(0), am.CommitNonce)
+		ast.Equal(uint64(1), am.PendingNonce)
+		ast.Equal(uint64(1), am.TxCount)
+		ast.Equal(1, len(am.Txs))
+		ast.Equal(0, len(am.SimpleTxs))
+	})
+}
