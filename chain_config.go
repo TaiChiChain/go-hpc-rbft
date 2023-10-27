@@ -146,6 +146,24 @@ type EpochInfo struct {
 	ValidatorSet []*NodeInfo `mapstructure:"validator_set" toml:"validator_set" json:"validator_set"`
 
 	DataSyncerSet []*NodeInfo `mapstructure:"data_syncer_set" toml:"data_syncer_set" json:"data_syncer_set"`
+
+	// Finance params about gas
+	FinanceParams *Finance `mapstructure:"finance_params" toml:"finance_params" json:"finance_params"`
+
+	ConfigParams *ConfigParams `mapstructure:"config_params" toml:"config_params" json:"config_params"`
+}
+
+// todo: excutor read params from epoch info, not from config
+type Finance struct {
+	GasLimit       uint64  `mapstructure:"gas_limit" toml:"gas_limit" json:"gas_limit"`
+	MaxGasPrice    uint64  `mapstructure:"max_gas_price" toml:"max_gas_price" json:"max_gas_price"`
+	MinGasPrice    uint64  `mapstructure:"min_gas_price" toml:"min_gas_price" json:"min_gas_price"`
+	GasChangeRate  float64 `mapstructure:"gas_change_rate" toml:"gas_change_rate" json:"gas_change_rate"`
+	GasPremiumRate float64 `mapstructure:"gas_premium_rate" toml:"gas_premium_rate" json:"gas_premium_rate"`
+}
+
+type ConfigParams struct {
+	TxMaxSize uint64 `mapstructure:"tx_max_size" toml:"tx_max_size" json:"tx_max_size"`
 }
 
 func (e *EpochInfo) Clone() *EpochInfo {
@@ -191,6 +209,16 @@ func (e *EpochInfo) Clone() *EpochInfo {
 				ConsensusVotingPower: item.ConsensusVotingPower,
 			}
 		}),
+		FinanceParams: &Finance{
+			GasLimit:       e.FinanceParams.GasLimit,
+			MaxGasPrice:    e.FinanceParams.MaxGasPrice,
+			MinGasPrice:    e.FinanceParams.MinGasPrice,
+			GasChangeRate:  e.FinanceParams.GasChangeRate,
+			GasPremiumRate: e.FinanceParams.GasPremiumRate,
+		},
+		ConfigParams: &ConfigParams{
+			TxMaxSize: e.ConfigParams.TxMaxSize,
+		},
 	}
 }
 
