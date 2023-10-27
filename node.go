@@ -68,6 +68,10 @@ type External[T any, Constraint consensus.TXConstraint[T]] interface {
 
 	// GetLowWatermark return the low watermark of txpool
 	GetLowWatermark() uint64
+
+	GetAccountPoolMeta(account string, full bool) *txpool.AccountMeta[T, Constraint]
+
+	GetPoolMeta(full bool) *txpool.Meta[T, Constraint]
 }
 
 // ServiceInbound receives and records modifications from application service which includes two events:
@@ -293,4 +297,33 @@ func (n *node[T, Constraint]) GetLowWatermark() uint64 {
 	n.rbft.postMsg(localEvent)
 
 	return <-getWatermarkReq.ch
+}
+
+func (n *node[T, Constraint]) GetAccountPoolMeta(account string, full bool) *txpool.AccountMeta[T, Constraint] {
+	req := &ReqGetAccountPoolMetaMsg[T, Constraint]{
+		account: account,
+		full:    full,
+		ch:      make(chan *txpool.AccountMeta[T, Constraint]),
+	}
+	localEvent := &MiscEvent{
+		EventType: ReqGetAccountMetaEvent,
+		Event:     req,
+	}
+	n.rbft.postMsg(localEvent)
+
+	return <-req.ch
+}
+
+func (n *node[T, Constraint]) GetPoolMeta(full bool) *txpool.Meta[T, Constraint] {
+	req := &ReqGetPoolMetaMsg[T, Constraint]{
+		full: full,
+		ch:   make(chan *txpool.Meta[T, Constraint]),
+	}
+	localEvent := &MiscEvent{
+		EventType: ReqGetPoolMetaEvent,
+		Event:     req,
+	}
+	n.rbft.postMsg(localEvent)
+
+	return <-req.ch
 }

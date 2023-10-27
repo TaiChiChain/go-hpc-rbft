@@ -74,7 +74,7 @@ func (rbft *rbftImpl[T, Constraint]) startBatchTimer() bool {
 
 	rbft.timerMgr.startTimer(batchTimer, localEvent)
 	rbft.batchMgr.batchTimerActive = true
-	rbft.logger.Debugf("Primary %d started the batch timer", rbft.peerMgr.selfID)
+	rbft.logger.Debugf("Replica %d started the batch timer", rbft.chainConfig.SelfID)
 
 	return true
 }
@@ -88,7 +88,7 @@ func (rbft *rbftImpl[T, Constraint]) startNoTxBatchTimer() bool {
 
 	rbft.timerMgr.startTimer(noTxBatchTimer, localEvent)
 	rbft.batchMgr.noTxBatchTimerActive = true
-	rbft.logger.Debugf("Primary %d started the no tx batch timer", rbft.peerMgr.selfID)
+	rbft.logger.Debugf("Replica %d started the no tx batch timer", rbft.chainConfig.SelfID)
 
 	return true
 }
@@ -97,7 +97,7 @@ func (rbft *rbftImpl[T, Constraint]) startNoTxBatchTimer() bool {
 func (rbft *rbftImpl[T, Constraint]) stopNoTxBatchTimer() {
 	rbft.timerMgr.stopTimer(noTxBatchTimer)
 	rbft.batchMgr.noTxBatchTimerActive = false
-	rbft.logger.Debugf("Primary %d stopped the no tx batch timer", rbft.peerMgr.selfID)
+	rbft.logger.Debugf("Replica %d stopped the no tx batch timer", rbft.chainConfig.SelfID)
 }
 
 // restartNoTxBatchTimer restarts the no tx batch timer
@@ -116,7 +116,7 @@ func (rbft *rbftImpl[T, Constraint]) restartNoTxBatchTimer() bool {
 
 	rbft.timerMgr.startTimer(noTxBatchTimer, localEvent)
 	rbft.batchMgr.batchTimerActive = true
-	rbft.logger.Debugf("Primary %d restarted the no tx batch timer", rbft.peerMgr.selfID)
+	rbft.logger.Debugf("Replica %d restarted the no tx batch timer", rbft.chainConfig.SelfID)
 
 	return true
 }
@@ -125,7 +125,7 @@ func (rbft *rbftImpl[T, Constraint]) restartNoTxBatchTimer() bool {
 func (rbft *rbftImpl[T, Constraint]) stopBatchTimer() {
 	rbft.timerMgr.stopTimer(batchTimer)
 	rbft.batchMgr.batchTimerActive = false
-	rbft.logger.Debugf("Primary %d stopped the batch timer", rbft.peerMgr.selfID)
+	rbft.logger.Debugf("Replica %d stopped the batch timer", rbft.chainConfig.SelfID)
 }
 
 // restartBatchTimer restarts the batch timer
@@ -139,7 +139,7 @@ func (rbft *rbftImpl[T, Constraint]) restartBatchTimer() bool {
 
 	rbft.timerMgr.startTimer(batchTimer, localEvent)
 	rbft.batchMgr.batchTimerActive = true
-	rbft.logger.Debugf("Primary %d restarted the batch timer", rbft.peerMgr.selfID)
+	rbft.logger.Debugf("Replica %d restarted the batch timer", rbft.chainConfig.SelfID)
 
 	return true
 }
@@ -152,11 +152,11 @@ func (rbft *rbftImpl[T, Constraint]) softRestartBatchTimer() bool {
 
 	hasStarted, _ := rbft.timerMgr.softStartTimerWithNewTT(batchTimer, rbft.timerMgr.getTimeoutValue(batchTimer), localEvent)
 	if hasStarted {
-		rbft.logger.Debugf("Replica %d has started batch timer before", rbft.peerMgr.selfID)
+		rbft.logger.Debugf("Replica %d has started batch timer before", rbft.chainConfig.SelfID)
 		return false
 	}
 	rbft.batchMgr.batchTimerActive = true
-	rbft.logger.Debugf("Primary %d softly restarted the batch timer", rbft.peerMgr.selfID)
+	rbft.logger.Debugf("Replica %d softly restarted the batch timer", rbft.chainConfig.SelfID)
 
 	return true
 }
@@ -169,13 +169,13 @@ func (rbft *rbftImpl[T, Constraint]) startCheckPoolTimer() {
 	}
 
 	rbft.timerMgr.startTimer(checkPoolTimer, localEvent)
-	rbft.logger.Debugf("Replica %d started the check pool timer", rbft.peerMgr.selfID)
+	rbft.logger.Debugf("Replica %d started the check pool timer", rbft.chainConfig.SelfID)
 }
 
 // stopCheckPoolTimer stops the check pool timer when node enter abnormal status.
 func (rbft *rbftImpl[T, Constraint]) stopCheckPoolTimer() {
 	rbft.timerMgr.stopTimer(checkPoolTimer)
-	rbft.logger.Debugf("Replica %d stopped the check pool timer", rbft.peerMgr.selfID)
+	rbft.logger.Debugf("Replica %d stopped the check pool timer", rbft.chainConfig.SelfID)
 }
 
 // restartCheckPoolTimer restarts the check pool timer.
@@ -188,7 +188,7 @@ func (rbft *rbftImpl[T, Constraint]) restartCheckPoolTimer() {
 	}
 
 	rbft.timerMgr.startTimer(checkPoolTimer, localEvent)
-	rbft.logger.Debugf("Replica %d restarted the check pool timer", rbft.peerMgr.selfID)
+	rbft.logger.Debugf("Replica %d restarted the check pool timer", rbft.chainConfig.SelfID)
 }
 
 // startCheckPoolTimer starts the check pool remove timer when tx stay txpool too long.
@@ -199,7 +199,7 @@ func (rbft *rbftImpl[T, Constraint]) startCheckPoolRemoveTimer() {
 	}
 
 	rbft.timerMgr.startTimer(checkPoolRemoveTimer, localEvent)
-	rbft.logger.Debugf("Replica %d started the check pool remove timer, need to remove invalid tx in txpool after %v", rbft.peerMgr.selfID, rbft.timerMgr.getTimeoutValue(checkPoolRemoveTimer))
+	rbft.logger.Debugf("Replica %d started the check pool remove timer, need to remove invalid tx in txpool after %v", rbft.chainConfig.SelfID, rbft.timerMgr.getTimeoutValue(checkPoolRemoveTimer))
 }
 
 // restartCheckPoolTimer restarts the check pool timer.
@@ -212,7 +212,7 @@ func (rbft *rbftImpl[T, Constraint]) restartCheckPoolRemoveTimer() {
 	}
 
 	rbft.timerMgr.startTimer(checkPoolRemoveTimer, localEvent)
-	rbft.logger.Debugf("Replica %d restarted the check pool remove timer, need to remove invalid tx in txpool after %v", rbft.peerMgr.selfID, rbft.timerMgr.getTimeoutValue(checkPoolRemoveTimer))
+	rbft.logger.Debugf("Replica %d restarted the check pool remove timer, need to remove invalid tx in txpool after %v", rbft.chainConfig.SelfID, rbft.timerMgr.getTimeoutValue(checkPoolRemoveTimer))
 }
 
 // maybeSendPrePrepare used by primary helps primary stores this batch and send prePrepare,
@@ -220,6 +220,12 @@ func (rbft *rbftImpl[T, Constraint]) restartCheckPoolRemoveTimer() {
 // we may store batch into cacheBatch temporarily if next demand seqNo is higher than our
 // high watermark. (this is where we restrict the speed of consensus)
 func (rbft *rbftImpl[T, Constraint]) maybeSendPrePrepare(batch *RequestBatch[T, Constraint], findCache bool) {
+	if !rbft.chainConfig.isValidator() {
+		rbft.logger.Debugf("Replica %d is not validator, not execute maybeSendPrePrepare",
+			rbft.chainConfig.SelfID)
+		return
+	}
+
 	var (
 		nextSeqNo uint64
 		nextBatch *RequestBatch[T, Constraint]
@@ -227,7 +233,7 @@ func (rbft *rbftImpl[T, Constraint]) maybeSendPrePrepare(batch *RequestBatch[T, 
 
 	if rbft.in(waitCheckpointBatchExecute) {
 		rbft.logger.Debugf("Replica %d is wait checkpoint block %d executed, not sending prePrepare",
-			rbft.peerMgr.selfID, rbft.exec.lastExec)
+			rbft.chainConfig.SelfID, rbft.exec.lastExec)
 		return
 	}
 
@@ -240,16 +246,16 @@ func (rbft *rbftImpl[T, Constraint]) maybeSendPrePrepare(batch *RequestBatch[T, 
 		}
 		if !rbft.inPrimaryTerm() {
 			rbft.logger.Debugf("Replica %d is primary, not sending prePrepare for request batch %s because "+
-				"next seqNo is out of high watermark %d, restore the batch", rbft.peerMgr.selfID, batchHash, rbft.chainConfig.H+rbft.chainConfig.L, findCache)
+				"next seqNo is out of high watermark %d, restore the batch", rbft.chainConfig.SelfID, batchHash, rbft.chainConfig.H+rbft.chainConfig.L, findCache)
 
 			if err := rbft.batchMgr.requestPool.RestoreOneBatch(batch.BatchHash); err != nil {
-				rbft.logger.Debugf("Replica %d is primary, restore the batch failed: %s", rbft.peerMgr.selfID, err.Error())
+				rbft.logger.Debugf("Replica %d is primary, restore the batch failed: %s", rbft.chainConfig.SelfID, err.Error())
 			}
 			return
 		}
 
 		rbft.logger.Debugf("Replica %d is primary, not sending prePrepare for request batch %s because "+
-			"next seqNo is out of high watermark %d, while findCache is %t", rbft.peerMgr.selfID, batchHash, rbft.chainConfig.H+rbft.chainConfig.L, findCache)
+			"next seqNo is out of high watermark %d, while findCache is %t", rbft.chainConfig.SelfID, batchHash, rbft.chainConfig.H+rbft.chainConfig.L, findCache)
 
 		if !findCache {
 			rbft.batchMgr.cacheBatch = append(rbft.batchMgr.cacheBatch, batch)
@@ -266,7 +272,7 @@ func (rbft *rbftImpl[T, Constraint]) maybeSendPrePrepare(batch *RequestBatch[T, 
 		nextBatch = rbft.batchMgr.cacheBatch[0]
 		rbft.batchMgr.cacheBatch = rbft.batchMgr.cacheBatch[1:]
 		rbft.metrics.cacheBatchNumber.Add(float64(-1))
-		rbft.logger.Infof("Primary %d finds cached batch, hash = %s", rbft.peerMgr.selfID, nextBatch.BatchHash)
+		rbft.logger.Infof("Primary %d finds cached batch, hash = %s", rbft.chainConfig.SelfID, nextBatch.BatchHash)
 	} else {
 		nextBatch = batch
 	}
@@ -304,27 +310,27 @@ func (rbft *rbftImpl[T, Constraint]) maybeSendPrePrepare(batch *RequestBatch[T, 
 // findNextPrepareBatch is used by the backup nodes to ensure that the batch corresponding to this cert exists.
 // If it exists, then prepare it.
 func (rbft *rbftImpl[T, Constraint]) findNextPrepareBatch(ctx context.Context, v uint64, n uint64, d string) error {
-	rbft.logger.Debugf("Replica %d findNextPrepareBatch in cert with for view=%d/seqNo=%d/digest=%s", rbft.peerMgr.selfID, v, n, d)
+	rbft.logger.Debugf("Replica %d findNextPrepareBatch in cert with for view=%d/seqNo=%d/digest=%s", rbft.chainConfig.SelfID, v, n, d)
 
 	if v != rbft.chainConfig.View {
-		rbft.logger.Debugf("Replica %d excepts the cert with view=%d, but actually the cert is view=%d/seqNo=%d/digest=%s", rbft.peerMgr.selfID, rbft.chainConfig.View, v, n, d)
+		rbft.logger.Debugf("Replica %d excepts the cert with view=%d, but actually the cert is view=%d/seqNo=%d/digest=%s", rbft.chainConfig.SelfID, rbft.chainConfig.View, v, n, d)
 		return nil
 	}
 
 	cert := rbft.storeMgr.getCert(v, n, d)
 	if cert.prePrepare == nil {
 		rbft.logger.Errorf("Replica %d get prePrepare failed for view=%d/seqNo=%d/digest=%s",
-			rbft.peerMgr.selfID, v, n, d)
+			rbft.chainConfig.SelfID, v, n, d)
 		return nil
 	}
 
 	if rbft.in(SkipInProgress) {
-		rbft.logger.Debugf("Replica %d do not try to send prepare because it's in stateUpdate", rbft.peerMgr.selfID)
+		rbft.logger.Debugf("Replica %d do not try to send prepare because it's in stateUpdate", rbft.chainConfig.SelfID)
 		return nil
 	}
 
 	if d == "" {
-		rbft.logger.Infof("Replica %d send prepare for no-op batch with view=%d/seqNo=%d", rbft.peerMgr.selfID, v, n)
+		rbft.logger.Infof("Replica %d send prepare for no-op batch with view=%d/seqNo=%d", rbft.chainConfig.SelfID, v, n)
 		return rbft.sendPrepare(ctx, v, n, d)
 	}
 	// when system restart or finished vc, we need to resend prepare for cert
@@ -332,20 +338,20 @@ func (rbft *rbftImpl[T, Constraint]) findNextPrepareBatch(ctx context.Context, v
 	// so we can get those batches from batchStore first.
 	if existBatch, ok := rbft.storeMgr.batchStore[d]; ok {
 		if isConfigBatch(existBatch.SeqNo, rbft.chainConfig.EpochInfo) {
-			rbft.logger.Debugf("Replica %d generate a config batch", rbft.peerMgr.selfID)
+			rbft.logger.Debugf("Replica %d generate a config batch", rbft.chainConfig.SelfID)
 			rbft.atomicOn(InConfChange)
 			cert.isConfig = true
 			rbft.epochMgr.configBatchInOrder = n
 			rbft.metrics.statusGaugeInConfChange.Set(InConfChange)
 		}
-		rbft.logger.Debugf("Replica %d prepare batch for view=%d/seqNo=%d, batch size: %d", rbft.peerMgr.selfID, v, n, len(existBatch.RequestHashList))
+		rbft.logger.Debugf("Replica %d prepare batch for view=%d/seqNo=%d, batch size: %d", rbft.chainConfig.SelfID, v, n, len(existBatch.RequestHashList))
 		return rbft.sendPrepare(ctx, v, n, d)
 	}
 	prePrep := cert.prePrepare
 
 	txList, localList, missingTxs, err := rbft.batchMgr.requestPool.GetRequestsByHashList(d, prePrep.HashBatch.Timestamp, prePrep.HashBatch.RequestHashList, prePrep.HashBatch.DeDuplicateRequestHashList)
 	if err != nil {
-		rbft.logger.Warningf("Replica %d get error when get txList, err: %v", rbft.peerMgr.selfID, err)
+		rbft.logger.Warningf("Replica %d get error when get txList, err: %v", rbft.chainConfig.SelfID, err)
 		rbft.sendViewChange()
 		return nil
 	}
@@ -372,14 +378,14 @@ func (rbft *rbftImpl[T, Constraint]) findNextPrepareBatch(ctx context.Context, v
 	rbft.metrics.outstandingBatchesGauge.Add(float64(1))
 
 	if isConfigBatch(batch.SeqNo, rbft.chainConfig.EpochInfo) {
-		rbft.logger.Debugf("Replica %d generate a config batch", rbft.peerMgr.selfID)
+		rbft.logger.Debugf("Replica %d generate a config batch", rbft.chainConfig.SelfID)
 		rbft.atomicOn(InConfChange)
 		cert.isConfig = true
 		rbft.epochMgr.configBatchInOrder = n
 		rbft.metrics.statusGaugeInConfChange.Set(InConfChange)
 	}
 
-	rbft.logger.Debugf("Replica %d prepare batch for view=%d/seqNo=%d, batch size: %d", rbft.peerMgr.selfID, v, n, len(txList))
+	rbft.logger.Debugf("Replica %d prepare batch for view=%d/seqNo=%d, batch size: %d", rbft.chainConfig.SelfID, v, n, len(txList))
 
 	return rbft.sendPrepare(ctx, v, n, d)
 }
@@ -390,10 +396,10 @@ func (rbft *rbftImpl[T, Constraint]) primaryResubmitTransactions() {
 	if !rbft.atomicIn(InConfChange) {
 		// reset lastBatchTime for primary.
 		rbft.batchMgr.lastBatchTime = 0
-		rbft.logger.Debugf("======== Primary %d resubmit transactions", rbft.peerMgr.selfID)
+		rbft.logger.Debugf("======== Primary %d resubmit transactions", rbft.chainConfig.SelfID)
 
 		if !rbft.isNormal() {
-			rbft.logger.Debugf("Primary %d is in abnormal, reject resubmit", rbft.peerMgr.selfID)
+			rbft.logger.Debugf("Primary %d is in abnormal, reject resubmit", rbft.chainConfig.SelfID)
 			return
 		}
 
@@ -412,7 +418,7 @@ func (rbft *rbftImpl[T, Constraint]) primaryResubmitTransactions() {
 				break
 			}
 			if !rbft.isNormal() {
-				rbft.logger.Debugf("Primary %d is in abnormal, reject resubmit", rbft.peerMgr.selfID)
+				rbft.logger.Debugf("Primary %d is in abnormal, reject resubmit", rbft.chainConfig.SelfID)
 				return
 			}
 
@@ -429,7 +435,7 @@ func (rbft *rbftImpl[T, Constraint]) primaryResubmitTransactions() {
 				break
 			}
 		}
-		rbft.logger.Debugf("======== Primary %d finished transactions resubmit", rbft.peerMgr.selfID)
+		rbft.logger.Debugf("======== Primary %d finished transactions resubmit", rbft.chainConfig.SelfID)
 	}
 }
 

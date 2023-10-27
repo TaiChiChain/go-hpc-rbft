@@ -86,7 +86,7 @@ func TestNode_Step(t *testing.T) {
 	// Post a Type_NULL_REQUEST Msg
 	// Type/Payload
 	nullRequest := &consensus.NullRequest{
-		ReplicaId: n.rbft.peerMgr.selfID,
+		ReplicaId: n.rbft.chainConfig.SelfID,
 	}
 	payload, _ := nullRequest.MarshalVTStrict()
 	msgTmp := &consensus.ConsensusMessage{

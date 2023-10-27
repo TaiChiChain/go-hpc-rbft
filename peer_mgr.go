@@ -18,8 +18,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/pkg/errors"
-
 	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
 )
@@ -30,66 +28,28 @@ import (
 type peerManager struct {
 	chainConfig *ChainConfig
 	metrics     *rbftMetrics // collect all metrics in rbft
-
 	// network helper to broadcast/unicast messages.
 	network Network
-
 	// logger
-	logger common.Logger
-
-	selfAccountAddress string
-	selfID             uint64
-	nodes              map[uint64]*NodeInfo
-	msgNonce           int64
-	isTest             bool
+	logger   common.Logger
+	msgNonce int64
+	isTest   bool
 }
 
 // init peer pool in rbft core
-func newPeerManager(metrics *rbftMetrics, network Network, config Config, isTest bool) *peerManager {
+func newPeerManager(chainConfig *ChainConfig, metrics *rbftMetrics, network Network, config Config, isTest bool) *peerManager {
 	return &peerManager{
-		metrics:            metrics,
-		selfAccountAddress: config.SelfAccountAddress,
-		network:            network,
-		logger:             config.Logger,
-		msgNonce:           time.Now().UnixNano(),
-		isTest:             isTest,
+		chainConfig: chainConfig,
+		metrics:     metrics,
+		network:     network,
+		logger:      config.Logger,
+		msgNonce:    time.Now().UnixNano(),
+		isTest:      isTest,
 	}
-}
-
-func (m *peerManager) updateRoutingTable(c *ChainConfig) error {
-	m.chainConfig = c
-	if len(m.chainConfig.EpochInfo.ValidatorSet) == 0 {
-		return errors.New("nil peers")
-	}
-
-	nodes := make(map[uint64]*NodeInfo, len(m.chainConfig.EpochInfo.ValidatorSet))
-	var selfID uint64
-	hasFound := false
-	for _, p := range m.chainConfig.EpochInfo.ValidatorSet {
-		if p.AccountAddress == m.selfAccountAddress {
-			selfID = p.ID
-			hasFound = true
-		}
-		nodes[p.ID] = p
-	}
-	for _, p := range m.chainConfig.EpochInfo.CandidateSet {
-		if p.AccountAddress == m.selfAccountAddress {
-			selfID = p.ID
-			hasFound = true
-		}
-		nodes[p.ID] = p
-	}
-	if !hasFound {
-		return errors.New("self not allowed in network")
-	}
-	m.selfID = selfID
-	m.nodes = nodes
-	m.logger.Infof("Local ID: %d, update routerMap:", m.selfID)
-	return nil
 }
 
 func (m *peerManager) broadcast(ctx context.Context, msg *consensus.ConsensusMessage) {
-	msg.From = m.selfID
+	msg.From = m.chainConfig.SelfID
 	msg.Epoch = m.chainConfig.EpochInfo.Epoch
 	msg.View = m.chainConfig.View
 	if !m.isTest {
@@ -105,7 +65,7 @@ func (m *peerManager) broadcast(ctx context.Context, msg *consensus.ConsensusMes
 }
 
 func (m *peerManager) unicast(ctx context.Context, msg *consensus.ConsensusMessage, to uint64) {
-	msg.From = m.selfID
+	msg.From = m.chainConfig.SelfID
 	msg.Epoch = m.chainConfig.EpochInfo.Epoch
 	msg.View = m.chainConfig.View
 	if !m.isTest {
@@ -113,13 +73,13 @@ func (m *peerManager) unicast(ctx context.Context, msg *consensus.ConsensusMessa
 		msg.Nonce = m.msgNonce
 	}
 
-	node, ok := m.nodes[to]
+	n, ok := m.chainConfig.NodeInfoMap[to]
 	if !ok {
 		m.logger.Errorf("Unicast to %d failed: not found node", to)
 		return
 	}
 	start := time.Now()
-	err := m.network.Unicast(ctx, msg, node.P2PNodeID)
+	err := m.network.Unicast(ctx, msg, n.P2PNodeID)
 	m.metrics.processEventDuration.With("event", "p2p_unicast").Observe(time.Since(start).Seconds())
 	if err != nil {
 		m.logger.Errorf("Unicast to %d failed: %v", to, err)

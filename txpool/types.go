@@ -56,3 +56,42 @@ type txPointer struct {
 	account string
 	nonce   uint64
 }
+
+type TxSimpleInfo struct {
+	Hash        string
+	Nonce       uint64
+	Size        int
+	Local       bool
+	LifeTime    int64
+	ArrivedTime int64
+}
+
+type TxInfo[T any, Constraint consensus.TXConstraint[T]] struct {
+	Tx          *T
+	Local       bool
+	LifeTime    int64
+	ArrivedTime int64
+}
+
+type AccountMeta[T any, Constraint consensus.TXConstraint[T]] struct {
+	CommitNonce  uint64
+	PendingNonce uint64
+	TxCount      uint64
+	Txs          []*TxInfo[T, Constraint]
+	SimpleTxs    []*TxSimpleInfo
+}
+
+type BatchSimpleInfo struct {
+	TxCount   uint64
+	Txs       []*TxSimpleInfo
+	Timestamp int64
+}
+
+type Meta[T any, Constraint consensus.TXConstraint[T]] struct {
+	TxCountLimit    uint64
+	TxCount         uint64
+	ReadyTxCount    uint64
+	Batches         map[string]*BatchSimpleInfo
+	MissingBatchTxs map[string]map[uint64]string
+	Accounts        map[string]*AccountMeta[T, Constraint]
+}

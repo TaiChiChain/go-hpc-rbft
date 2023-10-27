@@ -33,7 +33,7 @@ func TestEpoch_recvFetchCheckpoint_SendBackNormal(t *testing.T) {
 		SequenceNumber: uint64(12),
 	}
 	signedC := &consensus.SignedCheckpoint{
-		Author: rbfts[0].peerMgr.selfID,
+		Author: rbfts[0].chainConfig.SelfID,
 		Checkpoint: &consensus.Checkpoint{
 			Epoch: rbfts[0].chainConfig.EpochInfo.Epoch,
 			ExecuteState: &consensus.Checkpoint_ExecuteState{
@@ -57,7 +57,7 @@ func TestEpoch_recvFetchCheckpoint_SendBackStableCheckpoint(t *testing.T) {
 	}
 	rbfts[0].chainConfig.H = uint64(50)
 	signedC := &consensus.SignedCheckpoint{
-		Author: rbfts[0].peerMgr.selfID,
+		Author: rbfts[0].chainConfig.SelfID,
 		Checkpoint: &consensus.Checkpoint{
 			Epoch: rbfts[0].chainConfig.EpochInfo.Epoch,
 			ExecuteState: &consensus.Checkpoint_ExecuteState{

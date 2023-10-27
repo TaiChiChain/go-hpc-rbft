@@ -204,7 +204,13 @@ func (m *EpochChangeProof) Pretty() string {
 	if m == nil {
 		return "NIL"
 	}
-	return fmt.Sprintf("EpochChangeProof: epochChange:%v, more %d, author %d", m.GetEpochChanges(), m.GetMore(), m.GetAuthor())
+	var from, to uint64
+	if len(m.GetEpochChanges()) > 0 {
+		from = m.GetEpochChanges()[0].Checkpoint.Epoch()
+		to = m.GetEpochChanges()[len(m.GetEpochChanges())-1].Checkpoint.Epoch()
+	}
+
+	return fmt.Sprintf("EpochChangeProof: from:%d, to:%d, more %d, author %d", from, to, m.GetMore(), m.GetAuthor())
 }
 
 func (x *PrePrepare) ID() string {

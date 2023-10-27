@@ -57,7 +57,7 @@ func executeExceptN[T any, Constraint consensus.TXConstraint[T]](t *testing.T, r
 		if index == notExec {
 			continue
 		}
-		if rbfts[index].isPrimary(rbfts[index].peerMgr.selfID) {
+		if rbfts[index].isPrimary(rbfts[index].chainConfig.SelfID) {
 			primaryIndex = index
 			break
 		}
@@ -338,7 +338,7 @@ func (rbft *rbftImpl[T, Constraint]) consensusMessagePacker(e consensusEvent) *c
 
 	consensusMsg := &consensus.ConsensusMessage{
 		Type:    eventType,
-		From:    rbft.peerMgr.selfID,
+		From:    rbft.chainConfig.SelfID,
 		Epoch:   rbft.chainConfig.EpochInfo.Epoch,
 		View:    rbft.chainConfig.View,
 		Payload: payload,

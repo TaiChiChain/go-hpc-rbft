@@ -21,6 +21,7 @@ This file defines the structs used in RBFT
 import (
 	"context"
 	"fmt"
+	"github.com/axiomesh/axiom-bft/txpool"
 	"time"
 
 	"github.com/axiomesh/axiom-bft/common/consensus"
@@ -127,6 +128,41 @@ var canProcessMsgsWhenWaitCheckpoint = map[consensus.Type]struct{}{
 	consensus.Type_FETCH_CHECKPOINT:     {},
 	consensus.Type_EPOCH_CHANGE_REQUEST: {},
 	consensus.Type_EPOCH_CHANGE_PROOF:   {},
+}
+
+//consensus.Type_NULL_REQUEST:           {},
+//consensus.Type_PRE_PREPARE:            {},
+//consensus.Type_PREPARE:                {},
+//consensus.Type_COMMIT:                 {},
+//consensus.Type_REQUEST_SET:            {},
+//consensus.Type_SIGNED_CHECKPOINT:      {},
+//consensus.Type_FETCH_CHECKPOINT:       {},
+//consensus.Type_VIEW_CHANGE:            {},
+//consensus.Type_QUORUM_VIEW_CHANGE:     {},
+//consensus.Type_NEW_VIEW:               {},
+//consensus.Type_FETCH_VIEW:             {},
+//consensus.Type_RECOVERY_RESPONSE:      {},
+//consensus.Type_FETCH_BATCH_REQUEST:    {},
+//consensus.Type_FETCH_BATCH_RESPONSE:   {},
+//consensus.Type_FETCH_PQC_REQUEST:      {},
+//consensus.Type_FETCH_PQC_RESPONSE:     {},
+//consensus.Type_FETCH_MISSING_REQUEST:  {},
+//consensus.Type_FETCH_MISSING_RESPONSE: {},
+//consensus.Type_SYNC_STATE:             {},
+//consensus.Type_SYNC_STATE_RESPONSE:    {},
+//consensus.Type_EPOCH_CHANGE_REQUEST:   {},
+//consensus.Type_EPOCH_CHANGE_PROOF:     {},
+
+var validatorAcceptMsgsFromNonValidator = map[consensus.Type]struct{}{
+	consensus.Type_REBROADCAST_REQUEST_SET: {},
+	consensus.Type_VIEW_CHANGE:             {},
+	consensus.Type_FETCH_CHECKPOINT:        {},
+	consensus.Type_FETCH_VIEW:              {},
+	consensus.Type_FETCH_BATCH_REQUEST:     {},
+	consensus.Type_FETCH_PQC_REQUEST:       {},
+	consensus.Type_FETCH_MISSING_REQUEST:   {},
+	consensus.Type_SYNC_STATE:              {},
+	consensus.Type_EPOCH_CHANGE_REQUEST:    {},
 }
 
 type RequestSet[T any, Constraint consensus.TXConstraint[T]] struct {
@@ -308,6 +344,8 @@ const (
 	ReqNonceEvent
 	ReqPendingTxCountEvent
 	ReqGetWatermarkEvent
+	ReqGetPoolMetaEvent
+	ReqGetAccountMetaEvent
 )
 
 // MiscEvent represents misc event sent by local modules
@@ -332,4 +370,15 @@ type ReqPendingTxCountMsg struct {
 
 type ReqGetWatermarkMsg struct {
 	ch chan uint64
+}
+
+type ReqGetAccountPoolMetaMsg[T any, Constraint consensus.TXConstraint[T]] struct {
+	account string
+	full    bool
+	ch      chan *txpool.AccountMeta[T, Constraint]
+}
+
+type ReqGetPoolMetaMsg[T any, Constraint consensus.TXConstraint[T]] struct {
+	full bool
+	ch   chan *txpool.Meta[T, Constraint]
 }

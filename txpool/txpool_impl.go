@@ -30,10 +30,6 @@ type txPoolImpl[T any, Constraint consensus.TXConstraint[T]] struct {
 	getAccountNonce     GetAccountNonceFunc
 }
 
-func (p *txPoolImpl[T, Constraint]) GetTotalPendingTxCount() uint64 {
-	return uint64(len(p.txStore.txHashMap))
-}
-
 // AddNewRequests adds transactions into txPool.
 // When current node is primary, judge if we need to generate a batch by batch size.
 // When current node is backup, judge if we can eliminate some missing batches.
@@ -229,30 +225,6 @@ func newTxPoolImpl[T any, Constraint consensus.TXConstraint[T]](config Config) *
 func (p *txPoolImpl[T, Constraint]) Init(selfID uint64) error {
 	p.selfID = selfID
 	return nil
-}
-
-// GetPendingTxCountByAccount returns the latest pending nonce of the account in txpool
-func (p *txPoolImpl[T, Constraint]) GetPendingTxCountByAccount(account string) uint64 {
-	return p.txStore.nonceCache.getPendingNonce(account)
-}
-
-func (p *txPoolImpl[T, Constraint]) GetPendingTxByHash(hash string) *T {
-	key, ok := p.txStore.txHashMap[hash]
-	if !ok {
-		return nil
-	}
-
-	txMap, ok := p.txStore.allTxs[key.account]
-	if !ok {
-		return nil
-	}
-
-	item, ok := txMap.items[key.nonce]
-	if !ok {
-		return nil
-	}
-
-	return item.rawTx
 }
 
 // GenerateRequestBatch generates a transaction batch and post it
