@@ -875,3 +875,25 @@ func TestGetMeta(t *testing.T) {
 		ast.Equal(0, len(am.SimpleTxs))
 	})
 }
+
+func TestRemoveStateUpdatingTxs(t *testing.T) {
+	ast := assert.New(t)
+	pool := mockTxPoolImpl[consensus.FltTransaction, *consensus.FltTransaction]()
+	tx1_0 := ConstructTxByAccountAndNonce("account1", uint64(0))
+	tx1_1 := ConstructTxByAccountAndNonce("account1", uint64(1))
+	tx2_0 := ConstructTxByAccountAndNonce("account2", uint64(0))
+	tx2_1 := ConstructTxByAccountAndNonce("account2", uint64(1))
+	txs := []*consensus.FltTransaction{tx1_1, tx1_0, tx2_1, tx2_0}
+	pool.addNewRequests(txs, false, false, false, true, false)
+	ast.Equal(4, len(pool.txStore.txHashMap))
+	ast.Equal(2, pool.txStore.allTxs[tx1_0.RbftGetFrom()].index.size())
+	ast.Equal(2, pool.txStore.allTxs[tx2_0.RbftGetFrom()].index.size())
+	ast.Equal(4, pool.txStore.priorityIndex.size())
+
+	removeTxs := []string{tx1_0.RbftGetTxHash(), tx2_0.RbftGetTxHash()}
+	pool.RemoveStateUpdatingTxs(removeTxs)
+	ast.Equal(2, len(pool.txStore.txHashMap))
+	ast.Equal(1, pool.txStore.allTxs[tx1_0.RbftGetFrom()].index.size(), "successful remove tx1_0")
+	ast.Equal(1, pool.txStore.allTxs[tx2_0.RbftGetFrom()].index.size(), "successful remove tx2_0")
+	ast.Equal(2, pool.txStore.priorityIndex.size())
+}

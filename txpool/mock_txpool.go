@@ -689,6 +689,42 @@ func (c *TxPoolRemoveBatchesCall[T, Constraint]) DoAndReturn(f func([]string)) *
 	return c
 }
 
+// RemoveStateUpdatingTxs mocks base method.
+func (m *MockTxPool[T, Constraint]) RemoveStateUpdatingTxs(txHashList []string) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "RemoveStateUpdatingTxs", txHashList)
+}
+
+// RemoveStateUpdatingTxs indicates an expected call of RemoveStateUpdatingTxs.
+func (mr *MockTxPoolMockRecorder[T, Constraint]) RemoveStateUpdatingTxs(txHashList any) *TxPoolRemoveStateUpdatingTxsCall[T, Constraint] {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveStateUpdatingTxs", reflect.TypeOf((*MockTxPool[T, Constraint])(nil).RemoveStateUpdatingTxs), txHashList)
+	return &TxPoolRemoveStateUpdatingTxsCall[T, Constraint]{Call: call}
+}
+
+// TxPoolRemoveStateUpdatingTxsCall wrap *gomock.Call
+type TxPoolRemoveStateUpdatingTxsCall[T any, Constraint consensus.TXConstraint[T]] struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *TxPoolRemoveStateUpdatingTxsCall[T, Constraint]) Return() *TxPoolRemoveStateUpdatingTxsCall[T, Constraint] {
+	c.Call = c.Call.Return()
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *TxPoolRemoveStateUpdatingTxsCall[T, Constraint]) Do(f func([]string)) *TxPoolRemoveStateUpdatingTxsCall[T, Constraint] {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *TxPoolRemoveStateUpdatingTxsCall[T, Constraint]) DoAndReturn(f func([]string)) *TxPoolRemoveStateUpdatingTxsCall[T, Constraint] {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // RemoveTimeoutRequests mocks base method.
 func (m *MockTxPool[T, Constraint]) RemoveTimeoutRequests() (uint64, error) {
 	m.ctrl.T.Helper()

@@ -21,8 +21,9 @@ This file defines the structs used in RBFT
 import (
 	"context"
 	"fmt"
-	"github.com/axiomesh/axiom-bft/txpool"
 	"time"
+
+	"github.com/axiomesh/axiom-bft/txpool"
 
 	"github.com/axiomesh/axiom-bft/common/consensus"
 )
@@ -346,6 +347,7 @@ const (
 	ReqGetWatermarkEvent
 	ReqGetPoolMetaEvent
 	ReqGetAccountMetaEvent
+	ReqRemoveTxsEvent
 )
 
 // MiscEvent represents misc event sent by local modules
@@ -381,4 +383,8 @@ type ReqGetAccountPoolMetaMsg[T any, Constraint consensus.TXConstraint[T]] struc
 type ReqGetPoolMetaMsg[T any, Constraint consensus.TXConstraint[T]] struct {
 	full bool
 	ch   chan *txpool.Meta[T, Constraint]
+}
+
+type ReqRemoveTxsMsg[T any, Constraint consensus.TXConstraint[T]] struct {
+	removeTxHashList []string
 }

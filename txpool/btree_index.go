@@ -1,7 +1,10 @@
 package txpool
 
 import (
+	"fmt"
+
 	"github.com/google/btree"
+	"github.com/samber/lo"
 
 	"github.com/axiomesh/axiom-bft/common/consensus"
 )
@@ -84,12 +87,22 @@ func (idx *btreeIndex[T, Constraint]) insertBySortedNonceKey(nonce uint64) {
 	idx.data.ReplaceOrInsert(makeSortedNonceKey(nonce))
 }
 
-func (idx *btreeIndex[T, Constraint]) removeBySortedNonceKeys(txs map[string][]*internalTransaction[T, Constraint]) {
-	for _, list := range txs {
-		for _, poolTx := range list {
-			idx.data.Delete(makeSortedNonceKey(poolTx.getNonce()))
+func (idx *btreeIndex[T, Constraint]) removeBySortedNonceKeys(account string, txs []*internalTransaction[T, Constraint]) error {
+	var err error
+	lo.ForEach(txs, func(poolTx *internalTransaction[T, Constraint], _ int) {
+		if poolTx.getAccount() != account {
+			err = fmt.Errorf("account %s is not equal to %s", poolTx.getAccount(), account)
+			return
 		}
+	})
+	if err != nil {
+		return err
 	}
+
+	lo.ForEach(txs, func(poolTx *internalTransaction[T, Constraint], _ int) {
+		idx.data.Delete(makeSortedNonceKey(poolTx.getNonce()))
+	})
+	return err
 }
 
 func (idx *btreeIndex[T, Constraint]) insertByOrderedQueueKey(poolTx *internalTransaction[T, Constraint]) {
@@ -100,12 +113,22 @@ func (idx *btreeIndex[T, Constraint]) removeByOrderedQueueKey(poolTx *internalTr
 	idx.data.Delete(makeOrderedIndexKey(idx.getTimestamp(poolTx), poolTx.getAccount(), poolTx.getNonce()))
 }
 
-func (idx *btreeIndex[T, Constraint]) removeByOrderedQueueKeys(poolTxs map[string][]*internalTransaction[T, Constraint]) {
-	for _, list := range poolTxs {
-		for _, poolTx := range list {
-			idx.removeByOrderedQueueKey(poolTx)
+func (idx *btreeIndex[T, Constraint]) removeByOrderedQueueKeys(account string, txs []*internalTransaction[T, Constraint]) error {
+	var err error
+	lo.ForEach(txs, func(poolTx *internalTransaction[T, Constraint], _ int) {
+		if poolTx.getAccount() != account {
+			err = fmt.Errorf("account %s is not equal to %s", poolTx.getAccount(), account)
+			return
 		}
+	})
+	if err != nil {
+		return err
 	}
+
+	lo.ForEach(txs, func(poolTx *internalTransaction[T, Constraint], _ int) {
+		idx.removeByOrderedQueueKey(poolTx)
+	})
+	return nil
 }
 
 // size returns the size of the index

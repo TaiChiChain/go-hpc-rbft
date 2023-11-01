@@ -223,6 +223,16 @@ func (tf *testFramework[T, Constraint]) newNodeConfig(
 				ExcludeView:                   10,
 				ProposerElectionType:          ProposerElectionTypeRotating,
 			},
+			FinanceParams: &Finance{
+				GasLimit:       0x5f5e100,
+				MaxGasPrice:    10000000000000,
+				MinGasPrice:    1000000000000,
+				GasChangeRate:  0.125,
+				GasPremiumRate: 1,
+			},
+			ConfigParams: &ConfigParams{
+				TxMaxSize: 10 * 32 * 1024,
+			},
 		},
 		SelfAccountAddress:      p2pNodeID,
 		SetSize:                 25,

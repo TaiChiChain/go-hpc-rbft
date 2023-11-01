@@ -2488,13 +2488,13 @@ func (rbft *rbftImpl[T, Constraint]) recvStateUpdatedEvent(ss *types.ServiceSync
 
 	// 1. clear useless txs in txpool after state updated and saves txs which are not committed to ensure
 	// all received txs will be committed eventually.
-	var saveBatches []string
-	for batchDigest, batch := range rbft.storeMgr.batchStore {
-		if batch.SeqNo > seqNo {
-			saveBatches = append(saveBatches, batchDigest)
-		}
-	}
-	rbft.batchMgr.requestPool.Reset(saveBatches)
+	//var saveBatches []string
+	//for batchDigest, batch := range rbft.storeMgr.batchStore {
+	//	if batch.SeqNo > seqNo {
+	//		saveBatches = append(saveBatches, batchDigest)
+	//	}
+	//}
+	//rbft.batchMgr.requestPool.Reset(saveBatches)
 
 	// 2. reset commit state after cut down block.
 	if seqNo < rbft.exec.lastExec {

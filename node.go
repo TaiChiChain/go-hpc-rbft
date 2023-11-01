@@ -72,6 +72,8 @@ type External[T any, Constraint consensus.TXConstraint[T]] interface {
 	GetAccountPoolMeta(account string, full bool) *txpool.AccountMeta[T, Constraint]
 
 	GetPoolMeta(full bool) *txpool.Meta[T, Constraint]
+
+	ReportStateUpdatingBatches(committedTxHashList []string)
 }
 
 // ServiceInbound receives and records modifications from application service which includes two events:
@@ -326,4 +328,13 @@ func (n *node[T, Constraint]) GetPoolMeta(full bool) *txpool.Meta[T, Constraint]
 	n.rbft.postMsg(localEvent)
 
 	return <-req.ch
+}
+
+func (n *node[T, Constraint]) ReportStateUpdatingBatches(committedTxHashList []string) {
+	req := &ReqRemoveTxsMsg[T, Constraint]{committedTxHashList}
+	localEvent := &MiscEvent{
+		EventType: ReqRemoveTxsEvent,
+		Event:     req,
+	}
+	n.rbft.postMsg(localEvent)
 }

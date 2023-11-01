@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/btree"
@@ -242,7 +243,7 @@ func (p *txPoolImpl[T, Constraint]) GenerateRequestBatch() []*RequestHashBatch[T
 // except batches in saveBatches and local non-batched-txs that not included in ledger.
 // todo(lrx): except saveBatches
 func (p *txPoolImpl[T, Constraint]) Reset(saveBatches []string) {
-	p.logger.Debug("Reset txpool...")
+	p.logger.Info("Reset txpool...")
 	oldBatchCache := p.txStore.batchesCache
 	// 1. reset txStore in txPool
 	p.txStore = newTransactionStore[T, Constraint](p.getAccountNonce, p.logger)
@@ -338,6 +339,7 @@ func (p *txPoolImpl[T, Constraint]) RestoreOneBatch(hash string) error {
 // transaction batches from the pool(batchedTxs).
 func (p *txPoolImpl[T, Constraint]) RemoveBatches(hashList []string) {
 	// update current cached commit nonce for account
+	p.logger.Debugf("RemoveBatches: batch len:%d", len(hashList))
 	updateAccounts := make(map[string]uint64)
 	for _, batchHash := range hashList {
 		batch, ok := p.txStore.batchesCache[batchHash]
@@ -372,41 +374,15 @@ func (p *txPoolImpl[T, Constraint]) RemoveBatches(hashList []string) {
 		}
 		// clean related txs info in cache
 		for account := range dirtyAccounts {
-			commitNonce := p.txStore.nonceCache.getCommitNonce(account)
-			if list, ok := p.txStore.allTxs[account]; ok {
-				// remove all previous seq number txs for this account.
-				removedTxs := list.forward(commitNonce)
-				// remove index smaller than commitNonce delete index.
-				var wg sync.WaitGroup
-				wg.Add(5)
-				go func(ready map[string][]*internalTransaction[T, Constraint]) {
-					defer wg.Done()
-					list.index.removeBySortedNonceKeys(removedTxs)
-				}(removedTxs)
-				go func(ready map[string][]*internalTransaction[T, Constraint]) {
-					defer wg.Done()
-					p.txStore.priorityIndex.removeByOrderedQueueKeys(removedTxs)
-				}(removedTxs)
-				go func(ready map[string][]*internalTransaction[T, Constraint]) {
-					defer wg.Done()
-					p.txStore.parkingLotIndex.removeByOrderedQueueKeys(removedTxs)
-				}(removedTxs)
-				go func(ready map[string][]*internalTransaction[T, Constraint]) {
-					defer wg.Done()
-					p.txStore.localTTLIndex.removeByOrderedQueueKeys(removedTxs)
-				}(removedTxs)
-				go func(ready map[string][]*internalTransaction[T, Constraint]) {
-					defer wg.Done()
-					p.txStore.removeTTLIndex.removeByOrderedQueueKeys(removedTxs)
-				}(removedTxs)
-				wg.Wait()
+			if err := p.cleanTxsBeforeCommitNonce(account, p.txStore.nonceCache.getCommitNonce(account)); err != nil {
+				p.logger.Errorf("cleanTxsBeforeCommitNonce error: %v", err)
 			}
 		}
 	}
 	readyNum := uint64(p.txStore.priorityIndex.size())
 	// set priorityNonBatchSize to min(nonBatchedTxs, readyNum),
 	if p.txStore.priorityNonBatchSize > readyNum {
-		p.logger.Warningf("Set priorityNonBatchSize from %d to the length of priorityIndex %d", p.txStore.priorityNonBatchSize, readyNum)
+		p.logger.Debugf("Set priorityNonBatchSize from %d to the length of priorityIndex %d", p.txStore.priorityNonBatchSize, readyNum)
 		p.setPriorityNonBatchSize(readyNum)
 	}
 	for account, pendingNonce := range updateAccounts {
@@ -416,6 +392,113 @@ func (p *txPoolImpl[T, Constraint]) RemoveBatches(hashList []string) {
 		"priority len: %d, parkingLot len: %d, batchedTx len: %d, txHashMap len: %d", p.txStore.priorityNonBatchSize,
 		len(p.txStore.batchesCache), p.txStore.priorityIndex.size(), p.txStore.parkingLotIndex.size(),
 		len(p.txStore.batchedTxs), len(p.txStore.txHashMap))
+}
+
+func (p *txPoolImpl[T, Constraint]) cleanTxsBeforeCommitNonce(account string, commitNonce uint64) error {
+	var outErr error
+	// clean related txs info in cache
+	if list, ok := p.txStore.allTxs[account]; ok {
+		// remove all previous seq number txs for this account.
+		removedTxs := list.forward(commitNonce)
+		// remove index smaller than commitNonce delete index.
+		if err := p.cleanTxsByAccount(account, list, removedTxs[account]); err != nil {
+			outErr = err
+		}
+	}
+	return outErr
+}
+
+func (p *txPoolImpl[T, Constraint]) cleanTxsByAccount(account string, list *txSortedMap[T, Constraint], removedTxs []*internalTransaction[T, Constraint]) error {
+	var failed atomic.Bool
+	var wg sync.WaitGroup
+	wg.Add(5)
+	go func(txs []*internalTransaction[T, Constraint]) {
+		defer wg.Done()
+		if err := list.index.removeBySortedNonceKeys(account, txs); err != nil {
+			p.logger.Errorf("removeBySortedNonceKeys error: %v", err)
+			failed.Store(true)
+		} else {
+			lo.ForEach(txs, func(tx *internalTransaction[T, Constraint], _ int) {
+				delete(list.items, tx.getNonce())
+			})
+		}
+	}(removedTxs)
+	go func(txs []*internalTransaction[T, Constraint]) {
+		defer wg.Done()
+		if err := p.txStore.priorityIndex.removeByOrderedQueueKeys(account, txs); err != nil {
+			p.logger.Errorf("remove priorityIndex error: %v", err)
+			failed.Store(true)
+		}
+	}(removedTxs)
+	go func(txs []*internalTransaction[T, Constraint]) {
+		defer wg.Done()
+		if err := p.txStore.parkingLotIndex.removeByOrderedQueueKeys(account, txs); err != nil {
+			p.logger.Errorf("remove parkingLotIndex error: %v", err)
+			failed.Store(true)
+		}
+	}(removedTxs)
+	go func(txs []*internalTransaction[T, Constraint]) {
+		defer wg.Done()
+		if err := p.txStore.localTTLIndex.removeByOrderedQueueKeys(account, txs); err != nil {
+			p.logger.Errorf("remove localTTLIndex error: %v", err)
+			failed.Store(true)
+		}
+	}(removedTxs)
+	go func(txs []*internalTransaction[T, Constraint]) {
+		defer wg.Done()
+		if err := p.txStore.removeTTLIndex.removeByOrderedQueueKeys(account, txs); err != nil {
+			p.logger.Errorf("remove removeTTLIndex error: %v", err)
+			failed.Store(true)
+		}
+	}(removedTxs)
+	wg.Wait()
+
+	if failed.Load() {
+		return fmt.Errorf("failed to remove txs")
+	}
+	return nil
+}
+
+func (p *txPoolImpl[T, Constraint]) RemoveStateUpdatingTxs(txHashList []string) {
+	p.logger.Infof("start RemoveStateUpdatingTxs, len:%d", len(txHashList))
+	removeCount := 0
+	dirtyAccounts := make(map[string]bool)
+	removeTxs := make(map[string][]*internalTransaction[T, Constraint])
+	lo.ForEach(txHashList, func(txHash string, _ int) {
+		if pointer, ok := p.txStore.txHashMap[txHash]; ok {
+			poolTx := p.txStore.getPoolTxByTxnPointer(pointer.account, pointer.nonce)
+			if poolTx == nil {
+				p.logger.Errorf("pool tx %s not found in txpool, but exists in txHashMap", txHash)
+				return
+			}
+			// remove from txHashMap
+			p.txStore.deletePoolTx(txHash)
+			if removeTxs[pointer.account] == nil {
+				removeTxs[pointer.account] = make([]*internalTransaction[T, Constraint], 0)
+			}
+			// record dirty accounts and removeTxs
+			removeTxs[pointer.account] = append(removeTxs[pointer.account], poolTx)
+			dirtyAccounts[pointer.account] = true
+		}
+	})
+
+	for account := range dirtyAccounts {
+		if list, ok := p.txStore.allTxs[account]; ok {
+			if err := p.cleanTxsByAccount(account, list, removeTxs[account]); err != nil {
+				p.logger.Errorf("cleanTxsByAccount error: %v", err)
+			} else {
+				removeCount += len(removeTxs[account])
+			}
+		}
+	}
+
+	readyNum := uint64(p.txStore.priorityIndex.size())
+	// set priorityNonBatchSize to min(nonBatchedTxs, readyNum),
+	if p.txStore.priorityNonBatchSize > readyNum {
+		p.logger.Infof("Set priorityNonBatchSize from %d to the length of priorityIndex %d", p.txStore.priorityNonBatchSize, readyNum)
+		p.setPriorityNonBatchSize(readyNum)
+	}
+	p.logger.Infof("finish RemoveStateUpdatingTxs, len:%d, removeCount:%d", len(txHashList), removeCount)
 }
 
 // GetRequestsByHashList returns the transaction list corresponding to the given hash list.
@@ -794,32 +877,7 @@ func (p *txPoolImpl[T, Constraint]) RemoveTimeoutRequests() (uint64, error) {
 	for account, txs := range removedTxs {
 		if list, ok := p.txStore.allTxs[account]; ok {
 			// remove index from removedTxs
-			var wg sync.WaitGroup
-			wg.Add(5)
-			go func(ready map[string][]*internalTransaction[T, Constraint]) {
-				defer wg.Done()
-				list.index.removeBySortedNonceKeys(ready)
-				for _, tx := range txs {
-					delete(list.items, tx.getNonce())
-				}
-			}(removedTxs)
-			go func(ready map[string][]*internalTransaction[T, Constraint]) {
-				defer wg.Done()
-				p.txStore.priorityIndex.removeByOrderedQueueKeys(ready)
-			}(removedTxs)
-			go func(ready map[string][]*internalTransaction[T, Constraint]) {
-				defer wg.Done()
-				p.txStore.parkingLotIndex.removeByOrderedQueueKeys(ready)
-			}(removedTxs)
-			go func(ready map[string][]*internalTransaction[T, Constraint]) {
-				defer wg.Done()
-				p.txStore.localTTLIndex.removeByOrderedQueueKeys(ready)
-			}(removedTxs)
-			go func(ready map[string][]*internalTransaction[T, Constraint]) {
-				defer wg.Done()
-				p.txStore.removeTTLIndex.removeByOrderedQueueKeys(ready)
-			}(removedTxs)
-			wg.Wait()
+			_ = p.cleanTxsByAccount(account, list, txs)
 		}
 	}
 
@@ -830,7 +888,7 @@ func (p *txPoolImpl[T, Constraint]) RemoveTimeoutRequests() (uint64, error) {
 	readyNum := uint64(p.txStore.priorityIndex.size())
 	// set priorityNonBatchSize to min(nonBatchedTxs, readyNum),
 	if p.txStore.priorityNonBatchSize > readyNum {
-		p.logger.Warningf("Set priorityNonBatchSize from %d to the length of priorityIndex %d", p.txStore.priorityNonBatchSize, readyNum)
+		p.logger.Debugf("Set priorityNonBatchSize from %d to the length of priorityIndex %d", p.txStore.priorityNonBatchSize, readyNum)
 		p.setPriorityNonBatchSize(readyNum)
 	}
 
