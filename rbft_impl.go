@@ -1936,10 +1936,23 @@ func (rbft *rbftImpl[T, Constraint]) checkpoint(state *types.ServiceState, isCon
 
 // recvCheckpoint processes logic after receive checkpoint.
 func (rbft *rbftImpl[T, Constraint]) recvCheckpoint(signedCheckpoint *consensus.SignedCheckpoint, local bool) consensusEvent {
+	// avoid repeated signature verification
+	isCheckSignedCheckpoint := false
+
 	if local && !rbft.chainConfig.isValidator() {
 		rbft.logger.Debugf("Replica %d is not validator, not process self signedCheckpoint",
 			rbft.chainConfig.SelfID)
-		return nil
+
+		// Check whether qurom checkpoints have been received before
+		for cp, signedChkpt := range rbft.storeMgr.checkpointStore {
+			if cp.sequence == signedCheckpoint.Height() {
+				isCheckSignedCheckpoint = true
+				signedCheckpoint = signedChkpt
+			}
+		}
+		if !isCheckSignedCheckpoint {
+			return nil
+		}
 	}
 
 	if signedCheckpoint.Checkpoint.Epoch < rbft.chainConfig.EpochInfo.Epoch {
@@ -1954,7 +1967,7 @@ func (rbft *rbftImpl[T, Constraint]) recvCheckpoint(signedCheckpoint *consensus.
 		rbft.chainConfig.SelfID, signedCheckpoint.GetAuthor(), checkpointHeight, checkpointDigest)
 
 	// verify signature of remote checkpoint.
-	if !local {
+	if !local && !isCheckSignedCheckpoint {
 		vErr := rbft.verifySignedCheckpoint(signedCheckpoint)
 		if vErr != nil {
 			rbft.logger.Errorf("Replica %d verify signature of checkpoint from %d error: %s",
@@ -2274,6 +2287,8 @@ func (rbft *rbftImpl[T, Constraint]) moveWatermarks(n uint64, newEpoch bool) {
 			rbft.logger.Debugf("Replica %d clean batch, seqNo=%d, digest=%s", rbft.chainConfig.SelfID, batch.SeqNo, digest)
 			delete(rbft.storeMgr.batchStore, digest)
 			rbft.persistDelBatch(digest)
+		}
+		if batch.SeqNo <= n {
 			digestList = append(digestList, digest)
 		}
 	}
