@@ -81,6 +81,11 @@ func (rbft *rbftImpl[T, Constraint]) fetchRecoveryPQC() consensusEvent {
 
 // recvFetchPQCRequest returns all PQC info we have sent before to the sender
 func (rbft *rbftImpl[T, Constraint]) recvFetchPQCRequest(fetch *consensus.FetchPQCRequest) consensusEvent {
+	if !rbft.chainConfig.isValidator() {
+		rbft.logger.Debugf("Replica %d is not validator, not process fetchPQCRequest",
+			rbft.chainConfig.SelfID)
+		return nil
+	}
 	rbft.logger.Debugf("Replica %d received fetchPQCRequest from replica %d, remote h=%d", rbft.chainConfig.SelfID, fetch.ReplicaId, fetch.H)
 
 	remoteH := fetch.H
@@ -93,55 +98,54 @@ func (rbft *rbftImpl[T, Constraint]) recvFetchPQCRequest(fetch *consensus.FetchP
 	var pres []*consensus.Prepare
 	var cmts []*consensus.Commit
 
-	// replica just send all PQC info we had sent before
-	for idx, cert := range rbft.storeMgr.certStore {
-		// send all PQC that n > remoteH in current view, help remote node to advance.
-		if idx.n > remoteH && idx.v == rbft.chainConfig.View {
-			rbft.logger.Debugf("Replica %d find PQC response cert: %s, prePrepare==nil: %v, len(prepare): %d, len(commit): %d",
-				rbft.chainConfig.SelfID,
-				idx.ID(),
-				cert.prePrepare == nil,
-				len(cert.prepare),
-				len(cert.commit),
-			)
+	findPQC := func(certStore map[msgID]*msgCert) {
+		// replica just send all PQC info we had sent before
+		for idx, cert := range certStore {
+			// send all PQC that n > remoteH in current view, help remote node to advance.
+			if idx.n > remoteH && idx.v == rbft.chainConfig.View {
+				rbft.logger.Debugf("Replica %d find PQC response cert: %s, prePrepare==nil: %v, len(prepare): %d, len(commit): %d",
+					rbft.chainConfig.SelfID,
+					idx.ID(),
+					cert.prePrepare == nil,
+					len(cert.prepare),
+					len(cert.commit),
+				)
 
-			// only response with messages we have sent.
-			if cert.prePrepare == nil {
-				rbft.logger.Warningf("Replica %d in finds nil prePrepare for view=%d/seqNo=%d",
-					rbft.chainConfig.SelfID, idx.v, idx.n)
-			} else if cert.prePrepare.ReplicaId == rbft.chainConfig.SelfID {
-				rbft.logger.Debugf("Replica %d find PQC response, found matched prePre: %s", rbft.chainConfig.SelfID, cert.prePrepare.ID())
-				prePres = append(prePres, cert.prePrepare)
-			}
-			for _, pre := range cert.prepare {
-				if pre.ReplicaId == rbft.chainConfig.SelfID {
-					rbft.logger.Debugf("Replica %d find PQC response, found matched prepare: %s", rbft.chainConfig.SelfID, pre.ID())
-					prepare := pre
-					pres = append(pres, prepare)
+				// only response with messages we have sent.
+				if cert.prePrepare == nil {
+					rbft.logger.Warningf("Replica %d in finds nil prePrepare for view=%d/seqNo=%d",
+						rbft.chainConfig.SelfID, idx.v, idx.n)
+				} else if cert.prePrepare.ReplicaId == rbft.chainConfig.SelfID {
+					rbft.logger.Debugf("Replica %d find PQC response, found matched prePre: %s", rbft.chainConfig.SelfID, cert.prePrepare.ID())
+					prePres = append(prePres, cert.prePrepare)
 				}
-			}
-			for _, cmt := range cert.commit {
-				if cmt.ReplicaId == rbft.chainConfig.SelfID {
-					rbft.logger.Debugf("Replica %d find PQC response, found matched commit: %s", rbft.chainConfig.SelfID, cmt.ID())
-					commit := cmt
-					cmts = append(cmts, commit)
+				for _, pre := range cert.prepare {
+					if pre.ReplicaId == rbft.chainConfig.SelfID {
+						rbft.logger.Debugf("Replica %d find PQC response, found matched prepare: %s", rbft.chainConfig.SelfID, pre.ID())
+						prepare := pre
+						pres = append(pres, prepare)
+					}
+				}
+				for _, cmt := range cert.commit {
+					if cmt.ReplicaId == rbft.chainConfig.SelfID {
+						rbft.logger.Debugf("Replica %d find PQC response, found matched commit: %s", rbft.chainConfig.SelfID, cmt.ID())
+						commit := cmt
+						cmts = append(cmts, commit)
+					}
 				}
 			}
 		}
 	}
+	rbft.logger.Debugf("Replica %d find PQC response cert from certStore, size:%d", rbft.chainConfig.SelfID, len(rbft.storeMgr.certStore))
+	findPQC(rbft.storeMgr.certStore)
+	rbft.logger.Debugf("Replica %d find PQC response cert from committedCertCache, size:%d", rbft.chainConfig.SelfID, len(rbft.storeMgr.committedCertCache))
+	findPQC(rbft.storeMgr.committedCertCache)
 
 	pqcResponse := &consensus.FetchPQCResponse{
 		ReplicaId: rbft.chainConfig.SelfID,
-	}
-
-	if prePres != nil {
-		pqcResponse.PrepreSet = prePres
-	}
-	if pres != nil {
-		pqcResponse.PreSet = pres
-	}
-	if cmts != nil {
-		pqcResponse.CmtSet = cmts
+		PrepreSet: prePres,
+		PreSet:    pres,
+		CmtSet:    cmts,
 	}
 
 	payload, err := pqcResponse.MarshalVTStrict()

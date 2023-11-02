@@ -113,8 +113,8 @@ type Config struct {
 	// CheckPoolRemoveTimeout is the max time duration before one removing tx from pool.
 	CheckPoolRemoveTimeout time.Duration
 
-	// MinimumNumberOfBatchesToRetainAfterCheckpoint is Minimum number of batches to retain after checkpoint
-	MinimumNumberOfBatchesToRetainAfterCheckpoint uint64
+	// CommittedBlockCacheNumber is committed block cache number after checkpoint
+	CommittedBlockCacheNumber uint64
 }
 
 // rbftImpl is the core struct of RBFT service, which handles all functions about consensus.
@@ -172,11 +172,11 @@ func newRBFT[T any, Constraint consensus.TXConstraint[T]](c Config, external Ext
 			return nil, fmt.Errorf("epoch info error: genesis epoch and start_block must be 1, but get epoch: %d, start_block: %d", c.GenesisEpochInfo.Epoch, c.GenesisEpochInfo.StartBlock)
 		}
 	}
-	if c.MinimumNumberOfBatchesToRetainAfterCheckpoint == 0 {
+	if c.CommittedBlockCacheNumber == 0 {
 		if !isTest {
-			c.MinimumNumberOfBatchesToRetainAfterCheckpoint = 10
+			c.CommittedBlockCacheNumber = 10
 		} else {
-			c.MinimumNumberOfBatchesToRetainAfterCheckpoint = c.GenesisEpochInfo.ConsensusParams.CheckpointPeriod
+			c.CommittedBlockCacheNumber = c.GenesisEpochInfo.ConsensusParams.CheckpointPeriod
 		}
 	}
 
@@ -290,7 +290,7 @@ func (rbft *rbftImpl[T, Constraint]) init() error {
 	rbft.logger.Infof("RBFT log size (L) = %v", rbft.chainConfig.L)
 	rbft.logger.Infof("RBFT ID: %d", rbft.chainConfig.SelfID)
 	rbft.logger.Infof("RBFT isTimed: %v", rbft.chainConfig.EpochInfo.ConsensusParams.EnableTimedGenEmptyBlock)
-	rbft.logger.Infof("RBFT minimum number of batches to retain after checkpoint = %v", rbft.config.MinimumNumberOfBatchesToRetainAfterCheckpoint)
+	rbft.logger.Infof("RBFT minimum number of batches to retain after checkpoint = %v", rbft.config.CommittedBlockCacheNumber)
 
 	if err := rbft.batchMgr.requestPool.Init(rbft.chainConfig.SelfID); err != nil {
 		return err
@@ -1388,10 +1388,8 @@ func (rbft *rbftImpl[T, Constraint]) recvCommit(ctx context.Context, commit *con
 	}
 
 	cert := rbft.storeMgr.getCert(commit.View, commit.SequenceNumber, commit.BatchDigest)
-
 	commitID := commit.ID()
 	_, ok := cert.commit[commitID]
-
 	if ok {
 		if commit.SequenceNumber <= rbft.exec.lastExec {
 			// ignore duplicate commit with seqNo <= lastExec as this commit is not useful forever.
@@ -1631,8 +1629,10 @@ func (rbft *rbftImpl[T, Constraint]) recvFetchMissingResponse(ctx context.Contex
 func (rbft *rbftImpl[T, Constraint]) commitPendingBlocks() {
 	rbft.logger.Debugf("Replica %d attempting to commitTransactions", rbft.chainConfig.SelfID)
 
+	foreachIdx := 0
 	for hasTxToExec := true; hasTxToExec; {
-		if find, idx, cert := rbft.findNextCommitBatch(); find {
+		find, idx, cert := rbft.findNextCommitBatch()
+		if find {
 			rbft.metrics.committedBlockNumber.Add(float64(1))
 			rbft.persistCSet(idx.v, idx.n, idx.d)
 			// stop new view timer after one batch has been call executed
@@ -1685,10 +1685,13 @@ func (rbft *rbftImpl[T, Constraint]) commitPendingBlocks() {
 
 			// if it is a config batch, start to wait for stable checkpoint process after the batch committed
 			rbft.afterCommitBlock(idx, cert.isConfig)
+			foreachIdx++
 		} else {
 			hasTxToExec = false
 		}
 	}
+	rbft.logger.Debugf("Replica %d attempting to commitTransactions finished, times=%d", rbft.chainConfig.SelfID, foreachIdx)
+
 	if !rbft.in(waitCheckpointBatchExecute) {
 		rbft.startTimerIfOutstandingRequests()
 	}
@@ -2247,7 +2250,7 @@ func (rbft *rbftImpl[T, Constraint]) moveWatermarks(n uint64, newEpoch bool) {
 		return
 	}
 
-	for idx := range rbft.storeMgr.certStore {
+	for idx, cert := range rbft.storeMgr.certStore {
 		if idx.n <= h {
 			rbft.logger.Debugf("Replica %d cleaning quorum certificate for view=%d/seqNo=%d",
 				rbft.chainConfig.SelfID, idx.v, idx.n)
@@ -2256,8 +2259,10 @@ func (rbft *rbftImpl[T, Constraint]) moveWatermarks(n uint64, newEpoch bool) {
 			delete(rbft.storeMgr.committedCert, idx)
 			delete(rbft.storeMgr.seqMap, idx.n)
 			rbft.persistDelQPCSet(idx.v, idx.n, idx.d)
+			rbft.storeMgr.committedCertCache[idx] = cert
 		}
 	}
+	rbft.storeMgr.cleanCommittedCertCache(h)
 	rbft.metrics.outstandingBatchesGauge.Set(float64(len(rbft.storeMgr.outstandingReqBatches)))
 
 	// retain most recent 10 block info in txBatchStore cache as non-primary
@@ -2271,9 +2276,9 @@ func (rbft *rbftImpl[T, Constraint]) moveWatermarks(n uint64, newEpoch bool) {
 		target = pos - rbft.chainConfig.EpochInfo.ConsensusParams.CheckpointPeriod
 	}
 	// At least the last k batches are also kept when checkpoint is 1
-	if n-target < rbft.config.MinimumNumberOfBatchesToRetainAfterCheckpoint {
-		if n > rbft.config.MinimumNumberOfBatchesToRetainAfterCheckpoint {
-			target = n - rbft.config.MinimumNumberOfBatchesToRetainAfterCheckpoint
+	if n-target < rbft.config.CommittedBlockCacheNumber {
+		if n > rbft.config.CommittedBlockCacheNumber {
+			target = n - rbft.config.CommittedBlockCacheNumber
 		} else {
 			target = 0
 		}
@@ -2432,7 +2437,7 @@ func (rbft *rbftImpl[T, Constraint]) tryStateTransfer() {
 
 	// clean cert with seqNo <= target before stateUpdate to avoid influencing the
 	// following progress
-	for idx := range rbft.storeMgr.certStore {
+	for idx, cert := range rbft.storeMgr.certStore {
 		if idx.n <= target.metaState.Height {
 			rbft.logger.Debugf("Replica %d clean cert with seqNo %d <= target %d, "+
 				"digest=%s, before state update", rbft.chainConfig.SelfID, idx.n, target.metaState.Height, idx.d)
@@ -2441,8 +2446,10 @@ func (rbft *rbftImpl[T, Constraint]) tryStateTransfer() {
 			delete(rbft.storeMgr.committedCert, idx)
 			delete(rbft.storeMgr.seqMap, idx.n)
 			rbft.persistDelQPCSet(idx.v, idx.n, idx.d)
+			rbft.storeMgr.committedCertCache[idx] = cert
 		}
 	}
+	rbft.storeMgr.cleanCommittedCertCache(target.metaState.Height)
 	rbft.metrics.outstandingBatchesGauge.Set(float64(len(rbft.storeMgr.outstandingReqBatches)))
 
 	rbft.logger.Noticef("Replica %d try state update to %d", rbft.chainConfig.SelfID, target.metaState.Height)
