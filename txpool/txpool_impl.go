@@ -388,7 +388,7 @@ func (p *txPoolImpl[T, Constraint]) RemoveBatches(hashList []string) {
 	for account, pendingNonce := range updateAccounts {
 		p.logger.Debugf("Account %s update its pendingNonce to %d by commitNonce", account, pendingNonce)
 	}
-	p.logger.Debugf("Removes batches in txpool, and now there are %d non-batched txs, %d batches, "+
+	p.logger.Infof("Removes batches in txpool, and now there are %d non-batched txs, %d batches, "+
 		"priority len: %d, parkingLot len: %d, batchedTx len: %d, txHashMap len: %d", p.txStore.priorityNonBatchSize,
 		len(p.txStore.batchesCache), p.txStore.priorityIndex.size(), p.txStore.parkingLotIndex.size(),
 		len(p.txStore.batchedTxs), len(p.txStore.txHashMap))
@@ -459,10 +459,26 @@ func (p *txPoolImpl[T, Constraint]) cleanTxsByAccount(account string, list *txSo
 	return nil
 }
 
+func (p *txPoolImpl[T, Constraint]) updateNonceCache(pointer *txPointer, updateAccounts map[string]uint64) {
+	preCommitNonce := p.txStore.nonceCache.getCommitNonce(pointer.account)
+	// next wanted nonce
+	newCommitNonce := pointer.nonce + 1
+	if preCommitNonce < newCommitNonce {
+		p.txStore.nonceCache.setCommitNonce(pointer.account, newCommitNonce)
+		// Note!!! updating pendingNonce to commitNonce for the restart node
+		pendingNonce := p.txStore.nonceCache.getPendingNonce(pointer.account)
+		if pendingNonce < newCommitNonce {
+			updateAccounts[pointer.account] = newCommitNonce
+			p.txStore.nonceCache.setPendingNonce(pointer.account, newCommitNonce)
+		}
+	}
+}
+
 func (p *txPoolImpl[T, Constraint]) RemoveStateUpdatingTxs(txHashList []string) {
 	p.logger.Infof("start RemoveStateUpdatingTxs, len:%d", len(txHashList))
 	removeCount := 0
 	dirtyAccounts := make(map[string]bool)
+	updateAccounts := make(map[string]uint64)
 	removeTxs := make(map[string][]*internalTransaction[T, Constraint])
 	lo.ForEach(txHashList, func(txHash string, _ int) {
 		if pointer, ok := p.txStore.txHashMap[txHash]; ok {
@@ -471,6 +487,8 @@ func (p *txPoolImpl[T, Constraint]) RemoveStateUpdatingTxs(txHashList []string) 
 				p.logger.Errorf("pool tx %s not found in txpool, but exists in txHashMap", txHash)
 				return
 			}
+			// update nonce when remove tx
+			p.updateNonceCache(pointer, updateAccounts)
 			// remove from txHashMap
 			p.txStore.deletePoolTx(txHash)
 			if removeTxs[pointer.account] == nil {
@@ -498,6 +516,11 @@ func (p *txPoolImpl[T, Constraint]) RemoveStateUpdatingTxs(txHashList []string) 
 		p.logger.Infof("Set priorityNonBatchSize from %d to the length of priorityIndex %d", p.txStore.priorityNonBatchSize, readyNum)
 		p.setPriorityNonBatchSize(readyNum)
 	}
+
+	for account, pendingNonce := range updateAccounts {
+		p.logger.Debugf("Account %s update its pendingNonce to %d by commitNonce", account, pendingNonce)
+	}
+
 	p.logger.Infof("finish RemoveStateUpdatingTxs, len:%d, removeCount:%d", len(txHashList), removeCount)
 }
 
