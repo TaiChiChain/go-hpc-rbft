@@ -73,18 +73,18 @@ func (rbft *rbftImpl[T, Constraint]) inWV(v uint64, n uint64) bool {
 // sendInW used in maybeSendPrePrepare checks the given seqNo is between low
 // watermark and high watermark or not.
 func (rbft *rbftImpl[T, Constraint]) sendInW(n uint64) bool {
-	return n > rbft.chainConfig.H && n <= rbft.chainConfig.H+rbft.chainConfig.L
+	return n > rbft.chainConfig.H && n <= rbft.chainConfig.H+rbft.chainConfig.L && n <= rbft.chainConfig.EpochInfo.StartBlock+rbft.chainConfig.EpochInfo.EpochPeriod-1
 }
 
 // beyondRange is used to check the given seqNo is out of high-watermark or not
 func (rbft *rbftImpl[T, Constraint]) beyondRange(n uint64) bool {
-	return n > rbft.chainConfig.H+rbft.chainConfig.L
+	return n > rbft.chainConfig.H+rbft.chainConfig.L || n > rbft.chainConfig.EpochInfo.StartBlock+rbft.chainConfig.EpochInfo.EpochPeriod-1
 }
 
 // inPrimaryTerm check is in primary term, only true can generate batch and send prePrepare
 func (rbft *rbftImpl[T, Constraint]) inPrimaryTerm() bool {
 	if !rbft.chainConfig.isProposerElectionTypeWRF() {
-		return true
+		return rbft.batchMgr.seqNo < rbft.chainConfig.EpochInfo.StartBlock+rbft.chainConfig.EpochInfo.EpochPeriod-1
 	}
 	return rbft.batchMgr.seqNo < rbft.chainConfig.H+rbft.chainConfig.EpochInfo.ConsensusParams.CheckpointPeriod
 }
