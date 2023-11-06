@@ -331,7 +331,7 @@ func (n *node[T, Constraint]) GetPoolMeta(full bool) *txpool.Meta[T, Constraint]
 }
 
 func (n *node[T, Constraint]) ReportStateUpdatingBatches(committedTxHashList []string) {
-	req := &ReqRemoveTxsMsg[T, Constraint]{committedTxHashList}
+	req := &ReqRemoveTxsMsg[T, Constraint]{removeTxHashList: committedTxHashList}
 	localEvent := &MiscEvent{
 		EventType: ReqRemoveTxsEvent,
 		Event:     req,

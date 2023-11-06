@@ -760,9 +760,12 @@ func (rbft *rbftImpl[T, Constraint]) generateSignedCheckpoint(state *types.Servi
 		var qset []*consensus.VcPq
 		var cset []*consensus.SignedCheckpoint
 		rbft.logger.Debugf("Replica %d gather CSet:", rbft.chainConfig.SelfID)
-		for n, signedCheckpoint := range rbft.storeMgr.localCheckpoints {
-			cset = append(cset, signedCheckpoint)
-			rbft.logger.Debugf("seqNo: %d, ID: %s", n, signedCheckpoint.Checkpoint.Digest())
+		for n, ckp := range rbft.storeMgr.localCheckpoints {
+			ckp := ckp.CloneVT()
+			// remove unnecessary fields to avoid infinite growth
+			ckp.Checkpoint.ViewChange = nil
+			cset = append(cset, ckp)
+			rbft.logger.Debugf("seqNo: %d, ID: %s", n, ckp.Checkpoint.Digest())
 		}
 		// Gather all the p entries
 		rbft.logger.Debugf("Replica %d gather PSet:", rbft.chainConfig.SelfID)
@@ -790,6 +793,8 @@ func (rbft *rbftImpl[T, Constraint]) generateSignedCheckpoint(state *types.Servi
 			ReplicaId: rbft.chainConfig.SelfID,
 			View:      rbft.chainConfig.View + 1,
 			H:         rbft.chainConfig.H,
+			Pset:      pset,
+			Qset:      qset,
 			Cset:      cset,
 		}
 

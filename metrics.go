@@ -483,6 +483,7 @@ func newRBFTMetrics(metricsProv metrics.Provider) (*rbftMetrics, error) {
 	if err != nil {
 		return m, err
 	}
+	m.rejectedLocalTxs.Add(0)
 
 	m.incomingRemoteTxSets, err = metricsProv.NewCounter(
 		metrics.CounterOpts{
@@ -513,6 +514,7 @@ func newRBFTMetrics(metricsProv metrics.Provider) (*rbftMetrics, error) {
 	if err != nil {
 		return m, err
 	}
+	m.rejectedRemoteTxs.Add(0)
 
 	m.batchToPrePrepared, err = metricsProv.NewSummary(
 		metrics.SummaryOpts{

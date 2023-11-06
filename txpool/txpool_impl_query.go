@@ -1,8 +1,9 @@
 package txpool
 
 import (
-	"github.com/samber/lo"
 	"sort"
+
+	"github.com/samber/lo"
 )
 
 func (p *txPoolImpl[T, Constraint]) GetTotalPendingTxCount() uint64 {
