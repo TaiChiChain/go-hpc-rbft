@@ -4,6 +4,7 @@ import (
 	"crypto/md5"
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -454,7 +455,7 @@ func (p *txPoolImpl[T, Constraint]) cleanTxsByAccount(account string, list *txSo
 	wg.Wait()
 
 	if failed.Load() {
-		return fmt.Errorf("failed to remove txs")
+		return errors.New("failed to remove txs")
 	}
 	return nil
 }

@@ -28,10 +28,13 @@ import (
 type peerManager struct {
 	chainConfig *ChainConfig
 	metrics     *rbftMetrics // collect all metrics in rbft
+
 	// network helper to broadcast/unicast messages.
 	network Network
+
 	// logger
-	logger   common.Logger
+	logger common.Logger
+
 	msgNonce int64
 	isTest   bool
 }

@@ -362,6 +362,7 @@ type NodeRole uint8
 
 const (
 	NodeRoleUnknown NodeRole = iota
+
 	// NodeRoleDataSyncer only syncer data
 	NodeRoleDataSyncer
 	NodeRoleCandidate
