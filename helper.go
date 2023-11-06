@@ -532,16 +532,17 @@ func (rbft *rbftImpl[T, Constraint]) getVcBasis() *consensus.VcBasis {
 	rbft.persistPList(rbft.vcMgr.plist)
 	rbft.persistQList(rbft.vcMgr.qlist)
 
-	for idx := range rbft.storeMgr.certStore {
+	for idx, cert := range rbft.storeMgr.certStore {
 		if idx.v < rbft.chainConfig.View {
 			rbft.logger.Debugf("Replica %d clear cert with view=%d/seqNo=%d/digest=%s when construct VcBasis",
 				rbft.chainConfig.SelfID, idx.v, idx.n, idx.d)
 			delete(rbft.storeMgr.certStore, idx)
 			delete(rbft.storeMgr.seqMap, idx.n)
 			rbft.persistDelQPCSet(idx.v, idx.n, idx.d)
+			rbft.storeMgr.committedCertCache[idx] = cert
 		}
 	}
-
+	rbft.storeMgr.cleanCommittedCertCache(rbft.chainConfig.H)
 	basis.Pset, basis.Qset, basis.Cset = rbft.gatherPQC()
 
 	return basis

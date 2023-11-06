@@ -95,6 +95,9 @@ type TxPool[T any, Constraint consensus.TXConstraint[T]] interface {
 	// RemoveTimeoutRequests get the remained local txs in timeoutIndex and removeTxs in txpool by tolerance time.
 	RemoveTimeoutRequests() (uint64, error)
 
+	// RemoveStateUpdatingTxs removes all committed txs when state update one block during state updating
+	RemoveStateUpdatingTxs(txHashList []string)
+
 	// Start starts txPool service
 	Start() error
 

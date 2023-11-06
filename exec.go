@@ -134,6 +134,8 @@ func (rbft *rbftImpl[T, Constraint]) dispatchMiscEvent(e *MiscEvent) consensusEv
 		return rbft.handleReqGetPoolMetaEvent(e.Event.(*ReqGetPoolMetaMsg[T, Constraint]))
 	case ReqGetAccountMetaEvent:
 		return rbft.handleReqGetAccountMetaEvent(e.Event.(*ReqGetAccountPoolMetaMsg[T, Constraint]))
+	case ReqRemoveTxsEvent:
+		return rbft.handleReqRemoveTxsEvent(e.Event.(*ReqRemoveTxsMsg[T, Constraint]))
 	default:
 		rbft.logger.Errorf("Not Supported event: %v", e)
 		return nil
@@ -167,6 +169,11 @@ func (rbft *rbftImpl[T, Constraint]) handleReqGetPoolMetaEvent(e *ReqGetPoolMeta
 
 func (rbft *rbftImpl[T, Constraint]) handleReqGetAccountMetaEvent(e *ReqGetAccountPoolMetaMsg[T, Constraint]) consensusEvent {
 	e.ch <- rbft.batchMgr.requestPool.GetAccountMeta(e.account, e.full)
+	return nil
+}
+
+func (rbft *rbftImpl[T, Constraint]) handleReqRemoveTxsEvent(e *ReqRemoveTxsMsg[T, Constraint]) consensusEvent {
+	rbft.batchMgr.requestPool.RemoveStateUpdatingTxs(e.removeTxHashList)
 	return nil
 }
 

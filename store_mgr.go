@@ -30,7 +30,12 @@ This file provides a mechanism to manage the memory storage in RBFT
 
 // storeManager manages consensus store data structures for RBFT.
 type storeManager[T any, Constraint consensus.TXConstraint[T]] struct {
+	config Config
+
 	logger common.Logger
+
+	// cache committed cert to help remote recovery by PQC
+	committedCertCache map[msgID]*msgCert
 
 	// track quorum certificates for messages
 	certStore map[msgID]*msgCert
@@ -100,6 +105,7 @@ type stateUpdateTarget struct {
 // newStoreMgr news an instance of storeManager
 func newStoreMgr[T any, Constraint consensus.TXConstraint[T]](c Config) *storeManager[T, Constraint] {
 	sm := &storeManager[T, Constraint]{
+		committedCertCache:       make(map[msgID]*msgCert),
 		localCheckpoints:         make(map[uint64]*consensus.SignedCheckpoint),
 		higherCheckpoints:        make(map[uint64]*consensus.SignedCheckpoint),
 		checkpointStore:          make(map[chkptID]*consensus.SignedCheckpoint),
@@ -112,8 +118,21 @@ func newStoreMgr[T any, Constraint consensus.TXConstraint[T]](c Config) *storeMa
 		missingReqBatches:        make(map[string]bool),
 		missingBatchesInFetching: make(map[string]msgID),
 		logger:                   c.Logger,
+		config:                   c,
 	}
 	return sm
+}
+
+func (sm *storeManager[T, Constraint]) cleanCommittedCertCache(minHeight uint64) {
+	var needCleanHeight uint64
+	if sm.config.CommittedBlockCacheNumber < minHeight {
+		needCleanHeight = minHeight - sm.config.CommittedBlockCacheNumber
+	}
+	for idx := range sm.committedCertCache {
+		if idx.n < needCleanHeight {
+			delete(sm.committedCertCache, idx)
+		}
+	}
 }
 
 // saveCheckpoint saves checkpoint information to localCheckpoints

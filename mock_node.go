@@ -456,6 +456,42 @@ func (c *NodeReportStateUpdatedCall[T, Constraint]) DoAndReturn(f func(*types.Se
 	return c
 }
 
+// ReportStateUpdatingBatches mocks base method.
+func (m *MockNode[T, Constraint]) ReportStateUpdatingBatches(committedTxHashList []string) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "ReportStateUpdatingBatches", committedTxHashList)
+}
+
+// ReportStateUpdatingBatches indicates an expected call of ReportStateUpdatingBatches.
+func (mr *MockNodeMockRecorder[T, Constraint]) ReportStateUpdatingBatches(committedTxHashList any) *NodeReportStateUpdatingBatchesCall[T, Constraint] {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReportStateUpdatingBatches", reflect.TypeOf((*MockNode[T, Constraint])(nil).ReportStateUpdatingBatches), committedTxHashList)
+	return &NodeReportStateUpdatingBatchesCall[T, Constraint]{Call: call}
+}
+
+// NodeReportStateUpdatingBatchesCall wrap *gomock.Call
+type NodeReportStateUpdatingBatchesCall[T any, Constraint consensus.TXConstraint[T]] struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *NodeReportStateUpdatingBatchesCall[T, Constraint]) Return() *NodeReportStateUpdatingBatchesCall[T, Constraint] {
+	c.Call = c.Call.Return()
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *NodeReportStateUpdatingBatchesCall[T, Constraint]) Do(f func([]string)) *NodeReportStateUpdatingBatchesCall[T, Constraint] {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *NodeReportStateUpdatingBatchesCall[T, Constraint]) DoAndReturn(f func([]string)) *NodeReportStateUpdatingBatchesCall[T, Constraint] {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // Start mocks base method.
 func (m *MockNode[T, Constraint]) Start() error {
 	m.ctrl.T.Helper()
@@ -853,6 +889,42 @@ func (c *ExternalGetTotalPendingTxCountCall[T, Constraint]) Do(f func() uint64) 
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *ExternalGetTotalPendingTxCountCall[T, Constraint]) DoAndReturn(f func() uint64) *ExternalGetTotalPendingTxCountCall[T, Constraint] {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// ReportStateUpdatingBatches mocks base method.
+func (m *MockExternal[T, Constraint]) ReportStateUpdatingBatches(committedTxHashList []string) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "ReportStateUpdatingBatches", committedTxHashList)
+}
+
+// ReportStateUpdatingBatches indicates an expected call of ReportStateUpdatingBatches.
+func (mr *MockExternalMockRecorder[T, Constraint]) ReportStateUpdatingBatches(committedTxHashList any) *ExternalReportStateUpdatingBatchesCall[T, Constraint] {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReportStateUpdatingBatches", reflect.TypeOf((*MockExternal[T, Constraint])(nil).ReportStateUpdatingBatches), committedTxHashList)
+	return &ExternalReportStateUpdatingBatchesCall[T, Constraint]{Call: call}
+}
+
+// ExternalReportStateUpdatingBatchesCall wrap *gomock.Call
+type ExternalReportStateUpdatingBatchesCall[T any, Constraint consensus.TXConstraint[T]] struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *ExternalReportStateUpdatingBatchesCall[T, Constraint]) Return() *ExternalReportStateUpdatingBatchesCall[T, Constraint] {
+	c.Call = c.Call.Return()
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *ExternalReportStateUpdatingBatchesCall[T, Constraint]) Do(f func([]string)) *ExternalReportStateUpdatingBatchesCall[T, Constraint] {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *ExternalReportStateUpdatingBatchesCall[T, Constraint]) DoAndReturn(f func([]string)) *ExternalReportStateUpdatingBatchesCall[T, Constraint] {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
