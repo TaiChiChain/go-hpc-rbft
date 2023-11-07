@@ -224,11 +224,10 @@ func (tf *testFramework[T, Constraint]) newNodeConfig(
 				ProposerElectionType:          ProposerElectionTypeRotating,
 			},
 			FinanceParams: &Finance{
-				GasLimit:       0x5f5e100,
-				MaxGasPrice:    10000000000000,
-				MinGasPrice:    1000000000000,
-				GasChangeRate:  0.125,
-				GasPremiumRate: 1,
+				GasLimit:      0x5f5e100,
+				MaxGasPrice:   10000000000000,
+				MinGasPrice:   1000000000000,
+				GasChangeRate: 0.125,
 			},
 			ConfigParams: &ConfigParams{
 				TxMaxSize: 10 * 32 * 1024,
