@@ -155,11 +155,10 @@ type EpochInfo struct {
 
 // todo: excutor read params from epoch info, not from config
 type Finance struct {
-	GasLimit       uint64  `mapstructure:"gas_limit" toml:"gas_limit" json:"gas_limit"`
-	MaxGasPrice    uint64  `mapstructure:"max_gas_price" toml:"max_gas_price" json:"max_gas_price"`
-	MinGasPrice    uint64  `mapstructure:"min_gas_price" toml:"min_gas_price" json:"min_gas_price"`
-	GasChangeRate  float64 `mapstructure:"gas_change_rate" toml:"gas_change_rate" json:"gas_change_rate"`
-	GasPremiumRate float64 `mapstructure:"gas_premium_rate" toml:"gas_premium_rate" json:"gas_premium_rate"`
+	GasLimit      uint64  `mapstructure:"gas_limit" toml:"gas_limit" json:"gas_limit"`
+	MaxGasPrice   uint64  `mapstructure:"max_gas_price" toml:"max_gas_price" json:"max_gas_price"`
+	MinGasPrice   uint64  `mapstructure:"min_gas_price" toml:"min_gas_price" json:"min_gas_price"`
+	GasChangeRate float64 `mapstructure:"gas_change_rate" toml:"gas_change_rate" json:"gas_change_rate"`
 }
 
 type ConfigParams struct {
@@ -210,11 +209,10 @@ func (e *EpochInfo) Clone() *EpochInfo {
 			}
 		}),
 		FinanceParams: &Finance{
-			GasLimit:       e.FinanceParams.GasLimit,
-			MaxGasPrice:    e.FinanceParams.MaxGasPrice,
-			MinGasPrice:    e.FinanceParams.MinGasPrice,
-			GasChangeRate:  e.FinanceParams.GasChangeRate,
-			GasPremiumRate: e.FinanceParams.GasPremiumRate,
+			GasLimit:      e.FinanceParams.GasLimit,
+			MaxGasPrice:   e.FinanceParams.MaxGasPrice,
+			MinGasPrice:   e.FinanceParams.MinGasPrice,
+			GasChangeRate: e.FinanceParams.GasChangeRate,
 		},
 		ConfigParams: &ConfigParams{
 			TxMaxSize: e.ConfigParams.TxMaxSize,
