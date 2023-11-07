@@ -53,6 +53,7 @@ func (p *txPoolImpl[T, Constraint]) addNewRequests(txs []*T, isPrimary, local, i
 	matchMissingTxBatch := make(map[string]map[string]struct{})
 
 	currentSeqNoList := make(map[string]uint64, 0)
+	duplicateTxHash := make(map[string]bool, 0)
 	for _, tx := range txs {
 		txAccount := Constraint(tx).RbftGetFrom()
 		txHash := Constraint(tx).RbftGetTxHash()
@@ -90,15 +91,15 @@ func (p *txPoolImpl[T, Constraint]) addNewRequests(txs []*T, isPrimary, local, i
 		}
 
 		// ignore duplicate tx
-		if pointer := p.txStore.txHashMap[txHash]; pointer != nil {
-			p.logger.Debugf("Transaction [account: %s, nonce: %d, hash: %s] has already existed in txHashMap, "+
+		if pointer := p.txStore.txHashMap[txHash]; pointer != nil || duplicateTxHash[txHash] {
+			p.logger.Warningf("Transaction [account: %s, nonce: %d, hash: %s] has already existed in txHashMap, "+
 				"ignore it", txAccount, txNonce, txHash)
 			continue
 		}
 
 		if p.txStore.allTxs[txAccount] != nil {
 			if oldTx, ok := p.txStore.allTxs[txAccount].items[txNonce]; ok {
-				p.logger.Debugf("Receive duplicate nonce transaction [account: %s, nonce: %d, hash: %s],"+
+				p.logger.Warningf("Receive duplicate nonce transaction [account: %s, nonce: %d, hash: %s],"+
 					" will replace old tx[hash: %s]", txAccount, txNonce, txHash, oldTx.getHash())
 				p.replaceTx(tx, local, ready)
 			}
@@ -121,6 +122,7 @@ func (p *txPoolImpl[T, Constraint]) addNewRequests(txs []*T, isPrimary, local, i
 			arrivedTime: now,
 		}
 		validTxs[txAccount] = append(validTxs[txAccount], txItem)
+		duplicateTxHash[txHash] = true
 
 		// for replica, add validTxs to nonBatchedTxs and check if the missing transactions and batches are fetched
 		if !isPrimary && needCompletionMissingBatch {
@@ -669,9 +671,9 @@ func (p *txPoolImpl[T, Constraint]) SendMissingRequests(batchHash string, missin
 }
 
 func (p *txPoolImpl[T, Constraint]) ReceiveMissingRequests(batchHash string, txs map[uint64]*T) error {
-	p.logger.Debugf("Replica received %d missingTxs, batch hash: %s", len(txs), batchHash)
+	p.logger.Infof("Replica received %d missingTxs, batch hash: %s", len(txs), batchHash)
 	if _, ok := p.txStore.missingBatch[batchHash]; !ok {
-		p.logger.Debugf("Can't find batch %s from missingBatch", batchHash)
+		p.logger.Warningf("Can't find batch %s from missingBatch", batchHash)
 		return nil
 	}
 	expectLen := len(p.txStore.missingBatch[batchHash])
