@@ -897,3 +897,51 @@ func TestRemoveStateUpdatingTxs(t *testing.T) {
 	ast.Equal(1, pool.txStore.allTxs[tx2_0.RbftGetFrom()].index.size(), "successful remove tx2_0")
 	ast.Equal(2, pool.txStore.priorityIndex.size())
 }
+
+func TestDuplicateTxs(t *testing.T) {
+	ast := assert.New(t)
+	pool := mockTxPoolImpl[consensus.FltTransaction, *consensus.FltTransaction]()
+	tx := ConstructTxByAccountAndNonce("account1", uint64(0))
+	time.Sleep(1 * time.Millisecond)
+	txDup := ConstructTxByAccountAndNonce("account1", uint64(0))
+
+	txs := []*consensus.FltTransaction{tx, txDup}
+	pool.addNewRequests(txs, false, false, false, true, false)
+	ast.Equal(1, len(pool.txStore.txHashMap))
+	ast.Equal(tx.RbftGetTxHash(), pool.txStore.allTxs[tx.RbftGetFrom()].items[0].rawTx.RbftGetTxHash())
+
+	tx2 := ConstructTxByAccountAndNonce("account1", uint64(2))
+	time.Sleep(1 * time.Millisecond)
+	tx2Dup := ConstructTxByAccountAndNonce("account1", uint64(2))
+	txs = []*consensus.FltTransaction{tx2, tx2Dup}
+	pool.addNewRequests(txs, false, false, false, true, false)
+	ast.Equal(2, len(pool.txStore.txHashMap))
+	p, ok := pool.txStore.txHashMap[tx2.RbftGetTxHash()]
+	ast.False(ok)
+	p, ok = pool.txStore.txHashMap[tx2Dup.RbftGetTxHash()]
+	ast.True(ok)
+	ast.Equal(uint64(2), p.nonce)
+	ast.Equal(tx2Dup.RbftGetTxHash(), pool.txStore.allTxs[tx2.RbftGetFrom()].items[2].rawTx.RbftGetTxHash())
+
+	tx3 := ConstructTxByAccountAndNonce("account1", uint64(3))
+	time.Sleep(1 * time.Millisecond)
+	tx3Dup := ConstructTxByAccountAndNonce("account1", uint64(3))
+	txs = []*consensus.FltTransaction{tx3}
+	pool.addNewRequests(txs, false, false, false, true, false)
+	ast.Equal(3, len(pool.txStore.txHashMap))
+	p, ok = pool.txStore.txHashMap[tx3.RbftGetTxHash()]
+	ast.True(ok)
+	ast.Equal(uint64(3), p.nonce)
+	ast.Equal(tx3.RbftGetTxHash(), pool.txStore.allTxs[tx3.RbftGetFrom()].items[3].rawTx.RbftGetTxHash())
+
+	txs = []*consensus.FltTransaction{tx3Dup}
+	pool.addNewRequests(txs, false, false, false, true, false)
+	ast.Equal(3, len(pool.txStore.txHashMap))
+	p, ok = pool.txStore.txHashMap[tx3.RbftGetTxHash()]
+	ast.False(ok)
+	ast.Nil(p)
+	p, ok = pool.txStore.txHashMap[tx3Dup.RbftGetTxHash()]
+	ast.True(ok)
+	ast.Equal(uint64(3), p.nonce)
+	ast.Equal(tx3Dup.RbftGetTxHash(), pool.txStore.allTxs[tx3.RbftGetFrom()].items[3].rawTx.RbftGetTxHash())
+}
