@@ -52,8 +52,9 @@ func (p *txPoolImpl[T, Constraint]) addNewRequests(txs []*T, isPrimary, local, i
 	// val: txHash -> bool
 	matchMissingTxBatch := make(map[string]map[string]struct{})
 
-	currentSeqNoList := make(map[string]uint64, 0)
-	duplicateTxHash := make(map[string]bool, 0)
+	currentSeqNoList := make(map[string]uint64)
+	duplicateTxHash := make(map[string]bool)
+	duplicatePointer := make(map[txPointer]string)
 	for _, tx := range txs {
 		txAccount := Constraint(tx).RbftGetFrom()
 		txHash := Constraint(tx).RbftGetTxHash()
@@ -97,6 +98,18 @@ func (p *txPoolImpl[T, Constraint]) addNewRequests(txs []*T, isPrimary, local, i
 			continue
 		}
 
+		// check duplicate account and nonce(but different txHash), and replace old tx
+		if oldTxhash, ok := duplicatePointer[txPointer{account: txAccount, nonce: txNonce}]; ok {
+			p.logger.Warningf("Receive duplicate nonce transaction [account: %s, nonce: %d, hash: %s],"+
+				" will replace old tx[hash: %s]", txAccount, txNonce, txHash, oldTxhash)
+			txItems := validTxs[txAccount]
+			// remove old tx from txItems
+			newItems := lo.Filter(txItems, func(txItem *internalTransaction[T, Constraint], index int) bool {
+				return txItem.getNonce() != txNonce
+			})
+			validTxs[txAccount] = newItems
+		}
+
 		if p.txStore.allTxs[txAccount] != nil {
 			if oldTx, ok := p.txStore.allTxs[txAccount].items[txNonce]; ok {
 				p.logger.Warningf("Receive duplicate nonce transaction [account: %s, nonce: %d, hash: %s],"+
@@ -123,6 +136,7 @@ func (p *txPoolImpl[T, Constraint]) addNewRequests(txs []*T, isPrimary, local, i
 		}
 		validTxs[txAccount] = append(validTxs[txAccount], txItem)
 		duplicateTxHash[txHash] = true
+		duplicatePointer[txPointer{account: txAccount, nonce: txNonce}] = txHash
 
 		// for replica, add validTxs to nonBatchedTxs and check if the missing transactions and batches are fetched
 		if !isPrimary && needCompletionMissingBatch {
