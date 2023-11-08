@@ -29,18 +29,19 @@ func newMockRbft[T any, Constraint consensus.TXConstraint[T]](t *testing.T, ctrl
 			Version:                   1,
 			Epoch:                     1,
 			EpochPeriod:               1000,
-			CandidateSet:              []*NodeInfo{},
+			CandidateSet:              []NodeInfo{},
 			ValidatorSet:              peerSet,
 			StartBlock:                1,
 			P2PBootstrapNodeAddresses: []string{"1"},
-			ConsensusParams: &ConsensusParams{
+			ConsensusParams: ConsensusParams{
+				ValidatorElectionType:         ValidatorElectionTypeWRF,
+				ProposerElectionType:          ProposerElectionTypeAbnormalRotation,
 				CheckpointPeriod:              10,
 				HighWatermarkCheckpointPeriod: 4,
 				MaxValidatorNum:               10,
 				BlockMaxTxNum:                 500,
 				NotActiveWeight:               1,
 				ExcludeView:                   10,
-				ProposerElectionType:          ProposerElectionTypeRotating,
 			},
 		},
 		SetSize:                 25,
@@ -79,7 +80,7 @@ func TestRBFT_newRBFT(t *testing.T) {
 	}
 
 	// Nil Peers
-	rbft.config.GenesisEpochInfo.ValidatorSet = []*NodeInfo{}
+	rbft.config.GenesisEpochInfo.ValidatorSet = []NodeInfo{}
 	_, err = newRBFT(rbft.config, rbft.external, rbft.batchMgr.requestPool, true)
 	assert.Error(t, err)
 

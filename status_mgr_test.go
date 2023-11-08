@@ -22,11 +22,13 @@ func newTestStatusNode[T any, Constraint consensus.TXConstraint[T]](ctrl *gomock
 			Version:                   1,
 			Epoch:                     1,
 			EpochPeriod:               1000,
-			CandidateSet:              []*NodeInfo{},
+			CandidateSet:              []NodeInfo{},
 			ValidatorSet:              peerSet,
 			StartBlock:                1,
 			P2PBootstrapNodeAddresses: []string{"1"},
-			ConsensusParams: &ConsensusParams{
+			ConsensusParams: ConsensusParams{
+				ValidatorElectionType:         ValidatorElectionTypeWRF,
+				ProposerElectionType:          ProposerElectionTypeAbnormalRotation,
 				CheckpointPeriod:              10,
 				HighWatermarkCheckpointPeriod: 4,
 				MaxValidatorNum:               10,

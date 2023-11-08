@@ -21,11 +21,13 @@ func newTestTimerMgr[T any, Constraint consensus.TXConstraint[T]](ctrl *gomock.C
 			Version:                   1,
 			Epoch:                     1,
 			EpochPeriod:               1000,
-			CandidateSet:              []*NodeInfo{},
+			CandidateSet:              []NodeInfo{},
 			ValidatorSet:              peerSet,
 			StartBlock:                1,
 			P2PBootstrapNodeAddresses: []string{},
-			ConsensusParams: &ConsensusParams{
+			ConsensusParams: ConsensusParams{
+				ValidatorElectionType:         ValidatorElectionTypeWRF,
+				ProposerElectionType:          ProposerElectionTypeAbnormalRotation,
 				CheckpointPeriod:              2,
 				HighWatermarkCheckpointPeriod: 2,
 				MaxValidatorNum:               10,

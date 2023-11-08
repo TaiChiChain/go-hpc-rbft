@@ -1,6 +1,7 @@
 package rbft
 
 import (
+	"github.com/stretchr/testify/assert"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -8,11 +9,23 @@ import (
 
 func TestEpochInfo_ElectValidators(t *testing.T) {
 	e := &EpochInfo{
-		ConsensusParams: &ConsensusParams{
-			ValidatorElectionType: ValidatorElectionTypeVotingPowerPriority,
-			MaxValidatorNum:       4,
+		Version:                   1,
+		Epoch:                     1,
+		EpochPeriod:               100,
+		StartBlock:                1,
+		P2PBootstrapNodeAddresses: []string{"1", "2"},
+		ConsensusParams: ConsensusParams{
+			ProposerElectionType:          ProposerElectionTypeWRF,
+			ValidatorElectionType:         ValidatorElectionTypeWRF,
+			CheckpointPeriod:              1,
+			HighWatermarkCheckpointPeriod: 10,
+			MaxValidatorNum:               4,
+			BlockMaxTxNum:                 500,
+			EnableTimedGenEmptyBlock:      false,
+			NotActiveWeight:               1,
+			ExcludeView:                   100,
 		},
-		CandidateSet: []*NodeInfo{
+		CandidateSet: []NodeInfo{
 			{
 				ID:                   5,
 				ConsensusVotingPower: 1000,
@@ -30,7 +43,7 @@ func TestEpochInfo_ElectValidators(t *testing.T) {
 				ConsensusVotingPower: 0,
 			},
 		},
-		ValidatorSet: []*NodeInfo{
+		ValidatorSet: []NodeInfo{
 			{
 				ID:                   1,
 				ConsensusVotingPower: 1000,
@@ -48,8 +61,24 @@ func TestEpochInfo_ElectValidators(t *testing.T) {
 				ConsensusVotingPower: 0,
 			},
 		},
-		DataSyncerSet: nil,
+		DataSyncerSet: []NodeInfo{
+			{
+				ID:                   9,
+				ConsensusVotingPower: 1000,
+			},
+		},
+		FinanceParams: Finance{
+			GasLimit:              0x5f5e100,
+			MaxGasPrice:           10000000000000,
+			MinGasPrice:           1000000000000,
+			GasChangeRateValue:    1250,
+			GasChangeRateDecimals: 4,
+		},
+		ConfigParams: ConfigParams{
+			TxMaxSize: 1000,
+		},
 	}
+	assert.EqualValues(t, e, e.Clone())
 
 	err := e.ElectValidators([]byte("test seed"))
 	require.Nil(t, err)

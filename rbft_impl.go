@@ -1643,8 +1643,8 @@ func (rbft *rbftImpl[T, Constraint]) commitPendingBlocks() {
 
 			var proposerAccount string
 			if cert != nil && cert.prePrepare != nil {
-				proposer := rbft.chainConfig.NodeInfoMap[cert.prePrepare.HashBatch.Proposer]
-				if proposer != nil {
+				proposer, ok := rbft.chainConfig.NodeInfoMap[cert.prePrepare.HashBatch.Proposer]
+				if ok {
 					proposerAccount = proposer.AccountAddress
 				} else {
 					rbft.logger.Warningf("Replica %d did not find the proposer in the epoch", rbft.chainConfig.SelfID)
