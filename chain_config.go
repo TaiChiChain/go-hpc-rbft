@@ -22,7 +22,7 @@ const (
 	ProposerElectionTypeAbnormalRotation = "abnormal-rotation"
 )
 
-// Candidate/Validator node info
+// NodeInfo node info
 type NodeInfo struct {
 	// The node serial number is unique in the entire network.
 	// Once allocated, it will not change.
@@ -156,12 +156,11 @@ type EpochInfo struct {
 	ConfigParams ConfigParams `mapstructure:"config_params" toml:"config_params" json:"config_params"`
 }
 
-// todo: excutor read params from epoch info, not from config
 type Finance struct {
 	GasLimit              uint64 `mapstructure:"gas_limit" toml:"gas_limit" json:"gas_limit"`
 	MaxGasPrice           uint64 `mapstructure:"max_gas_price" toml:"max_gas_price" json:"max_gas_price"`
 	MinGasPrice           uint64 `mapstructure:"min_gas_price" toml:"min_gas_price" json:"min_gas_price"`
-	GasChangeRateValue    uint64 `mapstructure:"gas_change_rate" toml:"gas_change_rate" json:"gas_change_rate"`
+	GasChangeRateValue    uint64 `mapstructure:"gas_change_rate_value" toml:"gas_change_rate_value" json:"gas_change_rate_value"`
 	GasChangeRateDecimals uint64 `mapstructure:"gas_change_rate_decimals" toml:"gas_change_rate_decimals" json:"gas_change_rate_decimals"`
 }
 
@@ -413,7 +412,7 @@ type DynamicChainConfig struct {
 	PrimaryID uint64
 }
 
-// Chain config, tracking each view.
+// ChainConfig tracking each view.
 type ChainConfig struct {
 	// Epoch info.
 	EpochInfo *EpochInfo
