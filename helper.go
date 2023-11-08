@@ -849,8 +849,8 @@ func (rbft *rbftImpl[T, Constraint]) signCheckpoint(checkpoint *consensus.Checkp
 // verifySignedCheckpoint returns whether given signedCheckpoint contains a valid signature.
 func (rbft *rbftImpl[T, Constraint]) verifySignedCheckpoint(signedCheckpoint *consensus.SignedCheckpoint) error {
 	msg := signedCheckpoint.Checkpoint.Hash()
-	fromNode := rbft.chainConfig.NodeInfoMap[signedCheckpoint.GetAuthor()]
-	if fromNode == nil {
+	fromNode, ok := rbft.chainConfig.NodeInfoMap[signedCheckpoint.GetAuthor()]
+	if !ok {
 		return fmt.Errorf("unknow author: %d", signedCheckpoint.GetAuthor())
 	}
 	return rbft.external.Verify(fromNode.AccountAddress, signedCheckpoint.Signature, msg)

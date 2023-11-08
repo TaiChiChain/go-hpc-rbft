@@ -18,7 +18,7 @@ import (
 	"github.com/axiomesh/axiom-bft/types"
 )
 
-var peerSet = []*NodeInfo{
+var peerSet = []NodeInfo{
 	{
 		ID:                   1,
 		AccountAddress:       "node1",
@@ -81,7 +81,7 @@ type testNode[T any, Constraint consensus.TXConstraint[T]] struct {
 	n *node[T, Constraint]
 
 	// testNode.Peers is the router map in one node.
-	Router []*NodeInfo
+	Router []NodeInfo
 
 	// epoch info in mem-chain
 	Epoch uint64
@@ -210,26 +210,28 @@ func (tf *testFramework[T, Constraint]) newNodeConfig(
 			Version:                   1,
 			Epoch:                     epoch,
 			EpochPeriod:               1000,
-			CandidateSet:              []*NodeInfo{},
+			CandidateSet:              []NodeInfo{},
 			ValidatorSet:              peerSet,
 			StartBlock:                0,
 			P2PBootstrapNodeAddresses: []string{"1"},
-			ConsensusParams: &ConsensusParams{
+			ConsensusParams: ConsensusParams{
+				ValidatorElectionType:         ValidatorElectionTypeWRF,
+				ProposerElectionType:          ProposerElectionTypeAbnormalRotation,
 				CheckpointPeriod:              10,
 				HighWatermarkCheckpointPeriod: 4,
 				MaxValidatorNum:               10,
 				BlockMaxTxNum:                 100,
 				NotActiveWeight:               1,
 				ExcludeView:                   10,
-				ProposerElectionType:          ProposerElectionTypeRotating,
 			},
-			FinanceParams: &Finance{
-				GasLimit:      0x5f5e100,
-				MaxGasPrice:   10000000000000,
-				MinGasPrice:   1000000000000,
-				GasChangeRate: 0.125,
+			FinanceParams: Finance{
+				GasLimit:              0x5f5e100,
+				MaxGasPrice:           10000000000000,
+				MinGasPrice:           1000000000000,
+				GasChangeRateValue:    1250,
+				GasChangeRateDecimals: 4,
 			},
-			ConfigParams: &ConfigParams{
+			ConfigParams: ConfigParams{
 				TxMaxSize: 10 * 32 * 1024,
 			},
 		},

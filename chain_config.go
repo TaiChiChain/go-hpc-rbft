@@ -13,13 +13,13 @@ import (
 )
 
 const (
-	ValidatorElectionTypeWRF                 uint64 = 0
-	ValidatorElectionTypeVotingPowerPriority uint64 = 1
+	ValidatorElectionTypeWRF                 = "wrf"
+	ValidatorElectionTypeVotingPowerPriority = "voting-power-priority"
 )
 
 const (
-	ProposerElectionTypeWRF      uint64 = 0
-	ProposerElectionTypeRotating uint64 = 1
+	ProposerElectionTypeWRF              = "wrf"
+	ProposerElectionTypeAbnormalRotation = "abnormal-rotation"
 )
 
 // Candidate/Validator node info
@@ -39,7 +39,7 @@ type NodeInfo struct {
 	ConsensusVotingPower int64 `mapstructure:"consensus_voting_power" toml:"consensus_voting_power" json:"consensus_voting_power"`
 }
 
-func wrfSelectNodeByVotingPower(seed []byte, nodes []*NodeInfo) *NodeInfo {
+func wrfSelectNodeByVotingPower(seed []byte, nodes []NodeInfo) NodeInfo {
 	h := sha256.New()
 	_, err := h.Write(seed)
 	if err != nil {
@@ -48,7 +48,7 @@ func wrfSelectNodeByVotingPower(seed []byte, nodes []*NodeInfo) *NodeInfo {
 	seedHash := h.Sum(nil)
 
 	// clone
-	nodeSet := lo.Map(nodes, func(item *NodeInfo, idx int) *NodeInfo {
+	nodeSet := lo.Map(nodes, func(item NodeInfo, idx int) NodeInfo {
 		return item.Clone()
 	})
 	// sort by id
@@ -61,7 +61,7 @@ func wrfSelectNodeByVotingPower(seed []byte, nodes []*NodeInfo) *NodeInfo {
 	// |    a(VotingPower 2)    |    b(VotingPower 3)    |    c(VotingPower 1)    |     b(VotingPower 4)    |
 	// 0                        2                        5                        6                         10
 	// rand select from 0 - totalVotingPower
-	cumulativeVotingPowers := lo.Map(nodeSet, func(item *NodeInfo, idx int) uint64 {
+	cumulativeVotingPowers := lo.Map(nodeSet, func(item NodeInfo, idx int) uint64 {
 		totalVotingPower += uint64(item.ConsensusVotingPower)
 		return totalVotingPower
 	})
@@ -72,7 +72,7 @@ func wrfSelectNodeByVotingPower(seed []byte, nodes []*NodeInfo) *NodeInfo {
 	return nodeSet[selectedIndex]
 }
 
-func sortNodesByVotingPower(nodes []*NodeInfo) {
+func sortNodesByVotingPower(nodes []NodeInfo) {
 	sort.Slice(nodes, func(i, j int) bool {
 		if nodes[i].ConsensusVotingPower != nodes[j].ConsensusVotingPower {
 			return nodes[i].ConsensusVotingPower > nodes[j].ConsensusVotingPower
@@ -81,8 +81,8 @@ func sortNodesByVotingPower(nodes []*NodeInfo) {
 	})
 }
 
-func (n *NodeInfo) Clone() *NodeInfo {
-	return &NodeInfo{
+func (n *NodeInfo) Clone() NodeInfo {
+	return NodeInfo{
 		ID:                   n.ID,
 		AccountAddress:       n.AccountAddress,
 		P2PNodeID:            n.P2PNodeID,
@@ -91,7 +91,15 @@ func (n *NodeInfo) Clone() *NodeInfo {
 }
 
 type ConsensusParams struct {
-	ValidatorElectionType uint64 `mapstructure:"validator_election_type" toml:"validator_election_type" json:"validator_election_type"`
+	// The validator election type, default is wrf
+	// wrf: WRF
+	// voting-power-priority: the greater the voting weight, the more likely it is to be selected
+	ValidatorElectionType string `mapstructure:"validator_election_type" toml:"validator_election_type" json:"validator_election_type"`
+
+	// The proposer election type, default is wrf
+	// wrf: WRF
+	// abnormal-rotation: rotating by view(pbft logic, disable auto change proposer)
+	ProposerElectionType string `mapstructure:"proposer_election_type" toml:"proposer_election_type" json:"proposer_election_type"`
 
 	// The number of sustained blocks per Checkpoint.
 	CheckpointPeriod uint64 `mapstructure:"checkpoint_period" toml:"checkpoint_period" json:"checkpoint_period"`
@@ -113,11 +121,6 @@ type ConsensusParams struct {
 
 	// The low weight of the viewchange node is restored to normal after the specified number of rounds.
 	ExcludeView uint64 `mapstructure:"exclude_view" toml:"exclude_view" json:"exclude_view"`
-
-	// The proposer election type, default is wrf
-	// 0: WRF
-	// 1: Rotating by view(pbft logic, disable auto change proposer)
-	ProposerElectionType uint64 `mapstructure:"proposer_election_type" toml:"proposer_election_type" json:"proposer_election_type"`
 }
 
 type EpochInfo struct {
@@ -137,28 +140,29 @@ type EpochInfo struct {
 	P2PBootstrapNodeAddresses []string `mapstructure:"p2p_bootstrap_node_addresses" toml:"p2p_bootstrap_node_addresses" json:"p2p_bootstrap_node_addresses"`
 
 	// Consensus params.
-	ConsensusParams *ConsensusParams `mapstructure:"consensus_params" toml:"consensus_params" json:"consensus_params"`
+	ConsensusParams ConsensusParams `mapstructure:"consensus_params" toml:"consensus_params" json:"consensus_params"`
 
 	// Candidate set(Do not participate in consensus, only synchronize consensus results).
-	CandidateSet []*NodeInfo `mapstructure:"candidate_set" toml:"candidate_set" json:"candidate_set"`
+	CandidateSet []NodeInfo `mapstructure:"candidate_set" toml:"candidate_set" json:"candidate_set"`
 
 	// Validator set(Participation consensus)
-	ValidatorSet []*NodeInfo `mapstructure:"validator_set" toml:"validator_set" json:"validator_set"`
+	ValidatorSet []NodeInfo `mapstructure:"validator_set" toml:"validator_set" json:"validator_set"`
 
-	DataSyncerSet []*NodeInfo `mapstructure:"data_syncer_set" toml:"data_syncer_set" json:"data_syncer_set"`
+	DataSyncerSet []NodeInfo `mapstructure:"data_syncer_set" toml:"data_syncer_set" json:"data_syncer_set"`
 
 	// Finance params about gas
-	FinanceParams *Finance `mapstructure:"finance_params" toml:"finance_params" json:"finance_params"`
+	FinanceParams Finance `mapstructure:"finance_params" toml:"finance_params" json:"finance_params"`
 
-	ConfigParams *ConfigParams `mapstructure:"config_params" toml:"config_params" json:"config_params"`
+	ConfigParams ConfigParams `mapstructure:"config_params" toml:"config_params" json:"config_params"`
 }
 
 // todo: excutor read params from epoch info, not from config
 type Finance struct {
-	GasLimit      uint64  `mapstructure:"gas_limit" toml:"gas_limit" json:"gas_limit"`
-	MaxGasPrice   uint64  `mapstructure:"max_gas_price" toml:"max_gas_price" json:"max_gas_price"`
-	MinGasPrice   uint64  `mapstructure:"min_gas_price" toml:"min_gas_price" json:"min_gas_price"`
-	GasChangeRate float64 `mapstructure:"gas_change_rate" toml:"gas_change_rate" json:"gas_change_rate"`
+	GasLimit              uint64 `mapstructure:"gas_limit" toml:"gas_limit" json:"gas_limit"`
+	MaxGasPrice           uint64 `mapstructure:"max_gas_price" toml:"max_gas_price" json:"max_gas_price"`
+	MinGasPrice           uint64 `mapstructure:"min_gas_price" toml:"min_gas_price" json:"min_gas_price"`
+	GasChangeRateValue    uint64 `mapstructure:"gas_change_rate" toml:"gas_change_rate" json:"gas_change_rate"`
+	GasChangeRateDecimals uint64 `mapstructure:"gas_change_rate_decimals" toml:"gas_change_rate_decimals" json:"gas_change_rate_decimals"`
 }
 
 type ConfigParams struct {
@@ -174,7 +178,9 @@ func (e *EpochInfo) Clone() *EpochInfo {
 		P2PBootstrapNodeAddresses: lo.Map(e.P2PBootstrapNodeAddresses, func(item string, idx int) string {
 			return item
 		}),
-		ConsensusParams: &ConsensusParams{
+		ConsensusParams: ConsensusParams{
+			ValidatorElectionType:         e.ConsensusParams.ValidatorElectionType,
+			ProposerElectionType:          e.ConsensusParams.ProposerElectionType,
 			CheckpointPeriod:              e.ConsensusParams.CheckpointPeriod,
 			HighWatermarkCheckpointPeriod: e.ConsensusParams.HighWatermarkCheckpointPeriod,
 			MaxValidatorNum:               e.ConsensusParams.MaxValidatorNum,
@@ -182,39 +188,39 @@ func (e *EpochInfo) Clone() *EpochInfo {
 			EnableTimedGenEmptyBlock:      e.ConsensusParams.EnableTimedGenEmptyBlock,
 			NotActiveWeight:               e.ConsensusParams.NotActiveWeight,
 			ExcludeView:                   e.ConsensusParams.ExcludeView,
-			ProposerElectionType:          e.ConsensusParams.ProposerElectionType,
 		},
-		CandidateSet: lo.Map(e.CandidateSet, func(item *NodeInfo, idx int) *NodeInfo {
-			return &NodeInfo{
+		CandidateSet: lo.Map(e.CandidateSet, func(item NodeInfo, idx int) NodeInfo {
+			return NodeInfo{
 				ID:                   item.ID,
 				AccountAddress:       item.AccountAddress,
 				P2PNodeID:            item.P2PNodeID,
 				ConsensusVotingPower: item.ConsensusVotingPower,
 			}
 		}),
-		ValidatorSet: lo.Map(e.ValidatorSet, func(item *NodeInfo, idx int) *NodeInfo {
-			return &NodeInfo{
+		ValidatorSet: lo.Map(e.ValidatorSet, func(item NodeInfo, idx int) NodeInfo {
+			return NodeInfo{
 				ID:                   item.ID,
 				AccountAddress:       item.AccountAddress,
 				P2PNodeID:            item.P2PNodeID,
 				ConsensusVotingPower: item.ConsensusVotingPower,
 			}
 		}),
-		DataSyncerSet: lo.Map(e.DataSyncerSet, func(item *NodeInfo, idx int) *NodeInfo {
-			return &NodeInfo{
+		DataSyncerSet: lo.Map(e.DataSyncerSet, func(item NodeInfo, idx int) NodeInfo {
+			return NodeInfo{
 				ID:                   item.ID,
 				AccountAddress:       item.AccountAddress,
 				P2PNodeID:            item.P2PNodeID,
 				ConsensusVotingPower: item.ConsensusVotingPower,
 			}
 		}),
-		FinanceParams: &Finance{
-			GasLimit:      e.FinanceParams.GasLimit,
-			MaxGasPrice:   e.FinanceParams.MaxGasPrice,
-			MinGasPrice:   e.FinanceParams.MinGasPrice,
-			GasChangeRate: e.FinanceParams.GasChangeRate,
+		FinanceParams: Finance{
+			GasLimit:              e.FinanceParams.GasLimit,
+			MaxGasPrice:           e.FinanceParams.MaxGasPrice,
+			MinGasPrice:           e.FinanceParams.MinGasPrice,
+			GasChangeRateValue:    e.FinanceParams.GasChangeRateValue,
+			GasChangeRateDecimals: e.FinanceParams.GasChangeRateDecimals,
 		},
-		ConfigParams: &ConfigParams{
+		ConfigParams: ConfigParams{
 			TxMaxSize: e.ConfigParams.TxMaxSize,
 		},
 	}
@@ -267,11 +273,11 @@ func (e *EpochInfo) Check() error {
 		return errors.New("epoch info error: validators consensus_voting_power cannot all be zero")
 	}
 
-	if e.ConsensusParams.ProposerElectionType != ProposerElectionTypeWRF && e.ConsensusParams.ProposerElectionType != ProposerElectionTypeRotating {
-		return fmt.Errorf("epoch info error: unsupported proposer_election_type: %d", e.ConsensusParams.ProposerElectionType)
+	if e.ConsensusParams.ProposerElectionType != ProposerElectionTypeWRF && e.ConsensusParams.ProposerElectionType != ProposerElectionTypeAbnormalRotation {
+		return fmt.Errorf("epoch info error: unsupported proposer_election_type: %s", e.ConsensusParams.ProposerElectionType)
 	}
 	if e.ConsensusParams.ValidatorElectionType != ValidatorElectionTypeWRF && e.ConsensusParams.ValidatorElectionType != ValidatorElectionTypeVotingPowerPriority {
-		return fmt.Errorf("epoch info error: unsupported validator_election_type: %d", e.ConsensusParams.ValidatorElectionType)
+		return fmt.Errorf("epoch info error: unsupported validator_election_type: %s", e.ConsensusParams.ValidatorElectionType)
 	}
 
 	return nil
@@ -285,13 +291,13 @@ func (e *EpochInfo) Unmarshal(raw []byte) error {
 	return json.Unmarshal(raw, e)
 }
 
-func (e *EpochInfo) electValidatorsByWrf(electValidatorsByWrfSeed []byte, allEligibleNodes []*NodeInfo) []*NodeInfo {
+func (e *EpochInfo) electValidatorsByWrf(electValidatorsByWrfSeed []byte, allEligibleNodes []NodeInfo) []NodeInfo {
 	var i uint64 = 0
-	var validators []*NodeInfo
+	var validators []NodeInfo
 	for ; i < e.ConsensusParams.MaxValidatorNum; i++ {
 		validator := wrfSelectNodeByVotingPower(electValidatorsByWrfSeed, allEligibleNodes)
 		// exclude selected
-		allEligibleNodes = lo.Reject(allEligibleNodes, func(item *NodeInfo, index int) bool {
+		allEligibleNodes = lo.Reject(allEligibleNodes, func(item NodeInfo, index int) bool {
 			return item.ID == validator.ID
 		})
 		validators = append(validators, validator)
@@ -302,8 +308,8 @@ func (e *EpochInfo) electValidatorsByWrf(electValidatorsByWrfSeed []byte, allEli
 
 func (e *EpochInfo) ElectValidators(electValidatorsByWrfSeed []byte) error {
 	err := func() error {
-		var allEligibleNodes []*NodeInfo
-		var allNodes []*NodeInfo
+		var allEligibleNodes []NodeInfo
+		var allNodes []NodeInfo
 		for _, info := range e.ValidatorSet {
 			allNodes = append(allNodes, info.Clone())
 			if info.ConsensusVotingPower > 0 {
@@ -320,7 +326,7 @@ func (e *EpochInfo) ElectValidators(electValidatorsByWrfSeed []byte) error {
 			return errors.New("at least 4 nodes with voting weight greater than 0")
 		}
 
-		var validatorSet []*NodeInfo
+		var validatorSet []NodeInfo
 		if len(allEligibleNodes) <= int(e.ConsensusParams.MaxValidatorNum) {
 			sortNodesByVotingPower(allEligibleNodes)
 			validatorSet = allEligibleNodes
@@ -333,14 +339,14 @@ func (e *EpochInfo) ElectValidators(electValidatorsByWrfSeed []byte) error {
 				sortNodesByVotingPower(allEligibleNodes)
 				validatorSet = allEligibleNodes[:int(e.ConsensusParams.MaxValidatorNum)]
 			default:
-				return fmt.Errorf("epoch info error: unsupported validator_election_type: %d", e.ConsensusParams.ValidatorElectionType)
+				return fmt.Errorf("epoch info error: unsupported validator_election_type: %s", e.ConsensusParams.ValidatorElectionType)
 			}
 		}
 		e.ValidatorSet = validatorSet
-		validatorMap := lo.SliceToMap(validatorSet, func(info *NodeInfo) (uint64, struct{}) {
+		validatorMap := lo.SliceToMap(validatorSet, func(info NodeInfo) (uint64, struct{}) {
 			return info.ID, struct{}{}
 		})
-		e.CandidateSet = lo.Filter(allNodes, func(item *NodeInfo, index int) bool {
+		e.CandidateSet = lo.Filter(allNodes, func(item NodeInfo, index int) bool {
 			_, ok := validatorMap[item.ID]
 			return !ok
 		})
@@ -387,10 +393,10 @@ type EpochDerivedData struct {
 
 	NodeRoleMap map[uint64]NodeRole
 
-	NodeInfoMap map[uint64]*NodeInfo
+	NodeInfoMap map[uint64]NodeInfo
 
 	// will track validator consensusVotingPower
-	ValidatorMap map[uint64]*NodeInfo
+	ValidatorMap map[uint64]NodeInfo
 }
 
 type DynamicChainConfig struct {
@@ -437,9 +443,9 @@ func (c *ChainConfig) updateDerivedData() error {
 		return errors.New("validator_set, candidate_set, data_syncer_set cannot overlap(A node can only have one role at a time)")
 	}
 
-	c.NodeInfoMap = make(map[uint64]*NodeInfo)
+	c.NodeInfoMap = make(map[uint64]NodeInfo)
 	c.NodeRoleMap = make(map[uint64]NodeRole)
-	fillNodes := func(nodes []*NodeInfo, role NodeRole) {
+	fillNodes := func(nodes []NodeInfo, role NodeRole) {
 		for _, p := range nodes {
 			if p.AccountAddress == c.SelfAccountAddress {
 				c.SelfID = p.ID
@@ -453,7 +459,7 @@ func (c *ChainConfig) updateDerivedData() error {
 	fillNodes(c.EpochInfo.CandidateSet, NodeRoleCandidate)
 	fillNodes(c.EpochInfo.DataSyncerSet, NodeRoleDataSyncer)
 
-	c.ValidatorMap = lo.SliceToMap(c.EpochInfo.ValidatorSet, func(item *NodeInfo) (uint64, *NodeInfo) {
+	c.ValidatorMap = lo.SliceToMap(c.EpochInfo.ValidatorSet, func(item NodeInfo) (uint64, NodeInfo) {
 		return item.ID, item.Clone()
 	})
 
@@ -477,7 +483,7 @@ func (c *ChainConfig) calPrimaryIDByView(v uint64) uint64 {
 	switch c.EpochInfo.ConsensusParams.ProposerElectionType {
 	case ProposerElectionTypeWRF:
 		return c.wrfCalPrimaryIDByView(v)
-	case ProposerElectionTypeRotating:
+	case ProposerElectionTypeAbnormalRotation:
 		return v%uint64(c.N) + 1
 	default:
 		return c.wrfCalPrimaryIDByView(v)
