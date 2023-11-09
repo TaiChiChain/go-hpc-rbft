@@ -637,7 +637,11 @@ func (rbft *rbftImpl[T, Constraint]) processEvent(ee consensusEvent) consensusEv
 		}
 
 		rbft.processReqSetEvent(e)
-		rbft.metrics.processEventDuration.With("event", "request_set").Observe(time.Since(start).Seconds())
+		if e.Local {
+			rbft.metrics.processEventDuration.With("event", "add_local_tx").Observe(time.Since(start).Seconds())
+		} else {
+			rbft.metrics.processEventDuration.With("event", "add_remote_txs").Observe(time.Since(start).Seconds())
+		}
 		return nil
 
 	case *LocalEvent:
