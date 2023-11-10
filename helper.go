@@ -961,7 +961,11 @@ func (rbft *rbftImpl[T, Constraint]) verifySignedNewView(nv *consensus.NewView) 
 	if hErr != nil {
 		return nil, hErr
 	}
-	node, ok := rbft.chainConfig.NodeInfoMap[nv.GetReplicaId()]
+	from := nv.GetReplicaId()
+	if nv.AutoTermUpdate {
+		from = nv.FromId
+	}
+	node, ok := rbft.chainConfig.NodeInfoMap[from]
 	if !ok {
 		return nil, fmt.Errorf("invalid node %d not in router", nv.GetReplicaId())
 	}
