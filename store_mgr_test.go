@@ -10,6 +10,7 @@ import (
 	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/common/metrics/disabled"
+	"github.com/axiomesh/axiom-bft/types"
 )
 
 func newStorageTestNode[T any, Constraint consensus.TXConstraint[T]](ctrl *gomock.Controller) (*storeManager[T, Constraint], Config) {
@@ -17,6 +18,10 @@ func newStorageTestNode[T any, Constraint consensus.TXConstraint[T]](ctrl *gomoc
 
 	conf := Config{
 		SelfAccountAddress: "node2",
+		LastServiceState: &types.ServiceState{
+			MetaState: &types.MetaState{},
+			Epoch:     1,
+		},
 		GenesisEpochInfo: &EpochInfo{
 			Version:                   1,
 			Epoch:                     1,

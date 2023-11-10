@@ -44,8 +44,7 @@ type Config struct {
 	// self staking account address
 	SelfAccountAddress string
 
-	// Applied is the latest height index of application service which should be assigned when node restart.
-	Applied uint64
+	LastServiceState *types.ServiceState
 
 	// SetSize is the max size of a request set to broadcast among cluster.
 	SetSize int
@@ -259,7 +258,7 @@ func (rbft *rbftImpl[T, Constraint]) init() error {
 		return nil
 	}
 	// restore state from consensus database
-	rbft.exec.setLastExec(rbft.config.Applied)
+	rbft.exec.setLastExec(rbft.config.LastServiceState.MetaState.Height)
 
 	// load state from storage
 	if rErr := rbft.restoreState(); rErr != nil {
@@ -2297,7 +2296,8 @@ func (rbft *rbftImpl[T, Constraint]) moveWatermarks(n uint64, newEpoch bool) {
 			delete(rbft.storeMgr.batchStore, digest)
 			rbft.persistDelBatch(digest)
 		}
-		if batch.SeqNo <= n {
+		// ignore block that have already been executed（block execution is completed but checkpoint has not yet been completed）
+		if batch.SeqNo <= n && batch.SeqNo > rbft.config.LastServiceState.MetaState.Height {
 			digestList = append(digestList, digest)
 		}
 	}

@@ -588,7 +588,8 @@ func (rbft *rbftImpl[T, Constraint]) putBackRequestBatches(xset []*consensus.VcP
 	// but we can remove since we already have checkpoint after viewChange.
 	var deleteList []string
 	for digest, batch := range rbft.storeMgr.batchStore {
-		if batch.SeqNo <= rbft.chainConfig.H {
+		// ignore block that have already been executed（block execution is completed but checkpoint has not yet been completed）
+		if batch.SeqNo <= rbft.chainConfig.H && batch.SeqNo > rbft.config.LastServiceState.MetaState.Height {
 			rbft.logger.Debugf("Replica %d clear batch %s with seqNo %d <= initial checkpoint %d", rbft.chainConfig.SelfID, digest, batch.SeqNo, rbft.chainConfig.H)
 			delete(rbft.storeMgr.batchStore, digest)
 			rbft.persistDelBatch(digest)

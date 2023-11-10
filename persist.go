@@ -524,7 +524,30 @@ func (rbft *rbftImpl[T, Constraint]) restoreEpochInfo() {
 // restoreState restores lastExec, certStore, view, transaction batches, checkpoints, h and other related
 // params from database
 func (rbft *rbftImpl[T, Constraint]) restoreState() error {
+	var h uint64
+	hstr, err := rbft.storage.ReadState("rbft.h")
+	if err != nil {
+		rbft.logger.Debugf("Replica %d could not restore h: %s", rbft.chainConfig.SelfID, err)
+	} else {
+		h, err = strconv.ParseUint(string(hstr), 10, 64)
+		if err != nil {
+			rbft.logger.Warningf("transfer rbft.h from string to uint64 failed with err: %s", err)
+			return err
+		}
+	}
+
 	rbft.restoreEpochInfo()
+	if h != 0 && h < rbft.chainConfig.EpochInfo.StartBlock && rbft.chainConfig.EpochInfo.Epoch > 1 {
+		// this means that after the block is executed, the node is terminated before the checkpoint logic
+		// we need to get the epoch info of h, the current epoch information is not accepted
+		e, err := rbft.external.GetEpochInfo(rbft.chainConfig.EpochInfo.Epoch - 1)
+		if err != nil {
+			return errors.Wrapf(err, "failed to get epoch %d info", rbft.chainConfig.EpochInfo.Epoch-1)
+		}
+		rbft.chainConfig.EpochInfo = e
+		rbft.epochMgr.epoch = rbft.chainConfig.EpochInfo.Epoch
+	}
+
 	if err := rbft.chainConfig.updateDerivedData(); err != nil {
 		return err
 	}
@@ -560,8 +583,8 @@ func (rbft *rbftImpl[T, Constraint]) restoreState() error {
 		}
 	} else {
 		rbft.logger.Debugf("Replica %d could not restore checkpoints: %s", rbft.chainConfig.SelfID, err)
-		lastCheckpointBlockNumber := rbft.config.Applied / rbft.config.GenesisEpochInfo.ConsensusParams.CheckpointPeriod * rbft.config.GenesisEpochInfo.ConsensusParams.CheckpointPeriod
-		if rbft.config.GenesisEpochInfo.StartBlock != rbft.config.Applied && lastCheckpointBlockNumber != 0 {
+		lastCheckpointBlockNumber := rbft.config.LastServiceState.MetaState.Height / rbft.config.GenesisEpochInfo.ConsensusParams.CheckpointPeriod * rbft.config.GenesisEpochInfo.ConsensusParams.CheckpointPeriod
+		if rbft.config.GenesisEpochInfo.StartBlock != rbft.config.LastServiceState.MetaState.Height && lastCheckpointBlockNumber != 0 {
 			// find last checkpoint
 			lastCheckpointState := &types.ServiceState{
 				MetaState: &types.MetaState{
@@ -597,15 +620,7 @@ func (rbft *rbftImpl[T, Constraint]) restoreState() error {
 	}
 	rbft.chainConfig.updatePrimaryID()
 
-	hstr, rErr := rbft.storage.ReadState("rbft.h")
-	if rErr != nil {
-		rbft.logger.Debugf("Replica %d could not restore h: %s", rbft.chainConfig.SelfID, rErr)
-	} else {
-		h, err := strconv.ParseUint(string(hstr), 10, 64)
-		if err != nil {
-			rbft.logger.Warningf("transfer rbft.h from string to uint64 failed with err: %s", err)
-			return err
-		}
+	if h != 0 {
 		rbft.moveWatermarks(h, false)
 	}
 

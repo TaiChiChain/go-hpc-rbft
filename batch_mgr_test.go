@@ -133,7 +133,7 @@ func TestBatchMgr_findNextPrepareBatch(t *testing.T) {
 		rbfts[0].storeMgr.certStore[msgIDTmp].sentPrepare = false
 		assert.Nil(t, rbfts[0].findNextPrepareBatch(context.TODO(), 0, 20, "msg"))
 		assert.Equal(t, true, rbfts[0].storeMgr.certStore[msgIDTmp].sentPrepare)
-		// Digest == ""
+		// LastBlockDigest == ""
 		prePrepareTmpNil := &consensus.PrePrepare{
 			ReplicaId:      2,
 			View:           0,
