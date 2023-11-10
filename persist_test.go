@@ -14,6 +14,7 @@ import (
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/common/metrics/disabled"
 	"github.com/axiomesh/axiom-bft/txpool"
+	"github.com/axiomesh/axiom-bft/types"
 )
 
 func newPersistTestReplica[T any, Constraint consensus.TXConstraint[T]](ctrl *gomock.Controller) (*node[T, Constraint], *MockExternalStack[T, Constraint]) {
@@ -43,6 +44,10 @@ func newPersistTestReplica[T any, Constraint consensus.TXConstraint[T]](ctrl *go
 				NotActiveWeight:               1,
 				ExcludeView:                   10,
 			},
+		},
+		LastServiceState: &types.ServiceState{
+			MetaState: &types.MetaState{},
+			Epoch:     1,
 		},
 		SetSize:                 25,
 		SetTimeout:              100 * time.Millisecond,

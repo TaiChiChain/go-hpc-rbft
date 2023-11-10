@@ -235,9 +235,13 @@ func (tf *testFramework[T, Constraint]) newNodeConfig(
 				TxMaxSize: 10 * 32 * 1024,
 			},
 		},
-		SelfAccountAddress:      p2pNodeID,
-		SetSize:                 25,
-		SetTimeout:              100 * time.Millisecond,
+		SelfAccountAddress: p2pNodeID,
+		SetSize:            25,
+		SetTimeout:         100 * time.Millisecond,
+		LastServiceState: &types.ServiceState{
+			MetaState: &types.MetaState{},
+			Epoch:     epoch,
+		},
 		BatchTimeout:            2 * time.Second, // make sure the batch is too large to not trigger generate batch timer
 		RequestTimeout:          6 * time.Second,
 		NullRequestTimeout:      9 * time.Second,

@@ -11,11 +11,16 @@ import (
 	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/common/metrics/disabled"
+	"github.com/axiomesh/axiom-bft/types"
 )
 
 func newTestTimerMgr[T any, Constraint consensus.TXConstraint[T]](ctrl *gomock.Controller) *timerManager {
 	log := common.NewSimpleLogger()
 	conf := Config{
+		LastServiceState: &types.ServiceState{
+			MetaState: &types.MetaState{},
+			Epoch:     1,
+		},
 		SelfAccountAddress: "node1",
 		GenesisEpochInfo: &EpochInfo{
 			Version:                   1,

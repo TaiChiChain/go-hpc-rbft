@@ -465,6 +465,12 @@ func (rbft *rbftImpl[T, Constraint]) handleViewChangeEvent(e *LocalEvent) consen
 				"epoch=%d/n=%d/f=%d/view=%d/h=%d/lastExec=%d", rbft.chainConfig.SelfID, rbft.chainConfig.PrimaryID,
 				rbft.chainConfig.EpochInfo.Epoch, rbft.chainConfig.N, rbft.chainConfig.F, rbft.chainConfig.View, rbft.chainConfig.H, rbft.exec.lastExec)
 			rbft.external.SendFilterEvent(types.InformTypeFilterFinishRecovery, finishMsg)
+
+			// this means that after the block is executed, the node is terminated before the checkpoint logic
+			if rbft.chainConfig.H < rbft.config.LastServiceState.MetaState.Height {
+				//	try checkpoint
+				go rbft.reportCheckpoint(rbft.config.LastServiceState)
+			}
 		} else {
 			rbft.logger.Noticef("======== Replica %d finished viewChange, primary=%d, "+
 				"epoch=%d/n=%d/f=%d/view=%d/h=%d/lastExec=%d", rbft.chainConfig.SelfID, rbft.chainConfig.PrimaryID,

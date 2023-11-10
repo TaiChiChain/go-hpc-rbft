@@ -44,6 +44,10 @@ func newMockRbft[T any, Constraint consensus.TXConstraint[T]](t *testing.T, ctrl
 				ExcludeView:                   10,
 			},
 		},
+		LastServiceState: &types.ServiceState{
+			MetaState: &types.MetaState{},
+			Epoch:     1,
+		},
 		SetSize:                 25,
 		SetTimeout:              100 * time.Millisecond,
 		BatchTimeout:            500 * time.Millisecond,
