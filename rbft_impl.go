@@ -17,6 +17,7 @@ package rbft
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -48,9 +49,6 @@ type Config struct {
 
 	// SetSize is the max size of a request set to broadcast among cluster.
 	SetSize int
-
-	// SetTimeout is the max time duration before one generating a request set.
-	SetTimeout time.Duration
 
 	// BatchTimeout is the max time duration before primary generating a request batch.
 	BatchTimeout time.Duration
@@ -114,6 +112,9 @@ type Config struct {
 
 	// CommittedBlockCacheNumber is committed block cache number after checkpoint
 	CommittedBlockCacheNumber uint64
+
+	// ContinuousNullRequestToleranceNumber Viewchange will be sent when there is a packageable transaction locally and n nullrequests are received consecutively.
+	ContinuousNullRequestToleranceNumber uint64
 }
 
 // rbftImpl is the core struct of RBFT service, which handles all functions about consensus.
@@ -193,6 +194,7 @@ func newRBFT[T any, Constraint consensus.TXConstraint[T]](c Config, external Ext
 			H: c.GenesisEpochInfo.StartBlock,
 		},
 		SelfAccountAddress: c.SelfAccountAddress,
+		logger:             c.Logger,
 	}
 	rbft := &rbftImpl[T, Constraint]{
 		chainConfig:          chainConfig,
@@ -738,7 +740,7 @@ func (rbft *rbftImpl[T, Constraint]) handleNullRequestTimerEvent() {
 		rbft.logger.Warningf("Replica %d null request timer expired, sending viewChange", rbft.chainConfig.SelfID)
 		rbft.sendViewChange()
 	} else {
-		rbft.logger.Infof("Primary %d null request timer expired, sending null request", rbft.chainConfig.SelfID)
+		// rbft.logger.Infof("Primary %d null request timer expired, sending null request", rbft.chainConfig.SelfID)
 		rbft.sendNullRequest()
 
 		rbft.trySyncState()
@@ -788,7 +790,19 @@ func (rbft *rbftImpl[T, Constraint]) recvNullRequest(msg *consensus.NullRequest)
 		return nil
 	}
 
-	rbft.logger.Infof("Replica %d received null request from primary %d", rbft.chainConfig.SelfID, msg.ReplicaId)
+	if rbft.vcMgr.lastNullRequestSeqNo == rbft.batchMgr.getSeqNo() && rbft.batchMgr.requestPool.HasPendingRequestInPool() {
+		rbft.vcMgr.continuousNullRequestCounter++
+		if rbft.vcMgr.continuousNullRequestCounter > rbft.config.ContinuousNullRequestToleranceNumber {
+			rbft.logger.Warningf("Replica %d received continuous %d null request from primary %d", rbft.chainConfig.SelfID, rbft.vcMgr.continuousNullRequestCounter, msg.ReplicaId)
+			rbft.sendViewChange()
+			return nil
+		}
+	} else {
+		rbft.vcMgr.continuousNullRequestCounter = 1
+		rbft.vcMgr.lastNullRequestSeqNo = rbft.batchMgr.getSeqNo()
+	}
+
+	// rbft.logger.Infof("Replica %d received null request from primary %d", rbft.chainConfig.SelfID, msg.ReplicaId)
 
 	rbft.trySyncState()
 	rbft.nullReqTimerReset()
@@ -2105,6 +2119,8 @@ func (rbft *rbftImpl[T, Constraint]) finishNormalCheckpoint(checkpointHeight uin
 
 		// update view after checkpoint
 		// persist new view
+		rbft.setLastStableView(newView)
+		rbft.setView(newView)
 		nv := &consensus.NewView{
 			ReplicaId:     rbft.chainConfig.PrimaryID,
 			View:          newView,
@@ -2117,7 +2133,18 @@ func (rbft *rbftImpl[T, Constraint]) finishNormalCheckpoint(checkpointHeight uin
 			},
 			FromId:         rbft.chainConfig.SelfID,
 			AutoTermUpdate: true,
+			ValidatorDynamicInfo: lo.MapToSlice(rbft.chainConfig.ValidatorDynamicInfoMap, func(id uint64, item *NodeDynamicInfo) *consensus.NodeDynamicInfo {
+				return &consensus.NodeDynamicInfo{
+					Id:                             item.ID,
+					ConsensusVotingPower:           item.ConsensusVotingPower,
+					ConsensusVotingPowerReduced:    item.ConsensusVotingPowerReduced,
+					ConsensusVotingPowerReduceView: item.ConsensusVotingPowerReduceView,
+				}
+			}),
 		}
+		sort.Slice(nv.ValidatorDynamicInfo, func(i, j int) bool {
+			return nv.ValidatorDynamicInfo[i].Id < nv.ValidatorDynamicInfo[j].Id
+		})
 		sig, sErr := rbft.signNewView(nv)
 		if sErr != nil {
 			rbft.logger.Warningf("Replica %d sign new view failed: %s", rbft.chainConfig.SelfID, sErr)

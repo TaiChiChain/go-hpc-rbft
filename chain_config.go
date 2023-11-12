@@ -10,6 +10,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/samber/lo"
+
+	"github.com/axiomesh/axiom-bft/common"
 )
 
 const (
@@ -21,6 +23,13 @@ const (
 	ProposerElectionTypeWRF              = "wrf"
 	ProposerElectionTypeAbnormalRotation = "abnormal-rotation"
 )
+
+type NodeDynamicInfo struct {
+	ID                             uint64
+	ConsensusVotingPower           int64
+	ConsensusVotingPowerReduced    bool
+	ConsensusVotingPowerReduceView uint64
+}
 
 // NodeInfo node info
 type NodeInfo struct {
@@ -39,7 +48,7 @@ type NodeInfo struct {
 	ConsensusVotingPower int64 `mapstructure:"consensus_voting_power" toml:"consensus_voting_power" json:"consensus_voting_power"`
 }
 
-func wrfSelectNodeByVotingPower(seed []byte, nodes []NodeInfo) NodeInfo {
+func wrfSelectNodeByVotingPower(seed []byte, nodeID2VotingPower map[uint64]int64) uint64 {
 	h := sha256.New()
 	_, err := h.Write(seed)
 	if err != nil {
@@ -48,8 +57,11 @@ func wrfSelectNodeByVotingPower(seed []byte, nodes []NodeInfo) NodeInfo {
 	seedHash := h.Sum(nil)
 
 	// clone
-	nodeSet := lo.Map(nodes, func(item NodeInfo, idx int) NodeInfo {
-		return item.Clone()
+	nodeSet := lo.MapToSlice(nodeID2VotingPower, func(id uint64, votingPower int64) NodeInfo {
+		return NodeInfo{
+			ID:                   id,
+			ConsensusVotingPower: votingPower,
+		}
 	})
 	// sort by id
 	sort.Slice(nodeSet, func(i, j int) bool {
@@ -69,7 +81,7 @@ func wrfSelectNodeByVotingPower(seed []byte, nodes []NodeInfo) NodeInfo {
 	seedInt := big.NewInt(0).SetBytes(seedHash)
 	selectedCumulativeVotingPower := seedInt.Mod(seedInt, big.NewInt(int64(totalVotingPower))).Uint64()
 	selectedIndex := binarySearch(cumulativeVotingPowers, selectedCumulativeVotingPower)
-	return nodeSet[selectedIndex]
+	return nodeSet[selectedIndex].ID
 }
 
 func sortNodesByVotingPower(nodes []NodeInfo) {
@@ -120,7 +132,10 @@ type ConsensusParams struct {
 	NotActiveWeight int64 `mapstructure:"not_active_weight" toml:"not_active_weight" json:"not_active_weight"`
 
 	// The low weight of the viewchange node is restored to normal after the specified number of rounds.
-	ExcludeView uint64 `mapstructure:"exclude_view" toml:"exclude_view" json:"exclude_view"`
+	AbnormalNodeExcludeView uint64 `mapstructure:"abnormal_node_exclude_view" toml:"abnormal_node_exclude_view" json:"abnormal_node_exclude_view"`
+
+	// The block interval for node to propose again, Ensure that a node cannot continuously produce blocks
+	AgainProposeIntervalBlock uint64 `mapstructure:"again_propose_interval_block" toml:"again_propose_interval_block" json:"again_propose_interval_block"`
 }
 
 type EpochInfo struct {
@@ -186,7 +201,7 @@ func (e *EpochInfo) Clone() *EpochInfo {
 			BlockMaxTxNum:                 e.ConsensusParams.BlockMaxTxNum,
 			EnableTimedGenEmptyBlock:      e.ConsensusParams.EnableTimedGenEmptyBlock,
 			NotActiveWeight:               e.ConsensusParams.NotActiveWeight,
-			ExcludeView:                   e.ConsensusParams.ExcludeView,
+			AbnormalNodeExcludeView:       e.ConsensusParams.AbnormalNodeExcludeView,
 		},
 		CandidateSet: lo.Map(e.CandidateSet, func(item NodeInfo, idx int) NodeInfo {
 			return NodeInfo{
@@ -248,7 +263,7 @@ func (e *EpochInfo) Check() error {
 		return errors.New("epoch info error: block_max_tx_num cannot be 0")
 	}
 
-	if e.ConsensusParams.ExcludeView == 0 {
+	if e.ConsensusParams.AbnormalNodeExcludeView == 0 {
 		return errors.New("epoch info error: exclude_view cannot be 0")
 	}
 
@@ -292,14 +307,26 @@ func (e *EpochInfo) Unmarshal(raw []byte) error {
 
 func (e *EpochInfo) electValidatorsByWrf(electValidatorsByWrfSeed []byte, allEligibleNodes []NodeInfo) []NodeInfo {
 	var i uint64 = 0
+	allEligibleNodeDynamicInfoMap := make(map[uint64]NodeDynamicInfo)
+	allEligibleNodeMap := make(map[uint64]NodeInfo)
+	for _, eligibleNode := range allEligibleNodes {
+		allEligibleNodeDynamicInfoMap[eligibleNode.ID] = NodeDynamicInfo{
+			ID:                             eligibleNode.ID,
+			ConsensusVotingPower:           eligibleNode.ConsensusVotingPower,
+			ConsensusVotingPowerReduced:    false,
+			ConsensusVotingPowerReduceView: 0,
+		}
+		allEligibleNodeMap[eligibleNode.ID] = eligibleNode
+	}
+
 	var validators []NodeInfo
 	for ; i < e.ConsensusParams.MaxValidatorNum; i++ {
-		validator := wrfSelectNodeByVotingPower(electValidatorsByWrfSeed, allEligibleNodes)
+		validatorID := wrfSelectNodeByVotingPower(electValidatorsByWrfSeed, lo.SliceToMap(allEligibleNodes, func(item NodeInfo) (uint64, int64) {
+			return item.ID, item.ConsensusVotingPower
+		}))
 		// exclude selected
-		allEligibleNodes = lo.Reject(allEligibleNodes, func(item NodeInfo, index int) bool {
-			return item.ID == validator.ID
-		})
-		validators = append(validators, validator)
+		delete(allEligibleNodeDynamicInfoMap, validatorID)
+		validators = append(validators, allEligibleNodeMap[validatorID])
 	}
 
 	return validators
@@ -399,8 +426,14 @@ type EpochDerivedData struct {
 }
 
 type DynamicChainConfig struct {
+	// will track validator consensusVotingPower
+	ValidatorDynamicInfoMap map[uint64]*NodeDynamicInfo
+
 	// Low watermark block number.
 	H uint64
+
+	// Last stable view, change by ViewChangeDone and Checkpoint.
+	LastStableView uint64
 
 	// Current view(auto-increment), change by ViewChange and Checkpoint.
 	View uint64
@@ -422,6 +455,8 @@ type ChainConfig struct {
 	DynamicChainConfig
 
 	SelfAccountAddress string
+
+	logger common.Logger
 }
 
 func (c *ChainConfig) isProposerElectionTypeWRF() bool {
@@ -462,6 +497,15 @@ func (c *ChainConfig) updateDerivedData() error {
 		return item.ID, item.Clone()
 	})
 
+	c.ValidatorDynamicInfoMap = lo.MapEntries(c.ValidatorMap, func(id uint64, nodeInfo NodeInfo) (uint64, *NodeDynamicInfo) {
+		return id, &NodeDynamicInfo{
+			ID:                             id,
+			ConsensusVotingPower:           nodeInfo.ConsensusVotingPower,
+			ConsensusVotingPowerReduced:    false,
+			ConsensusVotingPowerReduceView: 0,
+		}
+	})
+
 	c.N = len(c.EpochInfo.ValidatorSet)
 	c.F = (c.N - 1) / 3
 	c.L = c.EpochInfo.ConsensusParams.CheckpointPeriod * c.EpochInfo.ConsensusParams.HighWatermarkCheckpointPeriod
@@ -474,19 +518,26 @@ func (c *ChainConfig) wrfCalPrimaryIDByView(v uint64) uint64 {
 	var seed = []byte(c.LastCheckpointExecBlockHash)
 	seed = binary.BigEndian.AppendUint64(seed, c.EpochInfo.Epoch)
 	seed = binary.BigEndian.AppendUint64(seed, v)
-	return wrfSelectNodeByVotingPower(seed, c.EpochInfo.ValidatorSet).ID
+	return wrfSelectNodeByVotingPower(seed, lo.MapEntries(c.ValidatorDynamicInfoMap, func(id uint64, nodeInfo *NodeDynamicInfo) (uint64, int64) {
+		return id, nodeInfo.ConsensusVotingPower
+	}))
 }
 
 // primaryID returns the expected primary id with the given view v
 func (c *ChainConfig) calPrimaryIDByView(v uint64) uint64 {
+	validatorDynamicInfo := c.validatorDynamicInfo()
+
+	var primaryID uint64
 	switch c.EpochInfo.ConsensusParams.ProposerElectionType {
 	case ProposerElectionTypeWRF:
-		return c.wrfCalPrimaryIDByView(v)
+		primaryID = c.wrfCalPrimaryIDByView(v)
 	case ProposerElectionTypeAbnormalRotation:
-		return v%uint64(c.N) + 1
+		primaryID = v%uint64(c.N) + 1
 	default:
-		return c.wrfCalPrimaryIDByView(v)
+		primaryID = c.wrfCalPrimaryIDByView(v)
 	}
+	c.logger.Debugf("calPrimaryIDByView, view: %d, primary id: %d, validatorDynamicInfo: %v", v, primaryID, validatorDynamicInfo)
+	return primaryID
 }
 
 func binarySearch(nums []uint64, target uint64) int {
@@ -506,4 +557,10 @@ func binarySearch(nums []uint64, target uint64) int {
 
 func (c *ChainConfig) updatePrimaryID() {
 	c.PrimaryID = c.calPrimaryIDByView(c.View)
+}
+
+func (c *ChainConfig) validatorDynamicInfo() []NodeDynamicInfo {
+	return lo.MapToSlice(c.ValidatorDynamicInfoMap, func(id uint64, nodeInfo *NodeDynamicInfo) NodeDynamicInfo {
+		return *nodeInfo
+	})
 }

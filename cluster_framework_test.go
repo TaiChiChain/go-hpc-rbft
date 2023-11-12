@@ -222,7 +222,7 @@ func (tf *testFramework[T, Constraint]) newNodeConfig(
 				MaxValidatorNum:               10,
 				BlockMaxTxNum:                 100,
 				NotActiveWeight:               1,
-				ExcludeView:                   10,
+				AbnormalNodeExcludeView:       10,
 			},
 			FinanceParams: Finance{
 				GasLimit:              0x5f5e100,
@@ -237,7 +237,6 @@ func (tf *testFramework[T, Constraint]) newNodeConfig(
 		},
 		SelfAccountAddress: p2pNodeID,
 		SetSize:            25,
-		SetTimeout:         100 * time.Millisecond,
 		LastServiceState: &types.ServiceState{
 			MetaState: &types.MetaState{},
 			Epoch:     epoch,

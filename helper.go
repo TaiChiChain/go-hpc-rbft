@@ -218,7 +218,7 @@ func (rbft *rbftImpl[T, Constraint]) nullReqTimerReset() {
 	timeout := rbft.timerMgr.getTimeoutValue(nullRequestTimer)
 	if !rbft.isPrimary(rbft.chainConfig.SelfID) {
 		// we're waiting for the primary to deliver a null request - give it a bit more time
-		timeout = 3*timeout + rbft.timerMgr.getTimeoutValue(requestTimer)
+		timeout = 3 * timeout / 2
 	}
 
 	event := &LocalEvent{
@@ -956,7 +956,7 @@ func (rbft *rbftImpl[T, Constraint]) signNewView(nv *consensus.NewView) ([]byte,
 
 // verifySignedNewView returns whether given NewView contains a valid signature.
 func (rbft *rbftImpl[T, Constraint]) verifySignedNewView(nv *consensus.NewView) ([]byte, error) {
-	rbft.logger.Debugf("verifySignedNewView: ")
+	rbft.logger.Debugf("verifySignedNewView, view: %d, new primary: %d, from: %d", nv.View, nv.ReplicaId, nv.FromId)
 	hash, hErr := rbft.calculateNewViewHash(nv)
 	if hErr != nil {
 		return nil, hErr
@@ -974,10 +974,11 @@ func (rbft *rbftImpl[T, Constraint]) verifySignedNewView(nv *consensus.NewView) 
 
 func (rbft *rbftImpl[T, Constraint]) calculateNewViewHash(nv *consensus.NewView) ([]byte, error) {
 	signValue := &consensus.NewView{
-		ReplicaId:      nv.ReplicaId,
-		View:           nv.View,
-		Xset:           nv.Xset,
-		AutoTermUpdate: nv.AutoTermUpdate,
+		ReplicaId:            nv.ReplicaId,
+		View:                 nv.View,
+		Xset:                 nv.Xset,
+		AutoTermUpdate:       nv.AutoTermUpdate,
+		ValidatorDynamicInfo: nv.ValidatorDynamicInfo,
 	}
 	res, mErr := signValue.MarshalVTStrict()
 	if mErr != nil {
