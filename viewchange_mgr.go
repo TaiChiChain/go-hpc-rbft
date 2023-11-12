@@ -17,7 +17,10 @@ package rbft
 import (
 	"context"
 	"encoding/hex"
+	"sort"
 	"time"
+
+	"github.com/samber/lo"
 
 	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
@@ -58,6 +61,9 @@ type vcManager struct {
 	higherViewRecord map[uint64]uint64
 
 	logger common.Logger
+
+	continuousNullRequestCounter uint64
+	lastNullRequestSeqNo         uint64
 }
 
 // quorumViewChangeCache is the cache of a QuorumViewChange message.
@@ -122,13 +128,63 @@ func newVcManager(c Config) *vcManager {
 	return vcm
 }
 
+func (rbft *rbftImpl[T, Constraint]) punishAbnormalNodes(view uint64) {
+	if view == rbft.chainConfig.LastStableView || view <= rbft.chainConfig.View {
+		return
+	}
+	rbft.logger.Infof("Replica %d punish abnormal nodes, pre view: %d, now view: %d", rbft.chainConfig.SelfID, rbft.chainConfig.View, view)
+
+	punishAbnormalNode := func(v uint64) {
+		abnormalNodeID := rbft.chainConfig.calPrimaryIDByView(v)
+		rbft.logger.Warningf("Replica %d reduce the voting power of abnormal node %d, view %d", rbft.chainConfig.SelfID, abnormalNodeID, v)
+		rbft.chainConfig.ValidatorDynamicInfoMap[abnormalNodeID].ConsensusVotingPowerReduced = true
+		rbft.chainConfig.ValidatorDynamicInfoMap[abnormalNodeID].ConsensusVotingPowerReduceView = v
+		rbft.chainConfig.ValidatorDynamicInfoMap[abnormalNodeID].ConsensusVotingPower = rbft.chainConfig.EpochInfo.ConsensusParams.NotActiveWeight
+	}
+	// There may be multiple rounds of viewchange, so it is necessary to reduce the selected primary nodes in each round.
+	for v := rbft.chainConfig.View; v < view; v++ {
+		punishAbnormalNode(v)
+	}
+}
+
 // setView sets the view with the viewLock.
 func (rbft *rbftImpl[T, Constraint]) setView(view uint64) {
+	rbft.viewLock.Lock()
+	if !rbft.isTest {
+		rbft.punishAbnormalNodes(view)
+	}
+	rbft.chainConfig.View = view
+	rbft.chainConfig.updatePrimaryID()
+	rbft.viewLock.Unlock()
+	rbft.metrics.viewGauge.Set(float64(view))
+}
+
+func (rbft *rbftImpl[T, Constraint]) setViewWithRecovery(view uint64) {
 	rbft.viewLock.Lock()
 	rbft.chainConfig.View = view
 	rbft.chainConfig.updatePrimaryID()
 	rbft.viewLock.Unlock()
 	rbft.metrics.viewGauge.Set(float64(view))
+}
+
+// setLastStableView after checkpoint or accept newView
+func (rbft *rbftImpl[T, Constraint]) setLastStableView(view uint64) {
+	if rbft.chainConfig.LastStableView == view {
+		return
+	}
+	rbft.chainConfig.LastStableView = view
+
+	if view != 0 && !rbft.isTest {
+		// recover abnormal node voting power
+		for id, n := range rbft.chainConfig.ValidatorDynamicInfoMap {
+			if n.ConsensusVotingPowerReduced && view >= n.ConsensusVotingPowerReduceView+rbft.chainConfig.EpochInfo.ConsensusParams.AbnormalNodeExcludeView {
+				rbft.logger.Infof("Replica %d recover abnormal node %d voting power from %d to %d, reduce view: %d", rbft.chainConfig.SelfID, id, n.ConsensusVotingPower, rbft.chainConfig.ValidatorMap[id].ConsensusVotingPower, n.ConsensusVotingPowerReduceView)
+				n.ConsensusVotingPower = rbft.chainConfig.ValidatorMap[id].ConsensusVotingPower
+				n.ConsensusVotingPowerReduced = false
+				n.ConsensusVotingPowerReduceView = 0
+			}
+		}
+	}
 }
 
 func (rbft *rbftImpl[T, Constraint]) checkView(msg *consensus.ConsensusMessage) {
@@ -170,7 +226,7 @@ func (rbft *rbftImpl[T, Constraint]) sendViewChange(status ...bool) consensusEve
 
 	// do some check and do some preparation
 	// such as stop nullRequest timer, clean vcMgr.viewChangeStore and so on.
-	err := rbft.beforeSendVC()
+	err := rbft.beforeSendVC(recovery)
 	if err != nil {
 		return nil
 	}
@@ -532,7 +588,18 @@ func (rbft *rbftImpl[T, Constraint]) sendNewView() consensusEvent {
 			},
 		},
 		FromId: rbft.chainConfig.SelfID,
+		ValidatorDynamicInfo: lo.MapToSlice(rbft.chainConfig.ValidatorDynamicInfoMap, func(id uint64, item *NodeDynamicInfo) *consensus.NodeDynamicInfo {
+			return &consensus.NodeDynamicInfo{
+				Id:                             item.ID,
+				ConsensusVotingPower:           item.ConsensusVotingPower,
+				ConsensusVotingPowerReduced:    item.ConsensusVotingPowerReduced,
+				ConsensusVotingPowerReduceView: item.ConsensusVotingPowerReduceView,
+			}
+		}),
 	}
+	sort.Slice(nv.ValidatorDynamicInfo, func(i, j int) bool {
+		return nv.ValidatorDynamicInfo[i].Id < nv.ValidatorDynamicInfo[j].Id
+	})
 	sig, sErr := rbft.signNewView(nv)
 	if sErr != nil {
 		rbft.logger.Warningf("Replica %d sign new view failed: %s", rbft.chainConfig.SelfID, sErr)
@@ -1188,7 +1255,7 @@ func (rbft *rbftImpl[T, Constraint]) softStartNewViewTimer(timeout time.Duration
 // 2. increase the view and delete new view of old view in newViewStore
 // 3. update pqlist
 // 4. delete old viewChange message
-func (rbft *rbftImpl[T, Constraint]) beforeSendVC() error {
+func (rbft *rbftImpl[T, Constraint]) beforeSendVC(recovery bool) error {
 	rbft.stopNewViewTimer()
 	rbft.timerMgr.stopTimer(nullRequestTimer)
 	rbft.stopFetchCheckpointTimer()
@@ -1207,7 +1274,12 @@ func (rbft *rbftImpl[T, Constraint]) beforeSendVC() error {
 	rbft.metrics.statusGaugeInConfChange.Set(0)
 
 	newView := rbft.chainConfig.View + uint64(1)
-	rbft.setView(newView)
+	if recovery {
+		rbft.setViewWithRecovery(newView)
+	} else {
+		rbft.setView(newView)
+	}
+
 	delete(rbft.vcMgr.newViewStore, rbft.chainConfig.View)
 
 	// clear old messages

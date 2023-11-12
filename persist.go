@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/samber/lo"
 
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/types"
@@ -457,7 +458,20 @@ func (rbft *rbftImpl[T, Constraint]) persistNewView(nv *consensus.NewView) {
 		rbft.logger.Errorf("Persist NewView failed with err: %s ", err)
 	}
 
+	rbft.setLastStableView(nv.View)
 	rbft.setView(nv.View)
+
+	if nv.View != 0 && nv.FromId != rbft.chainConfig.SelfID {
+		rbft.chainConfig.ValidatorDynamicInfoMap = lo.SliceToMap(nv.ValidatorDynamicInfo, func(v *consensus.NodeDynamicInfo) (uint64, *NodeDynamicInfo) {
+			return v.Id, &NodeDynamicInfo{
+				ID:                             v.Id,
+				ConsensusVotingPower:           v.ConsensusVotingPower,
+				ConsensusVotingPowerReduced:    v.ConsensusVotingPowerReduced,
+				ConsensusVotingPowerReduceView: v.ConsensusVotingPowerReduceView,
+			}
+		})
+	}
+
 	rbft.vcMgr.latestNewView = nv
 	rbft.vcMgr.latestQuorumViewChange = nil
 }
@@ -471,6 +485,7 @@ func (rbft *rbftImpl[T, Constraint]) restoreView() {
 		if err == nil {
 			rbft.logger.Debugf("Replica %d restore view %d", rbft.chainConfig.SelfID, nv.View)
 			rbft.vcMgr.latestNewView = nv
+			rbft.setLastStableView(nv.View)
 			rbft.setView(nv.View)
 			rbft.logger.Noticef("========= restore view %d =======", rbft.chainConfig.View)
 			return
@@ -480,6 +495,7 @@ func (rbft *rbftImpl[T, Constraint]) restoreView() {
 	}
 	// initial view 0 in new epoch.
 	rbft.vcMgr.latestNewView = initialNewView
+	rbft.setLastStableView(0)
 	rbft.setView(0)
 }
 

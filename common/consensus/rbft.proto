@@ -123,6 +123,13 @@ message QuorumViewChange {
     repeated ViewChange view_changes = 2;
 }
 
+message NodeDynamicInfo {
+    uint64 id = 1;
+    int64 consensus_voting_power = 2;
+    bool consensus_voting_power_reduced = 3;
+    uint64 consensus_voting_power_reduce_view = 4;
+}
+
 message NewView {
     // new primary id
     uint64 replica_id = 1;
@@ -134,6 +141,7 @@ message NewView {
     // signed from replica id(for wrf check)
     uint64 from_id = 7;
     bool auto_term_update = 8;
+    repeated NodeDynamicInfo validator_dynamic_info = 9;
 }
 
 message FetchView {

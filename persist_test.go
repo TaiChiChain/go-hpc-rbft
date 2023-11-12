@@ -42,7 +42,7 @@ func newPersistTestReplica[T any, Constraint consensus.TXConstraint[T]](ctrl *go
 				MaxValidatorNum:               10,
 				BlockMaxTxNum:                 500,
 				NotActiveWeight:               1,
-				ExcludeView:                   10,
+				AbnormalNodeExcludeView:       10,
 			},
 		},
 		LastServiceState: &types.ServiceState{
@@ -50,7 +50,6 @@ func newPersistTestReplica[T any, Constraint consensus.TXConstraint[T]](ctrl *go
 			Epoch:     1,
 		},
 		SetSize:                 25,
-		SetTimeout:              100 * time.Millisecond,
 		BatchTimeout:            500 * time.Millisecond,
 		RequestTimeout:          6 * time.Second,
 		NullRequestTimeout:      9 * time.Second,

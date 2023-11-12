@@ -38,7 +38,7 @@ func newTestTimerMgr[T any, Constraint consensus.TXConstraint[T]](ctrl *gomock.C
 				MaxValidatorNum:               10,
 				BlockMaxTxNum:                 500,
 				NotActiveWeight:               1,
-				ExcludeView:                   10,
+				AbnormalNodeExcludeView:       10,
 			},
 		},
 		Logger:      log,

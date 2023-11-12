@@ -79,44 +79,6 @@ func (c *StorageDelStateCall) DoAndReturn(f func(string) error) *StorageDelState
 	return c
 }
 
-// Destroy mocks base method.
-func (m *MockStorage) Destroy(key string) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Destroy", key)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Destroy indicates an expected call of Destroy.
-func (mr *MockStorageMockRecorder) Destroy(key any) *StorageDestroyCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Destroy", reflect.TypeOf((*MockStorage)(nil).Destroy), key)
-	return &StorageDestroyCall{Call: call}
-}
-
-// StorageDestroyCall wrap *gomock.Call
-type StorageDestroyCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *StorageDestroyCall) Return(arg0 error) *StorageDestroyCall {
-	c.Call = c.Call.Return(arg0)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *StorageDestroyCall) Do(f func(string) error) *StorageDestroyCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *StorageDestroyCall) DoAndReturn(f func(string) error) *StorageDestroyCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
 // ReadState mocks base method.
 func (m *MockStorage) ReadState(key string) ([]byte, error) {
 	m.ctrl.T.Helper()
@@ -846,44 +808,6 @@ func (c *ExternalStackDelStateCall[T, Constraint]) Do(f func(string) error) *Ext
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *ExternalStackDelStateCall[T, Constraint]) DoAndReturn(f func(string) error) *ExternalStackDelStateCall[T, Constraint] {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// Destroy mocks base method.
-func (m *MockExternalStack[T, Constraint]) Destroy(key string) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Destroy", key)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Destroy indicates an expected call of Destroy.
-func (mr *MockExternalStackMockRecorder[T, Constraint]) Destroy(key any) *ExternalStackDestroyCall[T, Constraint] {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Destroy", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).Destroy), key)
-	return &ExternalStackDestroyCall[T, Constraint]{Call: call}
-}
-
-// ExternalStackDestroyCall wrap *gomock.Call
-type ExternalStackDestroyCall[T any, Constraint consensus.TXConstraint[T]] struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *ExternalStackDestroyCall[T, Constraint]) Return(arg0 error) *ExternalStackDestroyCall[T, Constraint] {
-	c.Call = c.Call.Return(arg0)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *ExternalStackDestroyCall[T, Constraint]) Do(f func(string) error) *ExternalStackDestroyCall[T, Constraint] {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *ExternalStackDestroyCall[T, Constraint]) DoAndReturn(f func(string) error) *ExternalStackDestroyCall[T, Constraint] {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

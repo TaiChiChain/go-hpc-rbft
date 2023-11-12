@@ -23,7 +23,7 @@ func TestEpochInfo_ElectValidators(t *testing.T) {
 			BlockMaxTxNum:                 500,
 			EnableTimedGenEmptyBlock:      false,
 			NotActiveWeight:               1,
-			ExcludeView:                   100,
+			AbnormalNodeExcludeView:       100,
 		},
 		CandidateSet: []NodeInfo{
 			{
