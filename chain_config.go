@@ -165,11 +165,11 @@ type EpochInfo struct {
 
 	MiscParams MiscParams `mapstructure:"misc_params" toml:"misc_params" json:"misc_params"`
 
-	// Candidate set(Do not participate in consensus, only synchronize consensus results).
-	CandidateSet []NodeInfo `mapstructure:"candidate_set" toml:"candidate_set" json:"candidate_set"`
-
 	// Validator set(Participation consensus)
 	ValidatorSet []NodeInfo `mapstructure:"validator_set" toml:"validator_set" json:"validator_set"`
+
+	// Candidate set(Do not participate in consensus, only synchronize consensus results).
+	CandidateSet []NodeInfo `mapstructure:"candidate_set" toml:"candidate_set" json:"candidate_set"`
 
 	DataSyncerSet []NodeInfo `mapstructure:"data_syncer_set" toml:"data_syncer_set" json:"data_syncer_set"`
 }
@@ -196,17 +196,29 @@ func (e *EpochInfo) Clone() *EpochInfo {
 			return item
 		}),
 		ConsensusParams: ConsensusParams{
-			ValidatorElectionType:         e.ConsensusParams.ValidatorElectionType,
-			ProposerElectionType:          e.ConsensusParams.ProposerElectionType,
-			CheckpointPeriod:              e.ConsensusParams.CheckpointPeriod,
-			HighWatermarkCheckpointPeriod: e.ConsensusParams.HighWatermarkCheckpointPeriod,
-			MaxValidatorNum:               e.ConsensusParams.MaxValidatorNum,
-			BlockMaxTxNum:                 e.ConsensusParams.BlockMaxTxNum,
-			EnableTimedGenEmptyBlock:      e.ConsensusParams.EnableTimedGenEmptyBlock,
-			NotActiveWeight:               e.ConsensusParams.NotActiveWeight,
-			AbnormalNodeExcludeView:       e.ConsensusParams.AbnormalNodeExcludeView,
+			ValidatorElectionType:                e.ConsensusParams.ValidatorElectionType,
+			ProposerElectionType:                 e.ConsensusParams.ProposerElectionType,
+			CheckpointPeriod:                     e.ConsensusParams.CheckpointPeriod,
+			HighWatermarkCheckpointPeriod:        e.ConsensusParams.HighWatermarkCheckpointPeriod,
+			MaxValidatorNum:                      e.ConsensusParams.MaxValidatorNum,
+			BlockMaxTxNum:                        e.ConsensusParams.BlockMaxTxNum,
+			EnableTimedGenEmptyBlock:             e.ConsensusParams.EnableTimedGenEmptyBlock,
+			NotActiveWeight:                      e.ConsensusParams.NotActiveWeight,
+			AbnormalNodeExcludeView:              e.ConsensusParams.AbnormalNodeExcludeView,
+			AgainProposeIntervalBlock:            e.ConsensusParams.AgainProposeIntervalBlock,
+			ContinuousNullRequestToleranceNumber: e.ConsensusParams.ContinuousNullRequestToleranceNumber,
 		},
-		CandidateSet: lo.Map(e.CandidateSet, func(item NodeInfo, idx int) NodeInfo {
+		FinanceParams: FinanceParams{
+			GasLimit:              e.FinanceParams.GasLimit,
+			MaxGasPrice:           e.FinanceParams.MaxGasPrice,
+			MinGasPrice:           e.FinanceParams.MinGasPrice,
+			GasChangeRateValue:    e.FinanceParams.GasChangeRateValue,
+			GasChangeRateDecimals: e.FinanceParams.GasChangeRateDecimals,
+		},
+		MiscParams: MiscParams{
+			TxMaxSize: e.MiscParams.TxMaxSize,
+		},
+		ValidatorSet: lo.Map(e.ValidatorSet, func(item NodeInfo, idx int) NodeInfo {
 			return NodeInfo{
 				ID:                   item.ID,
 				AccountAddress:       item.AccountAddress,
@@ -214,7 +226,7 @@ func (e *EpochInfo) Clone() *EpochInfo {
 				ConsensusVotingPower: item.ConsensusVotingPower,
 			}
 		}),
-		ValidatorSet: lo.Map(e.ValidatorSet, func(item NodeInfo, idx int) NodeInfo {
+		CandidateSet: lo.Map(e.CandidateSet, func(item NodeInfo, idx int) NodeInfo {
 			return NodeInfo{
 				ID:                   item.ID,
 				AccountAddress:       item.AccountAddress,
@@ -230,16 +242,6 @@ func (e *EpochInfo) Clone() *EpochInfo {
 				ConsensusVotingPower: item.ConsensusVotingPower,
 			}
 		}),
-		FinanceParams: FinanceParams{
-			GasLimit:              e.FinanceParams.GasLimit,
-			MaxGasPrice:           e.FinanceParams.MaxGasPrice,
-			MinGasPrice:           e.FinanceParams.MinGasPrice,
-			GasChangeRateValue:    e.FinanceParams.GasChangeRateValue,
-			GasChangeRateDecimals: e.FinanceParams.GasChangeRateDecimals,
-		},
-		MiscParams: MiscParams{
-			TxMaxSize: e.MiscParams.TxMaxSize,
-		},
 	}
 }
 
