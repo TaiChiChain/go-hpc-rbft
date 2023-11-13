@@ -224,14 +224,14 @@ func (tf *testFramework[T, Constraint]) newNodeConfig(
 				NotActiveWeight:               1,
 				AbnormalNodeExcludeView:       10,
 			},
-			FinanceParams: Finance{
+			FinanceParams: FinanceParams{
 				GasLimit:              0x5f5e100,
 				MaxGasPrice:           10000000000000,
 				MinGasPrice:           1000000000000,
 				GasChangeRateValue:    1250,
 				GasChangeRateDecimals: 4,
 			},
-			ConfigParams: ConfigParams{
+			MiscParams: MiscParams{
 				TxMaxSize: 10 * 32 * 1024,
 			},
 		},

@@ -112,9 +112,6 @@ type Config struct {
 
 	// CommittedBlockCacheNumber is committed block cache number after checkpoint
 	CommittedBlockCacheNumber uint64
-
-	// ContinuousNullRequestToleranceNumber Viewchange will be sent when there is a packageable transaction locally and n nullrequests are received consecutively.
-	ContinuousNullRequestToleranceNumber uint64
 }
 
 // rbftImpl is the core struct of RBFT service, which handles all functions about consensus.
@@ -792,7 +789,7 @@ func (rbft *rbftImpl[T, Constraint]) recvNullRequest(msg *consensus.NullRequest)
 
 	if rbft.vcMgr.lastNullRequestSeqNo == rbft.batchMgr.getSeqNo() && rbft.batchMgr.requestPool.HasPendingRequestInPool() {
 		rbft.vcMgr.continuousNullRequestCounter++
-		if rbft.vcMgr.continuousNullRequestCounter > rbft.config.ContinuousNullRequestToleranceNumber {
+		if rbft.vcMgr.continuousNullRequestCounter > rbft.chainConfig.EpochInfo.ConsensusParams.ContinuousNullRequestToleranceNumber {
 			rbft.logger.Warningf("Replica %d received continuous %d null request from primary %d", rbft.chainConfig.SelfID, rbft.vcMgr.continuousNullRequestCounter, msg.ReplicaId)
 			rbft.sendViewChange()
 			return nil
