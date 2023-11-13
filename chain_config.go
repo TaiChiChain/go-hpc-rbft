@@ -136,6 +136,9 @@ type ConsensusParams struct {
 
 	// The block interval for node to propose again, Ensure that a node cannot continuously produce blocks
 	AgainProposeIntervalBlock uint64 `mapstructure:"again_propose_interval_block" toml:"again_propose_interval_block" json:"again_propose_interval_block"`
+
+	// ContinuousNullRequestToleranceNumber Viewchange will be sent when there is a packageable transaction locally and n nullrequests are received consecutively.
+	ContinuousNullRequestToleranceNumber uint64 `mapstructure:"continuous_null_request_tolerance_number" toml:"continuous_null_request_tolerance_number" json:"continuous_null_request_tolerance_number"`
 }
 
 type EpochInfo struct {
@@ -157,6 +160,11 @@ type EpochInfo struct {
 	// Consensus params.
 	ConsensusParams ConsensusParams `mapstructure:"consensus_params" toml:"consensus_params" json:"consensus_params"`
 
+	// FinanceParams params about gas
+	FinanceParams FinanceParams `mapstructure:"finance_params" toml:"finance_params" json:"finance_params"`
+
+	MiscParams MiscParams `mapstructure:"misc_params" toml:"misc_params" json:"misc_params"`
+
 	// Candidate set(Do not participate in consensus, only synchronize consensus results).
 	CandidateSet []NodeInfo `mapstructure:"candidate_set" toml:"candidate_set" json:"candidate_set"`
 
@@ -164,14 +172,9 @@ type EpochInfo struct {
 	ValidatorSet []NodeInfo `mapstructure:"validator_set" toml:"validator_set" json:"validator_set"`
 
 	DataSyncerSet []NodeInfo `mapstructure:"data_syncer_set" toml:"data_syncer_set" json:"data_syncer_set"`
-
-	// Finance params about gas
-	FinanceParams Finance `mapstructure:"finance_params" toml:"finance_params" json:"finance_params"`
-
-	ConfigParams ConfigParams `mapstructure:"config_params" toml:"config_params" json:"config_params"`
 }
 
-type Finance struct {
+type FinanceParams struct {
 	GasLimit              uint64 `mapstructure:"gas_limit" toml:"gas_limit" json:"gas_limit"`
 	MaxGasPrice           uint64 `mapstructure:"max_gas_price" toml:"max_gas_price" json:"max_gas_price"`
 	MinGasPrice           uint64 `mapstructure:"min_gas_price" toml:"min_gas_price" json:"min_gas_price"`
@@ -179,7 +182,7 @@ type Finance struct {
 	GasChangeRateDecimals uint64 `mapstructure:"gas_change_rate_decimals" toml:"gas_change_rate_decimals" json:"gas_change_rate_decimals"`
 }
 
-type ConfigParams struct {
+type MiscParams struct {
 	TxMaxSize uint64 `mapstructure:"tx_max_size" toml:"tx_max_size" json:"tx_max_size"`
 }
 
@@ -227,15 +230,15 @@ func (e *EpochInfo) Clone() *EpochInfo {
 				ConsensusVotingPower: item.ConsensusVotingPower,
 			}
 		}),
-		FinanceParams: Finance{
+		FinanceParams: FinanceParams{
 			GasLimit:              e.FinanceParams.GasLimit,
 			MaxGasPrice:           e.FinanceParams.MaxGasPrice,
 			MinGasPrice:           e.FinanceParams.MinGasPrice,
 			GasChangeRateValue:    e.FinanceParams.GasChangeRateValue,
 			GasChangeRateDecimals: e.FinanceParams.GasChangeRateDecimals,
 		},
-		ConfigParams: ConfigParams{
-			TxMaxSize: e.ConfigParams.TxMaxSize,
+		MiscParams: MiscParams{
+			TxMaxSize: e.MiscParams.TxMaxSize,
 		},
 	}
 }
