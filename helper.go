@@ -757,8 +757,6 @@ func (rbft *rbftImpl[T, Constraint]) generateSignedCheckpoint(state *types.Servi
 		// proof viewchanged by term update
 
 		// create viewChange message
-		var pset []*consensus.VcPq
-		var qset []*consensus.VcPq
 		var cset []*consensus.SignedCheckpoint
 		rbft.logger.Debugf("Replica %d gather CSet:", rbft.chainConfig.SelfID)
 		for n, ckp := range rbft.storeMgr.localCheckpoints {
@@ -768,34 +766,13 @@ func (rbft *rbftImpl[T, Constraint]) generateSignedCheckpoint(state *types.Servi
 			cset = append(cset, ckp)
 			rbft.logger.Debugf("seqNo: %d, ID: %s", n, ckp.Checkpoint.Digest())
 		}
-		// Gather all the p entries
-		rbft.logger.Debugf("Replica %d gather PSet:", rbft.chainConfig.SelfID)
-		for _, p := range rbft.calcPSet() {
-			if p.SequenceNumber < rbft.chainConfig.H {
-				rbft.logger.Errorf("Replica %d should not have anything in our pset less than h, found %+v", rbft.chainConfig.SelfID, p)
-				continue
-			}
-			pset = append(pset, p)
-			rbft.logger.Debugf("seqNo: %d, view: %d, digest: %s", p.SequenceNumber, p.View, p.BatchDigest)
-		}
-
-		// Gather all the q entries
-		rbft.logger.Debugf("Replica %d gather QSet:", rbft.chainConfig.SelfID)
-		for _, q := range rbft.calcQSet() {
-			if q.SequenceNumber < rbft.chainConfig.H {
-				rbft.logger.Errorf("Replica %d should not have anything in our qset less than h, found %+v", rbft.chainConfig.SelfID, q)
-				continue
-			}
-			qset = append(qset, q)
-			rbft.logger.Debugf("seqNo: %d, view: %d, digest: %s", q.SequenceNumber, q.View, q.BatchDigest)
-		}
 
 		vcBasis := &consensus.VcBasis{
 			ReplicaId: rbft.chainConfig.SelfID,
 			View:      rbft.chainConfig.View + 1,
 			H:         rbft.chainConfig.H,
-			Pset:      pset,
-			Qset:      qset,
+			Pset:      []*consensus.VcPq{},
+			Qset:      []*consensus.VcPq{},
 			Cset:      cset,
 		}
 

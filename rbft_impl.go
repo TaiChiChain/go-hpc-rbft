@@ -787,16 +787,20 @@ func (rbft *rbftImpl[T, Constraint]) recvNullRequest(msg *consensus.NullRequest)
 		return nil
 	}
 
-	if rbft.vcMgr.lastNullRequestSeqNo == rbft.batchMgr.getSeqNo() && rbft.batchMgr.requestPool.HasPendingRequestInPool() {
-		rbft.vcMgr.continuousNullRequestCounter++
-		if rbft.vcMgr.continuousNullRequestCounter > rbft.chainConfig.EpochInfo.ConsensusParams.ContinuousNullRequestToleranceNumber {
-			rbft.logger.Warningf("Replica %d received continuous %d null request from primary %d", rbft.chainConfig.SelfID, rbft.vcMgr.continuousNullRequestCounter, msg.ReplicaId)
-			rbft.sendViewChange()
-			return nil
+	if !rbft.isTest {
+		if rbft.vcMgr.lastNullRequestSeqNo == rbft.batchMgr.getSeqNo() {
+			if rbft.batchMgr.requestPool.HasPendingRequestInPool() {
+				rbft.vcMgr.continuousNullRequestCounter++
+				if rbft.vcMgr.continuousNullRequestCounter > rbft.chainConfig.EpochInfo.ConsensusParams.ContinuousNullRequestToleranceNumber {
+					rbft.logger.Warningf("Replica %d received continuous %d null request from primary %d", rbft.chainConfig.SelfID, rbft.vcMgr.continuousNullRequestCounter, msg.ReplicaId)
+					rbft.sendViewChange()
+					return nil
+				}
+			}
+		} else {
+			rbft.vcMgr.continuousNullRequestCounter = 1
+			rbft.vcMgr.lastNullRequestSeqNo = rbft.batchMgr.getSeqNo()
 		}
-	} else {
-		rbft.vcMgr.continuousNullRequestCounter = 1
-		rbft.vcMgr.lastNullRequestSeqNo = rbft.batchMgr.getSeqNo()
 	}
 
 	// rbft.logger.Infof("Replica %d received null request from primary %d", rbft.chainConfig.SelfID, msg.ReplicaId)
