@@ -3,20 +3,20 @@ package rbft
 import (
 	"testing"
 
+	"github.com/axiomesh/axiom-ledger/pkg/txpool/mock_txpool"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
 	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/common/metrics/disabled"
-	"github.com/axiomesh/axiom-bft/txpool"
 	"github.com/axiomesh/axiom-bft/types"
 )
 
 func newTestStatusNode[T any, Constraint consensus.TXConstraint[T]](ctrl *gomock.Controller) *rbftImpl[T, Constraint] {
 	log := common.NewSimpleLogger()
 	external := NewMockMinimalExternal[T, Constraint](ctrl)
-	pool := txpool.NewMockMinimalTxPool[T, Constraint](ctrl)
+	pool := mock_txpool.NewMockMinimalTxPool[T, Constraint](ctrl)
 	conf := Config{
 		LastServiceState: &types.ServiceState{
 			MetaState: &types.MetaState{},
@@ -64,8 +64,10 @@ func TestStatusMgr_inOne(t *testing.T) {
 
 	rbft := newTestStatusNode[consensus.FltTransaction, *consensus.FltTransaction](ctrl)
 
-	rbft.atomicOn(InViewChange)
-	assert.Equal(t, true, rbft.atomicInOne(InViewChange, InRecovery))
+	rbft.status.reset()
+	rbft.atomicOn(Normal)
+	rbft.atomicOn(InRecovery)
+	assert.Equal(t, true, rbft.atomicInOne(Normal, PoolFull, Pending))
 }
 
 func TestStatusMgr_setState(t *testing.T) {

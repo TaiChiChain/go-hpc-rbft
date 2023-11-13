@@ -18,8 +18,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/axiomesh/axiom-ledger/pkg/txpool"
+
 	"github.com/axiomesh/axiom-bft/common/consensus"
-	"github.com/axiomesh/axiom-bft/txpool"
 )
 
 // batchManager manages basic batch issues, including:
@@ -191,29 +192,29 @@ func (rbft *rbftImpl[T, Constraint]) restartCheckPoolTimer() {
 	rbft.logger.Debugf("Replica %d restarted the check pool timer", rbft.chainConfig.SelfID)
 }
 
-// startCheckPoolTimer starts the check pool remove timer when tx stay txpool too long.
-func (rbft *rbftImpl[T, Constraint]) startCheckPoolRemoveTimer() {
-	localEvent := &LocalEvent{
-		Service:   CoreRbftService,
-		EventType: CoreCheckPoolRemoveTimerEvent,
-	}
-
-	rbft.timerMgr.startTimer(checkPoolRemoveTimer, localEvent)
-	rbft.logger.Debugf("Replica %d started the check pool remove timer, need to remove invalid tx in txpool after %v", rbft.chainConfig.SelfID, rbft.timerMgr.getTimeoutValue(checkPoolRemoveTimer))
-}
-
-// restartCheckPoolTimer restarts the check pool timer.
-func (rbft *rbftImpl[T, Constraint]) restartCheckPoolRemoveTimer() {
-	rbft.timerMgr.stopTimer(checkPoolRemoveTimer)
-
-	localEvent := &LocalEvent{
-		Service:   CoreRbftService,
-		EventType: CoreCheckPoolRemoveTimerEvent,
-	}
-
-	rbft.timerMgr.startTimer(checkPoolRemoveTimer, localEvent)
-	rbft.logger.Debugf("Replica %d restarted the check pool remove timer, need to remove invalid tx in txpool after %v", rbft.chainConfig.SelfID, rbft.timerMgr.getTimeoutValue(checkPoolRemoveTimer))
-}
+//// startCheckPoolTimer starts the check pool remove timer when tx stay txpool too long.
+//func (rbft *rbftImpl[T, Constraint]) startCheckPoolRemoveTimer() {
+//	localEvent := &LocalEvent{
+//		Service:   CoreRbftService,
+//		EventType: CoreCheckPoolRemoveTimerEvent,
+//	}
+//
+//	rbft.timerMgr.startTimer(checkPoolRemoveTimer, localEvent)
+//	rbft.logger.Debugf("Replica %d started the check pool remove timer, need to remove invalid tx in txpool after %v", rbft.chainConfig.SelfID, rbft.timerMgr.getTimeoutValue(checkPoolRemoveTimer))
+//}
+//
+//// restartCheckPoolTimer restarts the check pool timer.
+//func (rbft *rbftImpl[T, Constraint]) restartCheckPoolRemoveTimer() {
+//	rbft.timerMgr.stopTimer(checkPoolRemoveTimer)
+//
+//	localEvent := &LocalEvent{
+//		Service:   CoreRbftService,
+//		EventType: CoreCheckPoolRemoveTimerEvent,
+//	}
+//
+//	rbft.timerMgr.startTimer(checkPoolRemoveTimer, localEvent)
+//	rbft.logger.Debugf("Replica %d restarted the check pool remove timer, need to remove invalid tx in txpool after %v", rbft.chainConfig.SelfID, rbft.timerMgr.getTimeoutValue(checkPoolRemoveTimer))
+//}
 
 // maybeSendPrePrepare used by primary helps primary stores this batch and send prePrepare,
 // flag findCache indicates whether we need to get request batch from cacheBatch or not as
@@ -300,9 +301,6 @@ func (rbft *rbftImpl[T, Constraint]) maybeSendPrePrepare(batch *RequestBatch[T, 
 	rbft.sendPrePrepare(nextSeqNo, digest, nextBatch)
 
 	if rbft.sendInW(nextSeqNo+1) && len(rbft.batchMgr.cacheBatch) > 0 {
-		rbft.restartBatchTimer()
-		rbft.restartNoTxBatchTimer()
-
 		rbft.maybeSendPrePrepare(nil, true)
 	}
 }
@@ -405,8 +403,6 @@ func (rbft *rbftImpl[T, Constraint]) primaryResubmitTransactions() {
 
 		// try cached batches first if any.
 		if len(rbft.batchMgr.cacheBatch) > 0 {
-			rbft.restartBatchTimer()
-			rbft.restartNoTxBatchTimer()
 			rbft.timerMgr.stopTimer(nullRequestTimer)
 			rbft.maybeSendPrePrepare(nil, true)
 		}
@@ -423,8 +419,25 @@ func (rbft *rbftImpl[T, Constraint]) primaryResubmitTransactions() {
 			}
 
 			if rbft.inPrimaryTerm() {
-				batches := rbft.batchMgr.requestPool.GenerateRequestBatch()
-				rbft.postBatches(batches)
+				var (
+					batch *txpool.RequestHashBatch[T, Constraint]
+					err   error
+				)
+				if rbft.isTest {
+					batch, err = rbft.batchMgr.requestPool.GenerateRequestBatch(txpool.GenBatchTimeoutEvent)
+					if err != nil {
+						rbft.logger.Warningf("Primary %d failed to generate a batch, err: %v", rbft.chainConfig.SelfID, err)
+						return
+					}
+				} else {
+					batch, err = rbft.batchMgr.requestPool.GenerateRequestBatch(txpool.GenBatchFirstEvent)
+					if err != nil {
+						rbft.logger.Warningf("Primary %d failed to generate a batch, err: %v", rbft.chainConfig.SelfID, err)
+						return
+					}
+				}
+
+				rbft.postBatches([]*txpool.RequestHashBatch[T, Constraint]{batch})
 			} else {
 				break
 			}

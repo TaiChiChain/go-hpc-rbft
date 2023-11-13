@@ -3,6 +3,7 @@ package rbft
 import (
 	"testing"
 
+	"github.com/axiomesh/axiom-ledger/pkg/txpool"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/axiomesh/axiom-bft/common/consensus"
@@ -32,14 +33,16 @@ func TestExec_handleCoreRbftEvent_batchTimerEvent(t *testing.T) {
 
 	tx := newTx()
 
-	rbfts[0].batchMgr.requestPool.AddNewRequests([]*consensus.FltTransaction{tx}, false, true, false, true)
-	reqBatch := rbfts[0].batchMgr.requestPool.GenerateRequestBatch()
+	err := rbfts[0].batchMgr.requestPool.AddLocalTx(tx)
+	assert.Nil(t, err)
+	reqBatch, err := rbfts[0].batchMgr.requestPool.GenerateRequestBatch(txpool.GenBatchTimeoutEvent)
+	assert.Nil(t, err)
 	batch := &RequestBatch[consensus.FltTransaction, *consensus.FltTransaction]{
-		RequestHashList: reqBatch[0].TxHashList,
-		RequestList:     reqBatch[0].TxList,
-		Timestamp:       reqBatch[0].Timestamp,
-		LocalList:       reqBatch[0].LocalList,
-		BatchHash:       reqBatch[0].BatchHash,
+		RequestHashList: reqBatch.TxHashList,
+		RequestList:     reqBatch.TxList,
+		Timestamp:       reqBatch.Timestamp,
+		LocalList:       reqBatch.LocalList,
+		BatchHash:       reqBatch.BatchHash,
 	}
 	rbfts[0].batchMgr.cacheBatch = append(rbfts[0].batchMgr.cacheBatch, batch)
 	rbfts[0].setNormal()

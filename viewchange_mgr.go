@@ -22,10 +22,11 @@ import (
 
 	"github.com/samber/lo"
 
+	"github.com/axiomesh/axiom-ledger/pkg/txpool"
+
 	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/common/metrics"
-	"github.com/axiomesh/axiom-bft/txpool"
 	"github.com/axiomesh/axiom-bft/types"
 )
 

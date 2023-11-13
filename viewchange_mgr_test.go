@@ -3,6 +3,7 @@ package rbft
 import (
 	"testing"
 
+	"github.com/axiomesh/axiom-ledger/pkg/txpool"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/axiomesh/axiom-bft/common/consensus"
@@ -19,7 +20,8 @@ func TestVC_FullProcess(t *testing.T) {
 
 	tx := newTx()
 	// node3 cache some txs.
-	rbfts[2].batchMgr.requestPool.AddNewRequests([]*consensus.FltTransaction{tx}, false, true, false, true)
+	err := rbfts[2].batchMgr.requestPool.AddLocalTx(tx)
+	assert.Nil(t, err)
 
 	// replica 1 send vc
 	rbfts[0].sendViewChange()
@@ -225,27 +227,29 @@ func TestVC_processNewView_AfterViewChanged_PrimaryNormal(t *testing.T) {
 	// mock primary node2 cached some txs.
 	nodes[1].broadcastMessageCache = nil
 	tx := newTx()
-	rbfts[1].batchMgr.requestPool.AddNewRequests([]*consensus.FltTransaction{tx}, false, true, false, true)
-	batch := rbfts[1].batchMgr.requestPool.GenerateRequestBatch()
+	err := rbfts[1].batchMgr.requestPool.AddLocalTx(tx)
+	assert.Nil(t, err)
+	batch, err := rbfts[1].batchMgr.requestPool.GenerateRequestBatch(txpool.GenBatchTimeoutEvent)
+	assert.Nil(t, err)
 
 	// a message list
 	msgList := []*consensus.VcPq{
 		{SequenceNumber: 1, BatchDigest: ""},
 		{SequenceNumber: 2, BatchDigest: ""},
-		{SequenceNumber: 3, BatchDigest: batch[0].BatchHash},
+		{SequenceNumber: 3, BatchDigest: batch.BatchHash},
 	}
 
 	rbfts[1].putBackRequestBatches(msgList)
 
 	batch3 := &RequestBatch[consensus.FltTransaction, *consensus.FltTransaction]{
-		RequestHashList: batch[0].TxHashList,
-		RequestList:     batch[0].TxList,
-		Timestamp:       batch[0].Timestamp,
-		LocalList:       batch[0].LocalList,
-		BatchHash:       batch[0].BatchHash,
+		RequestHashList: batch.TxHashList,
+		RequestList:     batch.TxList,
+		Timestamp:       batch.Timestamp,
+		LocalList:       batch.LocalList,
+		BatchHash:       batch.BatchHash,
 		SeqNo:           uint64(3),
 	}
-	rbfts[1].storeMgr.batchStore[batch[0].BatchHash] = batch3
+	rbfts[1].storeMgr.batchStore[batch.BatchHash] = batch3
 	rbfts[1].processNewView(msgList)
 	assert.Equal(t, uint64(3), rbfts[1].batchMgr.seqNo)
 	assert.Nil(t, nodes[1].broadcastMessageCache)
@@ -259,27 +263,29 @@ func TestVC_processNewView_AfterViewChanged_ReplicaNormal(t *testing.T) {
 
 	// mock backup node1 cached some txs.
 	tx := newTx()
-	rbfts[0].batchMgr.requestPool.AddNewRequests([]*consensus.FltTransaction{tx}, false, true, false, true)
-	batch := rbfts[0].batchMgr.requestPool.GenerateRequestBatch()
+	err := rbfts[0].batchMgr.requestPool.AddLocalTx(tx)
+	assert.Nil(t, err)
+	batch, err := rbfts[0].batchMgr.requestPool.GenerateRequestBatch(txpool.GenBatchTimeoutEvent)
+	assert.Nil(t, err)
 
 	// a message list
 	msgList := []*consensus.VcPq{
 		{SequenceNumber: 1, BatchDigest: ""},
 		{SequenceNumber: 2, BatchDigest: ""},
-		{SequenceNumber: 3, BatchDigest: batch[0].BatchHash},
+		{SequenceNumber: 3, BatchDigest: batch.BatchHash},
 	}
 
 	rbfts[0].putBackRequestBatches(msgList)
 
 	batch3 := &RequestBatch[consensus.FltTransaction, *consensus.FltTransaction]{
-		RequestHashList: batch[0].TxHashList,
-		RequestList:     batch[0].TxList,
-		Timestamp:       batch[0].Timestamp,
-		LocalList:       batch[0].LocalList,
-		BatchHash:       batch[0].BatchHash,
+		RequestHashList: batch.TxHashList,
+		RequestList:     batch.TxList,
+		Timestamp:       batch.Timestamp,
+		LocalList:       batch.LocalList,
+		BatchHash:       batch.BatchHash,
 		SeqNo:           uint64(3),
 	}
-	rbfts[0].storeMgr.batchStore[batch[0].BatchHash] = batch3
+	rbfts[0].storeMgr.batchStore[batch.BatchHash] = batch3
 	rbfts[0].setView(uint64(1))
 	rbfts[0].exec.setLastExec(uint64(3))
 	rbfts[0].processNewView(msgList)
@@ -291,27 +297,29 @@ func TestVC_fetchMissingReqBatchIfNeeded(t *testing.T) {
 	_, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 
 	tx := newTx()
-	rbfts[0].batchMgr.requestPool.AddNewRequests([]*consensus.FltTransaction{tx}, false, true, false, true)
-	batch := rbfts[0].batchMgr.requestPool.GenerateRequestBatch()
+	err := rbfts[0].batchMgr.requestPool.AddLocalTx(tx)
+	assert.Nil(t, err)
+	batch, err := rbfts[0].batchMgr.requestPool.GenerateRequestBatch(txpool.GenBatchTimeoutEvent)
+	assert.Nil(t, err)
 
 	// a message list
 	msgList := []*consensus.VcPq{
 		{SequenceNumber: 1, BatchDigest: ""},
 		{SequenceNumber: 2, BatchDigest: ""},
-		{SequenceNumber: 3, BatchDigest: batch[0].BatchHash},
+		{SequenceNumber: 3, BatchDigest: batch.BatchHash},
 	}
 
 	rbfts[0].putBackRequestBatches(msgList)
 
 	batch3 := &RequestBatch[consensus.FltTransaction, *consensus.FltTransaction]{
-		RequestHashList: batch[0].TxHashList,
-		RequestList:     batch[0].TxList,
-		Timestamp:       batch[0].Timestamp,
-		LocalList:       batch[0].LocalList,
-		BatchHash:       batch[0].BatchHash,
+		RequestHashList: batch.TxHashList,
+		RequestList:     batch.TxList,
+		Timestamp:       batch.Timestamp,
+		LocalList:       batch.LocalList,
+		BatchHash:       batch.BatchHash,
 		SeqNo:           uint64(3),
 	}
-	rbfts[0].storeMgr.batchStore[batch[0].BatchHash] = batch3
+	rbfts[0].storeMgr.batchStore[batch.BatchHash] = batch3
 
 	flag1 := rbfts[0].checkIfNeedFetchMissingReqBatch(msgList)
 	assert.Equal(t, false, flag1)

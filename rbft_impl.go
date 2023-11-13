@@ -26,10 +26,11 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
+	"github.com/axiomesh/axiom-ledger/pkg/txpool"
+
 	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/common/metrics"
-	"github.com/axiomesh/axiom-bft/txpool"
 	"github.com/axiomesh/axiom-bft/types"
 )
 
@@ -290,9 +291,12 @@ func (rbft *rbftImpl[T, Constraint]) init() error {
 	rbft.logger.Infof("RBFT isTimed: %v", rbft.chainConfig.EpochInfo.ConsensusParams.EnableTimedGenEmptyBlock)
 	rbft.logger.Infof("RBFT minimum number of batches to retain after checkpoint = %v", rbft.config.CommittedBlockCacheNumber)
 
-	if err := rbft.batchMgr.requestPool.Init(rbft.chainConfig.SelfID); err != nil {
-		return err
+	config := txpool.ConsensusConfig{
+		SelfID:                rbft.chainConfig.SelfID,
+		NotifyFindNextBatchFn: rbft.node.NotifyFindNextBatch,
+		NotifyGenerateBatchFn: rbft.node.NotifyGenBatch,
 	}
+	rbft.batchMgr.requestPool.Init(config)
 	rbft.isInited = true
 	return nil
 }
@@ -623,25 +627,6 @@ func (rbft *rbftImpl[T, Constraint]) checkMsgCanProcessWhenWaitCheckpoint(msgTyp
 func (rbft *rbftImpl[T, Constraint]) processEvent(ee consensusEvent) consensusEvent {
 	start := time.Now()
 	switch e := ee.(type) {
-	case *RequestSet[T, Constraint]:
-		// e.Local indicates whether this RequestSet was generated locally or received
-		// from remote nodes.
-		if e.Local {
-			rbft.metrics.incomingLocalTxSets.Add(float64(1))
-			rbft.metrics.incomingLocalTxs.Add(float64(len(e.Requests)))
-		} else {
-			rbft.metrics.incomingRemoteTxSets.Add(float64(1))
-			rbft.metrics.incomingRemoteTxs.Add(float64(len(e.Requests)))
-		}
-
-		rbft.processReqSetEvent(e)
-		if e.Local {
-			rbft.metrics.processEventDuration.With("event", "add_local_tx").Observe(time.Since(start).Seconds())
-		} else {
-			rbft.metrics.processEventDuration.With("event", "add_remote_txs").Observe(time.Since(start).Seconds())
-		}
-		return nil
-
 	case *LocalEvent:
 		if !rbft.checkEventCanProcessWhenWaitCheckpoint(e.EventType, e) {
 			rbft.metrics.processEventDuration.With("event", "local_event").Observe(time.Since(start).Seconds())
@@ -815,99 +800,99 @@ func (rbft *rbftImpl[T, Constraint]) recvNullRequest(msg *consensus.NullRequest)
 // 1. pool is full, reject txs relayed from other nodes
 // 2. node is in config change, add another config tx into txpool
 // 3. node is in skipInProgress, rejects any txs from other nodes
-func (rbft *rbftImpl[T, Constraint]) processReqSetEvent(req *RequestSet[T, Constraint]) consensusEvent {
-	// if pool already full, rejects the tx, unless it's from RPC because of time difference or we have opened flow control
-	if rbft.isPoolFull() && !req.Local && !rbft.flowControl {
-		rbft.rejectRequestSet(req)
-		return nil
-	}
-
-	// if current node is in skipInProgress, it should reject the transactions coming from other nodes, but has the responsibility to keep its own transactions
-	// if rbft.in(SkipInProgress) && !req.Local {
-	//	rbft.rejectRequestSet(req)
-	//	return nil
-	// }
-
-	// if current node is in abnormal, add normal txs into txPool without generate batches.
-	if !rbft.isNormal() || rbft.in(SkipInProgress) || rbft.in(InRecovery) || rbft.in(inEpochSyncing) || rbft.in(waitCheckpointBatchExecute) {
-		_, completionMissingBatchHashes := rbft.batchMgr.requestPool.AddNewRequests(req.Requests, false, req.Local, false, false)
-		var completionMissingBatchIdxs []msgID
-		for _, batchHash := range completionMissingBatchHashes {
-			idx, ok := rbft.storeMgr.missingBatchesInFetching[batchHash]
-			if !ok {
-				rbft.logger.Warningf("Replica %d completion batch with hash %s but not found missing record",
-					rbft.chainConfig.SelfID, batchHash)
-			} else {
-				rbft.logger.Infof("Replica %d completion batch with hash %s",
-					rbft.chainConfig.SelfID, batchHash)
-				completionMissingBatchIdxs = append(completionMissingBatchIdxs, idx)
-			}
-			delete(rbft.storeMgr.missingBatchesInFetching, batchHash)
-		}
-		if rbft.in(waitCheckpointBatchExecute) {
-			// findNextPrepareBatch after call checkpoint
-			rbft.storeMgr.beforeCheckpointEventCache = append(rbft.storeMgr.beforeCheckpointEventCache, &LocalEvent{
-				Service:   CoreRbftService,
-				EventType: CoreFindNextPrepareBatchsEvent,
-				Event:     completionMissingBatchIdxs,
-			})
-		}
-	} else {
-		// primary nodes would check if this transaction triggered generating a batch or not
-		if rbft.isPrimary(rbft.chainConfig.SelfID) {
-			// start batch timer and stop no tx batch timer when this node receives the first transaction of a batch
-			if !rbft.batchMgr.isBatchTimerActive() {
-				rbft.startBatchTimer()
-			}
-
-			batches, _ := rbft.batchMgr.requestPool.AddNewRequests(req.Requests, true, req.Local, false, rbft.inPrimaryTerm())
-			// If these transactions trigger generating a batch, stop batch timer
-			if len(batches) != 0 {
-				rbft.stopBatchTimer()
-				now := time.Now().UnixNano()
-				if rbft.batchMgr.lastBatchTime != 0 {
-					interval := time.Duration(now - rbft.batchMgr.lastBatchTime).Seconds()
-					rbft.metrics.batchInterval.With("type", "maxSize").Observe(interval)
-				}
-				rbft.batchMgr.lastBatchTime = now
-				rbft.postBatches(batches)
-			}
-			// if received txs but it is not match generate batch, stop no tx batch timer
-			if rbft.config.GenesisEpochInfo.ConsensusParams.EnableTimedGenEmptyBlock &&
-				rbft.batchMgr.requestPool.HasPendingRequestInPool() && rbft.batchMgr.noTxBatchTimerActive {
-				rbft.stopNoTxBatchTimer()
-			}
-		} else {
-			_, completionMissingBatchHashes := rbft.batchMgr.requestPool.AddNewRequests(req.Requests, false, req.Local, false, false)
-			for _, batchHash := range completionMissingBatchHashes {
-				idx, ok := rbft.storeMgr.missingBatchesInFetching[batchHash]
-				if !ok {
-					rbft.logger.Warningf("Replica %d completion batch with hash %s but not found missing record",
-						rbft.chainConfig.SelfID, batchHash)
-				} else {
-					rbft.logger.Infof("Replica %d completion batch with hash %s, try to prepare this batch",
-						rbft.chainConfig.SelfID, batchHash)
-
-					var ctx context.Context
-					if cert, ok := rbft.storeMgr.certStore[idx]; ok {
-						ctx = cert.prePrepareCtx
-					} else {
-						ctx = context.TODO()
-					}
-
-					_ = rbft.findNextPrepareBatch(ctx, idx.v, idx.n, idx.d)
-				}
-				delete(rbft.storeMgr.missingBatchesInFetching, batchHash)
-			}
-		}
-	}
-
-	if rbft.batchMgr.requestPool.IsPoolFull() {
-		rbft.setFull()
-	}
-
-	return nil
-}
+//func (rbft *rbftImpl[T, Constraint]) processReqSetEvent(req *RequestSet[T, Constraint]) consensusEvent {
+//	// if pool already full, rejects the tx, unless it's from RPC because of time difference or we have opened flow control
+//	if rbft.isPoolFull() && !req.Local && !rbft.flowControl {
+//		rbft.rejectRequestSet(req)
+//		return nil
+//	}
+//
+//	// if current node is in skipInProgress, it should reject the transactions coming from other nodes, but has the responsibility to keep its own transactions
+//	// if rbft.in(SkipInProgress) && !req.Local {
+//	//	rbft.rejectRequestSet(req)
+//	//	return nil
+//	// }
+//
+//	// if current node is in abnormal, add normal txs into txPool without generate batches.
+//	if !rbft.isNormal() || rbft.in(SkipInProgress) || rbft.in(InRecovery) || rbft.in(inEpochSyncing) || rbft.in(waitCheckpointBatchExecute) {
+//		_, completionMissingBatchHashes := rbft.batchMgr.requestPool.AddNewRequests(req.Requests, false, req.Local, false, false)
+//		var completionMissingBatchIdxs []msgID
+//		for _, batchHash := range completionMissingBatchHashes {
+//			idx, ok := rbft.storeMgr.missingBatchesInFetching[batchHash]
+//			if !ok {
+//				rbft.logger.Warningf("Replica %d completion batch with hash %s but not found missing record",
+//					rbft.chainConfig.SelfID, batchHash)
+//			} else {
+//				rbft.logger.Infof("Replica %d completion batch with hash %s",
+//					rbft.chainConfig.SelfID, batchHash)
+//				completionMissingBatchIdxs = append(completionMissingBatchIdxs, idx)
+//			}
+//			delete(rbft.storeMgr.missingBatchesInFetching, batchHash)
+//		}
+//		if rbft.in(waitCheckpointBatchExecute) {
+//			// findNextPrepareBatch after call checkpoint
+//			rbft.storeMgr.beforeCheckpointEventCache = append(rbft.storeMgr.beforeCheckpointEventCache, &LocalEvent{
+//				Service:   CoreRbftService,
+//				EventType: CoreFindNextPrepareBatchsEvent,
+//				Event:     completionMissingBatchIdxs,
+//			})
+//		}
+//	} else {
+//		// primary nodes would check if this transaction triggered generating a batch or not
+//		if rbft.isPrimary(rbft.chainConfig.SelfID) {
+//			// start batch timer and stop no tx batch timer when this node receives the first transaction of a batch
+//			if !rbft.batchMgr.isBatchTimerActive() {
+//				rbft.startBatchTimer()
+//			}
+//
+//			batches, _ := rbft.batchMgr.requestPool.AddNewRequests(req.Requests, true, req.Local, false, rbft.inPrimaryTerm())
+//			// If these transactions trigger generating a batch, stop batch timer
+//			if len(batches) != 0 {
+//				rbft.stopBatchTimer()
+//				now := time.Now().UnixNano()
+//				if rbft.batchMgr.lastBatchTime != 0 {
+//					interval := time.Duration(now - rbft.batchMgr.lastBatchTime).Seconds()
+//					rbft.metrics.batchInterval.With("type", "maxSize").Observe(interval)
+//				}
+//				rbft.batchMgr.lastBatchTime = now
+//				rbft.postBatches(batches)
+//			}
+//			// if received txs but it is not match generate batch, stop no tx batch timer
+//			if rbft.config.GenesisEpochInfo.ConsensusParams.EnableTimedGenEmptyBlock &&
+//				rbft.batchMgr.requestPool.HasPendingRequestInPool() && rbft.batchMgr.noTxBatchTimerActive {
+//				rbft.stopNoTxBatchTimer()
+//			}
+//		} else {
+//			_, completionMissingBatchHashes := rbft.batchMgr.requestPool.AddNewRequests(req.Requests, false, req.Local, false, false)
+//			for _, batchHash := range completionMissingBatchHashes {
+//				idx, ok := rbft.storeMgr.missingBatchesInFetching[batchHash]
+//				if !ok {
+//					rbft.logger.Warningf("Replica %d completion batch with hash %s but not found missing record",
+//						rbft.chainConfig.SelfID, batchHash)
+//				} else {
+//					rbft.logger.Infof("Replica %d completion batch with hash %s, try to prepare this batch",
+//						rbft.chainConfig.SelfID, batchHash)
+//
+//					var ctx context.Context
+//					if cert, ok := rbft.storeMgr.certStore[idx]; ok {
+//						ctx = cert.prePrepareCtx
+//					} else {
+//						ctx = context.TODO()
+//					}
+//
+//					_ = rbft.findNextPrepareBatch(ctx, idx.v, idx.n, idx.d)
+//				}
+//				delete(rbft.storeMgr.missingBatchesInFetching, batchHash)
+//			}
+//		}
+//	}
+//
+//	if rbft.batchMgr.requestPool.IsPoolFull() {
+//		rbft.setFull()
+//	}
+//
+//	return nil
+//}
 
 // rejectRequestSet rejects tx set and update related metrics.
 func (rbft *rbftImpl[T, Constraint]) rejectRequestSet(req *RequestSet[T, Constraint]) {
@@ -935,10 +920,7 @@ func (rbft *rbftImpl[T, Constraint]) processOutOfDateReqs() {
 		return
 	}
 
-	reqs, err := rbft.batchMgr.requestPool.FilterOutOfDateRequests()
-	if err != nil {
-		rbft.logger.Warningf("Replica %d get the remained reqs failed, error: %v", rbft.chainConfig.SelfID, err)
-	}
+	reqs := rbft.batchMgr.requestPool.FilterOutOfDateRequests()
 
 	if !rbft.batchMgr.requestPool.IsPoolFull() {
 		rbft.setNotFull()
@@ -994,25 +976,25 @@ func (rbft *rbftImpl[T, Constraint]) processOutOfDateReqs() {
 }
 
 // processNeedRemoveReqs process the checkPoolRemove timeout requests in requestPool, get the remained reqs from pool,
-// then remove these txs in local pool
-func (rbft *rbftImpl[T, Constraint]) processNeedRemoveReqs() {
-	rbft.logger.Infof("removeTx timer expired, Replica %d start remove tx in local txpool ", rbft.chainConfig.SelfID)
-	reqLen, err := rbft.batchMgr.requestPool.RemoveTimeoutRequests()
-	if err != nil {
-		rbft.logger.Warningf("Replica %d get the remained reqs failed, error: %v", rbft.chainConfig.SelfID, err)
-	}
-
-	if reqLen == 0 {
-		rbft.logger.Infof("Replica %d in normal finds 0 tx to remove", rbft.chainConfig.SelfID)
-		return
-	}
-
-	// if requestPool is not full, set rbft state to not full
-	if !rbft.batchMgr.requestPool.IsPoolFull() {
-		rbft.setNotFull()
-	}
-	rbft.logger.Warningf("Replica %d successful remove %d tx in local txpool ", rbft.chainConfig.SelfID, reqLen)
-}
+//// then remove these txs in local pool
+//func (rbft *rbftImpl[T, Constraint]) processNeedRemoveReqs() {
+//	rbft.logger.Infof("removeTx timer expired, Replica %d start remove tx in local txpool ", rbft.chainConfig.SelfID)
+//	reqLen, err := rbft.batchMgr.requestPool.RemoveTimeoutRequests()
+//	if err != nil {
+//		rbft.logger.Warningf("Replica %d get the remained reqs failed, error: %v", rbft.chainConfig.SelfID, err)
+//	}
+//
+//	if reqLen == 0 {
+//		rbft.logger.Infof("Replica %d in normal finds 0 tx to remove", rbft.chainConfig.SelfID)
+//		return
+//	}
+//
+//	// if requestPool is not full, set rbft state to not full
+//	if !rbft.batchMgr.requestPool.IsPoolFull() {
+//		rbft.setNotFull()
+//	}
+//	rbft.logger.Warningf("Replica %d successful remove %d tx in local txpool ", rbft.chainConfig.SelfID, reqLen)
+//}
 
 // recvRequestBatch handle logic after receive request batch
 func (rbft *rbftImpl[T, Constraint]) recvRequestBatch(reqBatch *txpool.RequestHashBatch[T, Constraint]) error {
@@ -1036,8 +1018,6 @@ func (rbft *rbftImpl[T, Constraint]) recvRequestBatch(reqBatch *txpool.RequestHa
 			rbft.atomicOn(InConfChange)
 			rbft.metrics.statusGaugeInConfChange.Set(InConfChange)
 		}
-		rbft.restartBatchTimer()
-		rbft.restartNoTxBatchTimer()
 		rbft.timerMgr.stopTimer(nullRequestTimer)
 		if len(rbft.batchMgr.cacheBatch) > 0 {
 			rbft.batchMgr.cacheBatch = append(rbft.batchMgr.cacheBatch, batch)
@@ -2663,7 +2643,7 @@ func (rbft *rbftImpl[T, Constraint]) recvReBroadcastRequestSet(e *consensus.ReBr
 		rbft.logger.Errorf("RequestSet unmarshal error: %v", err)
 		return nil
 	}
-	rbft.processReqSetEvent(&requestSet)
+	rbft.batchMgr.requestPool.AddRemoteTxs(requestSet.Requests)
 	rbft.metrics.processEventDuration.With("event", "rebroadcast_request_set").Observe(time.Since(start).Seconds())
 	return nil
 }

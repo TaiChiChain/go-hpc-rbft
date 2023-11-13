@@ -64,10 +64,14 @@ func executeExceptN[T any, Constraint consensus.TXConstraint[T]](t *testing.T, r
 	}
 	retMessages := make(map[consensus.Type][]*consensusMessageWrapper)
 
-	rbfts[0].batchMgr.requestPool.AddNewRequests([]*T{tx}, false, true, false, true)
-	rbfts[1].batchMgr.requestPool.AddNewRequests([]*T{tx}, false, true, false, true)
-	rbfts[2].batchMgr.requestPool.AddNewRequests([]*T{tx}, false, true, false, true)
-	rbfts[3].batchMgr.requestPool.AddNewRequests([]*T{tx}, false, true, false, true)
+	err := rbfts[0].batchMgr.requestPool.AddLocalTx(tx)
+	assert.Nil(t, err)
+	err = rbfts[1].batchMgr.requestPool.AddLocalTx(tx)
+	assert.Nil(t, err)
+	err = rbfts[2].batchMgr.requestPool.AddLocalTx(tx)
+	assert.Nil(t, err)
+	err = rbfts[3].batchMgr.requestPool.AddLocalTx(tx)
+	assert.Nil(t, err)
 
 	batchTimerEvent := &LocalEvent{
 		Service:   CoreRbftService,

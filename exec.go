@@ -19,6 +19,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/axiomesh/axiom-ledger/pkg/txpool"
+
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/types"
 )
@@ -136,10 +138,98 @@ func (rbft *rbftImpl[T, Constraint]) dispatchMiscEvent(e *MiscEvent) consensusEv
 		return rbft.handleReqGetAccountMetaEvent(e.Event.(*ReqGetAccountPoolMetaMsg[T, Constraint]))
 	case ReqRemoveTxsEvent:
 		return rbft.handleReqRemoveTxsEvent(e.Event.(*ReqRemoveTxsMsg[T, Constraint]))
+	case NotifyGenBatchEvent:
+		return rbft.handleNotifyGenBatchEvent()
+	case NotifyFindNextBatchEvent:
+		return rbft.handleNotifyFindNextBatchEvent(e.Event.(*NotifyFindNextBatchMsg).hashes)
 	default:
 		rbft.logger.Errorf("Not Supported event: %v", e)
 		return nil
 	}
+}
+
+func (rbft *rbftImpl[T, Constraint]) handleNotifyFindNextBatchEvent(completionMissingBatchHashes []string) consensusEvent {
+
+	// if current node is in abnormal, add normal txs into txPool without generate batches.
+	if !rbft.isNormal() || rbft.in(SkipInProgress) || rbft.in(InRecovery) || rbft.in(inEpochSyncing) || rbft.in(waitCheckpointBatchExecute) {
+		var completionMissingBatchIdxs []msgID
+		for _, batchHash := range completionMissingBatchHashes {
+			idx, ok := rbft.storeMgr.missingBatchesInFetching[batchHash]
+			if !ok {
+				rbft.logger.Warningf("Replica %d completion batch with hash %s but not found missing record",
+					rbft.chainConfig.SelfID, batchHash)
+			} else {
+				rbft.logger.Infof("Replica %d completion batch with hash %s",
+					rbft.chainConfig.SelfID, batchHash)
+				completionMissingBatchIdxs = append(completionMissingBatchIdxs, idx)
+			}
+			delete(rbft.storeMgr.missingBatchesInFetching, batchHash)
+		}
+		if rbft.in(waitCheckpointBatchExecute) {
+			// findNextPrepareBatch after call checkpoint
+			rbft.storeMgr.beforeCheckpointEventCache = append(rbft.storeMgr.beforeCheckpointEventCache, &LocalEvent{
+				Service:   CoreRbftService,
+				EventType: CoreFindNextPrepareBatchsEvent,
+				Event:     completionMissingBatchIdxs,
+			})
+		}
+	}
+
+	if rbft.isPrimary(rbft.chainConfig.SelfID) {
+		return nil
+	}
+	for _, batchHash := range completionMissingBatchHashes {
+		idx, ok := rbft.storeMgr.missingBatchesInFetching[batchHash]
+		if !ok {
+			rbft.logger.Warningf("Replica %d completion batch with hash %s but not found missing record",
+				rbft.chainConfig.SelfID, batchHash)
+		} else {
+			rbft.logger.Infof("Replica %d completion batch with hash %s, try to prepare this batch",
+				rbft.chainConfig.SelfID, batchHash)
+
+			var ctx context.Context
+			if cert, ok := rbft.storeMgr.certStore[idx]; ok {
+				ctx = cert.prePrepareCtx
+			} else {
+				ctx = context.TODO()
+			}
+
+			_ = rbft.findNextPrepareBatch(ctx, idx.v, idx.n, idx.d)
+		}
+		delete(rbft.storeMgr.missingBatchesInFetching, batchHash)
+	}
+	return nil
+}
+
+func (rbft *rbftImpl[T, Constraint]) handleNotifyGenBatchEvent() consensusEvent {
+	// if current node is in abnormal, ignore generate batch signal
+	if !rbft.isNormal() || rbft.in(SkipInProgress) || rbft.in(InRecovery) || rbft.in(inEpochSyncing) || rbft.in(waitCheckpointBatchExecute) {
+		rbft.logger.Warningf("Replica %d is in abnormal, ignore generate batch signal", rbft.chainConfig.SelfID)
+		return nil
+	}
+
+	if !rbft.isPrimary(rbft.chainConfig.SelfID) {
+		rbft.logger.Warningf("Replica %d is not primary, ignore post batch signal", rbft.chainConfig.SelfID)
+		return nil
+	}
+	rbft.stopBatchTimer()
+	batch, err := rbft.batchMgr.requestPool.GenerateRequestBatch(txpool.GenBatchSizeEvent)
+	if err != nil {
+		rbft.restartBatchTimer()
+		rbft.logger.Warningf("Replica %d generate batch error: %s", rbft.chainConfig.SelfID, err)
+		return nil
+	}
+	batches := []*txpool.RequestHashBatch[T, Constraint]{batch}
+	now := time.Now().UnixNano()
+	if rbft.batchMgr.lastBatchTime != 0 {
+		interval := time.Duration(now - rbft.batchMgr.lastBatchTime).Seconds()
+		rbft.metrics.batchInterval.With("type", "maxSize").Observe(interval)
+	}
+	rbft.batchMgr.lastBatchTime = now
+	rbft.postBatches(batches)
+	rbft.restartBatchTimer()
+	rbft.restartNoTxBatchTimer()
+	return nil
 }
 
 func (rbft *rbftImpl[T, Constraint]) handleReqTxEvent(e *ReqTxMsg[T, Constraint]) consensusEvent {
@@ -213,6 +303,7 @@ func (rbft *rbftImpl[T, Constraint]) handleCoreRbftEvent(e *LocalEvent) consensu
 		rbft.stopBatchTimer()
 
 		if rbft.batchMgr.requestPool.HasPendingRequestInPool() {
+			rbft.stopNoTxBatchTimer()
 			// call requestPool module to generate a tx batch
 			if rbft.inPrimaryTerm() {
 				now := time.Now().UnixNano()
@@ -228,7 +319,11 @@ func (rbft *rbftImpl[T, Constraint]) handleCoreRbftEvent(e *LocalEvent) consensu
 						"so we don't generate a batch, interval: %f", rbft.chainConfig.SelfID, interval)
 					return nil
 				}
-				batches := rbft.batchMgr.requestPool.GenerateRequestBatch()
+				batch, err := rbft.batchMgr.requestPool.GenerateRequestBatch(txpool.GenBatchTimeoutEvent)
+				if err != nil {
+					rbft.logger.Warningf("Replica %d failed to generate batch, err: %v", rbft.chainConfig.SelfID, err)
+					return nil
+				}
 				if rbft.batchMgr.lastBatchTime != 0 {
 					rbft.metrics.batchInterval.With("type", "timeout").Observe(interval)
 					if rbft.batchMgr.minTimeoutBatchTime == 0 || interval < rbft.batchMgr.minTimeoutBatchTime {
@@ -239,13 +334,15 @@ func (rbft *rbftImpl[T, Constraint]) handleCoreRbftEvent(e *LocalEvent) consensu
 					}
 				}
 				rbft.batchMgr.lastBatchTime = now
-				rbft.postBatches(batches)
+				rbft.postBatches([]*txpool.RequestHashBatch[T, Constraint]{batch})
 			}
-		} else {
-			// has no pending request, it means no tx match the condition of generate batch, restart no tx batch timer
-			if rbft.config.GenesisEpochInfo.ConsensusParams.EnableTimedGenEmptyBlock && rbft.batchMgr.noTxBatchTimerActive {
-				rbft.startNoTxBatchTimer()
-			}
+		}
+
+		// restart batch timer when generate a batch
+		rbft.restartBatchTimer()
+		// has no pending request, it means no tx match the condition of generate batch, restart no tx batch timer
+		if rbft.config.GenesisEpochInfo.ConsensusParams.EnableTimedGenEmptyBlock && !rbft.batchMgr.noTxBatchTimerActive {
+			rbft.startNoTxBatchTimer()
 		}
 		return nil
 
@@ -288,7 +385,12 @@ func (rbft *rbftImpl[T, Constraint]) handleCoreRbftEvent(e *LocalEvent) consensu
 
 		// call requestPool module to generate a tx batch
 		if rbft.inPrimaryTerm() {
-			batches := rbft.batchMgr.requestPool.GenerateRequestBatch()
+			batch, err := rbft.batchMgr.requestPool.GenerateRequestBatch(txpool.GenBatchNoTxTimeoutEvent)
+			if err != nil {
+				rbft.logger.Warningf("Replica %d failed to generate no-tx batch, err: %v", rbft.chainConfig.SelfID, err)
+				return nil
+			}
+			batches := []*txpool.RequestHashBatch[T, Constraint]{batch}
 			now := time.Now().UnixNano()
 			if rbft.batchMgr.lastBatchTime != 0 {
 				interval := time.Duration(now - rbft.batchMgr.lastBatchTime).Seconds()
@@ -302,6 +404,7 @@ func (rbft *rbftImpl[T, Constraint]) handleCoreRbftEvent(e *LocalEvent) consensu
 			rbft.postBatches(batches)
 		}
 
+		rbft.restartNoTxBatchTimer()
 		return nil
 
 	case CoreNullRequestTimerEvent:
@@ -356,10 +459,10 @@ func (rbft *rbftImpl[T, Constraint]) handleCoreRbftEvent(e *LocalEvent) consensu
 			rbft.chainConfig.SelfID, rbft.highWatermarkTimerReason)
 		return rbft.sendViewChange()
 
-	case CoreCheckPoolRemoveTimerEvent:
-		rbft.processNeedRemoveReqs()
-		rbft.restartCheckPoolRemoveTimer()
-		return nil
+	//case CoreCheckPoolRemoveTimerEvent:
+	//	rbft.processNeedRemoveReqs()
+	//	rbft.restartCheckPoolRemoveTimer()
+	//	return nil
 
 	default:
 		rbft.logger.Errorf("Invalid core RBFT event: %v", e)
@@ -517,7 +620,8 @@ func (rbft *rbftImpl[T, Constraint]) handleViewChangeEvent(e *LocalEvent) consen
 
 		if rbft.isPrimary(rbft.chainConfig.SelfID) {
 			rbft.primaryResubmitTransactions()
-			// start noTx batch timer if there is no pending tx in pool
+			// restart all batch timer when primary node finished recovery
+			rbft.restartBatchTimer()
 			rbft.restartNoTxBatchTimer()
 		} else {
 			// here, we always fetch PQC after finish recovery as we only recovery to the largest checkpoint which

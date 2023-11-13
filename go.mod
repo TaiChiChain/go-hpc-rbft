@@ -3,6 +3,7 @@ module github.com/axiomesh/axiom-bft
 go 1.20
 
 require (
+	github.com/axiomesh/axiom-ledger v0.0.2-0.20231115211720-bf0ab7e389c9
 	github.com/google/btree v1.1.2
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.16.0
@@ -24,11 +25,11 @@ require (
 	github.com/kr/text v0.2.0 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/prometheus/client_model v0.3.0 // indirect
-	github.com/prometheus/common v0.42.0 // indirect
-	github.com/prometheus/procfs v0.10.1 // indirect
+	github.com/prometheus/client_model v0.4.0 // indirect
+	github.com/prometheus/common v0.44.0 // indirect
+	github.com/prometheus/procfs v0.11.1 // indirect
 	github.com/rogpeppe/go-internal v1.11.0 // indirect
-	golang.org/x/exp v0.0.0-20220303212507-bbda1eaf7a17 // indirect
+	golang.org/x/exp v0.0.0-20230728194245-b0cb94b80691 // indirect
 	golang.org/x/sys v0.10.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

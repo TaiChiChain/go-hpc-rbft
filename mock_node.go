@@ -13,10 +13,11 @@ import (
 	context "context"
 	reflect "reflect"
 
-	consensus "github.com/axiomesh/axiom-bft/common/consensus"
-	txpool "github.com/axiomesh/axiom-bft/txpool"
-	types "github.com/axiomesh/axiom-bft/types"
+	txpool "github.com/axiomesh/axiom-ledger/pkg/txpool"
 	gomock "go.uber.org/mock/gomock"
+
+	consensus "github.com/axiomesh/axiom-bft/common/consensus"
+	types "github.com/axiomesh/axiom-bft/types"
 )
 
 // MockNode is a mock of Node interface.

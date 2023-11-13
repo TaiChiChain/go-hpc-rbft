@@ -9,12 +9,14 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel/trace"
+
+	"github.com/axiomesh/axiom-ledger/pkg/txpool"
 
 	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/common/metrics/disabled"
-	"github.com/axiomesh/axiom-bft/txpool"
 	"github.com/axiomesh/axiom-bft/types"
 )
 
@@ -263,8 +265,8 @@ func (tf *testFramework[T, Constraint]) newNodeConfig(
 // newTestNode init the testNode instance
 func (tf *testFramework[T, Constraint]) newTestNode(id uint64, p2pNodeID string, cc chan *channelMsg) *testNode[T, Constraint] {
 	// Init logger
-	log := common.NewSimpleLogger()
-	log.SetPrefix(fmt.Sprintf("[node%d] ", id))
+	poolLog := logrus.New()
+	poolLog.WithField("mode ", fmt.Sprintf("txpool%d", id))
 	// Simulation Function of External
 	var ext ExternalStack[T, Constraint]
 	testExt := &testExternal[T, Constraint]{
@@ -278,17 +280,23 @@ func (tf *testFramework[T, Constraint]) newTestNode(id uint64, p2pNodeID string,
 	// Memool Instance, Parameters in Config are Flexible
 	txpoolConfig := txpool.Config{
 		PoolSize:            100000,
-		BatchSize:           4,
+		BatchSize:           500,
 		BatchMemLimit:       false,
 		BatchMaxMem:         999,
 		ToleranceTime:       999 * time.Millisecond,
 		ToleranceRemoveTime: 15 * time.Minute,
-		Logger:              log,
+		Logger:              poolLog,
 		GetAccountNonce: func(address string) uint64 {
 			return 0
 		},
 	}
-	pool := txpool.NewTxPool[T, Constraint](txpoolConfig)
+	pool, err := txpool.NewTxPool[T, Constraint](txpoolConfig)
+	if err != nil {
+		panic(err)
+	}
+
+	log := common.NewSimpleLogger()
+	log.SetPrefix(fmt.Sprintf("[node%d] ", id))
 	conf := tf.newNodeConfig(p2pNodeID, log, 1)
 	n, err := newNode[T, Constraint](conf, ext, pool, true)
 	if err != nil {
@@ -391,6 +399,10 @@ func (ext *testExternal[T, Constraint]) Destroy(_ string) error {
 // Network
 func (ext *testExternal[T, Constraint]) postMsg(msg *channelMsg) {
 	ext.clusterChan <- msg
+}
+
+func (ext *testExternal[T, Constraint]) ListenMsg() <-chan *channelMsg {
+	return ext.clusterChan
 }
 
 func (ext *testExternal[T, Constraint]) Broadcast(ctx context.Context, msg *consensus.ConsensusMessage) error {

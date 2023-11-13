@@ -18,9 +18,10 @@ import (
 	"context"
 	"sync"
 
+	"github.com/axiomesh/axiom-ledger/pkg/txpool"
+
 	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
-	"github.com/axiomesh/axiom-bft/txpool"
 	"github.com/axiomesh/axiom-bft/types"
 )
 
@@ -224,19 +225,10 @@ func (n *node[T, Constraint]) Status() NodeStatus {
 	return n.rbft.getStatus()
 }
 
-func (n *node[T, Constraint]) GetUncommittedTransactions(maxsize uint64) []*T {
-	// get hash of transactions that had committed
-	var digestList []string
-	committedHeight := n.rbft.chainConfig.H
-	for digest, batch := range n.rbft.storeMgr.batchStore {
-		if batch.SeqNo <= committedHeight {
-			digestList = append(digestList, digest)
-		}
-	}
-	// remove committed transactions
-	n.rbft.batchMgr.requestPool.RemoveBatches(digestList)
-
-	return n.rbft.batchMgr.requestPool.GetUncommittedTransactions(maxsize)
+// GetUncommittedTransactions returns all uncommitted transactions.
+// not supported temporarily.
+func (n *node[T, Constraint]) GetUncommittedTransactions(_ uint64) []*T {
+	return nil
 }
 
 // getCurrentState retrieves the current application state.
@@ -334,6 +326,24 @@ func (n *node[T, Constraint]) ReportStateUpdatingBatches(committedTxHashList []s
 	req := &ReqRemoveTxsMsg[T, Constraint]{removeTxHashList: committedTxHashList}
 	localEvent := &MiscEvent{
 		EventType: ReqRemoveTxsEvent,
+		Event:     req,
+	}
+	n.rbft.postMsg(localEvent)
+}
+
+func (n *node[T, Constraint]) NotifyGenBatch(_ int) {
+	localEvent := &MiscEvent{
+		EventType: NotifyGenBatchEvent,
+	}
+	n.rbft.postMsg(localEvent)
+}
+
+func (n *node[T, Constraint]) NotifyFindNextBatch(hashes ...string) {
+	req := &NotifyFindNextBatchMsg{
+		hashes: hashes,
+	}
+	localEvent := &MiscEvent{
+		EventType: NotifyFindNextBatchEvent,
 		Event:     req,
 	}
 	n.rbft.postMsg(localEvent)

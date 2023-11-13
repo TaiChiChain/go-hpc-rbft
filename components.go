@@ -23,8 +23,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/axiomesh/axiom-ledger/pkg/txpool"
+
 	"github.com/axiomesh/axiom-bft/common/consensus"
-	"github.com/axiomesh/axiom-bft/txpool"
 )
 
 // constant timer names
@@ -111,7 +112,7 @@ var canProcessEventsWhenWaitCheckpoint = map[int]struct{}{
 	// CoreRbftService
 	CoreCheckpointBlockExecutedEvent: {},
 	CoreCheckPoolTimerEvent:          {},
-	CoreCheckPoolRemoveTimerEvent:    {},
+	//CoreCheckPoolRemoveTimerEvent:    {},
 }
 
 var canProcessMsgsWhenWaitCheckpoint = map[consensus.Type]struct{}{
@@ -346,6 +347,8 @@ const (
 	ReqGetPoolMetaEvent
 	ReqGetAccountMetaEvent
 	ReqRemoveTxsEvent
+	NotifyGenBatchEvent
+	NotifyFindNextBatchEvent
 )
 
 // MiscEvent represents misc event sent by local modules
@@ -385,4 +388,8 @@ type ReqGetPoolMetaMsg[T any, Constraint consensus.TXConstraint[T]] struct {
 
 type ReqRemoveTxsMsg[T any, Constraint consensus.TXConstraint[T]] struct {
 	removeTxHashList []string
+}
+
+type NotifyFindNextBatchMsg struct {
+	hashes []string
 }
