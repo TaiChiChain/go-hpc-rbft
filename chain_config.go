@@ -326,7 +326,7 @@ func (e *EpochInfo) electValidatorsByWrf(electValidatorsByWrfSeed []byte, allEli
 
 	var validators []NodeInfo
 	for ; i < e.ConsensusParams.MaxValidatorNum; i++ {
-		validatorID := wrfSelectNodeByVotingPower(electValidatorsByWrfSeed, lo.SliceToMap(allEligibleNodes, func(item NodeInfo) (uint64, int64) {
+		validatorID := wrfSelectNodeByVotingPower(electValidatorsByWrfSeed, lo.MapEntries(allEligibleNodeDynamicInfoMap, func(id uint64, item NodeDynamicInfo) (uint64, int64) {
 			return item.ID, item.ConsensusVotingPower
 		}))
 		// exclude selected
@@ -337,19 +337,24 @@ func (e *EpochInfo) electValidatorsByWrf(electValidatorsByWrfSeed []byte, allEli
 	return validators
 }
 
-func (e *EpochInfo) ElectValidators(electValidatorsByWrfSeed []byte) error {
+func (e *EpochInfo) ElectValidators(lastEpochInfo *EpochInfo, electValidatorsByWrfSeed []byte) error {
+	// Newly added nodes cannot be selected immediately
+	lastAllNodeFilter := lo.SliceToMap(lo.Flatten([][]NodeInfo{lastEpochInfo.ValidatorSet, lastEpochInfo.CandidateSet, lastEpochInfo.DataSyncerSet}), func(item NodeInfo) (uint64, bool) {
+		return item.ID, true
+	})
+
 	err := func() error {
 		var allEligibleNodes []NodeInfo
 		var allNodes []NodeInfo
 		for _, info := range e.ValidatorSet {
 			allNodes = append(allNodes, info.Clone())
-			if info.ConsensusVotingPower > 0 {
+			if info.ConsensusVotingPower > 0 && lastAllNodeFilter[info.ID] {
 				allEligibleNodes = append(allEligibleNodes, info.Clone())
 			}
 		}
 		for _, info := range e.CandidateSet {
 			allNodes = append(allNodes, info.Clone())
-			if info.ConsensusVotingPower > 0 {
+			if info.ConsensusVotingPower > 0 && lastAllNodeFilter[info.ID] {
 				allEligibleNodes = append(allEligibleNodes, info.Clone())
 			}
 		}
@@ -426,6 +431,8 @@ type EpochDerivedData struct {
 
 	NodeInfoMap map[uint64]NodeInfo
 
+	AccountAddr2NodeInfoMap map[string]NodeInfo
+
 	// will track validator consensusVotingPower
 	ValidatorMap map[uint64]NodeInfo
 }
@@ -483,6 +490,7 @@ func (c *ChainConfig) updateDerivedData() error {
 	}
 
 	c.NodeInfoMap = make(map[uint64]NodeInfo)
+	c.AccountAddr2NodeInfoMap = make(map[string]NodeInfo)
 	c.NodeRoleMap = make(map[uint64]NodeRole)
 	fillNodes := func(nodes []NodeInfo, role NodeRole) {
 		for _, p := range nodes {
@@ -490,6 +498,7 @@ func (c *ChainConfig) updateDerivedData() error {
 				c.SelfID = p.ID
 				c.SelfRole = role
 			}
+			c.AccountAddr2NodeInfoMap[p.AccountAddress] = p
 			c.NodeInfoMap[p.ID] = p
 			c.NodeRoleMap[p.ID] = role
 		}

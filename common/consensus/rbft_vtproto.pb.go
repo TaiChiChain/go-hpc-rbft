@@ -661,9 +661,10 @@ func (m *EpochChangeRequest) CloneVT() *EpochChangeRequest {
 		return (*EpochChangeRequest)(nil)
 	}
 	r := &EpochChangeRequest{
-		Author:      m.Author,
-		StartEpoch:  m.StartEpoch,
-		TargetEpoch: m.TargetEpoch,
+		Author:        m.Author,
+		StartEpoch:    m.StartEpoch,
+		TargetEpoch:   m.TargetEpoch,
+		AuthorAccount: m.AuthorAccount,
 	}
 	if len(m.unknownFields) > 0 {
 		r.unknownFields = make([]byte, len(m.unknownFields))
@@ -1751,6 +1752,9 @@ func (this *EpochChangeRequest) EqualVT(that *EpochChangeRequest) bool {
 		return false
 	}
 	if this.TargetEpoch != that.TargetEpoch {
+		return false
+	}
+	if this.AuthorAccount != that.AuthorAccount {
 		return false
 	}
 	return string(this.unknownFields) == string(that.unknownFields)
@@ -3545,6 +3549,13 @@ func (m *EpochChangeRequest) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 	if m.unknownFields != nil {
 		i -= len(m.unknownFields)
 		copy(dAtA[i:], m.unknownFields)
+	}
+	if len(m.AuthorAccount) > 0 {
+		i -= len(m.AuthorAccount)
+		copy(dAtA[i:], m.AuthorAccount)
+		i = encodeVarint(dAtA, i, uint64(len(m.AuthorAccount)))
+		i--
+		dAtA[i] = 0x22
 	}
 	if m.TargetEpoch != 0 {
 		i = encodeVarint(dAtA, i, uint64(m.TargetEpoch))
@@ -5539,6 +5550,13 @@ func (m *EpochChangeRequest) MarshalToSizedBufferVTStrict(dAtA []byte) (int, err
 		i -= len(m.unknownFields)
 		copy(dAtA[i:], m.unknownFields)
 	}
+	if len(m.AuthorAccount) > 0 {
+		i -= len(m.AuthorAccount)
+		copy(dAtA[i:], m.AuthorAccount)
+		i = encodeVarint(dAtA, i, uint64(len(m.AuthorAccount)))
+		i--
+		dAtA[i] = 0x22
+	}
 	if m.TargetEpoch != 0 {
 		i = encodeVarint(dAtA, i, uint64(m.TargetEpoch))
 		i--
@@ -6622,6 +6640,10 @@ func (m *EpochChangeRequest) SizeVT() (n int) {
 	}
 	if m.TargetEpoch != 0 {
 		n += 1 + sov(uint64(m.TargetEpoch))
+	}
+	l = len(m.AuthorAccount)
+	if l > 0 {
+		n += 1 + l + sov(uint64(l))
 	}
 	n += len(m.unknownFields)
 	return n
@@ -10807,6 +10829,38 @@ func (m *EpochChangeRequest) UnmarshalVT(dAtA []byte) error {
 					break
 				}
 			}
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field AuthorAccount", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflow
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLength
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLength
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.AuthorAccount = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skip(dAtA[iNdEx:])

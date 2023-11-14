@@ -67,7 +67,7 @@ func (m *peerManager) broadcast(ctx context.Context, msg *consensus.ConsensusMes
 	}
 }
 
-func (m *peerManager) unicast(ctx context.Context, msg *consensus.ConsensusMessage, to uint64) {
+func (m *peerManager) unicastByP2PID(ctx context.Context, msg *consensus.ConsensusMessage, p2pID string) {
 	msg.From = m.chainConfig.SelfID
 	msg.Epoch = m.chainConfig.EpochInfo.Epoch
 	msg.View = m.chainConfig.View
@@ -76,16 +76,31 @@ func (m *peerManager) unicast(ctx context.Context, msg *consensus.ConsensusMessa
 		msg.Nonce = m.msgNonce
 	}
 
+	start := time.Now()
+	err := m.network.Unicast(ctx, msg, p2pID)
+	m.metrics.processEventDuration.With("event", "p2p_unicast").Observe(time.Since(start).Seconds())
+	if err != nil {
+		m.logger.Errorf("Unicast to %s failed: %v", p2pID, err)
+		return
+	}
+}
+
+func (m *peerManager) unicast(ctx context.Context, msg *consensus.ConsensusMessage, to uint64) {
 	n, ok := m.chainConfig.NodeInfoMap[to]
 	if !ok {
 		m.logger.Errorf("Unicast to %d failed: not found node", to)
 		return
 	}
-	start := time.Now()
-	err := m.network.Unicast(ctx, msg, n.P2PNodeID)
-	m.metrics.processEventDuration.With("event", "p2p_unicast").Observe(time.Since(start).Seconds())
-	if err != nil {
-		m.logger.Errorf("Unicast to %d failed: %v", to, err)
+
+	m.unicastByP2PID(ctx, msg, n.P2PNodeID)
+}
+
+func (m *peerManager) unicastByAccountAddr(ctx context.Context, msg *consensus.ConsensusMessage, to string) {
+	n, ok := m.chainConfig.AccountAddr2NodeInfoMap[to]
+	if !ok {
+		m.logger.Errorf("Unicast to %s failed: not found node", to)
 		return
 	}
+
+	m.unicastByP2PID(ctx, msg, n.P2PNodeID)
 }
