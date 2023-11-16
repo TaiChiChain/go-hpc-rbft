@@ -13,26 +13,28 @@ import (
 	context "context"
 	reflect "reflect"
 
-	txpool "github.com/axiomesh/axiom-ledger/pkg/txpool"
+	txpool "github.com/axiomesh/axiom-kit/txpool"
 	gomock "go.uber.org/mock/gomock"
 
+	types2 "github.com/axiomesh/axiom-kit/types"
+
 	consensus "github.com/axiomesh/axiom-bft/common/consensus"
-	types "github.com/axiomesh/axiom-bft/types"
+	"github.com/axiomesh/axiom-bft/types"
 )
 
 // MockNode is a mock of Node interface.
-type MockNode[T any, Constraint consensus.TXConstraint[T]] struct {
+type MockNode[T any, Constraint types2.TXConstraint[T]] struct {
 	ctrl     *gomock.Controller
 	recorder *MockNodeMockRecorder[T, Constraint]
 }
 
 // MockNodeMockRecorder is the mock recorder for MockNode.
-type MockNodeMockRecorder[T any, Constraint consensus.TXConstraint[T]] struct {
+type MockNodeMockRecorder[T any, Constraint types2.TXConstraint[T]] struct {
 	mock *MockNode[T, Constraint]
 }
 
 // NewMockNode creates a new mock instance.
-func NewMockNode[T any, Constraint consensus.TXConstraint[T]](ctrl *gomock.Controller) *MockNode[T, Constraint] {
+func NewMockNode[T any, Constraint types2.TXConstraint[T]](ctrl *gomock.Controller) *MockNode[T, Constraint] {
 	mock := &MockNode[T, Constraint]{ctrl: ctrl}
 	mock.recorder = &MockNodeMockRecorder[T, Constraint]{mock}
 	return mock
@@ -59,7 +61,7 @@ func (mr *MockNodeMockRecorder[T, Constraint]) GetAccountPoolMeta(account, full 
 }
 
 // NodeGetAccountPoolMetaCall wrap *gomock.Call
-type NodeGetAccountPoolMetaCall[T any, Constraint consensus.TXConstraint[T]] struct {
+type NodeGetAccountPoolMetaCall[T any, Constraint types2.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
@@ -97,7 +99,7 @@ func (mr *MockNodeMockRecorder[T, Constraint]) GetLowWatermark() *NodeGetLowWate
 }
 
 // NodeGetLowWatermarkCall wrap *gomock.Call
-type NodeGetLowWatermarkCall[T any, Constraint consensus.TXConstraint[T]] struct {
+type NodeGetLowWatermarkCall[T any, Constraint types2.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
@@ -135,7 +137,7 @@ func (mr *MockNodeMockRecorder[T, Constraint]) GetPendingTxByHash(hash any) *Nod
 }
 
 // NodeGetPendingTxByHashCall wrap *gomock.Call
-type NodeGetPendingTxByHashCall[T any, Constraint consensus.TXConstraint[T]] struct {
+type NodeGetPendingTxByHashCall[T any, Constraint types2.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
@@ -173,7 +175,7 @@ func (mr *MockNodeMockRecorder[T, Constraint]) GetPendingTxCountByAccount(accoun
 }
 
 // NodeGetPendingTxCountByAccountCall wrap *gomock.Call
-type NodeGetPendingTxCountByAccountCall[T any, Constraint consensus.TXConstraint[T]] struct {
+type NodeGetPendingTxCountByAccountCall[T any, Constraint types2.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
@@ -211,7 +213,7 @@ func (mr *MockNodeMockRecorder[T, Constraint]) GetPoolMeta(full any) *NodeGetPoo
 }
 
 // NodeGetPoolMetaCall wrap *gomock.Call
-type NodeGetPoolMetaCall[T any, Constraint consensus.TXConstraint[T]] struct {
+type NodeGetPoolMetaCall[T any, Constraint types2.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
@@ -249,7 +251,7 @@ func (mr *MockNodeMockRecorder[T, Constraint]) GetTotalPendingTxCount() *NodeGet
 }
 
 // NodeGetTotalPendingTxCountCall wrap *gomock.Call
-type NodeGetTotalPendingTxCountCall[T any, Constraint consensus.TXConstraint[T]] struct {
+type NodeGetTotalPendingTxCountCall[T any, Constraint types2.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
@@ -287,7 +289,7 @@ func (mr *MockNodeMockRecorder[T, Constraint]) GetUncommittedTransactions(maxsiz
 }
 
 // NodeGetUncommittedTransactionsCall wrap *gomock.Call
-type NodeGetUncommittedTransactionsCall[T any, Constraint consensus.TXConstraint[T]] struct {
+type NodeGetUncommittedTransactionsCall[T any, Constraint types2.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
@@ -325,7 +327,7 @@ func (mr *MockNodeMockRecorder[T, Constraint]) Init() *NodeInitCall[T, Constrain
 }
 
 // NodeInitCall wrap *gomock.Call
-type NodeInitCall[T any, Constraint consensus.TXConstraint[T]] struct {
+type NodeInitCall[T any, Constraint types2.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
@@ -363,7 +365,7 @@ func (mr *MockNodeMockRecorder[T, Constraint]) Propose(requests, local any) *Nod
 }
 
 // NodeProposeCall wrap *gomock.Call
-type NodeProposeCall[T any, Constraint consensus.TXConstraint[T]] struct {
+type NodeProposeCall[T any, Constraint types2.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
@@ -399,7 +401,7 @@ func (mr *MockNodeMockRecorder[T, Constraint]) ReportExecuted(state any) *NodeRe
 }
 
 // NodeReportExecutedCall wrap *gomock.Call
-type NodeReportExecutedCall[T any, Constraint consensus.TXConstraint[T]] struct {
+type NodeReportExecutedCall[T any, Constraint types2.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
@@ -435,7 +437,7 @@ func (mr *MockNodeMockRecorder[T, Constraint]) ReportStateUpdated(state any) *No
 }
 
 // NodeReportStateUpdatedCall wrap *gomock.Call
-type NodeReportStateUpdatedCall[T any, Constraint consensus.TXConstraint[T]] struct {
+type NodeReportStateUpdatedCall[T any, Constraint types2.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
@@ -471,7 +473,7 @@ func (mr *MockNodeMockRecorder[T, Constraint]) ReportStateUpdatingBatches(commit
 }
 
 // NodeReportStateUpdatingBatchesCall wrap *gomock.Call
-type NodeReportStateUpdatingBatchesCall[T any, Constraint consensus.TXConstraint[T]] struct {
+type NodeReportStateUpdatingBatchesCall[T any, Constraint types2.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
@@ -509,7 +511,7 @@ func (mr *MockNodeMockRecorder[T, Constraint]) Start() *NodeStartCall[T, Constra
 }
 
 // NodeStartCall wrap *gomock.Call
-type NodeStartCall[T any, Constraint consensus.TXConstraint[T]] struct {
+type NodeStartCall[T any, Constraint types2.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
@@ -547,7 +549,7 @@ func (mr *MockNodeMockRecorder[T, Constraint]) Status() *NodeStatusCall[T, Const
 }
 
 // NodeStatusCall wrap *gomock.Call
-type NodeStatusCall[T any, Constraint consensus.TXConstraint[T]] struct {
+type NodeStatusCall[T any, Constraint types2.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
@@ -583,7 +585,7 @@ func (mr *MockNodeMockRecorder[T, Constraint]) Step(ctx, msg any) *NodeStepCall[
 }
 
 // NodeStepCall wrap *gomock.Call
-type NodeStepCall[T any, Constraint consensus.TXConstraint[T]] struct {
+type NodeStepCall[T any, Constraint types2.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
@@ -621,7 +623,7 @@ func (mr *MockNodeMockRecorder[T, Constraint]) Stop() *NodeStopCall[T, Constrain
 }
 
 // NodeStopCall wrap *gomock.Call
-type NodeStopCall[T any, Constraint consensus.TXConstraint[T]] struct {
+type NodeStopCall[T any, Constraint types2.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
@@ -644,18 +646,18 @@ func (c *NodeStopCall[T, Constraint]) DoAndReturn(f func() []*T) *NodeStopCall[T
 }
 
 // MockExternal is a mock of External interface.
-type MockExternal[T any, Constraint consensus.TXConstraint[T]] struct {
+type MockExternal[T any, Constraint types2.TXConstraint[T]] struct {
 	ctrl     *gomock.Controller
 	recorder *MockExternalMockRecorder[T, Constraint]
 }
 
 // MockExternalMockRecorder is the mock recorder for MockExternal.
-type MockExternalMockRecorder[T any, Constraint consensus.TXConstraint[T]] struct {
+type MockExternalMockRecorder[T any, Constraint types2.TXConstraint[T]] struct {
 	mock *MockExternal[T, Constraint]
 }
 
 // NewMockExternal creates a new mock instance.
-func NewMockExternal[T any, Constraint consensus.TXConstraint[T]](ctrl *gomock.Controller) *MockExternal[T, Constraint] {
+func NewMockExternal[T any, Constraint types2.TXConstraint[T]](ctrl *gomock.Controller) *MockExternal[T, Constraint] {
 	mock := &MockExternal[T, Constraint]{ctrl: ctrl}
 	mock.recorder = &MockExternalMockRecorder[T, Constraint]{mock}
 	return mock
@@ -682,7 +684,7 @@ func (mr *MockExternalMockRecorder[T, Constraint]) GetAccountPoolMeta(account, f
 }
 
 // ExternalGetAccountPoolMetaCall wrap *gomock.Call
-type ExternalGetAccountPoolMetaCall[T any, Constraint consensus.TXConstraint[T]] struct {
+type ExternalGetAccountPoolMetaCall[T any, Constraint types2.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
@@ -720,7 +722,7 @@ func (mr *MockExternalMockRecorder[T, Constraint]) GetLowWatermark() *ExternalGe
 }
 
 // ExternalGetLowWatermarkCall wrap *gomock.Call
-type ExternalGetLowWatermarkCall[T any, Constraint consensus.TXConstraint[T]] struct {
+type ExternalGetLowWatermarkCall[T any, Constraint types2.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
@@ -758,7 +760,7 @@ func (mr *MockExternalMockRecorder[T, Constraint]) GetPendingTxByHash(hash any) 
 }
 
 // ExternalGetPendingTxByHashCall wrap *gomock.Call
-type ExternalGetPendingTxByHashCall[T any, Constraint consensus.TXConstraint[T]] struct {
+type ExternalGetPendingTxByHashCall[T any, Constraint types2.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
@@ -796,7 +798,7 @@ func (mr *MockExternalMockRecorder[T, Constraint]) GetPendingTxCountByAccount(ac
 }
 
 // ExternalGetPendingTxCountByAccountCall wrap *gomock.Call
-type ExternalGetPendingTxCountByAccountCall[T any, Constraint consensus.TXConstraint[T]] struct {
+type ExternalGetPendingTxCountByAccountCall[T any, Constraint types2.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
@@ -834,7 +836,7 @@ func (mr *MockExternalMockRecorder[T, Constraint]) GetPoolMeta(full any) *Extern
 }
 
 // ExternalGetPoolMetaCall wrap *gomock.Call
-type ExternalGetPoolMetaCall[T any, Constraint consensus.TXConstraint[T]] struct {
+type ExternalGetPoolMetaCall[T any, Constraint types2.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
@@ -872,7 +874,7 @@ func (mr *MockExternalMockRecorder[T, Constraint]) GetTotalPendingTxCount() *Ext
 }
 
 // ExternalGetTotalPendingTxCountCall wrap *gomock.Call
-type ExternalGetTotalPendingTxCountCall[T any, Constraint consensus.TXConstraint[T]] struct {
+type ExternalGetTotalPendingTxCountCall[T any, Constraint types2.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
@@ -908,7 +910,7 @@ func (mr *MockExternalMockRecorder[T, Constraint]) ReportStateUpdatingBatches(co
 }
 
 // ExternalReportStateUpdatingBatchesCall wrap *gomock.Call
-type ExternalReportStateUpdatingBatchesCall[T any, Constraint consensus.TXConstraint[T]] struct {
+type ExternalReportStateUpdatingBatchesCall[T any, Constraint types2.TXConstraint[T]] struct {
 	*gomock.Call
 }
 

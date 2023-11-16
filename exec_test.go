@@ -3,7 +3,7 @@ package rbft
 import (
 	"testing"
 
-	"github.com/axiomesh/axiom-ledger/pkg/txpool"
+	"github.com/axiomesh/axiom-kit/txpool"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/axiomesh/axiom-bft/common/consensus"

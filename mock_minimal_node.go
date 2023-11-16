@@ -3,7 +3,7 @@ package rbft
 import (
 	"go.uber.org/mock/gomock"
 
-	"github.com/axiomesh/axiom-bft/common/consensus"
+	"github.com/axiomesh/axiom-kit/types"
 )
 
 // NewMockMinimalNode returns a minimal implement of MockNode which accepts
@@ -11,7 +11,7 @@ import (
 // Users can define custom MockNode like this:
 // func NewMockCustomNode(ctrl *gomock.Controller) *MockNode {...}
 // in which users must specify output for all functions.
-func NewMockMinimalNode[T any, Constraint consensus.TXConstraint[T]](ctrl *gomock.Controller) *MockNode[T, Constraint] {
+func NewMockMinimalNode[T any, Constraint types.TXConstraint[T]](ctrl *gomock.Controller) *MockNode[T, Constraint] {
 	mock := NewMockNode[T, Constraint](ctrl)
 	mock.EXPECT().Start().Return(nil).AnyTimes()
 	mock.EXPECT().Step(gomock.Any(), gomock.Any()).Return().AnyTimes()

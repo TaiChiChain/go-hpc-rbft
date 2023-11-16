@@ -20,21 +20,11 @@ import (
 	"encoding/json"
 
 	"golang.org/x/crypto/sha3"
+
+	"github.com/axiomesh/axiom-kit/types"
 )
 
-var _ RbftTransaction = (*FltTransaction)(nil)
-
-type RbftTransaction interface {
-	RbftGetTxHash() string
-	RbftGetFrom() string
-	RbftGetTimeStamp() int64
-	RbftGetData() []byte
-	RbftGetNonce() uint64
-	RbftUnmarshal(raw []byte) error
-	RbftMarshal() ([]byte, error)
-	RbftIsConfigTx() bool
-	RbftGetSize() int
-}
+var _ types.RbftTransaction = (*FltTransaction)(nil)
 
 const (
 	// TxVersion35 tx version 3.5

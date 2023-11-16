@@ -4,7 +4,7 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/mock/gomock"
 
-	"github.com/axiomesh/axiom-bft/common/consensus"
+	"github.com/axiomesh/axiom-kit/types"
 )
 
 // NewMockMinimalExternal returns a minimal implement of MockExternalStack which accepts
@@ -12,7 +12,7 @@ import (
 // Users can defines custom MockExternalStack like this:
 // func NewMockCustomMockExternalStack(ctrl *gomock.Controller) *MockExternalStack {...}
 // in which users must specify output for all functions.
-func NewMockMinimalExternal[T any, Constraint consensus.TXConstraint[T]](ctrl *gomock.Controller) *MockExternalStack[T, Constraint] {
+func NewMockMinimalExternal[T any, Constraint types.TXConstraint[T]](ctrl *gomock.Controller) *MockExternalStack[T, Constraint] {
 	mock := NewMockExternalStack[T, Constraint](ctrl)
 	mock.EXPECT().StoreState(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	mock.EXPECT().DelState(gomock.Any()).Return(nil).AnyTimes()

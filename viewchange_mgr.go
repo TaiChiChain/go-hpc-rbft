@@ -22,7 +22,7 @@ import (
 
 	"github.com/samber/lo"
 
-	"github.com/axiomesh/axiom-ledger/pkg/txpool"
+	"github.com/axiomesh/axiom-kit/txpool"
 
 	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"

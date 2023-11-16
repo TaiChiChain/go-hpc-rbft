@@ -23,7 +23,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/axiomesh/axiom-ledger/pkg/txpool"
+	"github.com/axiomesh/axiom-kit/txpool"
+
+	"github.com/axiomesh/axiom-kit/types"
 
 	"github.com/axiomesh/axiom-bft/common/consensus"
 )
@@ -165,7 +167,7 @@ var validatorAcceptMsgsFromNonValidator = map[consensus.Type]struct{}{
 	consensus.Type_EPOCH_CHANGE_REQUEST:    {},
 }
 
-type RequestSet[T any, Constraint consensus.TXConstraint[T]] struct {
+type RequestSet[T any, Constraint types.TXConstraint[T]] struct {
 	Requests []*T
 	Local    bool
 }
@@ -207,7 +209,7 @@ func (s *RequestSet[T, Constraint]) Unmarshal(raw []byte) error {
 	return s.FromPB(pbData)
 }
 
-type RequestBatch[T any, Constraint consensus.TXConstraint[T]] struct {
+type RequestBatch[T any, Constraint types.TXConstraint[T]] struct {
 	RequestHashList []string
 	RequestList     []*T
 	Timestamp       int64
@@ -357,7 +359,7 @@ type MiscEvent struct {
 	Event     any
 }
 
-type ReqTxMsg[T any, Constraint consensus.TXConstraint[T]] struct {
+type ReqTxMsg[T any, Constraint types.TXConstraint[T]] struct {
 	hash string
 	ch   chan *T
 }
@@ -375,18 +377,18 @@ type ReqGetWatermarkMsg struct {
 	ch chan uint64
 }
 
-type ReqGetAccountPoolMetaMsg[T any, Constraint consensus.TXConstraint[T]] struct {
+type ReqGetAccountPoolMetaMsg[T any, Constraint types.TXConstraint[T]] struct {
 	account string
 	full    bool
 	ch      chan *txpool.AccountMeta[T, Constraint]
 }
 
-type ReqGetPoolMetaMsg[T any, Constraint consensus.TXConstraint[T]] struct {
+type ReqGetPoolMetaMsg[T any, Constraint types.TXConstraint[T]] struct {
 	full bool
 	ch   chan *txpool.Meta[T, Constraint]
 }
 
-type ReqRemoveTxsMsg[T any, Constraint consensus.TXConstraint[T]] struct {
+type ReqRemoveTxsMsg[T any, Constraint types.TXConstraint[T]] struct {
 	removeTxHashList []string
 }
 

@@ -26,7 +26,9 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/axiomesh/axiom-ledger/pkg/txpool"
+	"github.com/axiomesh/axiom-kit/txpool"
+
+	types2 "github.com/axiomesh/axiom-kit/types"
 
 	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
@@ -116,7 +118,7 @@ type Config struct {
 }
 
 // rbftImpl is the core struct of RBFT service, which handles all functions about consensus.
-type rbftImpl[T any, Constraint consensus.TXConstraint[T]] struct {
+type rbftImpl[T any, Constraint types2.TXConstraint[T]] struct {
 	node        *node[T, Constraint]
 	chainConfig *ChainConfig
 	external    ExternalStack[T, Constraint] // manage interaction with application layer
@@ -160,7 +162,7 @@ type rbftImpl[T any, Constraint consensus.TXConstraint[T]] struct {
 var once sync.Once
 
 // newRBFT init the RBFT instance
-func newRBFT[T any, Constraint consensus.TXConstraint[T]](c Config, external ExternalStack[T, Constraint], requestPool txpool.TxPool[T, Constraint], isTest bool) (*rbftImpl[T, Constraint], error) {
+func newRBFT[T any, Constraint types2.TXConstraint[T]](c Config, external ExternalStack[T, Constraint], requestPool txpool.TxPool[T, Constraint], isTest bool) (*rbftImpl[T, Constraint], error) {
 	err := c.GenesisEpochInfo.Check()
 	if err != nil {
 		return nil, err

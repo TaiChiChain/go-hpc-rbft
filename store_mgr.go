@@ -17,6 +17,7 @@ package rbft
 import (
 	"context"
 
+	types2 "github.com/axiomesh/axiom-kit/types"
 	"github.com/samber/lo"
 
 	"github.com/axiomesh/axiom-bft/common"
@@ -29,7 +30,7 @@ This file provides a mechanism to manage the memory storage in RBFT
 */
 
 // storeManager manages consensus store data structures for RBFT.
-type storeManager[T any, Constraint consensus.TXConstraint[T]] struct {
+type storeManager[T any, Constraint types2.TXConstraint[T]] struct {
 	config Config
 
 	logger common.Logger
@@ -103,7 +104,7 @@ type stateUpdateTarget struct {
 }
 
 // newStoreMgr news an instance of storeManager
-func newStoreMgr[T any, Constraint consensus.TXConstraint[T]](c Config) *storeManager[T, Constraint] {
+func newStoreMgr[T any, Constraint types2.TXConstraint[T]](c Config) *storeManager[T, Constraint] {
 	sm := &storeManager[T, Constraint]{
 		committedCertCache:       make(map[msgID]*msgCert),
 		localCheckpoints:         make(map[uint64]*consensus.SignedCheckpoint),

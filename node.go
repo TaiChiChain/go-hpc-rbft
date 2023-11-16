@@ -18,7 +18,9 @@ import (
 	"context"
 	"sync"
 
-	"github.com/axiomesh/axiom-ledger/pkg/txpool"
+	"github.com/axiomesh/axiom-kit/txpool"
+
+	types2 "github.com/axiomesh/axiom-kit/types"
 
 	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
@@ -28,7 +30,7 @@ import (
 // Node represents a node in a RBFT cluster.
 //
 //go:generate mockgen -destination ./mock_node.go -package rbft -source ./node.go -typed
-type Node[T any, Constraint consensus.TXConstraint[T]] interface {
+type Node[T any, Constraint types2.TXConstraint[T]] interface {
 	// Init a RBFT node state.
 	Init() error
 
@@ -57,7 +59,7 @@ type Node[T any, Constraint consensus.TXConstraint[T]] interface {
 	External[T, Constraint]
 }
 
-type External[T any, Constraint consensus.TXConstraint[T]] interface {
+type External[T any, Constraint types2.TXConstraint[T]] interface {
 	// GetPendingTxCountByAccount will return the pending tx count of a given account
 	GetPendingTxCountByAccount(account string) uint64
 
@@ -99,7 +101,7 @@ type ServiceInbound interface {
 
 // node implements the Node interface and track application service synchronously to help RBFT core
 // retrieve service state.
-type node[T any, Constraint consensus.TXConstraint[T]] struct {
+type node[T any, Constraint types2.TXConstraint[T]] struct {
 	// rbft is the actually RBFT service.
 	rbft *rbftImpl[T, Constraint]
 
@@ -114,12 +116,12 @@ type node[T any, Constraint consensus.TXConstraint[T]] struct {
 }
 
 // NewNode initializes a Node service.
-func NewNode[T any, Constraint consensus.TXConstraint[T]](c Config, external ExternalStack[T, Constraint], requestPool txpool.TxPool[T, Constraint]) (Node[T, Constraint], error) {
+func NewNode[T any, Constraint types2.TXConstraint[T]](c Config, external ExternalStack[T, Constraint], requestPool txpool.TxPool[T, Constraint]) (Node[T, Constraint], error) {
 	return newNode[T, Constraint](c, external, requestPool, false)
 }
 
 // newNode help to initialize a Node service.
-func newNode[T any, Constraint consensus.TXConstraint[T]](c Config, external ExternalStack[T, Constraint], requestPool txpool.TxPool[T, Constraint], isTest bool) (*node[T, Constraint], error) {
+func newNode[T any, Constraint types2.TXConstraint[T]](c Config, external ExternalStack[T, Constraint], requestPool txpool.TxPool[T, Constraint], isTest bool) (*node[T, Constraint], error) {
 	rbft, err := newRBFT[T, Constraint](c, external, requestPool, isTest)
 	if err != nil {
 		return nil, err
@@ -335,7 +337,7 @@ func (n *node[T, Constraint]) NotifyGenBatch(_ int) {
 	localEvent := &MiscEvent{
 		EventType: NotifyGenBatchEvent,
 	}
-	n.rbft.postMsg(localEvent)
+	go n.rbft.postMsg(localEvent)
 }
 
 func (n *node[T, Constraint]) NotifyFindNextBatch(hashes ...string) {
@@ -346,5 +348,5 @@ func (n *node[T, Constraint]) NotifyFindNextBatch(hashes ...string) {
 		EventType: NotifyFindNextBatchEvent,
 		Event:     req,
 	}
-	n.rbft.postMsg(localEvent)
+	go n.rbft.postMsg(localEvent)
 }

@@ -10,7 +10,7 @@ func TestDecodeTx(t *testing.T) {
 	tx := newTx()
 	txBytes, err := tx.RbftMarshal()
 	assert.Nil(t, err)
-	actTx, err := DecodeTx[FltTransaction](txBytes)
+	actTx, err := DecodeTx[FltTransaction, *FltTransaction](txBytes)
 	assert.Nil(t, err)
 	assert.Equal(t, tx.Value, actTx.Value)
 }
@@ -23,7 +23,7 @@ func TestDecodeTxs(t *testing.T) {
 	tx2Bytes, err := tx2.RbftMarshal()
 	assert.Nil(t, err)
 	txsBytes := [][]byte{tx1Bytes, tx2Bytes}
-	txs, err := DecodeTxs[FltTransaction](txsBytes)
+	txs, err := DecodeTxs[FltTransaction, *FltTransaction](txsBytes)
 	assert.Nil(t, err)
 	assert.Equal(t, tx1.Value, txs[0].Value)
 }

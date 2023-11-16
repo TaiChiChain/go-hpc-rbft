@@ -5,10 +5,9 @@ import (
 	"testing"
 	"time"
 
+	types2 "github.com/axiomesh/axiom-kit/types"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
-
-	txpool "github.com/axiomesh/axiom-ledger/pkg/txpool/mock_txpool"
 
 	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
@@ -19,8 +18,8 @@ import (
 // ============================================
 // Basic Tools
 // ============================================
-func newMockRbft[T any, Constraint consensus.TXConstraint[T]](t *testing.T, ctrl *gomock.Controller) *rbftImpl[T, Constraint] {
-	pool := txpool.NewMockTxPool[T, Constraint](ctrl)
+// todo: mock pool
+func newMockRbft[T any, Constraint types2.TXConstraint[T]](t *testing.T, ctrl *gomock.Controller) *rbftImpl[T, Constraint] {
 	log := common.NewSimpleLogger()
 	external := NewMockMinimalExternal[T, Constraint](ctrl)
 
@@ -65,7 +64,8 @@ func newMockRbft[T any, Constraint consensus.TXConstraint[T]](t *testing.T, ctrl
 		MetricsProv: &disabled.Provider{},
 		DelFlag:     make(chan bool),
 	}
-	rbft, err := newRBFT[T, Constraint](conf, external, pool, true)
+	// todo: mock pool
+	rbft, err := newRBFT[T, Constraint](conf, external, nil, true)
 	if err != nil {
 		panic(err)
 	}

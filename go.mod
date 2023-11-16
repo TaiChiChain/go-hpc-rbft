@@ -3,8 +3,7 @@ module github.com/axiomesh/axiom-bft
 go 1.20
 
 require (
-	github.com/axiomesh/axiom-ledger v0.0.2-0.20231115211720-bf0ab7e389c9
-	github.com/google/btree v1.1.2
+	github.com/axiomesh/axiom-kit v0.0.3-0.20231116034616-1c12f3797378
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.16.0
 	github.com/samber/lo v1.38.1
@@ -18,11 +17,21 @@ require (
 )
 
 require (
+	github.com/DataDog/zstd v1.5.5 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
+	github.com/btcsuite/btcd/btcec/v2 v2.3.2 // indirect
+	github.com/cbergoon/merkletree v0.2.0 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
+	github.com/cockroachdb/errors v1.10.0 // indirect
+	github.com/cockroachdb/pebble v0.0.0-20230728201528-5e7f88523982 // indirect
+	github.com/cockroachdb/redact v1.1.5 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.2.0 // indirect
+	github.com/ethereum/go-ethereum v1.12.0 // indirect
+	github.com/getsentry/sentry-go v0.22.0 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
-	github.com/kr/text v0.2.0 // indirect
+	github.com/holiman/uint256 v1.2.3 // indirect
+	github.com/klauspost/compress v1.16.7 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_model v0.4.0 // indirect

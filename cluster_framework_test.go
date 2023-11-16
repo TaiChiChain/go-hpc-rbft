@@ -12,7 +12,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/axiomesh/axiom-ledger/pkg/txpool"
+	types2 "github.com/axiomesh/axiom-kit/types"
 
 	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
@@ -48,7 +48,7 @@ var peerSet = []NodeInfo{
 }
 
 // testFramework contains the core structure of test framework instance.
-type testFramework[T any, Constraint consensus.TXConstraint[T]] struct {
+type testFramework[T any, Constraint types2.TXConstraint[T]] struct {
 	N int
 
 	// Instance of nodes.
@@ -72,7 +72,7 @@ type testFramework[T any, Constraint consensus.TXConstraint[T]] struct {
 }
 
 // testNode contains the parameters of one node instance.
-type testNode[T any, Constraint consensus.TXConstraint[T]] struct {
+type testNode[T any, Constraint types2.TXConstraint[T]] struct {
 	Logger common.Logger
 
 	// Node is provided for application to contact wih RBFT core.
@@ -124,7 +124,7 @@ type testNode[T any, Constraint consensus.TXConstraint[T]] struct {
 }
 
 // testExternal is the instance of External interface.
-type testExternal[T any, Constraint consensus.TXConstraint[T]] struct {
+type testExternal[T any, Constraint types2.TXConstraint[T]] struct {
 	tf *testFramework[T, Constraint]
 
 	// testNode indicates which node the Service belongs to.
@@ -155,7 +155,7 @@ type channelMsg struct {
 // init process
 // =============================================================================
 // newTestFramework init the testFramework instance
-func newTestFramework[T any, Constraint consensus.TXConstraint[T]](account int) *testFramework[T, Constraint] {
+func newTestFramework[T any, Constraint types2.TXConstraint[T]](account int) *testFramework[T, Constraint] {
 	// Init PeerSet
 	var routers []*NodeInfo
 	for i := 0; i < account; i++ {
@@ -277,28 +277,30 @@ func (tf *testFramework[T, Constraint]) newTestNode(id uint64, p2pNodeID string,
 	}
 	ext = testExt
 
-	// Memool Instance, Parameters in Config are Flexible
-	txpoolConfig := txpool.Config{
-		PoolSize:            100000,
-		BatchSize:           500,
-		BatchMemLimit:       false,
-		BatchMaxMem:         999,
-		ToleranceTime:       999 * time.Millisecond,
-		ToleranceRemoveTime: 15 * time.Minute,
-		Logger:              poolLog,
-		GetAccountNonce: func(address string) uint64 {
-			return 0
-		},
-	}
-	pool, err := txpool.NewTxPool[T, Constraint](txpoolConfig)
-	if err != nil {
-		panic(err)
-	}
+	// todo: mock pool
+	//// Memool Instance, Parameters in Config are Flexible
+	//txpoolConfig := txpool.Config{
+	//	PoolSize:            100000,
+	//	BatchSize:           500,
+	//	BatchMemLimit:       false,
+	//	BatchMaxMem:         999,
+	//	ToleranceTime:       999 * time.Millisecond,
+	//	ToleranceRemoveTime: 15 * time.Minute,
+	//	Logger:              poolLog,
+	//	GetAccountNonce: func(address string) uint64 {
+	//		return 0
+	//	},
+	//}
+	//pool, err := txpool2.NewTxPool[T, Constraint](txpoolConfig)
+	//if err != nil {
+	//	panic(err)
+	//}
 
 	log := common.NewSimpleLogger()
 	log.SetPrefix(fmt.Sprintf("[node%d] ", id))
 	conf := tf.newNodeConfig(p2pNodeID, log, 1)
-	n, err := newNode[T, Constraint](conf, ext, pool, true)
+	// todo: input mock pool
+	n, err := newNode[T, Constraint](conf, ext, nil, true)
 	if err != nil {
 		panic(err)
 	}

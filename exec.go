@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/axiomesh/axiom-ledger/pkg/txpool"
+	"github.com/axiomesh/axiom-kit/txpool"
 
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/types"
@@ -215,18 +215,18 @@ func (rbft *rbftImpl[T, Constraint]) handleNotifyGenBatchEvent() consensusEvent 
 	rbft.stopBatchTimer()
 	batch, err := rbft.batchMgr.requestPool.GenerateRequestBatch(txpool.GenBatchSizeEvent)
 	if err != nil {
-		rbft.restartBatchTimer()
-		rbft.logger.Warningf("Replica %d generate batch error: %s", rbft.chainConfig.SelfID, err)
-		return nil
+		rbft.logger.Debugf("Replica %d generate batch error: %s", rbft.chainConfig.SelfID, err)
+	} else {
+		batches := []*txpool.RequestHashBatch[T, Constraint]{batch}
+		now := time.Now().UnixNano()
+		if rbft.batchMgr.lastBatchTime != 0 {
+			interval := time.Duration(now - rbft.batchMgr.lastBatchTime).Seconds()
+			rbft.metrics.batchInterval.With("type", "maxSize").Observe(interval)
+		}
+		rbft.batchMgr.lastBatchTime = now
+		rbft.postBatches(batches)
 	}
-	batches := []*txpool.RequestHashBatch[T, Constraint]{batch}
-	now := time.Now().UnixNano()
-	if rbft.batchMgr.lastBatchTime != 0 {
-		interval := time.Duration(now - rbft.batchMgr.lastBatchTime).Seconds()
-		rbft.metrics.batchInterval.With("type", "maxSize").Observe(interval)
-	}
-	rbft.batchMgr.lastBatchTime = now
-	rbft.postBatches(batches)
+
 	rbft.restartBatchTimer()
 	rbft.restartNoTxBatchTimer()
 	return nil
@@ -322,19 +322,19 @@ func (rbft *rbftImpl[T, Constraint]) handleCoreRbftEvent(e *LocalEvent) consensu
 				batch, err := rbft.batchMgr.requestPool.GenerateRequestBatch(txpool.GenBatchTimeoutEvent)
 				if err != nil {
 					rbft.logger.Warningf("Replica %d failed to generate batch, err: %v", rbft.chainConfig.SelfID, err)
-					return nil
-				}
-				if rbft.batchMgr.lastBatchTime != 0 {
-					rbft.metrics.batchInterval.With("type", "timeout").Observe(interval)
-					if rbft.batchMgr.minTimeoutBatchTime == 0 || interval < rbft.batchMgr.minTimeoutBatchTime {
-						rbft.logger.Debugf("update min timeoutBatch Time[height:%d, interval:%f, lastBatchTime:%v]",
-							rbft.batchMgr.getSeqNo()+1, interval, time.Unix(0, rbft.batchMgr.lastBatchTime))
-						rbft.metrics.minBatchIntervalDuration.With("type", "timeout").Set(interval)
-						rbft.batchMgr.minTimeoutBatchTime = interval
+				} else {
+					if rbft.batchMgr.lastBatchTime != 0 {
+						rbft.metrics.batchInterval.With("type", "timeout").Observe(interval)
+						if rbft.batchMgr.minTimeoutBatchTime == 0 || interval < rbft.batchMgr.minTimeoutBatchTime {
+							rbft.logger.Debugf("update min timeoutBatch Time[height:%d, interval:%f, lastBatchTime:%v]",
+								rbft.batchMgr.getSeqNo()+1, interval, time.Unix(0, rbft.batchMgr.lastBatchTime))
+							rbft.metrics.minBatchIntervalDuration.With("type", "timeout").Set(interval)
+							rbft.batchMgr.minTimeoutBatchTime = interval
+						}
 					}
+					rbft.batchMgr.lastBatchTime = now
+					rbft.postBatches([]*txpool.RequestHashBatch[T, Constraint]{batch})
 				}
-				rbft.batchMgr.lastBatchTime = now
-				rbft.postBatches([]*txpool.RequestHashBatch[T, Constraint]{batch})
 			}
 		}
 
@@ -388,23 +388,23 @@ func (rbft *rbftImpl[T, Constraint]) handleCoreRbftEvent(e *LocalEvent) consensu
 			batch, err := rbft.batchMgr.requestPool.GenerateRequestBatch(txpool.GenBatchNoTxTimeoutEvent)
 			if err != nil {
 				rbft.logger.Warningf("Replica %d failed to generate no-tx batch, err: %v", rbft.chainConfig.SelfID, err)
-				return nil
-			}
-			batches := []*txpool.RequestHashBatch[T, Constraint]{batch}
-			now := time.Now().UnixNano()
-			if rbft.batchMgr.lastBatchTime != 0 {
-				interval := time.Duration(now - rbft.batchMgr.lastBatchTime).Seconds()
-				rbft.metrics.batchInterval.With("type", "timeout_no_tx").Observe(interval)
-				if rbft.batchMgr.minTimeoutNoBatchTime == 0 || interval < rbft.batchMgr.minTimeoutNoBatchTime {
-					rbft.metrics.minBatchIntervalDuration.With("type", "timeout_no_tx").Set(interval)
-					rbft.batchMgr.minTimeoutNoBatchTime = interval
+			} else {
+				batches := []*txpool.RequestHashBatch[T, Constraint]{batch}
+				now := time.Now().UnixNano()
+				if rbft.batchMgr.lastBatchTime != 0 {
+					interval := time.Duration(now - rbft.batchMgr.lastBatchTime).Seconds()
+					rbft.metrics.batchInterval.With("type", "timeout_no_tx").Observe(interval)
+					if rbft.batchMgr.minTimeoutNoBatchTime == 0 || interval < rbft.batchMgr.minTimeoutNoBatchTime {
+						rbft.metrics.minBatchIntervalDuration.With("type", "timeout_no_tx").Set(interval)
+						rbft.batchMgr.minTimeoutNoBatchTime = interval
+					}
 				}
+				rbft.batchMgr.lastBatchTime = now
+				rbft.postBatches(batches)
 			}
-			rbft.batchMgr.lastBatchTime = now
-			rbft.postBatches(batches)
+			rbft.restartNoTxBatchTimer()
 		}
 
-		rbft.restartNoTxBatchTimer()
 		return nil
 
 	case CoreNullRequestTimerEvent:
