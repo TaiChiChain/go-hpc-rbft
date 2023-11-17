@@ -169,7 +169,7 @@ func (rbft *rbftImpl[T, Constraint]) handleNotifyFindNextBatchEvent(completionMi
 			// findNextPrepareBatch after call checkpoint
 			rbft.storeMgr.beforeCheckpointEventCache = append(rbft.storeMgr.beforeCheckpointEventCache, &LocalEvent{
 				Service:   CoreRbftService,
-				EventType: CoreFindNextPrepareBatchsEvent,
+				EventType: CoreFindNextPrepareBatchesEvent,
 				Event:     completionMissingBatchIdxs,
 			})
 		}
@@ -412,10 +412,14 @@ func (rbft *rbftImpl[T, Constraint]) handleCoreRbftEvent(e *LocalEvent) consensu
 		return nil
 
 	case CoreCheckPoolTimerEvent:
-		if !rbft.isNormal() {
-			return nil
-		}
-		rbft.processOutOfDateReqs()
+		rbft.stopCheckPoolTimer()
+		rbft.processOutOfDateReqs(true)
+		rbft.restartCheckPoolTimer()
+		return nil
+
+	case CoreRebroadcastTxsEvent:
+		rbft.stopCheckPoolTimer()
+		rbft.processOutOfDateReqs(false)
 		rbft.restartCheckPoolTimer()
 		return nil
 
@@ -426,7 +430,7 @@ func (rbft *rbftImpl[T, Constraint]) handleCoreRbftEvent(e *LocalEvent) consensu
 		rbft.recvCheckpointBlockExecutedEvent(e.Event.(*types.ServiceState))
 		return nil
 
-	case CoreFindNextPrepareBatchsEvent:
+	case CoreFindNextPrepareBatchesEvent:
 		ctx := context.Background()
 		completionMissingBatchIdxs := e.Event.([]msgID)
 		for _, idx := range completionMissingBatchIdxs {
@@ -583,6 +587,11 @@ func (rbft *rbftImpl[T, Constraint]) handleViewChangeEvent(e *LocalEvent) consen
 				"epoch=%d/n=%d/f=%d/view=%d/h=%d/lastExec=%d", rbft.chainConfig.SelfID, rbft.chainConfig.PrimaryID,
 				rbft.chainConfig.EpochInfo.Epoch, rbft.chainConfig.N, rbft.chainConfig.F, rbft.chainConfig.View, rbft.chainConfig.H, rbft.exec.lastExec)
 			rbft.external.SendFilterEvent(types.InformTypeFilterFinishViewChange, finishMsg)
+		}
+
+		// if node doesn't start check pool timer, start it
+		if !rbft.isActiveCheckPoolTimer() {
+			rbft.startCheckPoolTimer()
 		}
 		rbft.maybeSetNormal()
 		rbft.logger.Trace(consensus.TagNameViewChange, consensus.TagStageFinish, consensus.TagContentViewChange{

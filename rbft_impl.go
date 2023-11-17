@@ -292,6 +292,7 @@ func (rbft *rbftImpl[T, Constraint]) init() error {
 	rbft.logger.Infof("RBFT ID: %d", rbft.chainConfig.SelfID)
 	rbft.logger.Infof("RBFT isTimed: %v", rbft.chainConfig.EpochInfo.ConsensusParams.EnableTimedGenEmptyBlock)
 	rbft.logger.Infof("RBFT minimum number of batches to retain after checkpoint = %v", rbft.config.CommittedBlockCacheNumber)
+	rbft.logger.Infof("RBFT check pool timeout = %v", rbft.config.CheckPoolTimeout)
 
 	config := txpool.ConsensusConfig{
 		SelfID:                rbft.chainConfig.SelfID,
@@ -774,20 +775,25 @@ func (rbft *rbftImpl[T, Constraint]) recvNullRequest(msg *consensus.NullRequest)
 		return nil
 	}
 
-	if !rbft.isTest {
-		if rbft.vcMgr.lastNullRequestSeqNo == rbft.batchMgr.getSeqNo() {
-			if rbft.batchMgr.requestPool.HasPendingRequestInPool() {
-				rbft.vcMgr.continuousNullRequestCounter++
-				if rbft.vcMgr.continuousNullRequestCounter > rbft.chainConfig.EpochInfo.ConsensusParams.ContinuousNullRequestToleranceNumber {
-					rbft.logger.Warningf("Replica %d received continuous %d null request from primary %d", rbft.chainConfig.SelfID, rbft.vcMgr.continuousNullRequestCounter, msg.ReplicaId)
-					rbft.sendViewChange()
-					return nil
-				}
+	if rbft.vcMgr.lastNullRequestSeqNo == rbft.batchMgr.getSeqNo() && rbft.batchMgr.requestPool.HasPendingRequestInPool() {
+		rbft.vcMgr.continuousNullRequestCounter++
+		if rbft.vcMgr.continuousNullRequestCounter > rbft.chainConfig.EpochInfo.ConsensusParams.ReBroadcastToleranceNumber {
+			rbft.logger.Warningf("Replica %d received continuous %d null request from primary %d, need trigger rebroadcast tx to primary",
+				rbft.chainConfig.SelfID, rbft.vcMgr.continuousNullRequestCounter, msg.ReplicaId)
+			localEvent := &LocalEvent{
+				Service:   CoreRbftService,
+				EventType: CoreRebroadcastTxsEvent,
 			}
-		} else {
-			rbft.vcMgr.continuousNullRequestCounter = 1
-			rbft.vcMgr.lastNullRequestSeqNo = rbft.batchMgr.getSeqNo()
+			return localEvent
 		}
+		if rbft.vcMgr.continuousNullRequestCounter > rbft.chainConfig.EpochInfo.ConsensusParams.ContinuousNullRequestToleranceNumber {
+			rbft.logger.Warningf("Replica %d received continuous %d null request from primary %d", rbft.chainConfig.SelfID, rbft.vcMgr.continuousNullRequestCounter, msg.ReplicaId)
+			rbft.sendViewChange()
+			return nil
+		}
+	} else {
+		rbft.vcMgr.continuousNullRequestCounter = 1
+		rbft.vcMgr.lastNullRequestSeqNo = rbft.batchMgr.getSeqNo()
 	}
 
 	// rbft.logger.Infof("Replica %d received null request from primary %d", rbft.chainConfig.SelfID, msg.ReplicaId)
@@ -919,14 +925,8 @@ func (rbft *rbftImpl[T, Constraint]) rejectRequestSet(req *RequestSet[T, Constra
 
 // processOutOfDateReqs process the out-of-date requests in requestPool, get the remained txs from pool,
 // then broadcast all the remained requests that generate by itself to others
-func (rbft *rbftImpl[T, Constraint]) processOutOfDateReqs() {
-	// if rbft is in abnormal, reject process remained reqs
-	if !rbft.isNormal() {
-		rbft.logger.Warningf("Replica %d is in abnormal, reject broadcast remained reqs", rbft.chainConfig.SelfID)
-		return
-	}
-
-	reqs := rbft.batchMgr.requestPool.FilterOutOfDateRequests()
+func (rbft *rbftImpl[T, Constraint]) processOutOfDateReqs(timeout bool) {
+	reqs := rbft.batchMgr.requestPool.FilterOutOfDateRequests(timeout)
 
 	if !rbft.batchMgr.requestPool.IsPoolFull() {
 		rbft.setNotFull()
