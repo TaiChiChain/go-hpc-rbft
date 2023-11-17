@@ -139,6 +139,10 @@ type ConsensusParams struct {
 
 	// ContinuousNullRequestToleranceNumber Viewchange will be sent when there is a packageable transaction locally and n nullrequests are received consecutively.
 	ContinuousNullRequestToleranceNumber uint64 `mapstructure:"continuous_null_request_tolerance_number" toml:"continuous_null_request_tolerance_number" json:"continuous_null_request_tolerance_number"`
+
+	// ReBroadcastToleranceNumber replicate will rebroadcast pending ready txs when receiving null requests from primary above the threshold
+	// !!! notice!!! this param must smaller than  ContinuousNullRequestToleranceNumber
+	ReBroadcastToleranceNumber uint64 `mapstructure:"rebroadcast_tolerance_number" toml:"rebroadcast_tolerance_number" json:"rebroadcast_tolerance_number"`
 }
 
 type EpochInfo struct {

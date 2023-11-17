@@ -44,7 +44,6 @@ const (
 	fetchCheckpointTimer  = "fetchCheckpointTimer"  // timer for nodes to trigger fetch checkpoint when we are processing config transaction
 	highWatermarkTimer    = "highWatermarkTimer"    // timer for nodes to find the problem of missing too much checkpoint
 	fetchViewTimer        = "fetchViewTimer"        // timer for nodes to fetch view periodically
-	checkPoolRemoveTimer  = "checkPoolRemoveTimer"  // timer track timeout for check pool which need remove txs
 	noTxBatchTimer        = "noTxBatchTimer"        // timer for primary triggering package a batch which no transaction to send pre-prepare
 )
 
@@ -61,7 +60,6 @@ const (
 	DefaultSyncStateRestartTimeout = 10 * time.Second
 	DefaultCleanViewChangeTimeout  = 60 * time.Second
 	DefaultCheckPoolTimeout        = 3 * time.Minute
-	DefaultCheckPoolRemoveTimeout  = 15 * time.Minute
 	DefaultFetchCheckpointTimeout  = 5 * time.Second
 	DefaultFetchViewTimeout        = 1 * time.Second
 
@@ -75,11 +73,11 @@ const (
 	CoreBatchTimerEvent = iota
 	CoreNullRequestTimerEvent
 	CoreCheckPoolTimerEvent
+	CoreRebroadcastTxsEvent
 	CoreStateUpdatedEvent
 	CoreCheckpointBlockExecutedEvent
-	CoreFindNextPrepareBatchsEvent
+	CoreFindNextPrepareBatchesEvent
 	CoreHighWatermarkEvent
-	CoreCheckPoolRemoveTimerEvent
 	CoreNoTxBatchTimerEvent
 
 	// 2.view change
