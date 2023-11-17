@@ -17,6 +17,8 @@ package rbft
 import (
 	"context"
 
+	types2 "github.com/axiomesh/axiom-kit/types"
+
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/types"
 )
@@ -64,7 +66,7 @@ type Crypto interface {
 //     seqNos, it's applications responsibility to implement a fast sync algorithm to ensure node
 //     can catch up as soon as possible. Applications should call ServiceInbound.ReportStateUpdated
 //     to inform RBFT library the latest service state after StateUpdate.
-type ServiceOutbound[T any, Constraint consensus.TXConstraint[T]] interface {
+type ServiceOutbound[T any, Constraint types2.TXConstraint[T]] interface {
 	// Execute informs application layer to apply one batch with given request list and batch seqNo.
 	// Users can apply different batches asynchronously but ensure the order by seqNo.
 	Execute(txs []*T, localList []bool, seqNo uint64, timestamp int64, proposerAccount string)
@@ -89,7 +91,7 @@ type EpochService interface {
 // ExternalStack integrates all external interfaces which must be implemented by application users.
 //
 //go:generate mockgen -destination ./mock_external.go -package rbft -source ./external.go -typed
-type ExternalStack[T any, Constraint consensus.TXConstraint[T]] interface {
+type ExternalStack[T any, Constraint types2.TXConstraint[T]] interface {
 	Storage
 	Network
 	Crypto

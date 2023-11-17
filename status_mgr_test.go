@@ -6,17 +6,18 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
+	types2 "github.com/axiomesh/axiom-kit/types"
+
 	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/common/metrics/disabled"
-	"github.com/axiomesh/axiom-bft/txpool"
 	"github.com/axiomesh/axiom-bft/types"
 )
 
-func newTestStatusNode[T any, Constraint consensus.TXConstraint[T]](ctrl *gomock.Controller) *rbftImpl[T, Constraint] {
+// todo: mock pool
+func newTestStatusNode[T any, Constraint types2.TXConstraint[T]](ctrl *gomock.Controller) *rbftImpl[T, Constraint] {
 	log := common.NewSimpleLogger()
 	external := NewMockMinimalExternal[T, Constraint](ctrl)
-	pool := txpool.NewMockMinimalTxPool[T, Constraint](ctrl)
 	conf := Config{
 		LastServiceState: &types.ServiceState{
 			MetaState: &types.MetaState{},
@@ -46,8 +47,8 @@ func newTestStatusNode[T any, Constraint consensus.TXConstraint[T]](ctrl *gomock
 		MetricsProv: &disabled.Provider{},
 		DelFlag:     make(chan bool),
 	}
-
-	rbft, err := newRBFT[T, Constraint](conf, external, pool, true)
+	// todo: mock pool
+	rbft, err := newRBFT[T, Constraint](conf, external, nil, true)
 	if err != nil {
 		panic(err)
 	}
@@ -64,8 +65,10 @@ func TestStatusMgr_inOne(t *testing.T) {
 
 	rbft := newTestStatusNode[consensus.FltTransaction, *consensus.FltTransaction](ctrl)
 
-	rbft.atomicOn(InViewChange)
-	assert.Equal(t, true, rbft.atomicInOne(InViewChange, InRecovery))
+	rbft.status.reset()
+	rbft.atomicOn(Normal)
+	rbft.atomicOn(InRecovery)
+	assert.Equal(t, true, rbft.atomicInOne(Normal, PoolFull, Pending))
 }
 
 func TestStatusMgr_setState(t *testing.T) {

@@ -116,7 +116,8 @@ func (rbft *rbftImpl[T, Constraint]) atomicOff(statusPos ...uint64) {
 
 // atomic in returns the atomic status of specified position.
 func (rbft *rbftImpl[T, Constraint]) atomicIn(pos uint64) bool {
-	return rbft.status.atomicHasBit(pos)
+	s := rbft.status.atomicHasBit(pos)
+	return s
 }
 
 // atomic inOne checks the result of several atomic status computed with each other using '||'
@@ -180,7 +181,6 @@ func (rbft *rbftImpl[T, Constraint]) maybeSetNormal() {
 	if !rbft.atomicInOne(InViewChange, Pending, SkipInProgress) {
 		rbft.setNormal()
 		rbft.startCheckPoolTimer()
-		rbft.startCheckPoolRemoveTimer()
 	} else {
 		rbft.logger.Debugf("Replica %d not set normal as it's still in abnormal now, current status: {InViewChange: %v, Pending: %v, SkipInProgress: %v}", rbft.chainConfig.SelfID, rbft.atomicIn(InViewChange), rbft.atomicIn(Pending), rbft.atomicIn(SkipInProgress))
 	}

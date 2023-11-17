@@ -1,14 +1,10 @@
 package consensus
 
-// TXConstraint is used to ensure that the pointer of T must be RbftTransaction
-type TXConstraint[T any] interface {
-	*T
-	RbftTransaction
-}
+import "github.com/axiomesh/axiom-kit/types"
 
-type Transactions = []RbftTransaction
+type Transactions = []types.RbftTransaction
 
-func DecodeTx[T any, Constraint TXConstraint[T]](raw []byte) (*T, error) {
+func DecodeTx[T any, Constraint types.TXConstraint[T]](raw []byte) (*T, error) {
 	var t T
 	if err := Constraint(&t).RbftUnmarshal(raw); err != nil {
 		return nil, err
@@ -16,7 +12,7 @@ func DecodeTx[T any, Constraint TXConstraint[T]](raw []byte) (*T, error) {
 	return &t, nil
 }
 
-func DecodeTxs[T any, Constraint TXConstraint[T]](rawTxs [][]byte) ([]*T, error) {
+func DecodeTxs[T any, Constraint types.TXConstraint[T]](rawTxs [][]byte) ([]*T, error) {
 	var txs []*T
 	for _, rawTx := range rawTxs {
 		tx, err := DecodeTx[T, Constraint](rawTx)
@@ -28,7 +24,7 @@ func DecodeTxs[T any, Constraint TXConstraint[T]](rawTxs [][]byte) ([]*T, error)
 	return txs, nil
 }
 
-func EncodeTxs[T any, Constraint TXConstraint[T]](txs []*T) ([][]byte, error) {
+func EncodeTxs[T any, Constraint types.TXConstraint[T]](txs []*T) ([][]byte, error) {
 	var rawTxs [][]byte
 	for _, rawTx := range txs {
 		tx, err := Constraint(rawTx).RbftMarshal()

@@ -5,21 +5,21 @@ import (
 	"testing"
 	"time"
 
+	types2 "github.com/axiomesh/axiom-kit/types"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
 	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/common/metrics/disabled"
-	"github.com/axiomesh/axiom-bft/txpool"
 	"github.com/axiomesh/axiom-bft/types"
 )
 
 // ============================================
 // Basic Tools
 // ============================================
-func newMockRbft[T any, Constraint consensus.TXConstraint[T]](t *testing.T, ctrl *gomock.Controller) *rbftImpl[T, Constraint] {
-	pool := txpool.NewMockTxPool[T, Constraint](ctrl)
+// todo: mock pool
+func newMockRbft[T any, Constraint types2.TXConstraint[T]](t *testing.T, ctrl *gomock.Controller) *rbftImpl[T, Constraint] {
 	log := common.NewSimpleLogger()
 	external := NewMockMinimalExternal[T, Constraint](ctrl)
 
@@ -64,7 +64,8 @@ func newMockRbft[T any, Constraint consensus.TXConstraint[T]](t *testing.T, ctrl
 		MetricsProv: &disabled.Provider{},
 		DelFlag:     make(chan bool),
 	}
-	rbft, err := newRBFT[T, Constraint](conf, external, pool, true)
+	// todo: mock pool
+	rbft, err := newRBFT[T, Constraint](conf, external, nil, true)
 	if err != nil {
 		panic(err)
 	}
@@ -108,7 +109,8 @@ func TestRBFT_consensusMessageFilter(t *testing.T) {
 	rbfts[1].consensusMessageFilter(context.TODO(), sync, sync.ConsensusMessage)
 
 	tx := newTx()
-	rbfts[0].batchMgr.requestPool.AddNewRequests([]*consensus.FltTransaction{tx}, false, true, false, true)
+	err := rbfts[0].batchMgr.requestPool.AddLocalTx(tx)
+	assert.Nil(t, err)
 	batchTimerEvent := &LocalEvent{
 		Service:   CoreRbftService,
 		EventType: CoreBatchTimerEvent,
@@ -130,35 +132,37 @@ func TestRBFT_processReqSetEvent_PrimaryGenerateBatch(t *testing.T) {
 	// the batch size is 4
 	// it means we will generate a batch directly when we receive 4 transactions
 	var transactionSet []*consensus.FltTransaction
-	for i := 0; i < 4; i++ {
+	for i := 0; i < 500; i++ {
 		tx := newTx()
 		transactionSet = append(transactionSet, tx)
 	}
-	req := &RequestSet[consensus.FltTransaction, *consensus.FltTransaction]{
-		Requests: transactionSet,
-	}
 
 	// for primary
-	rbfts[0].processEvent(req)
+	rbfts[0].batchMgr.requestPool.AddRemoteTxs(transactionSet)
+	ev := <-rbfts[0].recvChan
+	event := ev.(*MiscEvent)
+
+	rbfts[0].processEvent(event)
+	assert.Equal(t, NotifyGenBatchEvent, event.EventType)
 	conMsg := nodes[0].broadcastMessageCache
 	assert.Equal(t, consensus.Type_PRE_PREPARE, conMsg.Type)
 	assert.True(t, rbfts[0].timerMgr.getTimer(batchTimer))
 }
 
-func TestRBFT_processReqSetEvent(t *testing.T) {
-	_, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
-	unlockCluster(rbfts)
-
-	ctx := newTx()
-	req := &RequestSet[consensus.FltTransaction, *consensus.FltTransaction]{
-		Requests: []*consensus.FltTransaction{ctx},
-	}
-
-	rbfts[1].atomicOn(InConfChange)
-	rbfts[1].processEvent(req)
-	batch := rbfts[1].batchMgr.requestPool.GenerateRequestBatch()
-	assert.NotNil(t, batch)
-}
+//func TestRBFT_processReqSetEvent(t *testing.T) {
+//	_, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
+//	unlockCluster(rbfts)
+//
+//	ctx := newTx()
+//	req := &RequestSet[consensus.FltTransaction, *consensus.FltTransaction]{
+//		Requests: []*consensus.FltTransaction{ctx},
+//	}
+//
+//	rbfts[1].atomicOn(InConfChange)
+//	rbfts[1].processEvent(req)
+//	batch, err := rbfts[1].batchMgr.requestPool.GenerateRequestBatch()
+//	assert.NotNil(t, batch)
+//}
 
 // ============================================
 // Post Tools
@@ -357,35 +361,42 @@ func TestRBFT_start_cache_message(t *testing.T) {
 func TestRBFT_processOutOfDateReqs(t *testing.T) {
 	_, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	tx := newTx()
-	rbfts[1].batchMgr.requestPool.AddNewRequests([]*consensus.FltTransaction{tx}, false, true, false, true)
+	err := rbfts[1].batchMgr.requestPool.AddLocalTx(tx)
+	assert.Nil(t, err)
 	rbfts[1].setFull()
 	rbfts[1].processOutOfDateReqs()
 	assert.Equal(t, true, rbfts[1].isPoolFull())
+	time.Sleep(1 * time.Second)
 
+	// sleep to trigger txpool tolerance time.
 	rbfts[1].setNormal()
 	rbfts[1].processOutOfDateReqs()
 	assert.Equal(t, false, rbfts[1].isPoolFull())
+	rvc := <-rbfts[1].external.(*testExternal[consensus.FltTransaction, *consensus.FltTransaction]).ListenMsg()
+	assert.Equal(t, consensus.Type_REBROADCAST_REQUEST_SET, rvc.msg.Type)
+	set := &RequestSet[consensus.FltTransaction, *consensus.FltTransaction]{}
+	err = set.Unmarshal(rvc.msg.Payload)
+	assert.Nil(t, err)
+	assert.Equal(t, 1, len(set.Requests))
 
 	// split according to set size when broadcast.
-	batch := make([]*consensus.FltTransaction, 100)
-	for i := 0; i < 100; i++ {
+	//batch := make([]*consensus.FltTransaction, 100)
+	for i := 0; i < 24; i++ {
 		tx := newTx()
-		batch[i] = tx
+		err := rbfts[1].batchMgr.requestPool.AddLocalTx(tx)
+		assert.Nil(t, err)
 	}
-	rbfts[1].batchMgr.requestPool.AddNewRequests(batch, false, true, false, true)
 	// sleep to trigger txpool tolerance time.
-	time.Sleep(1 * time.Millisecond)
+	time.Sleep(1 * time.Second)
 	rbfts[1].processOutOfDateReqs()
 	assert.Equal(t, false, rbfts[1].isPoolFull())
 
-	// split according to set mem size when broadcast.
-	rbfts[1].flowControl = true
-	// rbfts[1].flowControlMaxMem = 3 * batch[0].Size()
-	rbfts[1].batchMgr.requestPool.AddNewRequests(batch, false, true, false, true)
-	// sleep to trigger txpool tolerance time.
-	time.Sleep(1 * time.Millisecond)
-	rbfts[1].processOutOfDateReqs()
-	assert.Equal(t, false, rbfts[1].isPoolFull())
+	rvc = <-rbfts[1].external.(*testExternal[consensus.FltTransaction, *consensus.FltTransaction]).ListenMsg()
+	assert.Equal(t, consensus.Type_REBROADCAST_REQUEST_SET, rvc.msg.Type)
+	set = &RequestSet[consensus.FltTransaction, *consensus.FltTransaction]{}
+	err = set.Unmarshal(rvc.msg.Payload)
+	assert.Nil(t, err)
+	assert.Equal(t, 25, len(set.Requests))
 }
 
 func TestRBFT_sendNullRequest(t *testing.T) {

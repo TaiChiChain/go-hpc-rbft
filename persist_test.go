@@ -10,15 +10,16 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
+	types2 "github.com/axiomesh/axiom-kit/types"
+
 	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/common/metrics/disabled"
-	"github.com/axiomesh/axiom-bft/txpool"
 	"github.com/axiomesh/axiom-bft/types"
 )
 
-func newPersistTestReplica[T any, Constraint consensus.TXConstraint[T]](ctrl *gomock.Controller) (*node[T, Constraint], *MockExternalStack[T, Constraint]) {
-	pool := txpool.NewMockMinimalTxPool[T, Constraint](ctrl)
+// todo: input mock pool
+func newPersistTestReplica[T any, Constraint types2.TXConstraint[T]](ctrl *gomock.Controller) (*node[T, Constraint], *MockExternalStack[T, Constraint]) {
 	log := common.NewSimpleLogger()
 	ext := NewMockExternalStack[T, Constraint](ctrl)
 	ext.EXPECT().Sign(gomock.Any()).Return(nil, nil).AnyTimes()
@@ -69,7 +70,8 @@ func newPersistTestReplica[T any, Constraint consensus.TXConstraint[T]](ctrl *go
 	ext.EXPECT().GetEpochInfo(gomock.Any()).Return(conf.GenesisEpochInfo, nil).AnyTimes()
 	ext.EXPECT().GetCurrentEpochInfo().Return(conf.GenesisEpochInfo, nil).AnyTimes()
 
-	node, err := newNode[T, Constraint](conf, ext, pool, true)
+	// todo: mock pool
+	node, err := newNode[T, Constraint](conf, ext, nil, true)
 	if err != nil {
 		panic(err)
 	}

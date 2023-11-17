@@ -7,24 +7,26 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/axiomesh/axiom-kit/types"
+
 	"github.com/axiomesh/axiom-bft/common/consensus"
 )
 
 // ******************************************************************************************************************
 // some tools for unit tests
 // ******************************************************************************************************************
-func unlockCluster[T any, Constraint consensus.TXConstraint[T]](rbfts []*rbftImpl[T, Constraint]) {
+func unlockCluster[T any, Constraint types.TXConstraint[T]](rbfts []*rbftImpl[T, Constraint]) {
 	for index := range rbfts {
 		rbfts[index].atomicOff(Pending)
 		rbfts[index].setNormal()
 	}
 }
 
-func setClusterExec[T any, Constraint consensus.TXConstraint[T]](rbfts []*rbftImpl[T, Constraint], nodes []*testNode[T, Constraint], seq uint64) {
+func setClusterExec[T any, Constraint types.TXConstraint[T]](rbfts []*rbftImpl[T, Constraint], nodes []*testNode[T, Constraint], seq uint64) {
 	setClusterExecExcept[T, Constraint](rbfts, nodes, seq, len(rbfts))
 }
 
-func setClusterExecExcept[T any, Constraint consensus.TXConstraint[T]](rbfts []*rbftImpl[T, Constraint], nodes []*testNode[T, Constraint], seq uint64, noExec int) {
+func setClusterExecExcept[T any, Constraint types.TXConstraint[T]](rbfts []*rbftImpl[T, Constraint], nodes []*testNode[T, Constraint], seq uint64, noExec int) {
 	for index := range rbfts {
 		if index == noExec {
 			continue
@@ -43,15 +45,15 @@ func setClusterExecExcept[T any, Constraint consensus.TXConstraint[T]](rbfts []*
 // 2) "executeExceptPrimary", the backup replicas will process tx, but the primary only send a pre-prepare message
 // 3) "executeExceptN", the node "N" will be abnormal and others will process transactions normally
 // ******************************************************************************************************************
-func execute[T any, Constraint consensus.TXConstraint[T]](t *testing.T, rbfts []*rbftImpl[T, Constraint], nodes []*testNode[T, Constraint], tx *T, checkpoint bool) map[consensus.Type][]*consensusMessageWrapper {
+func execute[T any, Constraint types.TXConstraint[T]](t *testing.T, rbfts []*rbftImpl[T, Constraint], nodes []*testNode[T, Constraint], tx *T, checkpoint bool) map[consensus.Type][]*consensusMessageWrapper {
 	return executeExceptN[T, Constraint](t, rbfts, nodes, tx, checkpoint, len(rbfts))
 }
 
-func executeExceptPrimary[T any, Constraint consensus.TXConstraint[T]](t *testing.T, rbfts []*rbftImpl[T, Constraint], nodes []*testNode[T, Constraint], tx *T, checkpoint bool) map[consensus.Type][]*consensusMessageWrapper {
+func executeExceptPrimary[T any, Constraint types.TXConstraint[T]](t *testing.T, rbfts []*rbftImpl[T, Constraint], nodes []*testNode[T, Constraint], tx *T, checkpoint bool) map[consensus.Type][]*consensusMessageWrapper {
 	return executeExceptN[T, Constraint](t, rbfts, nodes, tx, checkpoint, 0)
 }
 
-func executeExceptN[T any, Constraint consensus.TXConstraint[T]](t *testing.T, rbfts []*rbftImpl[T, Constraint], nodes []*testNode[T, Constraint], tx *T, checkpoint bool, notExec int) map[consensus.Type][]*consensusMessageWrapper {
+func executeExceptN[T any, Constraint types.TXConstraint[T]](t *testing.T, rbfts []*rbftImpl[T, Constraint], nodes []*testNode[T, Constraint], tx *T, checkpoint bool, notExec int) map[consensus.Type][]*consensusMessageWrapper {
 	var primaryIndex int
 	for index := range rbfts {
 		if index == notExec {
@@ -64,10 +66,14 @@ func executeExceptN[T any, Constraint consensus.TXConstraint[T]](t *testing.T, r
 	}
 	retMessages := make(map[consensus.Type][]*consensusMessageWrapper)
 
-	rbfts[0].batchMgr.requestPool.AddNewRequests([]*T{tx}, false, true, false, true)
-	rbfts[1].batchMgr.requestPool.AddNewRequests([]*T{tx}, false, true, false, true)
-	rbfts[2].batchMgr.requestPool.AddNewRequests([]*T{tx}, false, true, false, true)
-	rbfts[3].batchMgr.requestPool.AddNewRequests([]*T{tx}, false, true, false, true)
+	err := rbfts[0].batchMgr.requestPool.AddLocalTx(tx)
+	assert.Nil(t, err)
+	err = rbfts[1].batchMgr.requestPool.AddLocalTx(tx)
+	assert.Nil(t, err)
+	err = rbfts[2].batchMgr.requestPool.AddLocalTx(tx)
+	assert.Nil(t, err)
+	err = rbfts[3].batchMgr.requestPool.AddLocalTx(tx)
+	assert.Nil(t, err)
 
 	batchTimerEvent := &LocalEvent{
 		Service:   CoreRbftService,
@@ -153,7 +159,7 @@ func (tf *testFramework[T, Constraint]) setN(num int) {
 	tf.N = num
 }
 
-func newBasicClusterInstance[T any, Constraint consensus.TXConstraint[T]]() ([]*testNode[T, Constraint], []*rbftImpl[T, Constraint]) {
+func newBasicClusterInstance[T any, Constraint types.TXConstraint[T]]() ([]*testNode[T, Constraint], []*rbftImpl[T, Constraint]) {
 	tf := newTestFramework[T, Constraint](4)
 	var rbfts []*rbftImpl[T, Constraint]
 	var nodes []*testNode[T, Constraint]
@@ -176,7 +182,7 @@ func newBasicClusterInstance[T any, Constraint consensus.TXConstraint[T]]() ([]*
 // clusterInitRecovery mocks cluster init recovery and change view to 1.
 // notExec indicates which node is offline and not execute recovery, use -1 to indicate no such nodes.
 // NOTE!!! assume replica 2 is online(the primary in view 1).
-func clusterInitRecovery[T any, Constraint consensus.TXConstraint[T]](t *testing.T, allNodes []*testNode[T, Constraint], allRbfts []*rbftImpl[T, Constraint], notExec int) {
+func clusterInitRecovery[T any, Constraint types.TXConstraint[T]](t *testing.T, allNodes []*testNode[T, Constraint], allRbfts []*rbftImpl[T, Constraint], notExec int) {
 	nodes := make([]*testNode[T, Constraint], 0)
 	rbfts := make([]*rbftImpl[T, Constraint], 0)
 	for idx := range allNodes {
