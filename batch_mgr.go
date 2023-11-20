@@ -162,6 +162,10 @@ func (rbft *rbftImpl[T, Constraint]) softRestartBatchTimer() bool {
 	return true
 }
 
+func (rbft *rbftImpl[T, Constraint]) isActiveCheckPoolTimer() bool {
+	return rbft.timerMgr.tTimers[checkPoolTimer].count() > 0
+}
+
 // startCheckPoolTimer starts the check pool timer when node enter normal status.
 func (rbft *rbftImpl[T, Constraint]) startCheckPoolTimer() {
 	localEvent := &LocalEvent{

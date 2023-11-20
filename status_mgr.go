@@ -180,7 +180,6 @@ func (rbft *rbftImpl[T, Constraint]) setNormal() {
 func (rbft *rbftImpl[T, Constraint]) maybeSetNormal() {
 	if !rbft.atomicInOne(InViewChange, Pending, SkipInProgress) {
 		rbft.setNormal()
-		rbft.startCheckPoolTimer()
 	} else {
 		rbft.logger.Debugf("Replica %d not set normal as it's still in abnormal now, current status: {InViewChange: %v, Pending: %v, SkipInProgress: %v}", rbft.chainConfig.SelfID, rbft.atomicIn(InViewChange), rbft.atomicIn(Pending), rbft.atomicIn(SkipInProgress))
 	}
@@ -190,7 +189,6 @@ func (rbft *rbftImpl[T, Constraint]) maybeSetNormal() {
 // we can't do sync state when we are in abnormal.
 func (rbft *rbftImpl[T, Constraint]) setAbNormal() {
 	rbft.exitSyncState()
-	rbft.stopCheckPoolTimer()
 	if rbft.isPrimary(rbft.chainConfig.SelfID) {
 		rbft.logger.Debug("Old primary stop batch timer before enter abnormal status")
 		rbft.stopBatchTimer()

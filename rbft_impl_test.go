@@ -364,13 +364,13 @@ func TestRBFT_processOutOfDateReqs(t *testing.T) {
 	err := rbfts[1].batchMgr.requestPool.AddLocalTx(tx)
 	assert.Nil(t, err)
 	rbfts[1].setFull()
-	rbfts[1].processOutOfDateReqs()
+	rbfts[1].processOutOfDateReqs(true)
 	assert.Equal(t, true, rbfts[1].isPoolFull())
-	time.Sleep(1 * time.Second)
 
 	// sleep to trigger txpool tolerance time.
+	time.Sleep(1 * time.Second)
 	rbfts[1].setNormal()
-	rbfts[1].processOutOfDateReqs()
+	rbfts[1].processOutOfDateReqs(true)
 	assert.Equal(t, false, rbfts[1].isPoolFull())
 	rvc := <-rbfts[1].external.(*testExternal[consensus.FltTransaction, *consensus.FltTransaction]).ListenMsg()
 	assert.Equal(t, consensus.Type_REBROADCAST_REQUEST_SET, rvc.msg.Type)
@@ -388,7 +388,7 @@ func TestRBFT_processOutOfDateReqs(t *testing.T) {
 	}
 	// sleep to trigger txpool tolerance time.
 	time.Sleep(1 * time.Second)
-	rbfts[1].processOutOfDateReqs()
+	rbfts[1].processOutOfDateReqs(true)
 	assert.Equal(t, false, rbfts[1].isPoolFull())
 
 	rvc = <-rbfts[1].external.(*testExternal[consensus.FltTransaction, *consensus.FltTransaction]).ListenMsg()
