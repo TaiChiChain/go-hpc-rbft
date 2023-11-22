@@ -250,11 +250,12 @@ func (rbft *rbftImpl[T, Constraint]) maybeSendPrePrepare(batch *RequestBatch[T, 
 			batchHash = batch.BatchHash
 		}
 		if !rbft.inPrimaryTerm() {
-			rbft.logger.Debugf("Replica %d is primary, not sending prePrepare for request batch %s because "+
-				"next seqNo is out of high watermark %d, restore the batch", rbft.chainConfig.SelfID, batchHash, rbft.chainConfig.H+rbft.chainConfig.L, findCache)
-
-			if err := rbft.batchMgr.requestPool.RestoreOneBatch(batch.BatchHash); err != nil {
-				rbft.logger.Debugf("Replica %d is primary, restore the batch failed: %s", rbft.chainConfig.SelfID, err.Error())
+			if batchHash != "<nil>" {
+				rbft.logger.Debugf("Replica %d is primary, not sending prePrepare for request batch %s because "+
+					"next seqNo is out of high watermark %d, restore the batch", rbft.chainConfig.SelfID, batchHash, rbft.chainConfig.H+rbft.chainConfig.L, findCache)
+				if err := rbft.batchMgr.requestPool.RestoreOneBatch(batchHash); err != nil {
+					rbft.logger.Debugf("Replica %d is primary, restore the batch failed: %s", rbft.chainConfig.SelfID, err.Error())
+				}
 			}
 			return
 		}
