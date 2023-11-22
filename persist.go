@@ -527,7 +527,7 @@ func (rbft *rbftImpl[T, Constraint]) restoreBatchStore() {
 }
 
 func (rbft *rbftImpl[T, Constraint]) restoreEpochInfo() {
-	e, err := rbft.external.GetCurrentEpochInfo()
+	e, err := rbft.external.GetEpochInfo(rbft.config.LastServiceState.Epoch)
 	if err != nil {
 		rbft.logger.Debugf("Replica %d failed to get current epoch from ledger: %v, will use genesis epoch info", rbft.chainConfig.SelfID, err)
 		rbft.chainConfig.EpochInfo = rbft.config.GenesisEpochInfo
@@ -555,16 +555,6 @@ func (rbft *rbftImpl[T, Constraint]) restoreState() error {
 	}
 
 	rbft.restoreEpochInfo()
-	if h != 0 && h < rbft.chainConfig.EpochInfo.StartBlock && rbft.chainConfig.EpochInfo.Epoch > 1 {
-		// this means that after the block is executed, the node is terminated before the checkpoint logic
-		// we need to get the epoch info of h, the current epoch information is not accepted
-		e, err := rbft.external.GetEpochInfo(rbft.chainConfig.EpochInfo.Epoch - 1)
-		if err != nil {
-			return errors.Wrapf(err, "failed to get epoch %d info", rbft.chainConfig.EpochInfo.Epoch-1)
-		}
-		rbft.chainConfig.EpochInfo = e
-		rbft.epochMgr.epoch = rbft.chainConfig.EpochInfo.Epoch
-	}
 
 	if err := rbft.chainConfig.updateDerivedData(); err != nil {
 		return err
