@@ -17,10 +17,9 @@ package rbft
 import (
 	"context"
 
-	types2 "github.com/axiomesh/axiom-kit/types"
-
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/types"
+	types2 "github.com/axiomesh/axiom-kit/types"
 )
 
 // Storage is an interface that should be implemented by the application using non-volatile

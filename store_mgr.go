@@ -17,12 +17,12 @@ package rbft
 import (
 	"context"
 
-	types2 "github.com/axiomesh/axiom-kit/types"
 	"github.com/samber/lo"
 
 	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/types"
+	types2 "github.com/axiomesh/axiom-kit/types"
 )
 
 /**

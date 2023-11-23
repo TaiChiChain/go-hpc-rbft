@@ -26,14 +26,12 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/axiomesh/axiom-kit/txpool"
-
-	types2 "github.com/axiomesh/axiom-kit/types"
-
 	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/common/metrics"
 	"github.com/axiomesh/axiom-bft/types"
+	"github.com/axiomesh/axiom-kit/txpool"
+	types2 "github.com/axiomesh/axiom-kit/types"
 )
 
 // Config contains the parameters to start a RAFT instance.
@@ -812,7 +810,7 @@ func (rbft *rbftImpl[T, Constraint]) recvNullRequest(msg *consensus.NullRequest)
 // 1. pool is full, reject txs relayed from other nodes
 // 2. node is in config change, add another config tx into txpool
 // 3. node is in skipInProgress, rejects any txs from other nodes
-//func (rbft *rbftImpl[T, Constraint]) processReqSetEvent(req *RequestSet[T, Constraint]) consensusEvent {
+// func (rbft *rbftImpl[T, Constraint]) processReqSetEvent(req *RequestSet[T, Constraint]) consensusEvent {
 //	// if pool already full, rejects the tx, unless it's from RPC because of time difference or we have opened flow control
 //	if rbft.isPoolFull() && !req.Local && !rbft.flowControl {
 //		rbft.rejectRequestSet(req)
@@ -904,7 +902,7 @@ func (rbft *rbftImpl[T, Constraint]) recvNullRequest(msg *consensus.NullRequest)
 //	}
 //
 //	return nil
-//}
+// }
 
 // rejectRequestSet rejects tx set and update related metrics.
 func (rbft *rbftImpl[T, Constraint]) rejectRequestSet(req *RequestSet[T, Constraint]) {
@@ -982,8 +980,8 @@ func (rbft *rbftImpl[T, Constraint]) processOutOfDateReqs(timeout bool) {
 }
 
 // processNeedRemoveReqs process the checkPoolRemove timeout requests in requestPool, get the remained reqs from pool,
-//// then remove these txs in local pool
-//func (rbft *rbftImpl[T, Constraint]) processNeedRemoveReqs() {
+// // then remove these txs in local pool
+// func (rbft *rbftImpl[T, Constraint]) processNeedRemoveReqs() {
 //	rbft.logger.Infof("removeTx timer expired, Replica %d start remove tx in local txpool ", rbft.chainConfig.SelfID)
 //	reqLen, err := rbft.batchMgr.requestPool.RemoveTimeoutRequests()
 //	if err != nil {
@@ -1000,7 +998,7 @@ func (rbft *rbftImpl[T, Constraint]) processOutOfDateReqs(timeout bool) {
 //		rbft.setNotFull()
 //	}
 //	rbft.logger.Warningf("Replica %d successful remove %d tx in local txpool ", rbft.chainConfig.SelfID, reqLen)
-//}
+// }
 
 // recvRequestBatch handle logic after receive request batch
 func (rbft *rbftImpl[T, Constraint]) recvRequestBatch(reqBatch *txpool.RequestHashBatch[T, Constraint]) error {
@@ -2487,6 +2485,7 @@ func (rbft *rbftImpl[T, Constraint]) tryStateTransfer() {
 func (rbft *rbftImpl[T, Constraint]) recvStateUpdatedEvent(ss *types.ServiceSyncState) consensusEvent {
 	seqNo := ss.MetaState.Height
 	digest := ss.MetaState.Digest
+	epochChanged := ss.Epoch != rbft.chainConfig.EpochInfo.Epoch
 
 	// high state target nil warning
 	if rbft.storeMgr.highStateTarget == nil {
@@ -2515,7 +2514,7 @@ func (rbft *rbftImpl[T, Constraint]) recvStateUpdatedEvent(ss *types.ServiceSync
 	}
 
 	rbft.logger.Debugf("Replica %d state updated, lastExec = %d, seqNo = %d", rbft.chainConfig.SelfID, rbft.exec.lastExec, seqNo)
-	if ss.EpochChanged {
+	if ss.EpochChanged || epochChanged {
 		rbft.logger.Debugf("Replica %d accept epoch proof for %d", rbft.chainConfig.SelfID, ss.Epoch)
 		if ec, ok := rbft.epochMgr.epochProofCache[ss.Epoch]; ok {
 			rbft.epochMgr.persistEpochQuorumCheckpoint(ec.GetCheckpoint())
@@ -2563,7 +2562,6 @@ func (rbft *rbftImpl[T, Constraint]) recvStateUpdatedEvent(ss *types.ServiceSync
 	rbft.maybeSetNormal()
 
 	// 4. process epoch-info
-	epochChanged := ss.Epoch != rbft.chainConfig.EpochInfo.Epoch
 	if epochChanged {
 		rbft.logger.Infof("epoch changed from %d to %d", rbft.chainConfig.EpochInfo.Epoch, ss.Epoch)
 		rbft.turnIntoEpoch()

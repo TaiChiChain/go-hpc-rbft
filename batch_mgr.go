@@ -19,7 +19,6 @@ import (
 	"fmt"
 
 	"github.com/axiomesh/axiom-kit/txpool"
-
 	"github.com/axiomesh/axiom-kit/types"
 )
 
@@ -196,8 +195,8 @@ func (rbft *rbftImpl[T, Constraint]) restartCheckPoolTimer() {
 	rbft.logger.Debugf("Replica %d restarted the check pool timer", rbft.chainConfig.SelfID)
 }
 
-//// startCheckPoolTimer starts the check pool remove timer when tx stay txpool too long.
-//func (rbft *rbftImpl[T, Constraint]) startCheckPoolRemoveTimer() {
+// // startCheckPoolTimer starts the check pool remove timer when tx stay txpool too long.
+// func (rbft *rbftImpl[T, Constraint]) startCheckPoolRemoveTimer() {
 //	localEvent := &LocalEvent{
 //		Service:   CoreRbftService,
 //		EventType: CoreCheckPoolRemoveTimerEvent,
@@ -205,10 +204,10 @@ func (rbft *rbftImpl[T, Constraint]) restartCheckPoolTimer() {
 //
 //	rbft.timerMgr.startTimer(checkPoolRemoveTimer, localEvent)
 //	rbft.logger.Debugf("Replica %d started the check pool remove timer, need to remove invalid tx in txpool after %v", rbft.chainConfig.SelfID, rbft.timerMgr.getTimeoutValue(checkPoolRemoveTimer))
-//}
+// }
 //
-//// restartCheckPoolTimer restarts the check pool timer.
-//func (rbft *rbftImpl[T, Constraint]) restartCheckPoolRemoveTimer() {
+// // restartCheckPoolTimer restarts the check pool timer.
+// func (rbft *rbftImpl[T, Constraint]) restartCheckPoolRemoveTimer() {
 //	rbft.timerMgr.stopTimer(checkPoolRemoveTimer)
 //
 //	localEvent := &LocalEvent{
@@ -218,7 +217,7 @@ func (rbft *rbftImpl[T, Constraint]) restartCheckPoolTimer() {
 //
 //	rbft.timerMgr.startTimer(checkPoolRemoveTimer, localEvent)
 //	rbft.logger.Debugf("Replica %d restarted the check pool remove timer, need to remove invalid tx in txpool after %v", rbft.chainConfig.SelfID, rbft.timerMgr.getTimeoutValue(checkPoolRemoveTimer))
-//}
+// }
 
 // maybeSendPrePrepare used by primary helps primary stores this batch and send prePrepare,
 // flag findCache indicates whether we need to get request batch from cacheBatch or not as

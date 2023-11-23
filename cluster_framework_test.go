@@ -12,12 +12,11 @@ import (
 	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel/trace"
 
-	types2 "github.com/axiomesh/axiom-kit/types"
-
 	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/common/metrics/disabled"
 	"github.com/axiomesh/axiom-bft/types"
+	types2 "github.com/axiomesh/axiom-kit/types"
 )
 
 var peerSet = []NodeInfo{
@@ -278,8 +277,8 @@ func (tf *testFramework[T, Constraint]) newTestNode(id uint64, p2pNodeID string,
 	ext = testExt
 
 	// todo: mock pool
-	//// Memool Instance, Parameters in Config are Flexible
-	//txpoolConfig := txpool.Config{
+	// // Memool Instance, Parameters in Config are Flexible
+	// txpoolConfig := txpool.Config{
 	//	PoolSize:            100000,
 	//	BatchSize:           500,
 	//	BatchMemLimit:       false,
@@ -290,11 +289,11 @@ func (tf *testFramework[T, Constraint]) newTestNode(id uint64, p2pNodeID string,
 	//	GetAccountNonce: func(address string) uint64 {
 	//		return 0
 	//	},
-	//}
-	//pool, err := txpool2.NewTxPool[T, Constraint](txpoolConfig)
-	//if err != nil {
+	// }
+	// pool, err := txpool2.NewTxPool[T, Constraint](txpoolConfig)
+	// if err != nil {
 	//	panic(err)
-	//}
+	// }
 
 	log := common.NewSimpleLogger()
 	log.SetPrefix(fmt.Sprintf("[node%d] ", id))
