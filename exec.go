@@ -19,10 +19,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/axiomesh/axiom-kit/txpool"
-
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/types"
+	"github.com/axiomesh/axiom-kit/txpool"
 )
 
 // executor manages exec related params
@@ -149,7 +148,6 @@ func (rbft *rbftImpl[T, Constraint]) dispatchMiscEvent(e *MiscEvent) consensusEv
 }
 
 func (rbft *rbftImpl[T, Constraint]) handleNotifyFindNextBatchEvent(completionMissingBatchHashes []string) consensusEvent {
-
 	// if current node is in abnormal, add normal txs into txPool without generate batches.
 	if !rbft.isNormal() || rbft.in(SkipInProgress) || rbft.in(InRecovery) || rbft.in(inEpochSyncing) || rbft.in(waitCheckpointBatchExecute) {
 		var completionMissingBatchIdxs []msgID
@@ -463,7 +461,7 @@ func (rbft *rbftImpl[T, Constraint]) handleCoreRbftEvent(e *LocalEvent) consensu
 			rbft.chainConfig.SelfID, rbft.highWatermarkTimerReason)
 		return rbft.sendViewChange()
 
-	//case CoreCheckPoolRemoveTimerEvent:
+	// case CoreCheckPoolRemoveTimerEvent:
 	//	rbft.processNeedRemoveReqs()
 	//	rbft.restartCheckPoolRemoveTimer()
 	//	return nil

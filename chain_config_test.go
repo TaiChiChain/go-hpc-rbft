@@ -189,5 +189,4 @@ func TestEpochInfo_ElectValidatorsAfterAddNewNodes(t *testing.T) {
 
 		require.Equal(t, uint64(1), tempEpoch.CandidateSet[0].ID)
 	})
-
 }

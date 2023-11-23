@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	types2 "github.com/axiomesh/axiom-kit/types"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/common/metrics/disabled"
 	"github.com/axiomesh/axiom-bft/types"
+	types2 "github.com/axiomesh/axiom-kit/types"
 )
 
 // ============================================
@@ -149,7 +149,7 @@ func TestRBFT_processReqSetEvent_PrimaryGenerateBatch(t *testing.T) {
 	assert.True(t, rbfts[0].timerMgr.getTimer(batchTimer))
 }
 
-//func TestRBFT_processReqSetEvent(t *testing.T) {
+// func TestRBFT_processReqSetEvent(t *testing.T) {
 //	_, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 //	unlockCluster(rbfts)
 //
@@ -162,7 +162,7 @@ func TestRBFT_processReqSetEvent_PrimaryGenerateBatch(t *testing.T) {
 //	rbfts[1].processEvent(req)
 //	batch, err := rbfts[1].batchMgr.requestPool.GenerateRequestBatch()
 //	assert.NotNil(t, batch)
-//}
+// }
 
 // ============================================
 // Post Tools
@@ -380,7 +380,7 @@ func TestRBFT_processOutOfDateReqs(t *testing.T) {
 	assert.Equal(t, 1, len(set.Requests))
 
 	// split according to set size when broadcast.
-	//batch := make([]*consensus.FltTransaction, 100)
+	// batch := make([]*consensus.FltTransaction, 100)
 	for i := 0; i < 24; i++ {
 		tx := newTx()
 		err := rbfts[1].batchMgr.requestPool.AddLocalTx(tx)

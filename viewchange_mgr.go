@@ -22,12 +22,11 @@ import (
 
 	"github.com/samber/lo"
 
-	"github.com/axiomesh/axiom-kit/txpool"
-
 	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/common/metrics"
 	"github.com/axiomesh/axiom-bft/types"
+	"github.com/axiomesh/axiom-kit/txpool"
 )
 
 var (

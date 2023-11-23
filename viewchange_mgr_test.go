@@ -3,10 +3,10 @@ package rbft
 import (
 	"testing"
 
-	"github.com/axiomesh/axiom-kit/txpool"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/axiomesh/axiom-bft/common/consensus"
+	"github.com/axiomesh/axiom-kit/txpool"
 )
 
 func TestVC_FullProcess(t *testing.T) {
