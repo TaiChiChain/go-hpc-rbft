@@ -19,9 +19,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/axiomesh/axiom-kit/txpool"
+
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/types"
-	"github.com/axiomesh/axiom-kit/txpool"
 )
 
 // executor manages exec related params
@@ -123,20 +124,8 @@ func (rbft *rbftImpl[T, Constraint]) dispatchLocalEvent(e *LocalEvent) consensus
 // dispatchMiscEvent dispatches misc Event to corresponding handles using its event type
 func (rbft *rbftImpl[T, Constraint]) dispatchMiscEvent(e *MiscEvent) consensusEvent {
 	switch e.EventType {
-	case ReqTxEvent:
-		return rbft.handleReqTxEvent(e.Event.(*ReqTxMsg[T, Constraint]))
-	case ReqNonceEvent:
-		return rbft.handleReqNonceEvent(e.Event.(*ReqNonceMsg))
-	case ReqPendingTxCountEvent:
-		return rbft.handleReqPendingTxCountEvent(e.Event.(*ReqPendingTxCountMsg))
 	case ReqGetWatermarkEvent:
 		return rbft.handleReqGetWatermarkEvent(e.Event.(*ReqGetWatermarkMsg))
-	case ReqGetPoolMetaEvent:
-		return rbft.handleReqGetPoolMetaEvent(e.Event.(*ReqGetPoolMetaMsg[T, Constraint]))
-	case ReqGetAccountMetaEvent:
-		return rbft.handleReqGetAccountMetaEvent(e.Event.(*ReqGetAccountPoolMetaMsg[T, Constraint]))
-	case ReqRemoveTxsEvent:
-		return rbft.handleReqRemoveTxsEvent(e.Event.(*ReqRemoveTxsMsg[T, Constraint]))
 	case NotifyGenBatchEvent:
 		return rbft.handleNotifyGenBatchEvent()
 	case NotifyFindNextBatchEvent:
@@ -230,38 +219,8 @@ func (rbft *rbftImpl[T, Constraint]) handleNotifyGenBatchEvent() consensusEvent 
 	return nil
 }
 
-func (rbft *rbftImpl[T, Constraint]) handleReqTxEvent(e *ReqTxMsg[T, Constraint]) consensusEvent {
-	e.ch <- rbft.batchMgr.requestPool.GetPendingTxByHash(e.hash)
-	return nil
-}
-
-func (rbft *rbftImpl[T, Constraint]) handleReqNonceEvent(e *ReqNonceMsg) consensusEvent {
-	e.ch <- rbft.batchMgr.requestPool.GetPendingTxCountByAccount(e.account)
-	return nil
-}
-
-func (rbft *rbftImpl[T, Constraint]) handleReqPendingTxCountEvent(e *ReqPendingTxCountMsg) consensusEvent {
-	e.ch <- rbft.batchMgr.requestPool.GetTotalPendingTxCount()
-	return nil
-}
-
 func (rbft *rbftImpl[T, Constraint]) handleReqGetWatermarkEvent(e *ReqGetWatermarkMsg) consensusEvent {
 	e.ch <- rbft.chainConfig.H
-	return nil
-}
-
-func (rbft *rbftImpl[T, Constraint]) handleReqGetPoolMetaEvent(e *ReqGetPoolMetaMsg[T, Constraint]) consensusEvent {
-	e.ch <- rbft.batchMgr.requestPool.GetMeta(e.full)
-	return nil
-}
-
-func (rbft *rbftImpl[T, Constraint]) handleReqGetAccountMetaEvent(e *ReqGetAccountPoolMetaMsg[T, Constraint]) consensusEvent {
-	e.ch <- rbft.batchMgr.requestPool.GetAccountMeta(e.account, e.full)
-	return nil
-}
-
-func (rbft *rbftImpl[T, Constraint]) handleReqRemoveTxsEvent(e *ReqRemoveTxsMsg[T, Constraint]) consensusEvent {
-	rbft.batchMgr.requestPool.RemoveStateUpdatingTxs(e.removeTxHashList)
 	return nil
 }
 
