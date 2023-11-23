@@ -18,11 +18,12 @@ import (
 	"context"
 	"sync"
 
+	"github.com/axiomesh/axiom-kit/txpool"
+	types2 "github.com/axiomesh/axiom-kit/types"
+
 	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/types"
-	"github.com/axiomesh/axiom-kit/txpool"
-	types2 "github.com/axiomesh/axiom-kit/types"
 )
 
 // Node represents a node in a RBFT cluster.
@@ -58,23 +59,8 @@ type Node[T any, Constraint types2.TXConstraint[T]] interface {
 }
 
 type External[T any, Constraint types2.TXConstraint[T]] interface {
-	// GetPendingTxCountByAccount will return the pending tx count of a given account
-	GetPendingTxCountByAccount(account string) uint64
-
-	// GetPendingTxByHash will return the tx by tx hash
-	GetPendingTxByHash(hash string) *T
-
-	// GetPendingTxCount return the current tx count of txpool
-	GetTotalPendingTxCount() uint64
-
 	// GetLowWatermark return the low watermark of txpool
 	GetLowWatermark() uint64
-
-	GetAccountPoolMeta(account string, full bool) *txpool.AccountMeta[T, Constraint]
-
-	GetPoolMeta(full bool) *txpool.Meta[T, Constraint]
-
-	ReportStateUpdatingBatches(committedTxHashList []string)
 }
 
 // ServiceInbound receives and records modifications from application service which includes two events:
@@ -238,48 +224,6 @@ func (n *node[T, Constraint]) getCurrentState() *types.ServiceState {
 	return n.currentState
 }
 
-// GetPendingTxCountByAccount returns pendingNonce by given account.
-func (n *node[T, Constraint]) GetPendingTxCountByAccount(account string) uint64 {
-	getNonceReq := &ReqNonceMsg{
-		account: account,
-		ch:      make(chan uint64),
-	}
-	localEvent := &MiscEvent{
-		EventType: ReqNonceEvent,
-		Event:     getNonceReq,
-	}
-	n.rbft.postMsg(localEvent)
-
-	return <-getNonceReq.ch
-}
-
-func (n *node[T, Constraint]) GetPendingTxByHash(hash string) *T {
-	getTxReq := &ReqTxMsg[T, Constraint]{
-		hash: hash,
-		ch:   make(chan *T),
-	}
-	localEvent := &MiscEvent{
-		EventType: ReqTxEvent,
-		Event:     getTxReq,
-	}
-	n.rbft.postMsg(localEvent)
-
-	return <-getTxReq.ch
-}
-
-func (n *node[T, Constraint]) GetTotalPendingTxCount() uint64 {
-	getPendingTxCountReq := &ReqPendingTxCountMsg{
-		ch: make(chan uint64),
-	}
-	localEvent := &MiscEvent{
-		EventType: ReqPendingTxCountEvent,
-		Event:     getPendingTxCountReq,
-	}
-	n.rbft.postMsg(localEvent)
-
-	return <-getPendingTxCountReq.ch
-}
-
 func (n *node[T, Constraint]) GetLowWatermark() uint64 {
 	getWatermarkReq := &ReqGetWatermarkMsg{
 		ch: make(chan uint64),
@@ -291,44 +235,6 @@ func (n *node[T, Constraint]) GetLowWatermark() uint64 {
 	n.rbft.postMsg(localEvent)
 
 	return <-getWatermarkReq.ch
-}
-
-func (n *node[T, Constraint]) GetAccountPoolMeta(account string, full bool) *txpool.AccountMeta[T, Constraint] {
-	req := &ReqGetAccountPoolMetaMsg[T, Constraint]{
-		account: account,
-		full:    full,
-		ch:      make(chan *txpool.AccountMeta[T, Constraint]),
-	}
-	localEvent := &MiscEvent{
-		EventType: ReqGetAccountMetaEvent,
-		Event:     req,
-	}
-	n.rbft.postMsg(localEvent)
-
-	return <-req.ch
-}
-
-func (n *node[T, Constraint]) GetPoolMeta(full bool) *txpool.Meta[T, Constraint] {
-	req := &ReqGetPoolMetaMsg[T, Constraint]{
-		full: full,
-		ch:   make(chan *txpool.Meta[T, Constraint]),
-	}
-	localEvent := &MiscEvent{
-		EventType: ReqGetPoolMetaEvent,
-		Event:     req,
-	}
-	n.rbft.postMsg(localEvent)
-
-	return <-req.ch
-}
-
-func (n *node[T, Constraint]) ReportStateUpdatingBatches(committedTxHashList []string) {
-	req := &ReqRemoveTxsMsg[T, Constraint]{removeTxHashList: committedTxHashList}
-	localEvent := &MiscEvent{
-		EventType: ReqRemoveTxsEvent,
-		Event:     req,
-	}
-	n.rbft.postMsg(localEvent)
 }
 
 func (n *node[T, Constraint]) NotifyGenBatch(_ int) {

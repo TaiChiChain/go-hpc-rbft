@@ -23,9 +23,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/axiomesh/axiom-bft/common/consensus"
-	"github.com/axiomesh/axiom-kit/txpool"
 	"github.com/axiomesh/axiom-kit/types"
+
+	"github.com/axiomesh/axiom-bft/common/consensus"
 )
 
 // constant timer names
@@ -338,13 +338,7 @@ type vcIdx struct {
 type nextDemandNewView uint64
 
 const (
-	ReqTxEvent = iota
-	ReqNonceEvent
-	ReqPendingTxCountEvent
-	ReqGetWatermarkEvent
-	ReqGetPoolMetaEvent
-	ReqGetAccountMetaEvent
-	ReqRemoveTxsEvent
+	ReqGetWatermarkEvent = iota
 	NotifyGenBatchEvent
 	NotifyFindNextBatchEvent
 )
@@ -355,37 +349,8 @@ type MiscEvent struct {
 	Event     any
 }
 
-type ReqTxMsg[T any, Constraint types.TXConstraint[T]] struct {
-	hash string
-	ch   chan *T
-}
-
-type ReqNonceMsg struct {
-	account string
-	ch      chan uint64
-}
-
-type ReqPendingTxCountMsg struct {
-	ch chan uint64
-}
-
 type ReqGetWatermarkMsg struct {
 	ch chan uint64
-}
-
-type ReqGetAccountPoolMetaMsg[T any, Constraint types.TXConstraint[T]] struct {
-	account string
-	full    bool
-	ch      chan *txpool.AccountMeta[T, Constraint]
-}
-
-type ReqGetPoolMetaMsg[T any, Constraint types.TXConstraint[T]] struct {
-	full bool
-	ch   chan *txpool.Meta[T, Constraint]
-}
-
-type ReqRemoveTxsMsg[T any, Constraint types.TXConstraint[T]] struct {
-	removeTxHashList []string
 }
 
 type NotifyFindNextBatchMsg struct {
