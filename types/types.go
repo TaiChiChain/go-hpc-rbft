@@ -38,6 +38,11 @@ type MetaState struct {
 	Digest string
 }
 
+type BlockMeta struct {
+	ProcessorNodeID uint64
+	BlockNum        uint64
+}
+
 // CheckpointState is the basic info for checkpoint.
 type CheckpointState struct {
 	Meta     MetaState

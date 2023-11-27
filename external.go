@@ -68,7 +68,7 @@ type Crypto interface {
 type ServiceOutbound[T any, Constraint types2.TXConstraint[T]] interface {
 	// Execute informs application layer to apply one batch with given request list and batch seqNo.
 	// Users can apply different batches asynchronously but ensure the order by seqNo.
-	Execute(txs []*T, localList []bool, seqNo uint64, timestamp int64, proposerAccount string)
+	Execute(txs []*T, localList []bool, seqNo uint64, timestamp int64, proposerAccount string, proposerNodeID uint64)
 
 	// StateUpdate informs application layer to catch up to given seqNo with specified state digest.
 	// epochChanges should be provided when the sync request has a backwardness of epoch changes
@@ -87,6 +87,10 @@ type EpochService interface {
 	ReadEpochState(key string) ([]byte, error)
 }
 
+type Ledger interface {
+	GetBlockMeta(num uint64) (*types.BlockMeta, error)
+}
+
 // ExternalStack integrates all external interfaces which must be implemented by application users.
 //
 //go:generate mockgen -destination ./mock_external.go -package rbft -source ./external.go -typed
@@ -96,4 +100,5 @@ type ExternalStack[T any, Constraint types2.TXConstraint[T]] interface {
 	Crypto
 	ServiceOutbound[T, Constraint]
 	EpochService
+	Ledger
 }

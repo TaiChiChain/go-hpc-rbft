@@ -23,9 +23,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/axiomesh/axiom-kit/types"
-
 	"github.com/axiomesh/axiom-bft/common/consensus"
+	"github.com/axiomesh/axiom-kit/types"
 )
 
 // constant timer names

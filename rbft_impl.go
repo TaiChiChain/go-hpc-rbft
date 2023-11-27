@@ -189,7 +189,8 @@ func newRBFT[T any, Constraint types2.TXConstraint[T]](c Config, external Extern
 		EpochInfo:        nil,
 		EpochDerivedData: EpochDerivedData{},
 		DynamicChainConfig: DynamicChainConfig{
-			H: c.GenesisEpochInfo.StartBlock,
+			H:                           c.GenesisEpochInfo.StartBlock,
+			RecentBlockProcessorTracker: NewBlockProcessorTracker(external.GetBlockMeta),
 		},
 		SelfAccountAddress: c.SelfAccountAddress,
 		logger:             c.Logger,
@@ -265,6 +266,7 @@ func (rbft *rbftImpl[T, Constraint]) init() error {
 		rbft.logger.Errorf("Replica restore state failed: %s", rErr)
 		return rErr
 	}
+	rbft.chainConfig.ResetRecentBlockNum(rbft.config.LastServiceState.MetaState.Height)
 
 	rbft.initTimers()
 	rbft.initStatus()
@@ -1640,10 +1642,12 @@ func (rbft *rbftImpl[T, Constraint]) commitPendingBlocks() {
 			}
 
 			var proposerAccount string
+			var proposerNodeID uint64
 			if cert != nil && cert.prePrepare != nil {
 				proposer, ok := rbft.chainConfig.NodeInfoMap[cert.prePrepare.HashBatch.Proposer]
 				if ok {
 					proposerAccount = proposer.AccountAddress
+					proposerNodeID = proposer.ID
 				} else {
 					rbft.logger.Warningf("Replica %d did not find the proposer in the epoch", rbft.chainConfig.SelfID)
 				}
@@ -1657,7 +1661,7 @@ func (rbft *rbftImpl[T, Constraint]) commitPendingBlocks() {
 				rbft.logger.Noticef("======== Replica %d Call execute a no-nop, epoch=%d/view=%d/seqNo=%d",
 					rbft.chainConfig.SelfID, rbft.chainConfig.EpochInfo.Epoch, idx.v, idx.n)
 
-				rbft.external.Execute(txList, localList, idx.n, 0, proposerAccount)
+				rbft.external.Execute(txList, localList, idx.n, 0, proposerAccount, proposerNodeID)
 			} else {
 				// find batch in batchStore rather than outstandingBatch as after viewChange
 				// we may clear outstandingBatch and save all batches in batchStore.
@@ -1675,14 +1679,14 @@ func (rbft *rbftImpl[T, Constraint]) commitPendingBlocks() {
 				rbft.metrics.batchToCommitDuration.Observe(batchToCommit)
 				rbft.logger.Noticef("======== Replica %d Call execute, epoch=%d/view=%d/seqNo=%d/txCount=%d/digest=%s",
 					rbft.chainConfig.SelfID, rbft.chainConfig.EpochInfo.Epoch, idx.v, idx.n, len(txList), idx.d)
-				rbft.external.Execute(txList, localList, idx.n, cert.prePrepare.HashBatch.Timestamp, proposerAccount)
+				rbft.external.Execute(txList, localList, idx.n, cert.prePrepare.HashBatch.Timestamp, proposerAccount, proposerNodeID)
 			}
 			delete(rbft.storeMgr.outstandingReqBatches, idx.d)
 			rbft.metrics.outstandingBatchesGauge.Set(float64(len(rbft.storeMgr.outstandingReqBatches)))
 			cert.sentExecute = true
 
 			// if it is a config batch, start to wait for stable checkpoint process after the batch committed
-			rbft.afterCommitBlock(idx, cert.isConfig)
+			rbft.afterCommitBlock(idx, cert.isConfig, proposerNodeID)
 			foreachIdx++
 		} else {
 			hasTxToExec = false
@@ -1771,9 +1775,13 @@ func (rbft *rbftImpl[T, Constraint]) findNextCommitBatch() (find bool, idx msgID
 
 // afterCommitBlock processes logic after commit block, update lastExec,
 // and generate checkpoint when lastExec % K == 0
-func (rbft *rbftImpl[T, Constraint]) afterCommitBlock(idx msgID, isConfig bool) {
+func (rbft *rbftImpl[T, Constraint]) afterCommitBlock(idx msgID, isConfig bool, proposerNodeID uint64) {
 	rbft.logger.Debugf("Replica %d finished execution %d, trying next", rbft.chainConfig.SelfID, idx.n)
 	rbft.exec.setLastExec(idx.n)
+	rbft.chainConfig.RecentBlockProcessorTracker.AddBlock(types.BlockMeta{
+		ProcessorNodeID: proposerNodeID,
+		BlockNum:        idx.n,
+	})
 	delete(rbft.storeMgr.committedCert, idx)
 	// not checkpoint
 	if isConfig || rbft.exec.lastExec%rbft.chainConfig.EpochInfo.ConsensusParams.CheckpointPeriod == 0 {

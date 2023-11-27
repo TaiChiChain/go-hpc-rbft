@@ -203,6 +203,7 @@ func (rbft *rbftImpl[T, Constraint]) updateEpochInfo(epochInfo *EpochInfo) {
 		rbft.logger.Criticalf("Replica %d failed to check epoch info for epoch %d from ledger: %v", rbft.chainConfig.SelfID, epochInfo.Epoch, err)
 		return
 	}
+	rbft.chainConfig.ResetRecentBlockNum(rbft.config.LastServiceState.MetaState.Height)
 	newRole := rbft.chainConfig.SelfRole
 	if oldRole != newRole {
 		rbft.logger.Infof("Replica %d change role from %s to %s", rbft.chainConfig.SelfID, oldRole.String(), newRole.String())
