@@ -13,12 +13,10 @@ import (
 	context "context"
 	reflect "reflect"
 
-	gomock "go.uber.org/mock/gomock"
-
-	types2 "github.com/axiomesh/axiom-kit/types"
-
 	consensus "github.com/axiomesh/axiom-bft/common/consensus"
-	"github.com/axiomesh/axiom-bft/types"
+	types "github.com/axiomesh/axiom-bft/types"
+	types0 "github.com/axiomesh/axiom-kit/types"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockStorage is a mock of Storage interface.
@@ -398,18 +396,18 @@ func (c *CryptoVerifyCall) DoAndReturn(f func(string, []byte, []byte) error) *Cr
 }
 
 // MockServiceOutbound is a mock of ServiceOutbound interface.
-type MockServiceOutbound[T any, Constraint types2.TXConstraint[T]] struct {
+type MockServiceOutbound[T any, Constraint types0.TXConstraint[T]] struct {
 	ctrl     *gomock.Controller
 	recorder *MockServiceOutboundMockRecorder[T, Constraint]
 }
 
 // MockServiceOutboundMockRecorder is the mock recorder for MockServiceOutbound.
-type MockServiceOutboundMockRecorder[T any, Constraint types2.TXConstraint[T]] struct {
+type MockServiceOutboundMockRecorder[T any, Constraint types0.TXConstraint[T]] struct {
 	mock *MockServiceOutbound[T, Constraint]
 }
 
 // NewMockServiceOutbound creates a new mock instance.
-func NewMockServiceOutbound[T any, Constraint types2.TXConstraint[T]](ctrl *gomock.Controller) *MockServiceOutbound[T, Constraint] {
+func NewMockServiceOutbound[T any, Constraint types0.TXConstraint[T]](ctrl *gomock.Controller) *MockServiceOutbound[T, Constraint] {
 	mock := &MockServiceOutbound[T, Constraint]{ctrl: ctrl}
 	mock.recorder = &MockServiceOutboundMockRecorder[T, Constraint]{mock}
 	return mock
@@ -434,7 +432,7 @@ func (mr *MockServiceOutboundMockRecorder[T, Constraint]) Execute(txs, localList
 }
 
 // ServiceOutboundExecuteCall wrap *gomock.Call
-type ServiceOutboundExecuteCall[T any, Constraint types2.TXConstraint[T]] struct {
+type ServiceOutboundExecuteCall[T any, Constraint types0.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
@@ -475,7 +473,7 @@ func (mr *MockServiceOutboundMockRecorder[T, Constraint]) SendFilterEvent(inform
 }
 
 // ServiceOutboundSendFilterEventCall wrap *gomock.Call
-type ServiceOutboundSendFilterEventCall[T any, Constraint types2.TXConstraint[T]] struct {
+type ServiceOutboundSendFilterEventCall[T any, Constraint types0.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
@@ -516,7 +514,7 @@ func (mr *MockServiceOutboundMockRecorder[T, Constraint]) StateUpdate(localLowWa
 }
 
 // ServiceOutboundStateUpdateCall wrap *gomock.Call
-type ServiceOutboundStateUpdateCall[T any, Constraint types2.TXConstraint[T]] struct {
+type ServiceOutboundStateUpdateCall[T any, Constraint types0.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
@@ -717,18 +715,18 @@ func (c *EpochServiceStoreEpochStateCall) DoAndReturn(f func(string, []byte) err
 }
 
 // MockExternalStack is a mock of ExternalStack interface.
-type MockExternalStack[T any, Constraint types2.TXConstraint[T]] struct {
+type MockExternalStack[T any, Constraint types0.TXConstraint[T]] struct {
 	ctrl     *gomock.Controller
 	recorder *MockExternalStackMockRecorder[T, Constraint]
 }
 
 // MockExternalStackMockRecorder is the mock recorder for MockExternalStack.
-type MockExternalStackMockRecorder[T any, Constraint types2.TXConstraint[T]] struct {
+type MockExternalStackMockRecorder[T any, Constraint types0.TXConstraint[T]] struct {
 	mock *MockExternalStack[T, Constraint]
 }
 
 // NewMockExternalStack creates a new mock instance.
-func NewMockExternalStack[T any, Constraint types2.TXConstraint[T]](ctrl *gomock.Controller) *MockExternalStack[T, Constraint] {
+func NewMockExternalStack[T any, Constraint types0.TXConstraint[T]](ctrl *gomock.Controller) *MockExternalStack[T, Constraint] {
 	mock := &MockExternalStack[T, Constraint]{ctrl: ctrl}
 	mock.recorder = &MockExternalStackMockRecorder[T, Constraint]{mock}
 	return mock
@@ -755,7 +753,7 @@ func (mr *MockExternalStackMockRecorder[T, Constraint]) Broadcast(ctx, msg any) 
 }
 
 // ExternalStackBroadcastCall wrap *gomock.Call
-type ExternalStackBroadcastCall[T any, Constraint types2.TXConstraint[T]] struct {
+type ExternalStackBroadcastCall[T any, Constraint types0.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
@@ -793,7 +791,7 @@ func (mr *MockExternalStackMockRecorder[T, Constraint]) DelState(key any) *Exter
 }
 
 // ExternalStackDelStateCall wrap *gomock.Call
-type ExternalStackDelStateCall[T any, Constraint types2.TXConstraint[T]] struct {
+type ExternalStackDelStateCall[T any, Constraint types0.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
@@ -829,7 +827,7 @@ func (mr *MockExternalStackMockRecorder[T, Constraint]) Execute(txs, localList, 
 }
 
 // ExternalStackExecuteCall wrap *gomock.Call
-type ExternalStackExecuteCall[T any, Constraint types2.TXConstraint[T]] struct {
+type ExternalStackExecuteCall[T any, Constraint types0.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
@@ -868,7 +866,7 @@ func (mr *MockExternalStackMockRecorder[T, Constraint]) GetCurrentEpochInfo() *E
 }
 
 // ExternalStackGetCurrentEpochInfoCall wrap *gomock.Call
-type ExternalStackGetCurrentEpochInfoCall[T any, Constraint types2.TXConstraint[T]] struct {
+type ExternalStackGetCurrentEpochInfoCall[T any, Constraint types0.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
@@ -907,7 +905,7 @@ func (mr *MockExternalStackMockRecorder[T, Constraint]) GetEpochInfo(epoch any) 
 }
 
 // ExternalStackGetEpochInfoCall wrap *gomock.Call
-type ExternalStackGetEpochInfoCall[T any, Constraint types2.TXConstraint[T]] struct {
+type ExternalStackGetEpochInfoCall[T any, Constraint types0.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
@@ -946,7 +944,7 @@ func (mr *MockExternalStackMockRecorder[T, Constraint]) ReadEpochState(key any) 
 }
 
 // ExternalStackReadEpochStateCall wrap *gomock.Call
-type ExternalStackReadEpochStateCall[T any, Constraint types2.TXConstraint[T]] struct {
+type ExternalStackReadEpochStateCall[T any, Constraint types0.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
@@ -985,7 +983,7 @@ func (mr *MockExternalStackMockRecorder[T, Constraint]) ReadState(key any) *Exte
 }
 
 // ExternalStackReadStateCall wrap *gomock.Call
-type ExternalStackReadStateCall[T any, Constraint types2.TXConstraint[T]] struct {
+type ExternalStackReadStateCall[T any, Constraint types0.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
@@ -1024,7 +1022,7 @@ func (mr *MockExternalStackMockRecorder[T, Constraint]) ReadStateSet(key any) *E
 }
 
 // ExternalStackReadStateSetCall wrap *gomock.Call
-type ExternalStackReadStateSetCall[T any, Constraint types2.TXConstraint[T]] struct {
+type ExternalStackReadStateSetCall[T any, Constraint types0.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
@@ -1065,7 +1063,7 @@ func (mr *MockExternalStackMockRecorder[T, Constraint]) SendFilterEvent(informTy
 }
 
 // ExternalStackSendFilterEventCall wrap *gomock.Call
-type ExternalStackSendFilterEventCall[T any, Constraint types2.TXConstraint[T]] struct {
+type ExternalStackSendFilterEventCall[T any, Constraint types0.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
@@ -1104,7 +1102,7 @@ func (mr *MockExternalStackMockRecorder[T, Constraint]) Sign(msg any) *ExternalS
 }
 
 // ExternalStackSignCall wrap *gomock.Call
-type ExternalStackSignCall[T any, Constraint types2.TXConstraint[T]] struct {
+type ExternalStackSignCall[T any, Constraint types0.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
@@ -1145,7 +1143,7 @@ func (mr *MockExternalStackMockRecorder[T, Constraint]) StateUpdate(localLowWate
 }
 
 // ExternalStackStateUpdateCall wrap *gomock.Call
-type ExternalStackStateUpdateCall[T any, Constraint types2.TXConstraint[T]] struct {
+type ExternalStackStateUpdateCall[T any, Constraint types0.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
@@ -1183,7 +1181,7 @@ func (mr *MockExternalStackMockRecorder[T, Constraint]) StoreEpochState(key, val
 }
 
 // ExternalStackStoreEpochStateCall wrap *gomock.Call
-type ExternalStackStoreEpochStateCall[T any, Constraint types2.TXConstraint[T]] struct {
+type ExternalStackStoreEpochStateCall[T any, Constraint types0.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
@@ -1221,7 +1219,7 @@ func (mr *MockExternalStackMockRecorder[T, Constraint]) StoreState(key, value an
 }
 
 // ExternalStackStoreStateCall wrap *gomock.Call
-type ExternalStackStoreStateCall[T any, Constraint types2.TXConstraint[T]] struct {
+type ExternalStackStoreStateCall[T any, Constraint types0.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
@@ -1259,7 +1257,7 @@ func (mr *MockExternalStackMockRecorder[T, Constraint]) Unicast(ctx, msg, to any
 }
 
 // ExternalStackUnicastCall wrap *gomock.Call
-type ExternalStackUnicastCall[T any, Constraint types2.TXConstraint[T]] struct {
+type ExternalStackUnicastCall[T any, Constraint types0.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
@@ -1297,7 +1295,7 @@ func (mr *MockExternalStackMockRecorder[T, Constraint]) Verify(peerHash, signatu
 }
 
 // ExternalStackVerifyCall wrap *gomock.Call
-type ExternalStackVerifyCall[T any, Constraint types2.TXConstraint[T]] struct {
+type ExternalStackVerifyCall[T any, Constraint types0.TXConstraint[T]] struct {
 	*gomock.Call
 }
 

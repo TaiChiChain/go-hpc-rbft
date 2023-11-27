@@ -179,11 +179,13 @@ type EpochInfo struct {
 }
 
 type FinanceParams struct {
-	GasLimit              uint64 `mapstructure:"gas_limit" toml:"gas_limit" json:"gas_limit"`
-	MaxGasPrice           uint64 `mapstructure:"max_gas_price" toml:"max_gas_price" json:"max_gas_price"`
-	MinGasPrice           uint64 `mapstructure:"min_gas_price" toml:"min_gas_price" json:"min_gas_price"`
-	GasChangeRateValue    uint64 `mapstructure:"gas_change_rate_value" toml:"gas_change_rate_value" json:"gas_change_rate_value"`
-	GasChangeRateDecimals uint64 `mapstructure:"gas_change_rate_decimals" toml:"gas_change_rate_decimals" json:"gas_change_rate_decimals"`
+	GasLimit               uint64 `mapstructure:"gas_limit" toml:"gas_limit" json:"gas_limit"`
+	StartGasPriceAvailable bool   `mapstructure:"start_gas_price_available" toml:"start_gas_price_available" json:"start_gas_price_available"`
+	StartGasPrice          uint64 `mapstructure:"start_gas_price" toml:"start_gas_price" json:"start_gas_price"`
+	MaxGasPrice            uint64 `mapstructure:"max_gas_price" toml:"max_gas_price" json:"max_gas_price"`
+	MinGasPrice            uint64 `mapstructure:"min_gas_price" toml:"min_gas_price" json:"min_gas_price"`
+	GasChangeRateValue     uint64 `mapstructure:"gas_change_rate_value" toml:"gas_change_rate_value" json:"gas_change_rate_value"`
+	GasChangeRateDecimals  uint64 `mapstructure:"gas_change_rate_decimals" toml:"gas_change_rate_decimals" json:"gas_change_rate_decimals"`
 }
 
 type MiscParams struct {
@@ -213,11 +215,13 @@ func (e *EpochInfo) Clone() *EpochInfo {
 			ContinuousNullRequestToleranceNumber: e.ConsensusParams.ContinuousNullRequestToleranceNumber,
 		},
 		FinanceParams: FinanceParams{
-			GasLimit:              e.FinanceParams.GasLimit,
-			MaxGasPrice:           e.FinanceParams.MaxGasPrice,
-			MinGasPrice:           e.FinanceParams.MinGasPrice,
-			GasChangeRateValue:    e.FinanceParams.GasChangeRateValue,
-			GasChangeRateDecimals: e.FinanceParams.GasChangeRateDecimals,
+			GasLimit:               e.FinanceParams.GasLimit,
+			StartGasPriceAvailable: false,
+			StartGasPrice:          0,
+			MaxGasPrice:            e.FinanceParams.MaxGasPrice,
+			MinGasPrice:            e.FinanceParams.MinGasPrice,
+			GasChangeRateValue:     e.FinanceParams.GasChangeRateValue,
+			GasChangeRateDecimals:  e.FinanceParams.GasChangeRateDecimals,
 		},
 		MiscParams: MiscParams{
 			TxMaxSize: e.MiscParams.TxMaxSize,
