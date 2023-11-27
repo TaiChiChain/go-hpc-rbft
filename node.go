@@ -18,12 +18,11 @@ import (
 	"context"
 	"sync"
 
-	"github.com/axiomesh/axiom-kit/txpool"
-	types2 "github.com/axiomesh/axiom-kit/types"
-
 	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/types"
+	"github.com/axiomesh/axiom-kit/txpool"
+	types2 "github.com/axiomesh/axiom-kit/types"
 )
 
 // Node represents a node in a RBFT cluster.

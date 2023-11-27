@@ -139,6 +139,13 @@ type testExternal[T any, Constraint types2.TXConstraint[T]] struct {
 	configCheckpointRecord map[uint64]*consensus.EpochChange
 }
 
+func (ext *testExternal[T, Constraint]) GetBlockMeta(num uint64) (*types.BlockMeta, error) {
+	return &types.BlockMeta{
+		ProcessorNodeID: 0,
+		BlockNum:        num,
+	}, nil
+}
+
 // channelMsg is the form of data in cluster network.
 type channelMsg struct {
 	// target node of consensus message.
@@ -224,6 +231,7 @@ func (tf *testFramework[T, Constraint]) newNodeConfig(
 				BlockMaxTxNum:                 100,
 				NotActiveWeight:               1,
 				AbnormalNodeExcludeView:       10,
+				AgainProposeIntervalBlockInValidatorsNumPercentage: 1,
 			},
 			FinanceParams: FinanceParams{
 				GasLimit:              0x5f5e100,
@@ -459,7 +467,7 @@ func (ext *testExternal[T, Constraint]) Verify(_ string, _ []byte, _ []byte) err
 }
 
 // ServiceOutbound
-func (ext *testExternal[T, Constraint]) Execute(requests []*T, _ []bool, seqNo uint64, timestamp int64, _ string) {
+func (ext *testExternal[T, Constraint]) Execute(requests []*T, _ []bool, seqNo uint64, timestamp int64, _ string, _ uint64) {
 	var txHashList []string
 	for _, req := range requests {
 		txHash := Constraint(req).RbftGetTxHash()

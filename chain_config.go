@@ -12,6 +12,7 @@ import (
 	"github.com/samber/lo"
 
 	"github.com/axiomesh/axiom-bft/common"
+	"github.com/axiomesh/axiom-bft/types"
 )
 
 const (
@@ -134,8 +135,10 @@ type ConsensusParams struct {
 	// The low weight of the viewchange node is restored to normal after the specified number of rounds.
 	AbnormalNodeExcludeView uint64 `mapstructure:"abnormal_node_exclude_view" toml:"abnormal_node_exclude_view" json:"abnormal_node_exclude_view"`
 
-	// The block interval for node to propose again, Ensure that a node cannot continuously produce blocks
-	AgainProposeIntervalBlock uint64 `mapstructure:"again_propose_interval_block" toml:"again_propose_interval_block" json:"again_propose_interval_block"`
+	// The block interval for node to propose again in validators num percentage,
+	// Ensure that a node cannot continuously produce blocks
+	// min is 1, max is validatorSetNum - 1
+	AgainProposeIntervalBlockInValidatorsNumPercentage uint64 `mapstructure:"again_propose_interval_block_in_validators_num_percentage" toml:"again_propose_interval_block_in_validators_num_percentage" json:"again_propose_interval_block_in_validators_num_percentage"`
 
 	// ContinuousNullRequestToleranceNumber Viewchange will be sent when there is a packageable transaction locally and n nullrequests are received consecutively.
 	ContinuousNullRequestToleranceNumber uint64 `mapstructure:"continuous_null_request_tolerance_number" toml:"continuous_null_request_tolerance_number" json:"continuous_null_request_tolerance_number"`
@@ -202,17 +205,18 @@ func (e *EpochInfo) Clone() *EpochInfo {
 			return item
 		}),
 		ConsensusParams: ConsensusParams{
-			ValidatorElectionType:                e.ConsensusParams.ValidatorElectionType,
-			ProposerElectionType:                 e.ConsensusParams.ProposerElectionType,
-			CheckpointPeriod:                     e.ConsensusParams.CheckpointPeriod,
-			HighWatermarkCheckpointPeriod:        e.ConsensusParams.HighWatermarkCheckpointPeriod,
-			MaxValidatorNum:                      e.ConsensusParams.MaxValidatorNum,
-			BlockMaxTxNum:                        e.ConsensusParams.BlockMaxTxNum,
-			EnableTimedGenEmptyBlock:             e.ConsensusParams.EnableTimedGenEmptyBlock,
-			NotActiveWeight:                      e.ConsensusParams.NotActiveWeight,
-			AbnormalNodeExcludeView:              e.ConsensusParams.AbnormalNodeExcludeView,
-			AgainProposeIntervalBlock:            e.ConsensusParams.AgainProposeIntervalBlock,
-			ContinuousNullRequestToleranceNumber: e.ConsensusParams.ContinuousNullRequestToleranceNumber,
+			ValidatorElectionType:         e.ConsensusParams.ValidatorElectionType,
+			ProposerElectionType:          e.ConsensusParams.ProposerElectionType,
+			CheckpointPeriod:              e.ConsensusParams.CheckpointPeriod,
+			HighWatermarkCheckpointPeriod: e.ConsensusParams.HighWatermarkCheckpointPeriod,
+			MaxValidatorNum:               e.ConsensusParams.MaxValidatorNum,
+			BlockMaxTxNum:                 e.ConsensusParams.BlockMaxTxNum,
+			EnableTimedGenEmptyBlock:      e.ConsensusParams.EnableTimedGenEmptyBlock,
+			NotActiveWeight:               e.ConsensusParams.NotActiveWeight,
+			AbnormalNodeExcludeView:       e.ConsensusParams.AbnormalNodeExcludeView,
+			AgainProposeIntervalBlockInValidatorsNumPercentage: e.ConsensusParams.AgainProposeIntervalBlockInValidatorsNumPercentage,
+			ContinuousNullRequestToleranceNumber:               e.ConsensusParams.ContinuousNullRequestToleranceNumber,
+			ReBroadcastToleranceNumber:                         e.ConsensusParams.ReBroadcastToleranceNumber,
 		},
 		FinanceParams: FinanceParams{
 			GasLimit:               e.FinanceParams.GasLimit,
@@ -266,6 +270,12 @@ func (e *EpochInfo) Check() error {
 
 	if e.ConsensusParams.HighWatermarkCheckpointPeriod == 0 {
 		return errors.New("epoch info error: high_watermark_checkpoint_period cannot be 0")
+	}
+
+	if e.ConsensusParams.AgainProposeIntervalBlockInValidatorsNumPercentage == 0 {
+		return errors.New("epoch info error: again_propose_interval_block_in_validators_num_percentage cannot be 0")
+	} else if e.ConsensusParams.AgainProposeIntervalBlockInValidatorsNumPercentage >= 100 {
+		return errors.New("epoch info error: again_propose_interval_block_in_validators_num_percentage cannot be greater than or equal to 100")
 	}
 
 	if e.ConsensusParams.MaxValidatorNum < 4 {
@@ -463,6 +473,85 @@ type DynamicChainConfig struct {
 
 	// Proposer node id of the current View period.
 	PrimaryID uint64
+
+	RecentBlockProcessorTracker *BlockProcessorTracker
+}
+
+// BlockProcessorTracker use rings to track recent block proposers
+type BlockProcessorTracker struct {
+	getBlockFunc        func(uint64) (*types.BlockMeta, error)
+	BlockProcessors     []*types.BlockMeta
+	RecentBlockNum      uint64
+	NextIdx             uint64
+	BlockProcessorIDSet map[uint64]struct{}
+	StartBlockNum       uint64
+	EndBlockNum         uint64
+}
+
+func NewBlockProcessorTracker(getBlockFunc func(uint64) (*types.BlockMeta, error)) *BlockProcessorTracker {
+	return &BlockProcessorTracker{
+		getBlockFunc:        getBlockFunc,
+		BlockProcessors:     []*types.BlockMeta{},
+		RecentBlockNum:      0,
+		NextIdx:             0,
+		BlockProcessorIDSet: map[uint64]struct{}{},
+		StartBlockNum:       0,
+		EndBlockNum:         0,
+	}
+}
+
+func (t *BlockProcessorTracker) ResetRecentBlockNum(epochStartBlockNum uint64, lastExecutedBlockNum uint64, recentBlockNum uint64) {
+	oldBlockProcessors := make(map[uint64]*types.BlockMeta, len(t.BlockProcessors))
+	for _, oldBlockProcessor := range t.BlockProcessors {
+		if oldBlockProcessor != nil {
+			oldBlockProcessors[oldBlockProcessor.BlockNum] = oldBlockProcessor
+		}
+	}
+	t.BlockProcessors = make([]*types.BlockMeta, recentBlockNum)
+	t.RecentBlockNum = recentBlockNum
+	t.NextIdx = 0
+	t.BlockProcessorIDSet = make(map[uint64]struct{})
+	t.StartBlockNum = epochStartBlockNum
+	t.EndBlockNum = lastExecutedBlockNum
+	if t.EndBlockNum > epochStartBlockNum+recentBlockNum-1 {
+		t.StartBlockNum = t.EndBlockNum - recentBlockNum + 1
+	}
+
+	if t.StartBlockNum < t.EndBlockNum {
+		for i := t.StartBlockNum; i <= t.EndBlockNum; i++ {
+			if oldBlockProcessor, ok := oldBlockProcessors[i]; ok {
+				t.AddBlock(*oldBlockProcessor)
+			} else {
+				m, err := t.getBlockFunc(i)
+				if err != nil {
+					panic(fmt.Sprintf("failed to get block %d when ResetRecentBlockNum: %v", i, err))
+				}
+				t.AddBlock(*m)
+			}
+		}
+	}
+}
+
+func (t *BlockProcessorTracker) AddBlock(blockProcessor types.BlockMeta) {
+	t.BlockProcessors[t.NextIdx] = &blockProcessor
+	var blockProcessorIDSet2 []uint64
+	blockProcessorIDSet := make(map[uint64]struct{})
+	for _, item := range t.BlockProcessors {
+		if item != nil {
+			blockProcessorIDSet[item.ProcessorNodeID] = struct{}{}
+			blockProcessorIDSet2 = append(blockProcessorIDSet2, item.ProcessorNodeID)
+		}
+	}
+	t.BlockProcessorIDSet = blockProcessorIDSet
+	t.NextIdx = (t.NextIdx + 1) % t.RecentBlockNum
+	t.EndBlockNum++
+	if t.EndBlockNum-t.StartBlockNum == t.RecentBlockNum {
+		t.StartBlockNum++
+	}
+}
+
+func (t *BlockProcessorTracker) GetRecentProcessorSet() map[uint64]struct{} {
+	return t.BlockProcessorIDSet
 }
 
 // ChainConfig tracking each view.
@@ -540,9 +629,15 @@ func (c *ChainConfig) wrfCalPrimaryIDByView(v uint64) uint64 {
 	var seed = []byte(c.LastCheckpointExecBlockHash)
 	seed = binary.BigEndian.AppendUint64(seed, c.EpochInfo.Epoch)
 	seed = binary.BigEndian.AppendUint64(seed, v)
-	return wrfSelectNodeByVotingPower(seed, lo.MapEntries(c.ValidatorDynamicInfoMap, func(id uint64, nodeInfo *NodeDynamicInfo) (uint64, int64) {
-		return id, nodeInfo.ConsensusVotingPower
-	}))
+
+	nodeID2VotingPower := make(map[uint64]int64)
+	for nodeID, info := range c.ValidatorDynamicInfoMap {
+		// exclude nodes that have recently produced blocks
+		if _, ok := c.RecentBlockProcessorTracker.GetRecentProcessorSet()[nodeID]; !ok {
+			nodeID2VotingPower[nodeID] = info.ConsensusVotingPower
+		}
+	}
+	return wrfSelectNodeByVotingPower(seed, nodeID2VotingPower)
 }
 
 // primaryID returns the expected primary id with the given view v
@@ -591,4 +686,15 @@ func (c *ChainConfig) validatorDynamicInfo() []NodeDynamicInfo {
 	return lo.MapToSlice(c.ValidatorDynamicInfoMap, func(id uint64, nodeInfo *NodeDynamicInfo) NodeDynamicInfo {
 		return *nodeInfo
 	})
+}
+
+func (c *ChainConfig) ResetRecentBlockNum(lastExecutedBlockNum uint64) {
+	validatorSetNum := uint64(len(c.EpochInfo.ValidatorSet))
+	recentBlockNum := validatorSetNum * c.EpochInfo.ConsensusParams.AgainProposeIntervalBlockInValidatorsNumPercentage / 100
+	if recentBlockNum == 0 {
+		recentBlockNum = 1
+	} else if recentBlockNum == validatorSetNum {
+		recentBlockNum = validatorSetNum - 1
+	}
+	c.RecentBlockProcessorTracker.ResetRecentBlockNum(c.EpochInfo.StartBlock, lastExecutedBlockNum, recentBlockNum)
 }

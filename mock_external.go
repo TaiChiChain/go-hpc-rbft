@@ -419,15 +419,15 @@ func (m *MockServiceOutbound[T, Constraint]) EXPECT() *MockServiceOutboundMockRe
 }
 
 // Execute mocks base method.
-func (m *MockServiceOutbound[T, Constraint]) Execute(txs []*T, localList []bool, seqNo uint64, timestamp int64, proposerAccount string) {
+func (m *MockServiceOutbound[T, Constraint]) Execute(txs []*T, localList []bool, seqNo uint64, timestamp int64, proposerAccount string, proposerNodeID uint64) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Execute", txs, localList, seqNo, timestamp, proposerAccount)
+	m.ctrl.Call(m, "Execute", txs, localList, seqNo, timestamp, proposerAccount, proposerNodeID)
 }
 
 // Execute indicates an expected call of Execute.
-func (mr *MockServiceOutboundMockRecorder[T, Constraint]) Execute(txs, localList, seqNo, timestamp, proposerAccount any) *ServiceOutboundExecuteCall[T, Constraint] {
+func (mr *MockServiceOutboundMockRecorder[T, Constraint]) Execute(txs, localList, seqNo, timestamp, proposerAccount, proposerNodeID any) *ServiceOutboundExecuteCall[T, Constraint] {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Execute", reflect.TypeOf((*MockServiceOutbound[T, Constraint])(nil).Execute), txs, localList, seqNo, timestamp, proposerAccount)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Execute", reflect.TypeOf((*MockServiceOutbound[T, Constraint])(nil).Execute), txs, localList, seqNo, timestamp, proposerAccount, proposerNodeID)
 	return &ServiceOutboundExecuteCall[T, Constraint]{Call: call}
 }
 
@@ -443,13 +443,13 @@ func (c *ServiceOutboundExecuteCall[T, Constraint]) Return() *ServiceOutboundExe
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *ServiceOutboundExecuteCall[T, Constraint]) Do(f func([]*T, []bool, uint64, int64, string)) *ServiceOutboundExecuteCall[T, Constraint] {
+func (c *ServiceOutboundExecuteCall[T, Constraint]) Do(f func([]*T, []bool, uint64, int64, string, uint64)) *ServiceOutboundExecuteCall[T, Constraint] {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *ServiceOutboundExecuteCall[T, Constraint]) DoAndReturn(f func([]*T, []bool, uint64, int64, string)) *ServiceOutboundExecuteCall[T, Constraint] {
+func (c *ServiceOutboundExecuteCall[T, Constraint]) DoAndReturn(f func([]*T, []bool, uint64, int64, string, uint64)) *ServiceOutboundExecuteCall[T, Constraint] {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -714,6 +714,68 @@ func (c *EpochServiceStoreEpochStateCall) DoAndReturn(f func(string, []byte) err
 	return c
 }
 
+// MockLedger is a mock of Ledger interface.
+type MockLedger struct {
+	ctrl     *gomock.Controller
+	recorder *MockLedgerMockRecorder
+}
+
+// MockLedgerMockRecorder is the mock recorder for MockLedger.
+type MockLedgerMockRecorder struct {
+	mock *MockLedger
+}
+
+// NewMockLedger creates a new mock instance.
+func NewMockLedger(ctrl *gomock.Controller) *MockLedger {
+	mock := &MockLedger{ctrl: ctrl}
+	mock.recorder = &MockLedgerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockLedger) EXPECT() *MockLedgerMockRecorder {
+	return m.recorder
+}
+
+// GetBlockMeta mocks base method.
+func (m *MockLedger) GetBlockMeta(num uint64) (*types.BlockMeta, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetBlockMeta", num)
+	ret0, _ := ret[0].(*types.BlockMeta)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetBlockMeta indicates an expected call of GetBlockMeta.
+func (mr *MockLedgerMockRecorder) GetBlockMeta(num any) *LedgerGetBlockMetaCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockMeta", reflect.TypeOf((*MockLedger)(nil).GetBlockMeta), num)
+	return &LedgerGetBlockMetaCall{Call: call}
+}
+
+// LedgerGetBlockMetaCall wrap *gomock.Call
+type LedgerGetBlockMetaCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *LedgerGetBlockMetaCall) Return(arg0 *types.BlockMeta, arg1 error) *LedgerGetBlockMetaCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *LedgerGetBlockMetaCall) Do(f func(uint64) (*types.BlockMeta, error)) *LedgerGetBlockMetaCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *LedgerGetBlockMetaCall) DoAndReturn(f func(uint64) (*types.BlockMeta, error)) *LedgerGetBlockMetaCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // MockExternalStack is a mock of ExternalStack interface.
 type MockExternalStack[T any, Constraint types0.TXConstraint[T]] struct {
 	ctrl     *gomock.Controller
@@ -814,15 +876,15 @@ func (c *ExternalStackDelStateCall[T, Constraint]) DoAndReturn(f func(string) er
 }
 
 // Execute mocks base method.
-func (m *MockExternalStack[T, Constraint]) Execute(txs []*T, localList []bool, seqNo uint64, timestamp int64, proposerAccount string) {
+func (m *MockExternalStack[T, Constraint]) Execute(txs []*T, localList []bool, seqNo uint64, timestamp int64, proposerAccount string, proposerNodeID uint64) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Execute", txs, localList, seqNo, timestamp, proposerAccount)
+	m.ctrl.Call(m, "Execute", txs, localList, seqNo, timestamp, proposerAccount, proposerNodeID)
 }
 
 // Execute indicates an expected call of Execute.
-func (mr *MockExternalStackMockRecorder[T, Constraint]) Execute(txs, localList, seqNo, timestamp, proposerAccount any) *ExternalStackExecuteCall[T, Constraint] {
+func (mr *MockExternalStackMockRecorder[T, Constraint]) Execute(txs, localList, seqNo, timestamp, proposerAccount, proposerNodeID any) *ExternalStackExecuteCall[T, Constraint] {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Execute", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).Execute), txs, localList, seqNo, timestamp, proposerAccount)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Execute", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).Execute), txs, localList, seqNo, timestamp, proposerAccount, proposerNodeID)
 	return &ExternalStackExecuteCall[T, Constraint]{Call: call}
 }
 
@@ -838,13 +900,52 @@ func (c *ExternalStackExecuteCall[T, Constraint]) Return() *ExternalStackExecute
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *ExternalStackExecuteCall[T, Constraint]) Do(f func([]*T, []bool, uint64, int64, string)) *ExternalStackExecuteCall[T, Constraint] {
+func (c *ExternalStackExecuteCall[T, Constraint]) Do(f func([]*T, []bool, uint64, int64, string, uint64)) *ExternalStackExecuteCall[T, Constraint] {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *ExternalStackExecuteCall[T, Constraint]) DoAndReturn(f func([]*T, []bool, uint64, int64, string)) *ExternalStackExecuteCall[T, Constraint] {
+func (c *ExternalStackExecuteCall[T, Constraint]) DoAndReturn(f func([]*T, []bool, uint64, int64, string, uint64)) *ExternalStackExecuteCall[T, Constraint] {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// GetBlockMeta mocks base method.
+func (m *MockExternalStack[T, Constraint]) GetBlockMeta(num uint64) (*types.BlockMeta, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetBlockMeta", num)
+	ret0, _ := ret[0].(*types.BlockMeta)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetBlockMeta indicates an expected call of GetBlockMeta.
+func (mr *MockExternalStackMockRecorder[T, Constraint]) GetBlockMeta(num any) *ExternalStackGetBlockMetaCall[T, Constraint] {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockMeta", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).GetBlockMeta), num)
+	return &ExternalStackGetBlockMetaCall[T, Constraint]{Call: call}
+}
+
+// ExternalStackGetBlockMetaCall wrap *gomock.Call
+type ExternalStackGetBlockMetaCall[T any, Constraint types0.TXConstraint[T]] struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *ExternalStackGetBlockMetaCall[T, Constraint]) Return(arg0 *types.BlockMeta, arg1 error) *ExternalStackGetBlockMetaCall[T, Constraint] {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *ExternalStackGetBlockMetaCall[T, Constraint]) Do(f func(uint64) (*types.BlockMeta, error)) *ExternalStackGetBlockMetaCall[T, Constraint] {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *ExternalStackGetBlockMetaCall[T, Constraint]) DoAndReturn(f func(uint64) (*types.BlockMeta, error)) *ExternalStackGetBlockMetaCall[T, Constraint] {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
