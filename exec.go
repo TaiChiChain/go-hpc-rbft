@@ -244,7 +244,6 @@ func (rbft *rbftImpl[T, Constraint]) handleCoreRbftEvent(e *LocalEvent) consensu
 			rbft.stopBatchTimer()
 			return nil
 		}
-		rbft.logger.Debugf("Primary %d batch timer expired, try to create a batch", rbft.chainConfig.SelfID)
 
 		if rbft.atomicIn(InConfChange) {
 			rbft.logger.Debugf("Replica %d is processing a config transaction, cannot generate batches", rbft.chainConfig.SelfID)
@@ -260,6 +259,8 @@ func (rbft *rbftImpl[T, Constraint]) handleCoreRbftEvent(e *LocalEvent) consensu
 		rbft.stopBatchTimer()
 
 		if rbft.batchMgr.requestPool.HasPendingRequestInPool() {
+			rbft.logger.Debugf("Primary %d batch timer expired, try to create a batch", rbft.chainConfig.SelfID)
+
 			rbft.stopNoTxBatchTimer()
 			// call requestPool module to generate a tx batch
 			if rbft.inPrimaryTerm() {
