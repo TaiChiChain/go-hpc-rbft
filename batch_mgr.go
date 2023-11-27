@@ -116,7 +116,7 @@ func (rbft *rbftImpl[T, Constraint]) restartNoTxBatchTimer() bool {
 
 	rbft.timerMgr.startTimer(noTxBatchTimer, localEvent)
 	rbft.batchMgr.batchTimerActive = true
-	rbft.logger.Debugf("Replica %d restarted the no tx batch timer", rbft.chainConfig.SelfID)
+	//rbft.logger.Debugf("Replica %d restarted the no tx batch timer", rbft.chainConfig.SelfID)
 
 	return true
 }
@@ -125,7 +125,7 @@ func (rbft *rbftImpl[T, Constraint]) restartNoTxBatchTimer() bool {
 func (rbft *rbftImpl[T, Constraint]) stopBatchTimer() {
 	rbft.timerMgr.stopTimer(batchTimer)
 	rbft.batchMgr.batchTimerActive = false
-	rbft.logger.Debugf("Replica %d stopped the batch timer", rbft.chainConfig.SelfID)
+	//rbft.logger.Debugf("Replica %d stopped the batch timer", rbft.chainConfig.SelfID)
 }
 
 // restartBatchTimer restarts the batch timer
@@ -139,7 +139,7 @@ func (rbft *rbftImpl[T, Constraint]) restartBatchTimer() bool {
 
 	rbft.timerMgr.startTimer(batchTimer, localEvent)
 	rbft.batchMgr.batchTimerActive = true
-	rbft.logger.Debugf("Replica %d restarted the batch timer", rbft.chainConfig.SelfID)
+	//rbft.logger.Debugf("Replica %d restarted the batch timer", rbft.chainConfig.SelfID)
 
 	return true
 }
