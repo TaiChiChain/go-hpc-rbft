@@ -258,6 +258,13 @@ func (m *VcBasis) CloneVT() *VcBasis {
 		}
 		r.Cset = tmpContainer
 	}
+	if rhs := m.ValidatorDynamicInfo; rhs != nil {
+		tmpContainer := make([]*NodeDynamicInfo, len(rhs))
+		for k, v := range rhs {
+			tmpContainer[k] = v.CloneVT()
+		}
+		r.ValidatorDynamicInfo = tmpContainer
+	}
 	if len(m.unknownFields) > 0 {
 		r.unknownFields = make([]byte, len(m.unknownFields))
 		copy(r.unknownFields, m.unknownFields)
@@ -1186,6 +1193,23 @@ func (this *VcBasis) EqualVT(that *VcBasis) bool {
 			}
 			if q == nil {
 				q = &SignedCheckpoint{}
+			}
+			if !p.EqualVT(q) {
+				return false
+			}
+		}
+	}
+	if len(this.ValidatorDynamicInfo) != len(that.ValidatorDynamicInfo) {
+		return false
+	}
+	for i, vx := range this.ValidatorDynamicInfo {
+		vy := that.ValidatorDynamicInfo[i]
+		if p, q := vx, vy; p != q {
+			if p == nil {
+				p = &NodeDynamicInfo{}
+			}
+			if q == nil {
+				q = &NodeDynamicInfo{}
 			}
 			if !p.EqualVT(q) {
 				return false
@@ -2540,6 +2564,18 @@ func (m *VcBasis) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 	if m.unknownFields != nil {
 		i -= len(m.unknownFields)
 		copy(dAtA[i:], m.unknownFields)
+	}
+	if len(m.ValidatorDynamicInfo) > 0 {
+		for iNdEx := len(m.ValidatorDynamicInfo) - 1; iNdEx >= 0; iNdEx-- {
+			size, err := m.ValidatorDynamicInfo[iNdEx].MarshalToSizedBufferVT(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarint(dAtA, i, uint64(size))
+			i--
+			dAtA[i] = 0x3a
+		}
 	}
 	if len(m.Cset) > 0 {
 		for iNdEx := len(m.Cset) - 1; iNdEx >= 0; iNdEx-- {
@@ -4541,6 +4577,18 @@ func (m *VcBasis) MarshalToSizedBufferVTStrict(dAtA []byte) (int, error) {
 		i -= len(m.unknownFields)
 		copy(dAtA[i:], m.unknownFields)
 	}
+	if len(m.ValidatorDynamicInfo) > 0 {
+		for iNdEx := len(m.ValidatorDynamicInfo) - 1; iNdEx >= 0; iNdEx-- {
+			size, err := m.ValidatorDynamicInfo[iNdEx].MarshalToSizedBufferVTStrict(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarint(dAtA, i, uint64(size))
+			i--
+			dAtA[i] = 0x3a
+		}
+	}
 	if len(m.Cset) > 0 {
 		for iNdEx := len(m.Cset) - 1; iNdEx >= 0; iNdEx-- {
 			size, err := m.Cset[iNdEx].MarshalToSizedBufferVTStrict(dAtA[:i])
@@ -6246,6 +6294,12 @@ func (m *VcBasis) SizeVT() (n int) {
 	}
 	if len(m.Cset) > 0 {
 		for _, e := range m.Cset {
+			l = e.SizeVT()
+			n += 1 + l + sov(uint64(l))
+		}
+	}
+	if len(m.ValidatorDynamicInfo) > 0 {
+		for _, e := range m.ValidatorDynamicInfo {
 			l = e.SizeVT()
 			n += 1 + l + sov(uint64(l))
 		}
@@ -8229,6 +8283,40 @@ func (m *VcBasis) UnmarshalVT(dAtA []byte) error {
 			}
 			m.Cset = append(m.Cset, &SignedCheckpoint{})
 			if err := m.Cset[len(m.Cset)-1].UnmarshalVT(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 7:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ValidatorDynamicInfo", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflow
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLength
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLength
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ValidatorDynamicInfo = append(m.ValidatorDynamicInfo, &NodeDynamicInfo{})
+			if err := m.ValidatorDynamicInfo[len(m.ValidatorDynamicInfo)-1].UnmarshalVT(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex

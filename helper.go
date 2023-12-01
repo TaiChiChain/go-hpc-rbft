@@ -21,6 +21,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math"
+	"sort"
 
 	"github.com/samber/lo"
 	"golang.org/x/crypto/sha3"
@@ -544,7 +545,17 @@ func (rbft *rbftImpl[T, Constraint]) getVcBasis() *consensus.VcBasis {
 	}
 	rbft.storeMgr.cleanCommittedCertCache(rbft.chainConfig.H)
 	basis.Pset, basis.Qset, basis.Cset = rbft.gatherPQC()
-
+	basis.ValidatorDynamicInfo = lo.MapToSlice(rbft.chainConfig.ValidatorDynamicInfoMap, func(id uint64, item *NodeDynamicInfo) *consensus.NodeDynamicInfo {
+		return &consensus.NodeDynamicInfo{
+			Id:                             item.ID,
+			ConsensusVotingPower:           item.ConsensusVotingPower,
+			ConsensusVotingPowerReduced:    item.ConsensusVotingPowerReduced,
+			ConsensusVotingPowerReduceView: item.ConsensusVotingPowerReduceView,
+		}
+	})
+	sort.Slice(basis.ValidatorDynamicInfo, func(i, j int) bool {
+		return basis.ValidatorDynamicInfo[i].Id < basis.ValidatorDynamicInfo[j].Id
+	})
 	return basis
 }
 

@@ -110,6 +110,7 @@ message VcBasis {
     repeated VcPq pset = 4;
     repeated VcPq qset = 5;
     repeated SignedCheckpoint cset = 6;
+    repeated NodeDynamicInfo validator_dynamic_info = 7;
 }
 
 message VcPq {
