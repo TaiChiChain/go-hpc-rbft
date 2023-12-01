@@ -695,6 +695,7 @@ func (rbft *rbftImpl[T, Constraint]) checkNewView(nv *consensus.NewView) (uint64
 
 	// ensure all ViewChanges have the same target view and target view is equal to
 	// NewView.view.
+	var validatorDynamicInfo []*consensus.NodeDynamicInfo = nil
 	for i, vc := range nv.ViewChangeSet.ViewChanges {
 		vcBasis := vc.Basis
 		view := vcBasis.GetView()
@@ -712,6 +713,24 @@ func (rbft *rbftImpl[T, Constraint]) checkNewView(nv *consensus.NewView) (uint64
 				"view %d and %d", rbft.chainConfig.SelfID, view, targetView)
 			return 0, "", false
 		}
+
+		if validatorDynamicInfo == nil {
+			validatorDynamicInfo = vcBasis.ValidatorDynamicInfo
+		} else {
+			if !consensus.ValidatorDynamicInfoEqual(validatorDynamicInfo, vcBasis.ValidatorDynamicInfo) {
+				rbft.logger.Warningf("Replica %d received an invalid NewView with viewchange %d mismatch validatorDynamicInfo", rbft.chainConfig.SelfID, vcBasis.GetReplicaId())
+				return 0, "", false
+			}
+		}
+	}
+	if validatorDynamicInfo == nil {
+		rbft.logger.Warningf("Replica %d received an invalid NewView with empty validatorDynamicInfo", rbft.chainConfig.SelfID)
+		return 0, "", false
+	}
+
+	if !consensus.ValidatorDynamicInfoEqual(validatorDynamicInfo, nv.ValidatorDynamicInfo) {
+		rbft.logger.Warningf("Replica %d received an invalid NewView with mismatch validatorDynamicInfo", rbft.chainConfig.SelfID)
+		return 0, "", false
 	}
 
 	// verify signature of new view.

@@ -233,3 +233,16 @@ func (x *Commit) ID() string {
 	}
 	return fmt.Sprintf("replica=%d/view=%d/seq=%d/digest=%s", x.ReplicaId, x.View, x.SequenceNumber, x.BatchDigest)
 }
+
+func ValidatorDynamicInfoEqual(a []*NodeDynamicInfo, b []*NodeDynamicInfo) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	for i, info := range a {
+		if !info.EqualVT(b[i]) {
+			return false
+		}
+	}
+	return true
+}

@@ -2522,6 +2522,8 @@ func (rbft *rbftImpl[T, Constraint]) recvStateUpdatedEvent(ss *types.ServiceSync
 	}
 
 	rbft.logger.Debugf("Replica %d state updated, lastExec = %d, seqNo = %d", rbft.chainConfig.SelfID, rbft.exec.lastExec, seqNo)
+	// reset recent blocks
+	rbft.chainConfig.ResetRecentBlockNum(seqNo)
 	if ss.EpochChanged || epochChanged {
 		rbft.logger.Debugf("Replica %d accept epoch proof for %d", rbft.chainConfig.SelfID, ss.Epoch)
 		if ec, ok := rbft.epochMgr.epochProofCache[ss.Epoch]; ok {
