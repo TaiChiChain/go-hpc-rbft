@@ -8,15 +8,18 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/axiomesh/axiom-kit/txpool/mock_txpool"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel/trace"
+	"go.uber.org/mock/gomock"
+
+	types2 "github.com/axiomesh/axiom-kit/types"
 
 	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/common/metrics/disabled"
 	"github.com/axiomesh/axiom-bft/types"
-	types2 "github.com/axiomesh/axiom-kit/types"
 )
 
 var peerSet = []NodeInfo{
@@ -284,30 +287,13 @@ func (tf *testFramework[T, Constraint]) newTestNode(id uint64, p2pNodeID string,
 	}
 	ext = testExt
 
-	// todo: mock pool
-	// // Memool Instance, Parameters in Config are Flexible
-	// txpoolConfig := txpool.Config{
-	//	PoolSize:            100000,
-	//	BatchSize:           500,
-	//	BatchMemLimit:       false,
-	//	BatchMaxMem:         999,
-	//	ToleranceTime:       999 * time.Millisecond,
-	//	ToleranceRemoveTime: 15 * time.Minute,
-	//	Logger:              poolLog,
-	//	GetAccountNonce: func(address string) uint64 {
-	//		return 0
-	//	},
-	// }
-	// pool, err := txpool2.NewTxPool[T, Constraint](txpoolConfig)
-	// if err != nil {
-	//	panic(err)
-	// }
+	ctrl := gomock.NewController(nil)
+	pool := mock_txpool.NewMockMinimalTxPool[T, Constraint](4, ctrl)
 
 	log := common.NewSimpleLogger()
 	log.SetPrefix(fmt.Sprintf("[node%d] ", id))
 	conf := tf.newNodeConfig(p2pNodeID, log, 1)
-	// todo: input mock pool
-	n, err := newNode[T, Constraint](conf, ext, nil, true)
+	n, err := newNode[T, Constraint](conf, ext, pool, true)
 	if err != nil {
 		panic(err)
 	}

@@ -5,20 +5,21 @@ import (
 	"testing"
 	"time"
 
+	"github.com/axiomesh/axiom-kit/txpool/mock_txpool"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
+
+	types2 "github.com/axiomesh/axiom-kit/types"
 
 	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/common/metrics/disabled"
 	"github.com/axiomesh/axiom-bft/types"
-	types2 "github.com/axiomesh/axiom-kit/types"
 )
 
 // ============================================
 // Basic Tools
 // ============================================
-// todo: mock pool
 func newMockRbft[T any, Constraint types2.TXConstraint[T]](t *testing.T, ctrl *gomock.Controller) *rbftImpl[T, Constraint] {
 	log := common.NewSimpleLogger()
 	external := NewMockMinimalExternal[T, Constraint](ctrl)
@@ -42,6 +43,7 @@ func newMockRbft[T any, Constraint types2.TXConstraint[T]](t *testing.T, ctrl *g
 				BlockMaxTxNum:                 500,
 				NotActiveWeight:               1,
 				AbnormalNodeExcludeView:       10,
+				AgainProposeIntervalBlockInValidatorsNumPercentage: 30,
 			},
 		},
 		LastServiceState: &types.ServiceState{
@@ -64,8 +66,14 @@ func newMockRbft[T any, Constraint types2.TXConstraint[T]](t *testing.T, ctrl *g
 		MetricsProv: &disabled.Provider{},
 		DelFlag:     make(chan bool),
 	}
-	// todo: mock pool
-	rbft, err := newRBFT[T, Constraint](conf, external, nil, true)
+
+	external.EXPECT().GetEpochInfo(gomock.Any()).DoAndReturn(func(u uint64) (*EpochInfo, error) {
+		return conf.GenesisEpochInfo, nil
+	}).AnyTimes()
+
+	pool := mock_txpool.NewMockMinimalTxPool[T, Constraint](4, ctrl)
+
+	rbft, err := newRBFT[T, Constraint](conf, external, pool, true)
 	if err != nil {
 		panic(err)
 	}
@@ -229,11 +237,6 @@ func TestRBFT_getStatus(t *testing.T) {
 	assert.Equal(t, StateTransferring, int(status.Status))
 	rbfts[0].atomicOff(StateTransferring)
 
-	rbfts[0].atomicOn(PoolFull)
-	status = rbfts[0].getStatus()
-	assert.Equal(t, PoolFull, int(status.Status))
-	rbfts[0].atomicOff(PoolFull)
-
 	rbfts[0].atomicOn(Pending)
 	status = rbfts[0].getStatus()
 	assert.Equal(t, Pending, int(status.Status))
@@ -363,15 +366,11 @@ func TestRBFT_processOutOfDateReqs(t *testing.T) {
 	tx := newTx()
 	err := rbfts[1].batchMgr.requestPool.AddLocalTx(tx)
 	assert.Nil(t, err)
-	rbfts[1].setFull()
-	rbfts[1].processOutOfDateReqs(true)
-	assert.Equal(t, true, rbfts[1].isPoolFull())
 
 	// sleep to trigger txpool tolerance time.
 	time.Sleep(1 * time.Second)
 	rbfts[1].setNormal()
 	rbfts[1].processOutOfDateReqs(true)
-	assert.Equal(t, false, rbfts[1].isPoolFull())
 	rvc := <-rbfts[1].external.(*testExternal[consensus.FltTransaction, *consensus.FltTransaction]).ListenMsg()
 	assert.Equal(t, consensus.Type_REBROADCAST_REQUEST_SET, rvc.msg.Type)
 	set := &RequestSet[consensus.FltTransaction, *consensus.FltTransaction]{}
@@ -389,7 +388,6 @@ func TestRBFT_processOutOfDateReqs(t *testing.T) {
 	// sleep to trigger txpool tolerance time.
 	time.Sleep(1 * time.Second)
 	rbfts[1].processOutOfDateReqs(true)
-	assert.Equal(t, false, rbfts[1].isPoolFull())
 
 	rvc = <-rbfts[1].external.(*testExternal[consensus.FltTransaction, *consensus.FltTransaction]).ListenMsg()
 	assert.Equal(t, consensus.Type_REBROADCAST_REQUEST_SET, rvc.msg.Type)
