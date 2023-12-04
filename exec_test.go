@@ -5,9 +5,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/axiomesh/axiom-kit/txpool"
+
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/types"
-	"github.com/axiomesh/axiom-kit/txpool"
 )
 
 func TestExec_handleCoreRbftEvent_batchTimerEvent(t *testing.T) {
@@ -80,7 +81,7 @@ func TestExec_handleCoreRbftEvent_CheckPoolTimerEvent(t *testing.T) {
 
 	// for abnormal node
 	rbfts[0].handleCoreRbftEvent(ev)
-	assert.False(t, rbfts[0].timerMgr.getTimer(checkPoolTimer))
+	assert.True(t, rbfts[0].timerMgr.getTimer(checkPoolTimer), "abnormal node should restart check pool timer as the same as normal node")
 
 	// for normal node
 	rbfts[0].setNormal()

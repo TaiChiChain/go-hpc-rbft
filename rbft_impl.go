@@ -26,12 +26,13 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
+	"github.com/axiomesh/axiom-kit/txpool"
+	types2 "github.com/axiomesh/axiom-kit/types"
+
 	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/common/metrics"
 	"github.com/axiomesh/axiom-bft/types"
-	"github.com/axiomesh/axiom-kit/txpool"
-	types2 "github.com/axiomesh/axiom-kit/types"
 )
 
 // Config contains the parameters to start a RAFT instance.
@@ -545,8 +546,6 @@ func (rbft *rbftImpl[T, Constraint]) getStatus() (status NodeStatus) {
 		status.Status = InViewChange
 	case rbft.atomicIn(StateTransferring):
 		status.Status = StateTransferring
-	case rbft.isPoolFull():
-		status.Status = PoolFull
 	case rbft.atomicIn(Pending):
 		status.Status = Pending
 	default:
@@ -927,10 +926,6 @@ func (rbft *rbftImpl[T, Constraint]) rejectRequestSet(req *RequestSet[T, Constra
 // then broadcast all the remained requests that generate by itself to others
 func (rbft *rbftImpl[T, Constraint]) processOutOfDateReqs(timeout bool) {
 	reqs := rbft.batchMgr.requestPool.FilterOutOfDateRequests(timeout)
-
-	if !rbft.batchMgr.requestPool.IsPoolFull() {
-		rbft.setNotFull()
-	}
 
 	reqLen := len(reqs)
 	if reqLen == 0 {
@@ -1610,11 +1605,6 @@ func (rbft *rbftImpl[T, Constraint]) recvFetchMissingResponse(ctx context.Contex
 		rbft.logger.Warningf("Replica %d find something wrong with fetchMissingResponse, error: %v",
 			rbft.chainConfig.SelfID, err)
 		return rbft.sendViewChange()
-	}
-
-	// set pool full status if received txs fill up the txpool.
-	if rbft.batchMgr.requestPool.IsPoolFull() {
-		rbft.setFull()
 	}
 
 	_ = rbft.findNextPrepareBatch(ctx, re.View, re.SequenceNumber, re.BatchDigest)
@@ -2319,10 +2309,6 @@ func (rbft *rbftImpl[T, Constraint]) moveWatermarks(n uint64, newEpoch bool) {
 	}
 	rbft.metrics.batchesGauge.Set(float64(len(rbft.storeMgr.batchStore)))
 	rbft.batchMgr.requestPool.RemoveBatches(digestList)
-
-	if !rbft.batchMgr.requestPool.IsPoolFull() {
-		rbft.setNotFull()
-	}
 
 	for cID, signedCheckpoint := range rbft.storeMgr.checkpointStore {
 		if cID.sequence <= h {

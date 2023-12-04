@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/axiomesh/axiom-kit/txpool/mock_txpool"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/axiomesh/axiom-bft/common/consensus"
@@ -265,6 +266,10 @@ func TestCluster_ReceiveViewChangeBeforeStart(t *testing.T) {
 func TestCluster_ViewChange_StateUpdate_Timeout_StateUpdated_Replica(t *testing.T) {
 	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	unlockCluster(rbfts)
+	// set batch size too big to avoid trigger notifyGenBatch event
+	for _, rbft := range rbfts {
+		rbft.batchMgr.requestPool.(*mock_txpool.MockMinimalTxPool[consensus.FltTransaction, *consensus.FltTransaction]).SetBatchSize(500)
+	}
 
 	for i := 0; i < 40; i++ {
 		tx := newTx()
@@ -344,6 +349,10 @@ func TestCluster_ViewChange_StateUpdate_Timeout_StateUpdated_Replica(t *testing.
 func TestCluster_ViewChange_StateUpdate_Timeout_StateUpdated_Primary(t *testing.T) {
 	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	unlockCluster(rbfts)
+	// set batch size too big to avoid trigger notifyGenBatch event
+	for _, rbft := range rbfts {
+		rbft.batchMgr.requestPool.(*mock_txpool.MockMinimalTxPool[consensus.FltTransaction, *consensus.FltTransaction]).SetBatchSize(500)
+	}
 
 	for i := 0; i < 40; i++ {
 		tx := newTx()
@@ -468,6 +477,11 @@ func TestCluster_Checkpoint_in_StateUpdating(t *testing.T) {
 
 	nodes, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	unlockCluster(rbfts)
+
+	// set batch size too big to avoid trigger notifyGenBatch event
+	for _, rbft := range rbfts {
+		rbft.batchMgr.requestPool.(*mock_txpool.MockMinimalTxPool[consensus.FltTransaction, *consensus.FltTransaction]).SetBatchSize(500)
+	}
 
 	var retMessageSet []map[consensus.Type][]*consensusMessageWrapper
 	for i := 0; i < 50; i++ {

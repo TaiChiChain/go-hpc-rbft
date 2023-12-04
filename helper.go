@@ -610,10 +610,6 @@ func (rbft *rbftImpl[T, Constraint]) putBackRequestBatches(xset []*consensus.VcP
 	rbft.metrics.batchesGauge.Set(float64(len(rbft.storeMgr.batchStore)))
 	rbft.batchMgr.requestPool.RemoveBatches(deleteList)
 
-	if !rbft.batchMgr.requestPool.IsPoolFull() {
-		rbft.setNotFull()
-	}
-
 	// directly restore all batchedTxs back into non-batched txs and re-arrange them by order when processNewView.
 	rbft.batchMgr.requestPool.RestorePool()
 

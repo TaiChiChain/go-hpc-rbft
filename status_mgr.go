@@ -31,7 +31,6 @@ const (
 	InViewChange      // node is trying to change view
 	InRecovery        // node is trying to recover state
 	StateTransferring // node is updating state
-	PoolFull          // node's txPool is full
 	Pending           // node cannot process consensus messages
 	Stopped           // node has stopped and cannot process consensus messages
 
@@ -197,26 +196,9 @@ func (rbft *rbftImpl[T, Constraint]) setAbNormal() {
 	rbft.metrics.statusGaugeInNormal.Set(0)
 }
 
-// setFull means tx pool has reached the pool size.
-func (rbft *rbftImpl[T, Constraint]) setFull() {
-	rbft.atomicOn(PoolFull)
-	rbft.metrics.statusGaugePoolFull.Set(PoolFull)
-}
-
-// setNotFull means tx pool hasn't reached the pool size.
-func (rbft *rbftImpl[T, Constraint]) setNotFull() {
-	rbft.atomicOff(PoolFull)
-	rbft.metrics.statusGaugePoolFull.Set(0)
-}
-
 // isNormal checks setNormal and returns if system is normal or not.
 func (rbft *rbftImpl[T, Constraint]) isNormal() bool {
 	return rbft.in(Normal)
-}
-
-// isPoolFull checks and returns if tx pool is full or not.
-func (rbft *rbftImpl[T, Constraint]) isPoolFull() bool {
-	return rbft.atomicIn(PoolFull)
 }
 
 // initStatus init basic status when starts up
@@ -226,5 +208,4 @@ func (rbft *rbftImpl[T, Constraint]) initStatus() {
 	// until RBFT starts recovery
 	rbft.atomicOn(Pending)
 	rbft.metrics.statusGaugePending.Set(Pending)
-	rbft.setNotFull()
 }

@@ -30,7 +30,6 @@ func NewMockMinimalExternal[T any, Constraint types.TXConstraint[T]](ctrl *gomoc
 	mock.EXPECT().StateUpdate(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return().AnyTimes()
 	mock.EXPECT().SendFilterEvent(gomock.Any(), gomock.Any()).Return().AnyTimes()
 
-	mock.EXPECT().GetEpochInfo(gomock.Any()).Return(nil, nil).AnyTimes()
 	mock.EXPECT().GetCurrentEpochInfo().Return(nil, errors.New("not found epoch info for mock")).AnyTimes()
 	mock.EXPECT().StoreEpochState(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	mock.EXPECT().ReadEpochState(gomock.Any()).Return(nil, errors.New("ReadEpochState Error")).AnyTimes()

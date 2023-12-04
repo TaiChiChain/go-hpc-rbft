@@ -3,17 +3,18 @@ package rbft
 import (
 	"testing"
 
+	"github.com/axiomesh/axiom-kit/txpool/mock_txpool"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
+
+	types2 "github.com/axiomesh/axiom-kit/types"
 
 	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/common/metrics/disabled"
 	"github.com/axiomesh/axiom-bft/types"
-	types2 "github.com/axiomesh/axiom-kit/types"
 )
 
-// todo: mock pool
 func newTestStatusNode[T any, Constraint types2.TXConstraint[T]](ctrl *gomock.Controller) *rbftImpl[T, Constraint] {
 	log := common.NewSimpleLogger()
 	external := NewMockMinimalExternal[T, Constraint](ctrl)
@@ -40,14 +41,21 @@ func newTestStatusNode[T any, Constraint types2.TXConstraint[T]](ctrl *gomock.Co
 				BlockMaxTxNum:                 500,
 				NotActiveWeight:               1,
 				AbnormalNodeExcludeView:       10,
+				AgainProposeIntervalBlockInValidatorsNumPercentage: 30,
 			},
 		},
 		Logger:      log,
 		MetricsProv: &disabled.Provider{},
 		DelFlag:     make(chan bool),
 	}
-	// todo: mock pool
-	rbft, err := newRBFT[T, Constraint](conf, external, nil, true)
+
+	external.EXPECT().GetEpochInfo(gomock.Any()).DoAndReturn(func(u uint64) (*EpochInfo, error) {
+		return conf.GenesisEpochInfo, nil
+	}).AnyTimes()
+
+	pool := mock_txpool.NewMockMinimalTxPool[T, Constraint](4, ctrl)
+
+	rbft, err := newRBFT[T, Constraint](conf, external, pool, true)
 	if err != nil {
 		panic(err)
 	}
@@ -67,7 +75,7 @@ func TestStatusMgr_inOne(t *testing.T) {
 	rbft.status.reset()
 	rbft.atomicOn(Normal)
 	rbft.atomicOn(InRecovery)
-	assert.Equal(t, true, rbft.atomicInOne(Normal, PoolFull, Pending))
+	assert.Equal(t, true, rbft.atomicInOne(Normal, Pending))
 }
 
 func TestStatusMgr_setState(t *testing.T) {
@@ -78,9 +86,6 @@ func TestStatusMgr_setState(t *testing.T) {
 
 	rbft.setNormal()
 	assert.Equal(t, true, rbft.in(Normal))
-
-	rbft.setFull()
-	assert.Equal(t, true, rbft.atomicIn(PoolFull))
 }
 
 func TestStatusMgr_maybeSetNormal(t *testing.T) {
