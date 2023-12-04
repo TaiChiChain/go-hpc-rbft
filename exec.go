@@ -190,7 +190,11 @@ func (rbft *rbftImpl[T, Constraint]) handleNotifyFindNextBatchEvent(completionMi
 func (rbft *rbftImpl[T, Constraint]) handleNotifyGenBatchEvent() consensusEvent {
 	// if current node is in abnormal, ignore generate batch signal
 	if !rbft.isNormal() || rbft.in(SkipInProgress) || rbft.in(InRecovery) || rbft.in(inEpochSyncing) || rbft.in(waitCheckpointBatchExecute) {
-		rbft.logger.Warningf("Replica %d is in abnormal, ignore generate batch signal", rbft.chainConfig.SelfID)
+		if !rbft.isNormal() {
+			rbft.logger.Warningf("Replica %d is in abnormal, ignore generate batch signal", rbft.chainConfig.SelfID)
+		} else {
+			rbft.logger.Debugf("Replica %d is not ready, ignore generate batch signal", rbft.chainConfig.SelfID)
+		}
 		return nil
 	}
 
