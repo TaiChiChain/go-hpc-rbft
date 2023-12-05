@@ -220,8 +220,8 @@ func (e *EpochInfo) Clone() *EpochInfo {
 		},
 		FinanceParams: FinanceParams{
 			GasLimit:               e.FinanceParams.GasLimit,
-			StartGasPriceAvailable: false,
-			StartGasPrice:          0,
+			StartGasPriceAvailable: e.FinanceParams.StartGasPriceAvailable,
+			StartGasPrice:          e.FinanceParams.StartGasPrice,
 			MaxGasPrice:            e.FinanceParams.MaxGasPrice,
 			MinGasPrice:            e.FinanceParams.MinGasPrice,
 			GasChangeRateValue:     e.FinanceParams.GasChangeRateValue,
