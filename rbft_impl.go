@@ -26,13 +26,12 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/axiomesh/axiom-kit/txpool"
-	types2 "github.com/axiomesh/axiom-kit/types"
-
 	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/common/metrics"
 	"github.com/axiomesh/axiom-bft/types"
+	"github.com/axiomesh/axiom-kit/txpool"
+	types2 "github.com/axiomesh/axiom-kit/types"
 )
 
 // Config contains the parameters to start a RAFT instance.
