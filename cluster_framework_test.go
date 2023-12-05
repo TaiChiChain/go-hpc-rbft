@@ -8,18 +8,17 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/axiomesh/axiom-kit/txpool/mock_txpool"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/mock/gomock"
 
-	types2 "github.com/axiomesh/axiom-kit/types"
-
 	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/common/metrics/disabled"
 	"github.com/axiomesh/axiom-bft/types"
+	"github.com/axiomesh/axiom-kit/txpool/mock_txpool"
+	types2 "github.com/axiomesh/axiom-kit/types"
 )
 
 var peerSet = []NodeInfo{

@@ -511,14 +511,16 @@ func (t *BlockProcessorTracker) ResetRecentBlockNum(epochStartBlockNum uint64, l
 	t.RecentBlockNum = recentBlockNum
 	t.NextIdx = 0
 	t.BlockProcessorIDSet = make(map[uint64]struct{})
-	t.StartBlockNum = epochStartBlockNum
-	t.EndBlockNum = lastExecutedBlockNum
-	if t.EndBlockNum > epochStartBlockNum+recentBlockNum-1 {
-		t.StartBlockNum = t.EndBlockNum - recentBlockNum + 1
+	t.StartBlockNum = 0
+	t.EndBlockNum = 0
+	startBlockNum := epochStartBlockNum
+	endBlockNum := lastExecutedBlockNum
+	if endBlockNum > epochStartBlockNum+recentBlockNum-1 {
+		startBlockNum = endBlockNum - recentBlockNum + 1
 	}
 
-	if t.StartBlockNum < t.EndBlockNum {
-		for i := t.StartBlockNum; i <= t.EndBlockNum; i++ {
+	if startBlockNum <= endBlockNum {
+		for i := startBlockNum; i <= endBlockNum; i++ {
 			if oldBlockProcessor, ok := oldBlockProcessors[i]; ok {
 				t.AddBlock(*oldBlockProcessor)
 			} else {
@@ -534,19 +536,22 @@ func (t *BlockProcessorTracker) ResetRecentBlockNum(epochStartBlockNum uint64, l
 
 func (t *BlockProcessorTracker) AddBlock(blockProcessor types.BlockMeta) {
 	t.BlockProcessors[t.NextIdx] = &blockProcessor
-	var blockProcessorIDSet2 []uint64
 	blockProcessorIDSet := make(map[uint64]struct{})
 	for _, item := range t.BlockProcessors {
 		if item != nil {
 			blockProcessorIDSet[item.ProcessorNodeID] = struct{}{}
-			blockProcessorIDSet2 = append(blockProcessorIDSet2, item.ProcessorNodeID)
 		}
 	}
 	t.BlockProcessorIDSet = blockProcessorIDSet
 	t.NextIdx = (t.NextIdx + 1) % t.RecentBlockNum
-	t.EndBlockNum++
-	if t.EndBlockNum-t.StartBlockNum == t.RecentBlockNum {
-		t.StartBlockNum++
+	if t.StartBlockNum == 0 && t.EndBlockNum == 0 {
+		t.StartBlockNum = blockProcessor.BlockNum
+		t.EndBlockNum = blockProcessor.BlockNum
+	} else {
+		t.EndBlockNum++
+		if t.EndBlockNum-t.StartBlockNum == t.RecentBlockNum {
+			t.StartBlockNum++
+		}
 	}
 }
 

@@ -4,10 +4,10 @@ import (
 	"context"
 	"testing"
 
-	"github.com/axiomesh/axiom-kit/txpool/mock_txpool"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/axiomesh/axiom-bft/common/consensus"
+	"github.com/axiomesh/axiom-kit/txpool/mock_txpool"
 )
 
 func TestCluster_MissingCheckpoint(t *testing.T) {

@@ -3,16 +3,15 @@ package rbft
 import (
 	"testing"
 
-	"github.com/axiomesh/axiom-kit/txpool/mock_txpool"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
-
-	types2 "github.com/axiomesh/axiom-kit/types"
 
 	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/common/metrics/disabled"
 	"github.com/axiomesh/axiom-bft/types"
+	"github.com/axiomesh/axiom-kit/txpool/mock_txpool"
+	types2 "github.com/axiomesh/axiom-kit/types"
 )
 
 func newTestStatusNode[T any, Constraint types2.TXConstraint[T]](ctrl *gomock.Controller) *rbftImpl[T, Constraint] {
