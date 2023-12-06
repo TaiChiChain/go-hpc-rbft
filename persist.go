@@ -578,7 +578,7 @@ func (rbft *rbftImpl[T, Constraint]) restoreState() error {
 					MetaState: &types.MetaState{Height: seqNo, Digest: digest},
 					Epoch:     rbft.chainConfig.EpochInfo.Epoch,
 				}
-				signedC, gErr := rbft.generateSignedCheckpoint(state, isConfigBatch(seqNo, rbft.chainConfig.EpochInfo))
+				signedC, gErr := rbft.generateSignedCheckpoint(state, isConfigBatch(seqNo, rbft.chainConfig.EpochInfo), false)
 				if gErr != nil {
 					return gErr
 				}
@@ -601,7 +601,7 @@ func (rbft *rbftImpl[T, Constraint]) restoreState() error {
 				},
 				Epoch: rbft.chainConfig.EpochInfo.Epoch,
 			}
-			lastCheckpoint, gErr := rbft.generateSignedCheckpoint(lastCheckpointState, isConfigBatch(lastCheckpointState.MetaState.Height, rbft.chainConfig.EpochInfo))
+			lastCheckpoint, gErr := rbft.generateSignedCheckpoint(lastCheckpointState, isConfigBatch(lastCheckpointState.MetaState.Height, rbft.chainConfig.EpochInfo), false)
 			if gErr != nil {
 				return gErr
 			}
@@ -617,7 +617,7 @@ func (rbft *rbftImpl[T, Constraint]) restoreState() error {
 				},
 				Epoch: rbft.config.GenesisEpochInfo.Epoch,
 			}
-			genesisCheckpoint, gErr := rbft.generateSignedCheckpoint(state, false)
+			genesisCheckpoint, gErr := rbft.generateSignedCheckpoint(state, false, false)
 			if gErr != nil {
 				return gErr
 			}

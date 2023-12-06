@@ -21,7 +21,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math"
-	"sort"
 
 	"github.com/samber/lo"
 	"golang.org/x/crypto/sha3"
@@ -508,7 +507,7 @@ func (rbft *rbftImpl[T, Constraint]) calcPSet() map[uint64]*consensus.VcPq {
 
 // getVcBasis helps re-calculate the plist and qlist then construct a vcBasis
 // at teh same time, useless cert with lower .
-func (rbft *rbftImpl[T, Constraint]) getVcBasis() *consensus.VcBasis {
+func (rbft *rbftImpl[T, Constraint]) getVcBasis(needPunishAbnormalNodes bool) *consensus.VcBasis {
 	basis := &consensus.VcBasis{
 		View:      rbft.chainConfig.View,
 		H:         rbft.chainConfig.H,
@@ -545,17 +544,7 @@ func (rbft *rbftImpl[T, Constraint]) getVcBasis() *consensus.VcBasis {
 	}
 	rbft.storeMgr.cleanCommittedCertCache(rbft.chainConfig.H)
 	basis.Pset, basis.Qset, basis.Cset = rbft.gatherPQC()
-	basis.ValidatorDynamicInfo = lo.MapToSlice(rbft.chainConfig.ValidatorDynamicInfoMap, func(id uint64, item *NodeDynamicInfo) *consensus.NodeDynamicInfo {
-		return &consensus.NodeDynamicInfo{
-			Id:                             item.ID,
-			ConsensusVotingPower:           item.ConsensusVotingPower,
-			ConsensusVotingPowerReduced:    item.ConsensusVotingPowerReduced,
-			ConsensusVotingPowerReduceView: item.ConsensusVotingPowerReduceView,
-		}
-	})
-	sort.Slice(basis.ValidatorDynamicInfo, func(i, j int) bool {
-		return basis.ValidatorDynamicInfo[i].Id < basis.ValidatorDynamicInfo[j].Id
-	})
+	basis.ValidatorDynamicInfo = rbft.getUnstableValidatorDynamicInfoMap(basis.View, needPunishAbnormalNodes)
 	return basis
 }
 
@@ -748,7 +737,7 @@ func (rbft *rbftImpl[T, Constraint]) drainChannel(ch chan consensusEvent) ([]*T,
 }
 
 // generateSignedCheckpoint generates a signed checkpoint using given service state.
-func (rbft *rbftImpl[T, Constraint]) generateSignedCheckpoint(state *types.ServiceState, isConfig bool) (*consensus.SignedCheckpoint, error) {
+func (rbft *rbftImpl[T, Constraint]) generateSignedCheckpoint(state *types.ServiceState, isConfig bool, isAfterCheckpoint bool) (*consensus.SignedCheckpoint, error) {
 	signedCheckpoint := &consensus.SignedCheckpoint{
 		Author: rbft.chainConfig.SelfID,
 	}
@@ -776,12 +765,17 @@ func (rbft *rbftImpl[T, Constraint]) generateSignedCheckpoint(state *types.Servi
 
 		vcBasis := &consensus.VcBasis{
 			ReplicaId: rbft.chainConfig.SelfID,
-			View:      rbft.chainConfig.View + 1,
+			View:      rbft.chainConfig.View,
 			H:         rbft.chainConfig.H,
 			Pset:      []*consensus.VcPq{},
 			Qset:      []*consensus.VcPq{},
 			Cset:      cset,
 		}
+		if isAfterCheckpoint {
+			// term rotation
+			vcBasis.View++
+		}
+		vcBasis.ValidatorDynamicInfo = rbft.getUnstableValidatorDynamicInfoMap(vcBasis.View, false)
 
 		vc := &consensus.ViewChange{
 			Basis:    vcBasis,

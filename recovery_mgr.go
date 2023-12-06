@@ -268,7 +268,7 @@ func (rbft *rbftImpl[T, Constraint]) initSyncState() consensusEvent {
 		return nil
 	}
 
-	signedCheckpoint, sErr := rbft.generateSignedCheckpoint(state, isConfigBatch(state.MetaState.Height, rbft.chainConfig.EpochInfo))
+	signedCheckpoint, sErr := rbft.generateSignedCheckpoint(state, isConfigBatch(state.MetaState.Height, rbft.chainConfig.EpochInfo), false)
 	if sErr != nil {
 		rbft.logger.Errorf("Replica %d generate checkpoint error: %s", rbft.chainConfig.SelfID, sErr)
 		rbft.stopNamespace()
@@ -297,7 +297,7 @@ func (rbft *rbftImpl[T, Constraint]) recvSyncState(sync *consensus.SyncState) co
 		rbft.logger.Warningf("Replica %d has a nil state", rbft.chainConfig.SelfID)
 		return nil
 	}
-	signedCheckpoint, sErr := rbft.generateSignedCheckpoint(state, isConfigBatch(state.MetaState.Height, rbft.chainConfig.EpochInfo))
+	signedCheckpoint, sErr := rbft.generateSignedCheckpoint(state, isConfigBatch(state.MetaState.Height, rbft.chainConfig.EpochInfo), false)
 	if sErr != nil {
 		rbft.logger.Errorf("Replica %d generate checkpoint error: %s", rbft.chainConfig.SelfID, sErr)
 		rbft.stopNamespace()
