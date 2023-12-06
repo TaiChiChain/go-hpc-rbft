@@ -688,9 +688,7 @@ func (c *ChainConfig) validatorDynamicInfo() []NodeDynamicInfo {
 	sort.Slice(res, func(i, j int) bool {
 		return res[i].ID < res[j].ID
 	})
-	return lo.MapToSlice(c.ValidatorDynamicInfoMap, func(id uint64, nodeInfo *NodeDynamicInfo) NodeDynamicInfo {
-		return *nodeInfo
-	})
+	return res
 }
 
 func (c *ChainConfig) ResetRecentBlockNum(lastExecutedBlockNum uint64) {

@@ -1884,7 +1884,7 @@ func (rbft *rbftImpl[T, Constraint]) checkpoint(state *types.ServiceState, isCon
 	rbft.logger.Infof("Replica %d sending checkpoint for view=%d/seqNo=%d and digest=%s",
 		rbft.chainConfig.SelfID, rbft.chainConfig.View, seqNo, digest)
 
-	signedCheckpoint, err := rbft.generateSignedCheckpoint(state, isConfig)
+	signedCheckpoint, err := rbft.generateSignedCheckpoint(state, isConfig, true)
 	if err != nil {
 		rbft.logger.Errorf("Replica %d generate signed checkpoint error: %s", rbft.chainConfig.SelfID, err)
 		rbft.stopNamespace()
