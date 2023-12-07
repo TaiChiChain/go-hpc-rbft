@@ -228,6 +228,29 @@ func (m *ViewChange) CloneMessageVT() proto.Message {
 	return m.CloneVT()
 }
 
+func (m *ValidatorDynamicInfo) CloneVT() *ValidatorDynamicInfo {
+	if m == nil {
+		return (*ValidatorDynamicInfo)(nil)
+	}
+	r := &ValidatorDynamicInfo{}
+	if rhs := m.Info; rhs != nil {
+		tmpContainer := make([]*NodeDynamicInfo, len(rhs))
+		for k, v := range rhs {
+			tmpContainer[k] = v.CloneVT()
+		}
+		r.Info = tmpContainer
+	}
+	if len(m.unknownFields) > 0 {
+		r.unknownFields = make([]byte, len(m.unknownFields))
+		copy(r.unknownFields, m.unknownFields)
+	}
+	return r
+}
+
+func (m *ValidatorDynamicInfo) CloneMessageVT() proto.Message {
+	return m.CloneVT()
+}
+
 func (m *VcBasis) CloneVT() *VcBasis {
 	if m == nil {
 		return (*VcBasis)(nil)
@@ -258,12 +281,19 @@ func (m *VcBasis) CloneVT() *VcBasis {
 		}
 		r.Cset = tmpContainer
 	}
-	if rhs := m.ValidatorDynamicInfo; rhs != nil {
+	if rhs := m.IfNotRecoverValidatorDynamicInfo; rhs != nil {
 		tmpContainer := make([]*NodeDynamicInfo, len(rhs))
 		for k, v := range rhs {
 			tmpContainer[k] = v.CloneVT()
 		}
-		r.ValidatorDynamicInfo = tmpContainer
+		r.IfNotRecoverValidatorDynamicInfo = tmpContainer
+	}
+	if rhs := m.IfRecoverValidatorDynamicInfo; rhs != nil {
+		tmpContainer := make([]*NodeDynamicInfo, len(rhs))
+		for k, v := range rhs {
+			tmpContainer[k] = v.CloneVT()
+		}
+		r.IfRecoverValidatorDynamicInfo = tmpContainer
 	}
 	if len(m.unknownFields) > 0 {
 		r.unknownFields = make([]byte, len(m.unknownFields))
@@ -1133,6 +1163,39 @@ func (this *ViewChange) EqualMessageVT(thatMsg proto.Message) bool {
 	}
 	return this.EqualVT(that)
 }
+func (this *ValidatorDynamicInfo) EqualVT(that *ValidatorDynamicInfo) bool {
+	if this == that {
+		return true
+	} else if this == nil || that == nil {
+		return false
+	}
+	if len(this.Info) != len(that.Info) {
+		return false
+	}
+	for i, vx := range this.Info {
+		vy := that.Info[i]
+		if p, q := vx, vy; p != q {
+			if p == nil {
+				p = &NodeDynamicInfo{}
+			}
+			if q == nil {
+				q = &NodeDynamicInfo{}
+			}
+			if !p.EqualVT(q) {
+				return false
+			}
+		}
+	}
+	return string(this.unknownFields) == string(that.unknownFields)
+}
+
+func (this *ValidatorDynamicInfo) EqualMessageVT(thatMsg proto.Message) bool {
+	that, ok := thatMsg.(*ValidatorDynamicInfo)
+	if !ok {
+		return false
+	}
+	return this.EqualVT(that)
+}
 func (this *VcBasis) EqualVT(that *VcBasis) bool {
 	if this == that {
 		return true
@@ -1199,11 +1262,28 @@ func (this *VcBasis) EqualVT(that *VcBasis) bool {
 			}
 		}
 	}
-	if len(this.ValidatorDynamicInfo) != len(that.ValidatorDynamicInfo) {
+	if len(this.IfNotRecoverValidatorDynamicInfo) != len(that.IfNotRecoverValidatorDynamicInfo) {
 		return false
 	}
-	for i, vx := range this.ValidatorDynamicInfo {
-		vy := that.ValidatorDynamicInfo[i]
+	for i, vx := range this.IfNotRecoverValidatorDynamicInfo {
+		vy := that.IfNotRecoverValidatorDynamicInfo[i]
+		if p, q := vx, vy; p != q {
+			if p == nil {
+				p = &NodeDynamicInfo{}
+			}
+			if q == nil {
+				q = &NodeDynamicInfo{}
+			}
+			if !p.EqualVT(q) {
+				return false
+			}
+		}
+	}
+	if len(this.IfRecoverValidatorDynamicInfo) != len(that.IfRecoverValidatorDynamicInfo) {
+		return false
+	}
+	for i, vx := range this.IfRecoverValidatorDynamicInfo {
+		vy := that.IfRecoverValidatorDynamicInfo[i]
 		if p, q := vx, vy; p != q {
 			if p == nil {
 				p = &NodeDynamicInfo{}
@@ -2535,6 +2615,51 @@ func (m *ViewChange) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
+func (m *ValidatorDynamicInfo) MarshalVT() (dAtA []byte, err error) {
+	if m == nil {
+		return nil, nil
+	}
+	size := m.SizeVT()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBufferVT(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ValidatorDynamicInfo) MarshalToVT(dAtA []byte) (int, error) {
+	size := m.SizeVT()
+	return m.MarshalToSizedBufferVT(dAtA[:size])
+}
+
+func (m *ValidatorDynamicInfo) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
+	if m == nil {
+		return 0, nil
+	}
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.unknownFields != nil {
+		i -= len(m.unknownFields)
+		copy(dAtA[i:], m.unknownFields)
+	}
+	if len(m.Info) > 0 {
+		for iNdEx := len(m.Info) - 1; iNdEx >= 0; iNdEx-- {
+			size, err := m.Info[iNdEx].MarshalToSizedBufferVT(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarint(dAtA, i, uint64(size))
+			i--
+			dAtA[i] = 0xa
+		}
+	}
+	return len(dAtA) - i, nil
+}
+
 func (m *VcBasis) MarshalVT() (dAtA []byte, err error) {
 	if m == nil {
 		return nil, nil
@@ -2565,9 +2690,21 @@ func (m *VcBasis) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 		i -= len(m.unknownFields)
 		copy(dAtA[i:], m.unknownFields)
 	}
-	if len(m.ValidatorDynamicInfo) > 0 {
-		for iNdEx := len(m.ValidatorDynamicInfo) - 1; iNdEx >= 0; iNdEx-- {
-			size, err := m.ValidatorDynamicInfo[iNdEx].MarshalToSizedBufferVT(dAtA[:i])
+	if len(m.IfRecoverValidatorDynamicInfo) > 0 {
+		for iNdEx := len(m.IfRecoverValidatorDynamicInfo) - 1; iNdEx >= 0; iNdEx-- {
+			size, err := m.IfRecoverValidatorDynamicInfo[iNdEx].MarshalToSizedBufferVT(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarint(dAtA, i, uint64(size))
+			i--
+			dAtA[i] = 0x42
+		}
+	}
+	if len(m.IfNotRecoverValidatorDynamicInfo) > 0 {
+		for iNdEx := len(m.IfNotRecoverValidatorDynamicInfo) - 1; iNdEx >= 0; iNdEx-- {
+			size, err := m.IfNotRecoverValidatorDynamicInfo[iNdEx].MarshalToSizedBufferVT(dAtA[:i])
 			if err != nil {
 				return 0, err
 			}
@@ -4547,6 +4684,51 @@ func (m *ViewChange) MarshalToSizedBufferVTStrict(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
+func (m *ValidatorDynamicInfo) MarshalVTStrict() (dAtA []byte, err error) {
+	if m == nil {
+		return nil, nil
+	}
+	size := m.SizeVT()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBufferVTStrict(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ValidatorDynamicInfo) MarshalToVTStrict(dAtA []byte) (int, error) {
+	size := m.SizeVT()
+	return m.MarshalToSizedBufferVTStrict(dAtA[:size])
+}
+
+func (m *ValidatorDynamicInfo) MarshalToSizedBufferVTStrict(dAtA []byte) (int, error) {
+	if m == nil {
+		return 0, nil
+	}
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.unknownFields != nil {
+		i -= len(m.unknownFields)
+		copy(dAtA[i:], m.unknownFields)
+	}
+	if len(m.Info) > 0 {
+		for iNdEx := len(m.Info) - 1; iNdEx >= 0; iNdEx-- {
+			size, err := m.Info[iNdEx].MarshalToSizedBufferVTStrict(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarint(dAtA, i, uint64(size))
+			i--
+			dAtA[i] = 0xa
+		}
+	}
+	return len(dAtA) - i, nil
+}
+
 func (m *VcBasis) MarshalVTStrict() (dAtA []byte, err error) {
 	if m == nil {
 		return nil, nil
@@ -4577,9 +4759,21 @@ func (m *VcBasis) MarshalToSizedBufferVTStrict(dAtA []byte) (int, error) {
 		i -= len(m.unknownFields)
 		copy(dAtA[i:], m.unknownFields)
 	}
-	if len(m.ValidatorDynamicInfo) > 0 {
-		for iNdEx := len(m.ValidatorDynamicInfo) - 1; iNdEx >= 0; iNdEx-- {
-			size, err := m.ValidatorDynamicInfo[iNdEx].MarshalToSizedBufferVTStrict(dAtA[:i])
+	if len(m.IfRecoverValidatorDynamicInfo) > 0 {
+		for iNdEx := len(m.IfRecoverValidatorDynamicInfo) - 1; iNdEx >= 0; iNdEx-- {
+			size, err := m.IfRecoverValidatorDynamicInfo[iNdEx].MarshalToSizedBufferVTStrict(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarint(dAtA, i, uint64(size))
+			i--
+			dAtA[i] = 0x42
+		}
+	}
+	if len(m.IfNotRecoverValidatorDynamicInfo) > 0 {
+		for iNdEx := len(m.IfNotRecoverValidatorDynamicInfo) - 1; iNdEx >= 0; iNdEx-- {
+			size, err := m.IfNotRecoverValidatorDynamicInfo[iNdEx].MarshalToSizedBufferVTStrict(dAtA[:i])
 			if err != nil {
 				return 0, err
 			}
@@ -6265,6 +6459,22 @@ func (m *ViewChange) SizeVT() (n int) {
 	return n
 }
 
+func (m *ValidatorDynamicInfo) SizeVT() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if len(m.Info) > 0 {
+		for _, e := range m.Info {
+			l = e.SizeVT()
+			n += 1 + l + sov(uint64(l))
+		}
+	}
+	n += len(m.unknownFields)
+	return n
+}
+
 func (m *VcBasis) SizeVT() (n int) {
 	if m == nil {
 		return 0
@@ -6298,8 +6508,14 @@ func (m *VcBasis) SizeVT() (n int) {
 			n += 1 + l + sov(uint64(l))
 		}
 	}
-	if len(m.ValidatorDynamicInfo) > 0 {
-		for _, e := range m.ValidatorDynamicInfo {
+	if len(m.IfNotRecoverValidatorDynamicInfo) > 0 {
+		for _, e := range m.IfNotRecoverValidatorDynamicInfo {
+			l = e.SizeVT()
+			n += 1 + l + sov(uint64(l))
+		}
+	}
+	if len(m.IfRecoverValidatorDynamicInfo) > 0 {
+		for _, e := range m.IfRecoverValidatorDynamicInfo {
 			l = e.SizeVT()
 			n += 1 + l + sov(uint64(l))
 		}
@@ -8098,6 +8314,91 @@ func (m *ViewChange) UnmarshalVT(dAtA []byte) error {
 	}
 	return nil
 }
+func (m *ValidatorDynamicInfo) UnmarshalVT(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflow
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ValidatorDynamicInfo: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ValidatorDynamicInfo: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Info", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflow
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLength
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLength
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Info = append(m.Info, &NodeDynamicInfo{})
+			if err := m.Info[len(m.Info)-1].UnmarshalVT(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skip(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLength
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.unknownFields = append(m.unknownFields, dAtA[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
 func (m *VcBasis) UnmarshalVT(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -8288,7 +8589,7 @@ func (m *VcBasis) UnmarshalVT(dAtA []byte) error {
 			iNdEx = postIndex
 		case 7:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ValidatorDynamicInfo", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field IfNotRecoverValidatorDynamicInfo", wireType)
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
@@ -8315,8 +8616,42 @@ func (m *VcBasis) UnmarshalVT(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.ValidatorDynamicInfo = append(m.ValidatorDynamicInfo, &NodeDynamicInfo{})
-			if err := m.ValidatorDynamicInfo[len(m.ValidatorDynamicInfo)-1].UnmarshalVT(dAtA[iNdEx:postIndex]); err != nil {
+			m.IfNotRecoverValidatorDynamicInfo = append(m.IfNotRecoverValidatorDynamicInfo, &NodeDynamicInfo{})
+			if err := m.IfNotRecoverValidatorDynamicInfo[len(m.IfNotRecoverValidatorDynamicInfo)-1].UnmarshalVT(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 8:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field IfRecoverValidatorDynamicInfo", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflow
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLength
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLength
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.IfRecoverValidatorDynamicInfo = append(m.IfRecoverValidatorDynamicInfo, &NodeDynamicInfo{})
+			if err := m.IfRecoverValidatorDynamicInfo[len(m.IfRecoverValidatorDynamicInfo)-1].UnmarshalVT(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex

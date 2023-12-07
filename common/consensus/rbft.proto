@@ -103,6 +103,10 @@ message ViewChange {
     bool recovery = 4;
 }
 
+message ValidatorDynamicInfo{
+    repeated NodeDynamicInfo info = 1;
+}
+
 message VcBasis {
     uint64 replica_id = 1;
     uint64 view = 2;
@@ -110,7 +114,8 @@ message VcBasis {
     repeated VcPq pset = 4;
     repeated VcPq qset = 5;
     repeated SignedCheckpoint cset = 6;
-    repeated NodeDynamicInfo validator_dynamic_info = 7;
+    repeated NodeDynamicInfo if_not_recover_validator_dynamic_info = 7;
+    repeated NodeDynamicInfo if_recover_validator_dynamic_info = 8;
 }
 
 message VcPq {

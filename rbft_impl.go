@@ -2098,7 +2098,7 @@ func (rbft *rbftImpl[T, Constraint]) finishNormalCheckpoint(checkpointHeight uin
 		// update view after checkpoint
 		// persist new view
 		rbft.setLastStableView(newView)
-		rbft.setView(newView)
+		rbft.setViewWithRecovery(newView)
 		nv := &consensus.NewView{
 			ReplicaId:     rbft.chainConfig.PrimaryID,
 			View:          newView,

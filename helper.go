@@ -507,7 +507,7 @@ func (rbft *rbftImpl[T, Constraint]) calcPSet() map[uint64]*consensus.VcPq {
 
 // getVcBasis helps re-calculate the plist and qlist then construct a vcBasis
 // at teh same time, useless cert with lower .
-func (rbft *rbftImpl[T, Constraint]) getVcBasis(needPunishAbnormalNodes bool) *consensus.VcBasis {
+func (rbft *rbftImpl[T, Constraint]) getVcBasis() *consensus.VcBasis {
 	basis := &consensus.VcBasis{
 		View:      rbft.chainConfig.View,
 		H:         rbft.chainConfig.H,
@@ -544,7 +544,8 @@ func (rbft *rbftImpl[T, Constraint]) getVcBasis(needPunishAbnormalNodes bool) *c
 	}
 	rbft.storeMgr.cleanCommittedCertCache(rbft.chainConfig.H)
 	basis.Pset, basis.Qset, basis.Cset = rbft.gatherPQC()
-	basis.ValidatorDynamicInfo = rbft.getUnstableValidatorDynamicInfoMap(basis.View, needPunishAbnormalNodes)
+	basis.IfRecoverValidatorDynamicInfo = rbft.getUnstableValidatorDynamicInfoMap(basis.View, true)
+	basis.IfNotRecoverValidatorDynamicInfo = rbft.getUnstableValidatorDynamicInfoMap(basis.View, false)
 	return basis
 }
 
@@ -775,7 +776,10 @@ func (rbft *rbftImpl[T, Constraint]) generateSignedCheckpoint(state *types.Servi
 			// term rotation
 			vcBasis.View++
 		}
-		vcBasis.ValidatorDynamicInfo = rbft.getUnstableValidatorDynamicInfoMap(vcBasis.View, false)
+		rbft.logger.Infof("Replica %d generate IfRecoverValidatorDynamicInfo", rbft.chainConfig.SelfID)
+		vcBasis.IfRecoverValidatorDynamicInfo = rbft.getUnstableValidatorDynamicInfoMap(vcBasis.View, true)
+		rbft.logger.Infof("Replica %d generate IfNotRecoverValidatorDynamicInfo", rbft.chainConfig.SelfID)
+		vcBasis.IfNotRecoverValidatorDynamicInfo = rbft.getUnstableValidatorDynamicInfoMap(vcBasis.View, false)
 
 		vc := &consensus.ViewChange{
 			Basis:    vcBasis,

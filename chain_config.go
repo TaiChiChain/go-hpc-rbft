@@ -658,7 +658,13 @@ func (c *ChainConfig) calPrimaryIDByView(v uint64) uint64 {
 	default:
 		primaryID = c.wrfCalPrimaryIDByView(v)
 	}
-	c.logger.Debugf("calPrimaryIDByView, view: %d, primary id: %d, validatorDynamicInfo: %v", v, primaryID, validatorDynamicInfo)
+	excludedNodes := lo.MapToSlice(c.RecentBlockProcessorTracker.GetRecentProcessorSet(), func(id uint64, _ struct{}) uint64 {
+		return id
+	})
+	sort.Slice(excludedNodes, func(i, j int) bool {
+		return excludedNodes[i] < excludedNodes[j]
+	})
+	c.logger.Debugf("calPrimaryIDByView, view: %d, primary id: %d, validatorDynamicInfo: %v, excludedNodes: %v", v, primaryID, validatorDynamicInfo, excludedNodes)
 	return primaryID
 }
 
