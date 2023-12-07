@@ -487,6 +487,16 @@ func (rbft *rbftImpl[T, Constraint]) restoreView() {
 		if err == nil {
 			rbft.logger.Debugf("Replica %d restore view %d", rbft.chainConfig.SelfID, nv.View)
 			rbft.vcMgr.latestNewView = nv
+			// restore ValidatorDynamicInfo
+			rbft.chainConfig.ValidatorDynamicInfoMap = lo.SliceToMap(nv.ValidatorDynamicInfo, func(v *consensus.NodeDynamicInfo) (uint64, *NodeDynamicInfo) {
+				return v.Id, &NodeDynamicInfo{
+					ID:                             v.Id,
+					ConsensusVotingPower:           v.ConsensusVotingPower,
+					ConsensusVotingPowerReduced:    v.ConsensusVotingPowerReduced,
+					ConsensusVotingPowerReduceView: v.ConsensusVotingPowerReduceView,
+				}
+			})
+			rbft.logger.Debugf("Replica %d restore ValidatorDynamicInfoMap %v", rbft.chainConfig.SelfID, showSimpleValidatorDynamicInfo(nv.ValidatorDynamicInfo))
 			rbft.setLastStableView(nv.View)
 			rbft.setView(nv.View)
 			rbft.logger.Noticef("========= restore view %d =======", rbft.chainConfig.View)

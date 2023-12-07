@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/samber/lo"
+	"golang.org/x/crypto/sha3"
 
 	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
@@ -128,21 +129,33 @@ func newVcManager(c Config) *vcManager {
 	return vcm
 }
 
-func (rbft *rbftImpl[T, Constraint]) punishAbnormalNodes(view uint64, validatorDynamicInfoMap map[uint64]*NodeDynamicInfo) {
+func (rbft *rbftImpl[T, Constraint]) punishAbnormalNodes(isTemp bool, isRecovery bool, view uint64, validatorDynamicInfoMap map[uint64]*NodeDynamicInfo) {
 	if view == rbft.chainConfig.LastStableView || view <= rbft.chainConfig.View {
 		return
 	}
-	rbft.logger.Infof("Replica %d punish abnormal nodes, pre view: %d, now view: %d", rbft.chainConfig.SelfID, rbft.chainConfig.View, view)
+	if !isTemp {
+		rbft.logger.Infof("Replica %d try punish abnormal nodes, LastStableView: %d, pre view: %d, now view: %d", rbft.chainConfig.SelfID, rbft.chainConfig.LastStableView, rbft.chainConfig.View, view)
+	}
 
 	punishAbnormalNode := func(v uint64) {
 		abnormalNodeID := rbft.chainConfig.calPrimaryIDByView(v)
-		rbft.logger.Warningf("Replica %d reduce the voting power of abnormal node %d, view %d", rbft.chainConfig.SelfID, abnormalNodeID, v)
+		if validatorDynamicInfoMap[abnormalNodeID].ConsensusVotingPowerReduced && validatorDynamicInfoMap[abnormalNodeID].ConsensusVotingPowerReduceView == v {
+			// already reduce
+			return
+		}
+		if !isTemp {
+			rbft.logger.Warningf("Replica %d reduce the voting power of abnormal node %d, view %d", rbft.chainConfig.SelfID, abnormalNodeID, v)
+		}
 		validatorDynamicInfoMap[abnormalNodeID].ConsensusVotingPowerReduced = true
 		validatorDynamicInfoMap[abnormalNodeID].ConsensusVotingPowerReduceView = v
 		validatorDynamicInfoMap[abnormalNodeID].ConsensusVotingPower = rbft.chainConfig.EpochInfo.ConsensusParams.NotActiveWeight
 	}
 	// There may be multiple rounds of viewchange, so it is necessary to reduce the selected primary nodes in each round.
-	for v := rbft.chainConfig.View; v < view; v++ {
+	for v := rbft.chainConfig.LastStableView; v < view; v++ {
+		// if recover doesn't reduce the last view node
+		if v == view-1 && isRecovery {
+			continue
+		}
 		punishAbnormalNode(v)
 	}
 }
@@ -167,7 +180,7 @@ func (rbft *rbftImpl[T, Constraint]) recoverAbnormalNodes(view uint64, validator
 func (rbft *rbftImpl[T, Constraint]) setView(view uint64) {
 	rbft.viewLock.Lock()
 	if !rbft.isTest {
-		rbft.punishAbnormalNodes(view, rbft.chainConfig.ValidatorDynamicInfoMap)
+		rbft.punishAbnormalNodes(false, false, view, rbft.chainConfig.ValidatorDynamicInfoMap)
 		rbft.recoverAbnormalNodes(view, rbft.chainConfig.ValidatorDynamicInfoMap)
 	}
 	rbft.chainConfig.View = view
@@ -178,6 +191,10 @@ func (rbft *rbftImpl[T, Constraint]) setView(view uint64) {
 
 func (rbft *rbftImpl[T, Constraint]) setViewWithRecovery(view uint64) {
 	rbft.viewLock.Lock()
+	if !rbft.isTest {
+		rbft.punishAbnormalNodes(false, true, view, rbft.chainConfig.ValidatorDynamicInfoMap)
+		rbft.recoverAbnormalNodes(view, rbft.chainConfig.ValidatorDynamicInfoMap)
+	}
 	rbft.chainConfig.View = view
 	rbft.chainConfig.updatePrimaryID()
 	rbft.viewLock.Unlock()
@@ -186,7 +203,7 @@ func (rbft *rbftImpl[T, Constraint]) setViewWithRecovery(view uint64) {
 
 // getUnstableValidatorDynamicInfoMap returns the unstable validator dynamic info
 // assumes that the abnormal node is restored after the view is stable
-func (rbft *rbftImpl[T, Constraint]) getUnstableValidatorDynamicInfoMap(view uint64, needPunishAbnormalNodes bool) []*consensus.NodeDynamicInfo {
+func (rbft *rbftImpl[T, Constraint]) getUnstableValidatorDynamicInfoMap(view uint64, isRecovery bool) []*consensus.NodeDynamicInfo {
 	unstableValidatorDynamicInfoMap := lo.MapEntries(rbft.chainConfig.ValidatorDynamicInfoMap, func(k uint64, v *NodeDynamicInfo) (uint64, *NodeDynamicInfo) {
 		return k, &NodeDynamicInfo{
 			ID:                             v.ID,
@@ -195,9 +212,7 @@ func (rbft *rbftImpl[T, Constraint]) getUnstableValidatorDynamicInfoMap(view uin
 			ConsensusVotingPowerReduceView: v.ConsensusVotingPowerReduceView,
 		}
 	})
-	if needPunishAbnormalNodes {
-		rbft.punishAbnormalNodes(view, unstableValidatorDynamicInfoMap)
-	}
+	rbft.punishAbnormalNodes(true, isRecovery, view, unstableValidatorDynamicInfoMap)
 	rbft.recoverAbnormalNodes(view, unstableValidatorDynamicInfoMap)
 	res := lo.MapToSlice(unstableValidatorDynamicInfoMap, func(id uint64, item *NodeDynamicInfo) *consensus.NodeDynamicInfo {
 		return &consensus.NodeDynamicInfo{
@@ -262,15 +277,13 @@ func (rbft *rbftImpl[T, Constraint]) sendViewChange(status ...bool) consensusEve
 		return nil
 	}
 
-	needPunishAbnormalNodes := true
 	if recovery {
 		rbft.atomicOn(InRecovery)
 		rbft.metrics.statusGaugeInRecovery.Set(InRecovery)
-		needPunishAbnormalNodes = false
 	}
 
 	// create viewChange message
-	vcBasis := rbft.getVcBasis(needPunishAbnormalNodes)
+	vcBasis := rbft.getVcBasis()
 	vc := &consensus.ViewChange{
 		Basis:    vcBasis,
 		Recovery: recovery,
@@ -285,7 +298,8 @@ func (rbft *rbftImpl[T, Constraint]) sendViewChange(status ...bool) consensusEve
 	rbft.logger.Infof("Replica %d sending viewChange, v:%d, h:%d, |C|:%d, |P|:%d, "+
 		"|Q|:%d, recovery: %+v", rbft.chainConfig.SelfID, vcBasis.GetView(), vcBasis.GetH(), len(vcBasis.GetCset()),
 		len(vcBasis.GetPset()), len(vcBasis.GetQset()), recovery)
-
+	rbft.logger.Debugf("Replica %d sending viewChange, if recover ValidatorDynamicInfo: %v", rbft.chainConfig.SelfID, showSimpleValidatorDynamicInfo(vc.Basis.IfRecoverValidatorDynamicInfo))
+	rbft.logger.Debugf("Replica %d sending viewChange, if not recover ValidatorDynamicInfo: %v", rbft.chainConfig.SelfID, showSimpleValidatorDynamicInfo(vc.Basis.IfNotRecoverValidatorDynamicInfo))
 	payload, err := vc.MarshalVTStrict()
 	if err != nil {
 		rbft.logger.Errorf("ConsensusMessage_VIEW_CHANGE Marshal Error: %s", err)
@@ -325,6 +339,8 @@ func (rbft *rbftImpl[T, Constraint]) recvViewChange(vc *consensus.ViewChange, ve
 	rbft.logger.Infof("Replica %d received viewChange from replica %d, v:%d, h:%d, "+
 		"|C|:%d, |P|:%d, |Q|:%d, recovery: %v", rbft.chainConfig.SelfID, remoteReplicaID, targetView, vcBasis.GetH(),
 		len(vcBasis.GetCset()), len(vcBasis.GetPset()), len(vcBasis.GetQset()), vc.Recovery)
+	rbft.logger.Debugf("Replica %d received viewChange from replica %d, if recover ValidatorDynamicInfo: %v", rbft.chainConfig.SelfID, remoteReplicaID, showSimpleValidatorDynamicInfo(vc.Basis.IfRecoverValidatorDynamicInfo))
+	rbft.logger.Debugf("Replica %d received viewChange from replica %d, if not recover ValidatorDynamicInfo: %v", rbft.chainConfig.SelfID, remoteReplicaID, showSimpleValidatorDynamicInfo(vc.Basis.IfNotRecoverValidatorDynamicInfo))
 
 	if targetView < rbft.chainConfig.View {
 		// for recovery node with a lower view, we can directly send back latest new view to help
@@ -589,6 +605,16 @@ func (rbft *rbftImpl[T, Constraint]) sendNewView() consensusEvent {
 	)
 	vcSet, basis = rbft.getViewChangeBasis()
 
+	validatorDynamicInfo, ok := rbft.selectValidatorDynamicInfo(vcSet.ViewChanges)
+	if !ok {
+		rbft.logger.Infof("Replica %d could not find consistent validatorDynamicInfo",
+			rbft.chainConfig.SelfID)
+		for _, vc := range vcSet.ViewChanges {
+			rbft.logger.Infof("Replica %d view change IfRecoverValidatorDynamicInfo: %v, IfNotRecoverValidatorDynamicInfo: %v", vc.Basis.ReplicaId, showSimpleValidatorDynamicInfo(vc.Basis.IfRecoverValidatorDynamicInfo), showSimpleValidatorDynamicInfo(vc.Basis.IfNotRecoverValidatorDynamicInfo))
+		}
+		return nil
+	}
+
 	// get suitable checkpoint for later recovery, replicas contains the peer no who has this checkpoint.
 	// if we can't find suitable checkpoint, ok return false.
 	checkpointState, checkpointSet, ok := rbft.selectInitialCheckpoint(basis)
@@ -620,19 +646,9 @@ func (rbft *rbftImpl[T, Constraint]) sendNewView() consensusEvent {
 				},
 			},
 		},
-		FromId: rbft.chainConfig.SelfID,
-		ValidatorDynamicInfo: lo.MapToSlice(rbft.chainConfig.ValidatorDynamicInfoMap, func(id uint64, item *NodeDynamicInfo) *consensus.NodeDynamicInfo {
-			return &consensus.NodeDynamicInfo{
-				Id:                             item.ID,
-				ConsensusVotingPower:           item.ConsensusVotingPower,
-				ConsensusVotingPowerReduced:    item.ConsensusVotingPowerReduced,
-				ConsensusVotingPowerReduceView: item.ConsensusVotingPowerReduceView,
-			}
-		}),
+		FromId:               rbft.chainConfig.SelfID,
+		ValidatorDynamicInfo: validatorDynamicInfo,
 	}
-	sort.Slice(nv.ValidatorDynamicInfo, func(i, j int) bool {
-		return nv.ValidatorDynamicInfo[i].Id < nv.ValidatorDynamicInfo[j].Id
-	})
 	sig, sErr := rbft.signNewView(nv)
 	if sErr != nil {
 		rbft.logger.Warningf("Replica %d sign new view failed: %s", rbft.chainConfig.SelfID, sErr)
@@ -728,8 +744,6 @@ func (rbft *rbftImpl[T, Constraint]) checkNewView(nv *consensus.NewView) (uint64
 
 	// ensure all ViewChanges have the same target view and target view is equal to
 	// NewView.view.
-	var validatorDynamicInfo []*consensus.NodeDynamicInfo = nil
-	var validatorDynamicInfoReplica uint64
 	for i, vc := range nv.ViewChangeSet.ViewChanges {
 		vcBasis := vc.Basis
 		view := vcBasis.GetView()
@@ -747,24 +761,19 @@ func (rbft *rbftImpl[T, Constraint]) checkNewView(nv *consensus.NewView) (uint64
 				"view %d and %d", rbft.chainConfig.SelfID, view, targetView)
 			return 0, "", false
 		}
-
-		if validatorDynamicInfo == nil {
-			validatorDynamicInfo = vcBasis.ValidatorDynamicInfo
-			validatorDynamicInfoReplica = vcBasis.GetReplicaId()
-		} else {
-			if !consensus.ValidatorDynamicInfoEqual(validatorDynamicInfo, vcBasis.ValidatorDynamicInfo) {
-				rbft.logger.Warningf("Replica %d received an invalid NewView with viewchange %d mismatch validatorDynamicInfo, first(replica %d): %v, current: %v", rbft.chainConfig.SelfID, vcBasis.GetReplicaId(), validatorDynamicInfoReplica, validatorDynamicInfo, vcBasis.ValidatorDynamicInfo)
-				return 0, "", false
-			}
-		}
 	}
-	if len(validatorDynamicInfo) == 0 {
-		rbft.logger.Warningf("Replica %d received an invalid NewView with empty validatorDynamicInfo from viewchange set", rbft.chainConfig.SelfID)
+	validatorDynamicInfo, ok := rbft.selectValidatorDynamicInfo(nv.ViewChangeSet.ViewChanges)
+	if !ok {
+		rbft.logger.Infof("Replica %d received an invalid NewView that could not find consistent validatorDynamicInfo",
+			rbft.chainConfig.SelfID)
+		for _, vc := range nv.ViewChangeSet.ViewChanges {
+			rbft.logger.Infof("Replica %d view change IfRecoverValidatorDynamicInfo: %v, IfNotRecoverValidatorDynamicInfo: %v", vc.Basis.ReplicaId, showSimpleValidatorDynamicInfo(vc.Basis.IfRecoverValidatorDynamicInfo), showSimpleValidatorDynamicInfo(vc.Basis.IfNotRecoverValidatorDynamicInfo))
+		}
 		return 0, "", false
 	}
 
 	if !consensus.ValidatorDynamicInfoEqual(validatorDynamicInfo, nv.ValidatorDynamicInfo) {
-		rbft.logger.Warningf("Replica %d received an invalid NewView with mismatch validatorDynamicInfo, viewchange's: %v, newView's: %v", rbft.chainConfig.SelfID, validatorDynamicInfo, nv.ValidatorDynamicInfo)
+		rbft.logger.Warningf("Replica %d received an invalid NewView with mismatch validatorDynamicInfo, viewchange's: %v, newView's: %v", rbft.chainConfig.SelfID, showSimpleValidatorDynamicInfo(validatorDynamicInfo), showSimpleValidatorDynamicInfo(nv.ValidatorDynamicInfo))
 		return 0, "", false
 	}
 
@@ -1383,6 +1392,97 @@ func (rbft *rbftImpl[T, Constraint]) getViewChangeBasis() (*consensus.QuorumView
 	return qvc, basis
 }
 
+type ValidatorDynamicInfo struct {
+	count int
+	info  []*consensus.NodeDynamicInfo
+	hash  string
+}
+
+func (v *ValidatorDynamicInfo) getHash() (string, error) {
+	if v.hash != "" {
+		return v.hash, nil
+	}
+	hasher := sha3.NewLegacyKeccak256()
+	pbInfo := &consensus.ValidatorDynamicInfo{
+		Info: v.info,
+	}
+	raw, err := pbInfo.MarshalVTStrict()
+	if err != nil {
+		return "", err
+	}
+	_, err = hasher.Write(raw)
+	if err != nil {
+		return "", err
+	}
+	hash := hasher.Sum(nil)
+	v.hash = hex.EncodeToString(hash)
+	return v.hash, nil
+}
+
+func (rbft *rbftImpl[T, Constraint]) selectValidatorDynamicInfo(viewChanges []*consensus.ViewChange) ([]*consensus.NodeDynamicInfo, bool) {
+	recoverValidatorDynamicInfoRecord := make(map[string]*ValidatorDynamicInfo)
+	notRecoverValidatorDynamicInfoRecord := make(map[string]*ValidatorDynamicInfo)
+	var recoverCount, notRecoverCount int
+	var quorumRecoverValidatorDynamicInfo, quorumNotRecoverValidatorDynamicInfo []*consensus.NodeDynamicInfo
+	for _, vc := range viewChanges {
+		b := vc.Basis
+		if len(b.IfRecoverValidatorDynamicInfo) == 0 || len(b.IfNotRecoverValidatorDynamicInfo) == 0 {
+			continue
+		}
+
+		recoverValidatorDynamicInfo := &ValidatorDynamicInfo{
+			count: 1,
+			info:  b.IfRecoverValidatorDynamicInfo,
+		}
+		hash, err := recoverValidatorDynamicInfo.getHash()
+		if err != nil {
+			continue
+		}
+		if info, ok := recoverValidatorDynamicInfoRecord[hash]; ok {
+			info.count++
+			if info.count == rbft.commonCaseQuorum() {
+				quorumRecoverValidatorDynamicInfo = recoverValidatorDynamicInfo.info
+			}
+		} else {
+			recoverValidatorDynamicInfoRecord[hash] = recoverValidatorDynamicInfo
+		}
+
+		notRecoverValidatorDynamicInfo := &ValidatorDynamicInfo{
+			count: 1,
+			info:  b.IfNotRecoverValidatorDynamicInfo,
+		}
+		hash, err = notRecoverValidatorDynamicInfo.getHash()
+		if err != nil {
+			continue
+		}
+		if info, ok := notRecoverValidatorDynamicInfoRecord[hash]; ok {
+			info.count++
+			if info.count == rbft.commonCaseQuorum() {
+				quorumNotRecoverValidatorDynamicInfo = notRecoverValidatorDynamicInfo.info
+			}
+		} else {
+			notRecoverValidatorDynamicInfoRecord[hash] = notRecoverValidatorDynamicInfo
+		}
+
+		if vc.Recovery {
+			recoverCount++
+		} else {
+			notRecoverCount++
+		}
+	}
+	if len(quorumRecoverValidatorDynamicInfo) == 0 && len(quorumNotRecoverValidatorDynamicInfo) == 0 {
+		return nil, false
+	} else if len(quorumRecoverValidatorDynamicInfo) != 0 {
+		return quorumRecoverValidatorDynamicInfo, true
+	} else if len(quorumNotRecoverValidatorDynamicInfo) != 0 {
+		return quorumNotRecoverValidatorDynamicInfo, true
+	}
+	if recoverCount >= notRecoverCount {
+		return quorumRecoverValidatorDynamicInfo, true
+	}
+	return quorumNotRecoverValidatorDynamicInfo, true
+}
+
 // selectInitialCheckpoint selects suitable initial checkpoint from received ViewChange message.
 // If we find suitable checkpoint, it returns a certain checkpoint meta and the signed checkpoint set.
 // The initial checkpoint is the max checkpoint which exists in at least oneCorrectQuorum
@@ -1847,4 +1947,15 @@ func (rbft *rbftImpl[T, Constraint]) processNewView(msgList []*consensus.VcPq) {
 			rbft.peerMgr.broadcast(context.TODO(), consensusMsg)
 		}
 	}
+}
+
+func showSimpleValidatorDynamicInfo(v []*consensus.NodeDynamicInfo) []NodeDynamicInfo {
+	return lo.Map(v, func(item *consensus.NodeDynamicInfo, index int) NodeDynamicInfo {
+		return NodeDynamicInfo{
+			ID:                             item.Id,
+			ConsensusVotingPower:           item.ConsensusVotingPower,
+			ConsensusVotingPowerReduced:    item.ConsensusVotingPowerReduced,
+			ConsensusVotingPowerReduceView: item.ConsensusVotingPowerReduceView,
+		}
+	})
 }
