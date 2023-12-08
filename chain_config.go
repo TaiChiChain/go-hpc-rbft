@@ -462,6 +462,8 @@ type DynamicChainConfig struct {
 	// Low watermark block number.
 	H uint64
 
+	LastStableValidatorDynamicInfoMap map[uint64]*NodeDynamicInfo
+
 	// Last stable view, change by ViewChangeDone and Checkpoint.
 	LastStableView uint64
 
@@ -621,6 +623,14 @@ func (c *ChainConfig) updateDerivedData() error {
 			ConsensusVotingPowerReduceView: 0,
 		}
 	})
+	c.LastStableValidatorDynamicInfoMap = lo.MapEntries(c.ValidatorMap, func(id uint64, nodeInfo NodeInfo) (uint64, *NodeDynamicInfo) {
+		return id, &NodeDynamicInfo{
+			ID:                             id,
+			ConsensusVotingPower:           nodeInfo.ConsensusVotingPower,
+			ConsensusVotingPowerReduced:    false,
+			ConsensusVotingPowerReduceView: 0,
+		}
+	})
 
 	c.N = len(c.EpochInfo.ValidatorSet)
 	c.F = (c.N - 1) / 3
@@ -629,14 +639,14 @@ func (c *ChainConfig) updateDerivedData() error {
 	return nil
 }
 
-func (c *ChainConfig) wrfCalPrimaryIDByView(v uint64) uint64 {
+func (c *ChainConfig) wrfCalPrimaryIDByView(v uint64, validatorDynamicInfoMap map[uint64]*NodeDynamicInfo) uint64 {
 	// generate random number by last blockhash + view + epoch
 	var seed = []byte(c.LastCheckpointExecBlockHash)
 	seed = binary.BigEndian.AppendUint64(seed, c.EpochInfo.Epoch)
 	seed = binary.BigEndian.AppendUint64(seed, v)
 
 	nodeID2VotingPower := make(map[uint64]int64)
-	for nodeID, info := range c.ValidatorDynamicInfoMap {
+	for nodeID, info := range validatorDynamicInfoMap {
 		// exclude nodes that have recently produced blocks
 		if _, ok := c.RecentBlockProcessorTracker.GetRecentProcessorSet()[nodeID]; !ok {
 			nodeID2VotingPower[nodeID] = info.ConsensusVotingPower
@@ -646,17 +656,17 @@ func (c *ChainConfig) wrfCalPrimaryIDByView(v uint64) uint64 {
 }
 
 // primaryID returns the expected primary id with the given view v
-func (c *ChainConfig) calPrimaryIDByView(v uint64) uint64 {
+func (c *ChainConfig) calPrimaryIDByView(v uint64, validatorDynamicInfoMap map[uint64]*NodeDynamicInfo) uint64 {
 	validatorDynamicInfo := c.validatorDynamicInfo()
 
 	var primaryID uint64
 	switch c.EpochInfo.ConsensusParams.ProposerElectionType {
 	case ProposerElectionTypeWRF:
-		primaryID = c.wrfCalPrimaryIDByView(v)
+		primaryID = c.wrfCalPrimaryIDByView(v, validatorDynamicInfoMap)
 	case ProposerElectionTypeAbnormalRotation:
 		primaryID = v%uint64(c.N) + 1
 	default:
-		primaryID = c.wrfCalPrimaryIDByView(v)
+		primaryID = c.wrfCalPrimaryIDByView(v, validatorDynamicInfoMap)
 	}
 	excludedNodes := lo.MapToSlice(c.RecentBlockProcessorTracker.GetRecentProcessorSet(), func(id uint64, _ struct{}) uint64 {
 		return id
@@ -684,7 +694,7 @@ func binarySearch(nums []uint64, target uint64) int {
 }
 
 func (c *ChainConfig) updatePrimaryID() {
-	c.PrimaryID = c.calPrimaryIDByView(c.View)
+	c.PrimaryID = c.calPrimaryIDByView(c.View, c.ValidatorDynamicInfoMap)
 }
 
 func (c *ChainConfig) validatorDynamicInfo() []NodeDynamicInfo {

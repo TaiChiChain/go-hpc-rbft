@@ -445,7 +445,7 @@ func (rbft *rbftImpl[T, Constraint]) persistH(seqNo uint64) {
 }
 
 // persistNewView persists current view to database
-func (rbft *rbftImpl[T, Constraint]) persistNewView(nv *consensus.NewView) {
+func (rbft *rbftImpl[T, Constraint]) persistNewView(nv *consensus.NewView, isRecovery bool) {
 	key := "new-view"
 	raw, err := nv.MarshalVTStrict()
 	if err != nil {
@@ -459,10 +459,22 @@ func (rbft *rbftImpl[T, Constraint]) persistNewView(nv *consensus.NewView) {
 	}
 
 	rbft.setLastStableView(nv.View)
-	rbft.setView(nv.View)
+	if isRecovery {
+		rbft.setViewWithRecovery(nv.View)
+	} else {
+		rbft.setView(nv.View)
+	}
 
-	if nv.View != 0 && nv.FromId != rbft.chainConfig.SelfID {
+	if nv.View != 0 {
 		rbft.chainConfig.ValidatorDynamicInfoMap = lo.SliceToMap(nv.ValidatorDynamicInfo, func(v *consensus.NodeDynamicInfo) (uint64, *NodeDynamicInfo) {
+			return v.Id, &NodeDynamicInfo{
+				ID:                             v.Id,
+				ConsensusVotingPower:           v.ConsensusVotingPower,
+				ConsensusVotingPowerReduced:    v.ConsensusVotingPowerReduced,
+				ConsensusVotingPowerReduceView: v.ConsensusVotingPowerReduceView,
+			}
+		})
+		rbft.chainConfig.LastStableValidatorDynamicInfoMap = lo.SliceToMap(nv.ValidatorDynamicInfo, func(v *consensus.NodeDynamicInfo) (uint64, *NodeDynamicInfo) {
 			return v.Id, &NodeDynamicInfo{
 				ID:                             v.Id,
 				ConsensusVotingPower:           v.ConsensusVotingPower,
@@ -489,6 +501,14 @@ func (rbft *rbftImpl[T, Constraint]) restoreView() {
 			rbft.vcMgr.latestNewView = nv
 			// restore ValidatorDynamicInfo
 			rbft.chainConfig.ValidatorDynamicInfoMap = lo.SliceToMap(nv.ValidatorDynamicInfo, func(v *consensus.NodeDynamicInfo) (uint64, *NodeDynamicInfo) {
+				return v.Id, &NodeDynamicInfo{
+					ID:                             v.Id,
+					ConsensusVotingPower:           v.ConsensusVotingPower,
+					ConsensusVotingPowerReduced:    v.ConsensusVotingPowerReduced,
+					ConsensusVotingPowerReduceView: v.ConsensusVotingPowerReduceView,
+				}
+			})
+			rbft.chainConfig.LastStableValidatorDynamicInfoMap = lo.SliceToMap(nv.ValidatorDynamicInfo, func(v *consensus.NodeDynamicInfo) (uint64, *NodeDynamicInfo) {
 				return v.Id, &NodeDynamicInfo{
 					ID:                             v.Id,
 					ConsensusVotingPower:           v.ConsensusVotingPower,

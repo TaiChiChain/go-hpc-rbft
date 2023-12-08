@@ -167,7 +167,7 @@ func (rbft *rbftImpl[T, Constraint]) turnIntoEpoch() {
 	rbft.updateEpochInfo(newEpoch)
 
 	// initial view 0 in new epoch.
-	rbft.persistNewView(initialNewView)
+	rbft.persistNewView(initialNewView, true)
 	rbft.logger.Infof("Replica %d persist view=%d after epoch change", rbft.chainConfig.SelfID, rbft.chainConfig.View)
 
 	// clean cached old epoch proof

@@ -2095,10 +2095,13 @@ func (rbft *rbftImpl[T, Constraint]) finishNormalCheckpoint(checkpointHeight uin
 			}
 		}
 
+		validatorDynamicInfo, ok := rbft.selectValidatorDynamicInfo(qvc.ViewChanges)
+		if !ok {
+			rbft.logger.Errorf("Replica %d selectValidatorDynamicInfo failed after finishNormalCheckpoint", rbft.chainConfig.SelfID)
+			return nil
+		}
 		// update view after checkpoint
 		// persist new view
-		rbft.setLastStableView(newView)
-		rbft.setViewWithRecovery(newView)
 		nv := &consensus.NewView{
 			ReplicaId:     rbft.chainConfig.PrimaryID,
 			View:          newView,
@@ -2109,16 +2112,9 @@ func (rbft *rbftImpl[T, Constraint]) finishNormalCheckpoint(checkpointHeight uin
 					return item.Author, item.Signature
 				}),
 			},
-			FromId:         rbft.chainConfig.SelfID,
-			AutoTermUpdate: true,
-			ValidatorDynamicInfo: lo.MapToSlice(rbft.chainConfig.ValidatorDynamicInfoMap, func(id uint64, item *NodeDynamicInfo) *consensus.NodeDynamicInfo {
-				return &consensus.NodeDynamicInfo{
-					Id:                             item.ID,
-					ConsensusVotingPower:           item.ConsensusVotingPower,
-					ConsensusVotingPowerReduced:    item.ConsensusVotingPowerReduced,
-					ConsensusVotingPowerReduceView: item.ConsensusVotingPowerReduceView,
-				}
-			}),
+			FromId:               rbft.chainConfig.SelfID,
+			AutoTermUpdate:       true,
+			ValidatorDynamicInfo: validatorDynamicInfo,
 		}
 		sort.Slice(nv.ValidatorDynamicInfo, func(i, j int) bool {
 			return nv.ValidatorDynamicInfo[i].Id < nv.ValidatorDynamicInfo[j].Id
@@ -2129,7 +2125,7 @@ func (rbft *rbftImpl[T, Constraint]) finishNormalCheckpoint(checkpointHeight uin
 			return nil
 		}
 		nv.Signature = sig
-		rbft.persistNewView(nv)
+		rbft.persistNewView(nv, true)
 
 		// Slave -> Primary： need update self seqNo(because only primary will update)
 		rbft.batchMgr.setSeqNo(checkpointHeight)
@@ -2602,7 +2598,7 @@ func (rbft *rbftImpl[T, Constraint]) recvStateUpdatedEvent(ss *types.ServiceSync
 	}
 
 	if rbft.atomicIn(InViewChange) {
-		if rbft.chainConfig.SelfID == rbft.chainConfig.calPrimaryIDByView(rbft.chainConfig.View) {
+		if rbft.chainConfig.SelfID == rbft.chainConfig.calPrimaryIDByView(rbft.chainConfig.View, rbft.chainConfig.ValidatorDynamicInfoMap) {
 			// view may not be changed after state-update, current node mistakes itself for primary
 			// so send view change to step into the new view
 			rbft.logger.Debugf("Primary %d send view-change after state update", rbft.chainConfig.SelfID)
@@ -2613,7 +2609,7 @@ func (rbft *rbftImpl[T, Constraint]) recvStateUpdatedEvent(ss *types.ServiceSync
 		// if not(sync chain then vc), trigger recovery to find correct view-number
 		nv, ok := rbft.vcMgr.newViewStore[rbft.chainConfig.View]
 		if ok {
-			rbft.persistNewView(nv)
+			rbft.persistNewView(nv, false)
 			rbft.logger.Infof("Replica %d persist view=%d after sync chain", rbft.chainConfig.SelfID, rbft.chainConfig.View)
 			return &LocalEvent{
 				Service:   ViewChangeService,

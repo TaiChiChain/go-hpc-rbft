@@ -199,7 +199,7 @@ func (rbft *rbftImpl[T, Constraint]) handleNotifyGenBatchEvent() consensusEvent 
 	}
 
 	if !rbft.isPrimary(rbft.chainConfig.SelfID) {
-		rbft.logger.Warningf("Replica %d is not primary, ignore post batch signal", rbft.chainConfig.SelfID)
+		rbft.logger.Debugf("Replica %d is not primary, ignore post batch signal", rbft.chainConfig.SelfID)
 		return nil
 	}
 	rbft.stopBatchTimer()
@@ -629,7 +629,7 @@ func (rbft *rbftImpl[T, Constraint]) handleViewChangeEvent(e *LocalEvent) consen
 			// primary construct and send new view message
 			return rbft.sendNewView()
 		}
-		rbft.logger.Infof("Replica %d received viewChange quorum, replica check newView", rbft.chainConfig.SelfID)
+		rbft.logger.Infof("Replica %d received viewChange quorum, replica check newView, primary is %d", rbft.chainConfig.SelfID, rbft.chainConfig.PrimaryID)
 		return rbft.replicaCheckNewView()
 
 	case FetchViewEvent:

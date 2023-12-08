@@ -130,7 +130,7 @@ func newVcManager(c Config) *vcManager {
 }
 
 func (rbft *rbftImpl[T, Constraint]) punishAbnormalNodes(isTemp bool, isRecovery bool, view uint64, validatorDynamicInfoMap map[uint64]*NodeDynamicInfo) {
-	if view == rbft.chainConfig.LastStableView || view <= rbft.chainConfig.View {
+	if view == 0 || view == rbft.chainConfig.LastStableView || view < rbft.chainConfig.View {
 		return
 	}
 	if !isTemp {
@@ -138,7 +138,7 @@ func (rbft *rbftImpl[T, Constraint]) punishAbnormalNodes(isTemp bool, isRecovery
 	}
 
 	punishAbnormalNode := func(v uint64) {
-		abnormalNodeID := rbft.chainConfig.calPrimaryIDByView(v)
+		abnormalNodeID := rbft.chainConfig.calPrimaryIDByView(v, validatorDynamicInfoMap)
 		if validatorDynamicInfoMap[abnormalNodeID].ConsensusVotingPowerReduced && validatorDynamicInfoMap[abnormalNodeID].ConsensusVotingPowerReduceView == v {
 			// already reduce
 			return
@@ -161,7 +161,7 @@ func (rbft *rbftImpl[T, Constraint]) punishAbnormalNodes(isTemp bool, isRecovery
 }
 
 func (rbft *rbftImpl[T, Constraint]) recoverAbnormalNodes(view uint64, validatorDynamicInfoMap map[uint64]*NodeDynamicInfo) {
-	if view == 0 || view <= rbft.chainConfig.View {
+	if view == 0 || view < rbft.chainConfig.View {
 		return
 	}
 
@@ -180,8 +180,17 @@ func (rbft *rbftImpl[T, Constraint]) recoverAbnormalNodes(view uint64, validator
 func (rbft *rbftImpl[T, Constraint]) setView(view uint64) {
 	rbft.viewLock.Lock()
 	if !rbft.isTest {
-		rbft.punishAbnormalNodes(false, false, view, rbft.chainConfig.ValidatorDynamicInfoMap)
-		rbft.recoverAbnormalNodes(view, rbft.chainConfig.ValidatorDynamicInfoMap)
+		unstableValidatorDynamicInfoMap := lo.MapEntries(rbft.chainConfig.LastStableValidatorDynamicInfoMap, func(k uint64, v *NodeDynamicInfo) (uint64, *NodeDynamicInfo) {
+			return k, &NodeDynamicInfo{
+				ID:                             v.ID,
+				ConsensusVotingPower:           v.ConsensusVotingPower,
+				ConsensusVotingPowerReduced:    v.ConsensusVotingPowerReduced,
+				ConsensusVotingPowerReduceView: v.ConsensusVotingPowerReduceView,
+			}
+		})
+		rbft.punishAbnormalNodes(false, false, view, unstableValidatorDynamicInfoMap)
+		rbft.recoverAbnormalNodes(view, unstableValidatorDynamicInfoMap)
+		rbft.chainConfig.ValidatorDynamicInfoMap = unstableValidatorDynamicInfoMap
 	}
 	rbft.chainConfig.View = view
 	rbft.chainConfig.updatePrimaryID()
@@ -192,8 +201,17 @@ func (rbft *rbftImpl[T, Constraint]) setView(view uint64) {
 func (rbft *rbftImpl[T, Constraint]) setViewWithRecovery(view uint64) {
 	rbft.viewLock.Lock()
 	if !rbft.isTest {
-		rbft.punishAbnormalNodes(false, true, view, rbft.chainConfig.ValidatorDynamicInfoMap)
-		rbft.recoverAbnormalNodes(view, rbft.chainConfig.ValidatorDynamicInfoMap)
+		unstableValidatorDynamicInfoMap := lo.MapEntries(rbft.chainConfig.LastStableValidatorDynamicInfoMap, func(k uint64, v *NodeDynamicInfo) (uint64, *NodeDynamicInfo) {
+			return k, &NodeDynamicInfo{
+				ID:                             v.ID,
+				ConsensusVotingPower:           v.ConsensusVotingPower,
+				ConsensusVotingPowerReduced:    v.ConsensusVotingPowerReduced,
+				ConsensusVotingPowerReduceView: v.ConsensusVotingPowerReduceView,
+			}
+		})
+		rbft.punishAbnormalNodes(false, true, view, unstableValidatorDynamicInfoMap)
+		rbft.recoverAbnormalNodes(view, unstableValidatorDynamicInfoMap)
+		rbft.chainConfig.ValidatorDynamicInfoMap = unstableValidatorDynamicInfoMap
 	}
 	rbft.chainConfig.View = view
 	rbft.chainConfig.updatePrimaryID()
@@ -204,13 +222,24 @@ func (rbft *rbftImpl[T, Constraint]) setViewWithRecovery(view uint64) {
 // getUnstableValidatorDynamicInfoMap returns the unstable validator dynamic info
 // assumes that the abnormal node is restored after the view is stable
 func (rbft *rbftImpl[T, Constraint]) getUnstableValidatorDynamicInfoMap(view uint64, isRecovery bool) []*consensus.NodeDynamicInfo {
-	unstableValidatorDynamicInfoMap := lo.MapEntries(rbft.chainConfig.ValidatorDynamicInfoMap, func(k uint64, v *NodeDynamicInfo) (uint64, *NodeDynamicInfo) {
+	unstableValidatorDynamicInfoMap := lo.MapEntries(rbft.chainConfig.LastStableValidatorDynamicInfoMap, func(k uint64, v *NodeDynamicInfo) (uint64, *NodeDynamicInfo) {
 		return k, &NodeDynamicInfo{
 			ID:                             v.ID,
 			ConsensusVotingPower:           v.ConsensusVotingPower,
 			ConsensusVotingPowerReduced:    v.ConsensusVotingPowerReduced,
 			ConsensusVotingPowerReduceView: v.ConsensusVotingPowerReduceView,
 		}
+	})
+	info := lo.MapToSlice(unstableValidatorDynamicInfoMap, func(id uint64, v *NodeDynamicInfo) NodeDynamicInfo {
+		return NodeDynamicInfo{
+			ID:                             v.ID,
+			ConsensusVotingPower:           v.ConsensusVotingPower,
+			ConsensusVotingPowerReduced:    v.ConsensusVotingPowerReduced,
+			ConsensusVotingPowerReduceView: v.ConsensusVotingPowerReduceView,
+		}
+	})
+	sort.Slice(info, func(i, j int) bool {
+		return info[i].ID < info[j].ID
 	})
 	rbft.punishAbnormalNodes(true, isRecovery, view, unstableValidatorDynamicInfoMap)
 	rbft.recoverAbnormalNodes(view, unstableValidatorDynamicInfoMap)
@@ -665,6 +694,8 @@ func (rbft *rbftImpl[T, Constraint]) sendNewView() consensusEvent {
 
 	rbft.logger.Infof("Replica %d is new primary, sending newView, v:%d, X:%+v",
 		rbft.chainConfig.SelfID, nv.View, msgList)
+	rbft.logger.Infof("Replica %d generated newView validatorDynamicInfo: %v",
+		rbft.chainConfig.SelfID, showSimpleValidatorDynamicInfo(validatorDynamicInfo))
 	payload, err := nv.MarshalVTStrict()
 	if err != nil {
 		rbft.logger.Errorf("ConsensusMessage_NEW_VIEW Marshal Error: %s", err)
@@ -727,7 +758,7 @@ func (rbft *rbftImpl[T, Constraint]) checkNewView(nv *consensus.NewView) (uint64
 
 	// wrf recovery cannot check the PrimaryID
 	if !rbft.chainConfig.isProposerElectionTypeWRF() {
-		expectedPrimaryID := rbft.chainConfig.calPrimaryIDByView(nv.View)
+		expectedPrimaryID := rbft.chainConfig.calPrimaryIDByView(nv.View, rbft.chainConfig.ValidatorDynamicInfoMap)
 		if expectedPrimaryID != nv.ReplicaId {
 			rbft.logger.Warningf("Replica %d reject invalid newView from %d, v:%d, expected primary: %d",
 				rbft.chainConfig.SelfID, nv.ReplicaId, nv.View, expectedPrimaryID)
@@ -1091,7 +1122,7 @@ func (rbft *rbftImpl[T, Constraint]) resetStateForNewView() consensusEvent {
 	// clear consensus cache to a correct state.
 	rbft.processNewView(nv.Xset)
 
-	rbft.persistNewView(nv)
+	rbft.persistNewView(nv, false)
 	rbft.logger.Infof("Replica %d persist view=%d after new view", rbft.chainConfig.SelfID, rbft.chainConfig.View)
 
 	if rbft.atomicIn(InViewChange) {
@@ -1472,9 +1503,9 @@ func (rbft *rbftImpl[T, Constraint]) selectValidatorDynamicInfo(viewChanges []*c
 	}
 	if len(quorumRecoverValidatorDynamicInfo) == 0 && len(quorumNotRecoverValidatorDynamicInfo) == 0 {
 		return nil, false
-	} else if len(quorumRecoverValidatorDynamicInfo) != 0 {
+	} else if len(quorumRecoverValidatorDynamicInfo) != 0 && len(quorumNotRecoverValidatorDynamicInfo) == 0 {
 		return quorumRecoverValidatorDynamicInfo, true
-	} else if len(quorumNotRecoverValidatorDynamicInfo) != 0 {
+	} else if len(quorumRecoverValidatorDynamicInfo) == 0 && len(quorumNotRecoverValidatorDynamicInfo) != 0 {
 		return quorumNotRecoverValidatorDynamicInfo, true
 	}
 	if recoverCount >= notRecoverCount {
