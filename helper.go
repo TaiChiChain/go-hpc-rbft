@@ -776,14 +776,16 @@ func (rbft *rbftImpl[T, Constraint]) generateSignedCheckpoint(state *types.Servi
 			// term rotation
 			vcBasis.View++
 		}
-		rbft.logger.Infof("Replica %d generate IfRecoverValidatorDynamicInfo", rbft.chainConfig.SelfID)
+
 		vcBasis.IfRecoverValidatorDynamicInfo = rbft.getUnstableValidatorDynamicInfoMap(vcBasis.View, true)
-		rbft.logger.Infof("Replica %d generate IfNotRecoverValidatorDynamicInfo", rbft.chainConfig.SelfID)
+		rbft.logger.Infof("Replica %d generate checkpoint's IfRecoverValidatorDynamicInfo: %v", rbft.chainConfig.SelfID, showSimpleValidatorDynamicInfo(vcBasis.IfRecoverValidatorDynamicInfo))
+
 		vcBasis.IfNotRecoverValidatorDynamicInfo = rbft.getUnstableValidatorDynamicInfoMap(vcBasis.View, false)
+		rbft.logger.Infof("Replica %d generate checkpoint's IfNotRecoverValidatorDynamicInfo: %v", rbft.chainConfig.SelfID, showSimpleValidatorDynamicInfo(vcBasis.IfNotRecoverValidatorDynamicInfo))
 
 		vc := &consensus.ViewChange{
 			Basis:    vcBasis,
-			Recovery: false,
+			Recovery: true,
 		}
 		sig, sErr := rbft.signViewChange(vc)
 		if sErr != nil {
