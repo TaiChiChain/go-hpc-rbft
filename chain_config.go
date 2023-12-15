@@ -290,10 +290,6 @@ func (e *EpochInfo) Check() error {
 		return errors.New("epoch info error: exclude_view cannot be 0")
 	}
 
-	if len(e.P2PBootstrapNodeAddresses) == 0 {
-		return errors.New("epoch info error: p2p_bootstrap_node_addresses cannot be empty")
-	}
-
 	if len(e.ValidatorSet) < 4 {
 		return errors.New("epoch info error: validator_set need at least 4")
 	}
