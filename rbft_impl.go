@@ -26,12 +26,13 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
+	"github.com/axiomesh/axiom-kit/txpool"
+	types2 "github.com/axiomesh/axiom-kit/types"
+
 	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/common/metrics"
 	"github.com/axiomesh/axiom-bft/types"
-	"github.com/axiomesh/axiom-kit/txpool"
-	types2 "github.com/axiomesh/axiom-kit/types"
 )
 
 // Config contains the parameters to start a RAFT instance.
@@ -2638,7 +2639,7 @@ func (rbft *rbftImpl[T, Constraint]) recvReBroadcastRequestSet(e *consensus.ReBr
 		rbft.logger.Errorf("RequestSet unmarshal error: %v", err)
 		return nil
 	}
-	rbft.batchMgr.requestPool.AddRemoteTxs(requestSet.Requests)
+	rbft.batchMgr.requestPool.AddRebroadcastTxs(requestSet.Requests)
 	rbft.metrics.processEventDuration.With("event", "rebroadcast_request_set").Observe(time.Since(start).Seconds())
 	return nil
 }
