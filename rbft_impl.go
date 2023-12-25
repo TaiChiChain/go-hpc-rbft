@@ -311,9 +311,6 @@ func (rbft *rbftImpl[T, Constraint]) start() error {
 		return err
 	}
 
-	if err := rbft.batchMgr.requestPool.Start(); err != nil {
-		return err
-	}
 	// exit pending status after start rbft to avoid missing consensus messages from other nodes.
 	rbft.atomicOff(Pending)
 	rbft.metrics.statusGaugePending.Set(0)
