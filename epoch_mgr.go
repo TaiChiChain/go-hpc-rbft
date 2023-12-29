@@ -2,6 +2,7 @@ package rbft
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"sync"
 
@@ -14,6 +15,11 @@ import (
 
 // MaxNumEpochEndingCheckpoint is max checkpoints allowed include in EpochChangeProof
 const MaxNumEpochEndingCheckpoint = 100
+
+const (
+	EpochStatePrefix = "epoch_q_chkpt."
+	EpochIndexKey    = "epoch_latest_idx"
+)
 
 // epochManager manages the epoch structure for RBFT.
 type epochManager struct {
@@ -451,21 +457,29 @@ func (em *epochManager) verifyEpochChangeProof(proof *consensus.EpochChangeProof
 
 // persistEpochQuorumCheckpoint persists QuorumCheckpoint or epoch to database
 func (em *epochManager) persistEpochQuorumCheckpoint(c *consensus.QuorumCheckpoint) {
-	key := fmt.Sprintf("epoch_q_chkpt.%d", c.Checkpoint.Epoch)
+	key := fmt.Sprintf("%s%d", EpochStatePrefix, c.Checkpoint.Epoch)
 	raw, err := c.MarshalVTStrict()
 	if err != nil {
 		em.logger.Errorf("Persist epoch %d quorum chkpt failed with marshal err: %s ", c.Checkpoint.Epoch, err)
 		return
 	}
 
-	if err := em.epochService.StoreEpochState(key, raw); err != nil {
+	if err = em.epochService.StoreEpochState(key, raw); err != nil {
 		em.logger.Errorf("Persist epoch %d quorum chkpt failed with err: %s ", c.Checkpoint.Epoch, err)
+	}
+
+	// update latest epoch index
+	data := make([]byte, 8)
+	binary.BigEndian.PutUint64(data, c.Checkpoint.Epoch)
+	indexKey := EpochIndexKey
+	if err = em.epochService.StoreEpochState(indexKey, data); err != nil {
+		em.logger.Errorf("Persist epoch index %d failed with err: %s ", c.Checkpoint.Epoch, err)
 	}
 }
 
 // persistDelCheckpoint get QuorumCheckpoint with the given epoch
 func (em *epochManager) getEpochQuorumCheckpoint(epoch uint64) (*consensus.QuorumCheckpoint, error) {
-	key := fmt.Sprintf("epoch_q_chkpt.%d", epoch)
+	key := fmt.Sprintf("%s%d", EpochStatePrefix, epoch)
 
 	raw, err := em.epochService.ReadEpochState(key)
 	if err != nil {
