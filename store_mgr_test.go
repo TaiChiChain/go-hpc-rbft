@@ -18,7 +18,7 @@ func newStorageTestNode[T any, Constraint types2.TXConstraint[T]](ctrl *gomock.C
 	log := common.NewSimpleLogger()
 
 	conf := Config{
-		SelfAccountAddress: "node2",
+		SelfP2PNodeID: "node2",
 		LastServiceState: &types.ServiceState{
 			MetaState: &types.MetaState{},
 			Epoch:     1,

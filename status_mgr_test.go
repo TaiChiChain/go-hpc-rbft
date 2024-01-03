@@ -22,7 +22,7 @@ func newTestStatusNode[T any, Constraint types2.TXConstraint[T]](ctrl *gomock.Co
 			MetaState: &types.MetaState{},
 			Epoch:     1,
 		},
-		SelfAccountAddress: "node1",
+		SelfP2PNodeID: "node1",
 		GenesisEpochInfo: &EpochInfo{
 			Version:                   1,
 			Epoch:                     1,

@@ -94,13 +94,3 @@ func (m *peerManager) unicast(ctx context.Context, msg *consensus.ConsensusMessa
 
 	m.unicastByP2PID(ctx, msg, n.P2PNodeID)
 }
-
-func (m *peerManager) unicastByAccountAddr(ctx context.Context, msg *consensus.ConsensusMessage, to string) {
-	n, ok := m.chainConfig.AccountAddr2NodeInfoMap[to]
-	if !ok {
-		m.logger.Errorf("Unicast to %s failed: not found node", to)
-		return
-	}
-
-	m.unicastByP2PID(ctx, msg, n.P2PNodeID)
-}

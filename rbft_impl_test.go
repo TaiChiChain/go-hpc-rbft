@@ -24,7 +24,7 @@ func newMockRbft[T any, Constraint types2.TXConstraint[T]](t *testing.T, ctrl *g
 	external := NewMockMinimalExternal[T, Constraint](ctrl)
 
 	conf := Config{
-		SelfAccountAddress: "node1",
+		SelfP2PNodeID: "node1",
 		GenesisEpochInfo: &EpochInfo{
 			Version:                   1,
 			Epoch:                     1,
@@ -97,7 +97,7 @@ func TestRBFT_newRBFT(t *testing.T) {
 
 	// Is a New Node
 	rbft.config.GenesisEpochInfo.ValidatorSet = peerSet
-	rbft.config.SelfAccountAddress = "node4"
+	rbft.config.SelfP2PNodeID = "node4"
 	rbft, _ = newRBFT(rbft.config, rbft.external, rbft.batchMgr.requestPool, true)
 	assert.Equal(t, 4, rbft.chainConfig.N)
 }

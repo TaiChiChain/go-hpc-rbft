@@ -272,10 +272,10 @@ func (em *epochManager) checkEpoch(msg *consensus.ConsensusMessage) consensusEve
 func (em *epochManager) retrieveEpochChange(start, target uint64, recipient uint64) error {
 	em.logger.Debugf("Replica %d request epoch changes %d to %d from %d", em.chainConfig.SelfID, start, target, recipient)
 	req := &consensus.EpochChangeRequest{
-		Author:        em.chainConfig.SelfID,
-		StartEpoch:    start,
-		TargetEpoch:   target,
-		AuthorAccount: em.chainConfig.SelfAccountAddress,
+		Author:          em.chainConfig.SelfID,
+		StartEpoch:      start,
+		TargetEpoch:     target,
+		AuthorP2PNodeId: em.chainConfig.SelfP2PNodeID,
 	}
 	payload, mErr := req.MarshalVTStrict()
 	if mErr != nil {
@@ -314,7 +314,7 @@ func (em *epochManager) processEpochChangeRequest(request *consensus.EpochChange
 			Type:    consensus.Type_EPOCH_CHANGE_PROOF,
 			Payload: payload,
 		}
-		em.peerMgr.unicastByAccountAddr(context.TODO(), cum, request.AuthorAccount)
+		em.peerMgr.unicastByP2PID(context.TODO(), cum, request.AuthorP2PNodeId)
 	}
 
 	return nil

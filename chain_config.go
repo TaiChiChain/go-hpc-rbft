@@ -445,8 +445,6 @@ type EpochDerivedData struct {
 
 	NodeInfoMap map[uint64]NodeInfo
 
-	AccountAddr2NodeInfoMap map[string]NodeInfo
-
 	// will track validator consensusVotingPower
 	ValidatorMap map[uint64]NodeInfo
 }
@@ -566,7 +564,7 @@ type ChainConfig struct {
 
 	DynamicChainConfig
 
-	SelfAccountAddress string
+	SelfP2PNodeID string
 
 	logger common.Logger
 }
@@ -590,15 +588,13 @@ func (c *ChainConfig) updateDerivedData() error {
 	}
 
 	c.NodeInfoMap = make(map[uint64]NodeInfo)
-	c.AccountAddr2NodeInfoMap = make(map[string]NodeInfo)
 	c.NodeRoleMap = make(map[uint64]NodeRole)
 	fillNodes := func(nodes []NodeInfo, role NodeRole) {
 		for _, p := range nodes {
-			if p.AccountAddress == c.SelfAccountAddress {
+			if p.P2PNodeID == c.SelfP2PNodeID {
 				c.SelfID = p.ID
 				c.SelfRole = role
 			}
-			c.AccountAddr2NodeInfoMap[p.AccountAddress] = p
 			c.NodeInfoMap[p.ID] = p
 			c.NodeRoleMap[p.ID] = role
 		}
