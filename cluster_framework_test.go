@@ -171,7 +171,6 @@ func newTestFramework[T any, Constraint types2.TXConstraint[T]](account int) *te
 		n := "node" + strconv.Itoa(i+1)
 		peer := &NodeInfo{
 			ID:                   id,
-			AccountAddress:       n,
 			P2PNodeID:            n,
 			ConsensusVotingPower: 1,
 		}
@@ -203,7 +202,7 @@ func newTestFramework[T any, Constraint types2.TXConstraint[T]](account int) *te
 
 	// Init testNode in TestFramework
 	for i := range tf.Router {
-		tn := tf.newTestNode(tf.Router[i].ID, tf.Router[i].AccountAddress, cc)
+		tn := tf.newTestNode(tf.Router[i].ID, tf.Router[i].P2PNodeID, cc)
 		tf.TestNode = append(tf.TestNode, tn)
 	}
 
@@ -246,8 +245,8 @@ func (tf *testFramework[T, Constraint]) newNodeConfig(
 				TxMaxSize: 10 * 32 * 1024,
 			},
 		},
-		SelfAccountAddress: p2pNodeID,
-		SetSize:            25,
+		SelfP2PNodeID: p2pNodeID,
+		SetSize:       25,
 		LastServiceState: &types.ServiceState{
 			MetaState: &types.MetaState{},
 			Epoch:     epoch,

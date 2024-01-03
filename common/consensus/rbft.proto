@@ -230,7 +230,7 @@ message EpochChangeRequest {
     uint64 start_epoch = 2;
     // The target epoch for the request
     uint64 target_epoch = 3;
-    string author_account = 4;
+    string author_p2p_node_id = 4;
 }
 
 message Pset {

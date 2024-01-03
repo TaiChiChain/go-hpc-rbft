@@ -698,10 +698,10 @@ func (m *EpochChangeRequest) CloneVT() *EpochChangeRequest {
 		return (*EpochChangeRequest)(nil)
 	}
 	r := &EpochChangeRequest{
-		Author:        m.Author,
-		StartEpoch:    m.StartEpoch,
-		TargetEpoch:   m.TargetEpoch,
-		AuthorAccount: m.AuthorAccount,
+		Author:          m.Author,
+		StartEpoch:      m.StartEpoch,
+		TargetEpoch:     m.TargetEpoch,
+		AuthorP2PNodeId: m.AuthorP2PNodeId,
 	}
 	if len(m.unknownFields) > 0 {
 		r.unknownFields = make([]byte, len(m.unknownFields))
@@ -1858,7 +1858,7 @@ func (this *EpochChangeRequest) EqualVT(that *EpochChangeRequest) bool {
 	if this.TargetEpoch != that.TargetEpoch {
 		return false
 	}
-	if this.AuthorAccount != that.AuthorAccount {
+	if this.AuthorP2PNodeId != that.AuthorP2PNodeId {
 		return false
 	}
 	return string(this.unknownFields) == string(that.unknownFields)
@@ -3723,10 +3723,10 @@ func (m *EpochChangeRequest) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 		i -= len(m.unknownFields)
 		copy(dAtA[i:], m.unknownFields)
 	}
-	if len(m.AuthorAccount) > 0 {
-		i -= len(m.AuthorAccount)
-		copy(dAtA[i:], m.AuthorAccount)
-		i = encodeVarint(dAtA, i, uint64(len(m.AuthorAccount)))
+	if len(m.AuthorP2PNodeId) > 0 {
+		i -= len(m.AuthorP2PNodeId)
+		copy(dAtA[i:], m.AuthorP2PNodeId)
+		i = encodeVarint(dAtA, i, uint64(len(m.AuthorP2PNodeId)))
 		i--
 		dAtA[i] = 0x22
 	}
@@ -5792,10 +5792,10 @@ func (m *EpochChangeRequest) MarshalToSizedBufferVTStrict(dAtA []byte) (int, err
 		i -= len(m.unknownFields)
 		copy(dAtA[i:], m.unknownFields)
 	}
-	if len(m.AuthorAccount) > 0 {
-		i -= len(m.AuthorAccount)
-		copy(dAtA[i:], m.AuthorAccount)
-		i = encodeVarint(dAtA, i, uint64(len(m.AuthorAccount)))
+	if len(m.AuthorP2PNodeId) > 0 {
+		i -= len(m.AuthorP2PNodeId)
+		copy(dAtA[i:], m.AuthorP2PNodeId)
+		i = encodeVarint(dAtA, i, uint64(len(m.AuthorP2PNodeId)))
 		i--
 		dAtA[i] = 0x22
 	}
@@ -6911,7 +6911,7 @@ func (m *EpochChangeRequest) SizeVT() (n int) {
 	if m.TargetEpoch != 0 {
 		n += 1 + sov(uint64(m.TargetEpoch))
 	}
-	l = len(m.AuthorAccount)
+	l = len(m.AuthorP2PNodeId)
 	if l > 0 {
 		n += 1 + l + sov(uint64(l))
 	}
@@ -11254,7 +11254,7 @@ func (m *EpochChangeRequest) UnmarshalVT(dAtA []byte) error {
 			}
 		case 4:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field AuthorAccount", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field AuthorP2PNodeId", wireType)
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
@@ -11282,7 +11282,7 @@ func (m *EpochChangeRequest) UnmarshalVT(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.AuthorAccount = string(dAtA[iNdEx:postIndex])
+			m.AuthorP2PNodeId = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

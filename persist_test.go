@@ -25,7 +25,7 @@ func newPersistTestReplica[T any, Constraint types2.TXConstraint[T]](ctrl *gomoc
 	ext.EXPECT().Verify(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
 	conf := Config{
-		SelfAccountAddress: "node2",
+		SelfP2PNodeID: "node2",
 		GenesisEpochInfo: &EpochInfo{
 			Version:                   1,
 			Epoch:                     1,

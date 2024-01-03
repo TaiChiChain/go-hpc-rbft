@@ -26,13 +26,12 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/axiomesh/axiom-kit/txpool"
-	types2 "github.com/axiomesh/axiom-kit/types"
-
 	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/common/metrics"
 	"github.com/axiomesh/axiom-bft/types"
+	"github.com/axiomesh/axiom-kit/txpool"
+	types2 "github.com/axiomesh/axiom-kit/types"
 )
 
 // Config contains the parameters to start a RAFT instance.
@@ -44,8 +43,7 @@ type Config struct {
 
 	LastCheckpointBlockDigest string
 
-	// self staking account address
-	SelfAccountAddress string
+	SelfP2PNodeID string
 
 	LastServiceState *types.ServiceState
 
@@ -193,8 +191,8 @@ func newRBFT[T any, Constraint types2.TXConstraint[T]](c Config, external Extern
 			H:                           c.GenesisEpochInfo.StartBlock,
 			RecentBlockProcessorTracker: NewBlockProcessorTracker(external.GetBlockMeta),
 		},
-		SelfAccountAddress: c.SelfAccountAddress,
-		logger:             c.Logger,
+		SelfP2PNodeID: c.SelfP2PNodeID,
+		logger:        c.Logger,
 	}
 	rbft := &rbftImpl[T, Constraint]{
 		chainConfig:          chainConfig,

@@ -838,7 +838,7 @@ func (rbft *rbftImpl[T, Constraint]) verifySignedCheckpoint(signedCheckpoint *co
 	if !ok {
 		return fmt.Errorf("unknow author: %d", signedCheckpoint.GetAuthor())
 	}
-	return rbft.external.Verify(fromNode.AccountAddress, signedCheckpoint.Signature, msg)
+	return rbft.external.Verify(fromNode.P2PNodeID, signedCheckpoint.Signature, msg)
 }
 
 // syncConfigCheckpoint posts config checkpoint out and wait for its completion synchronously.
@@ -906,7 +906,7 @@ func (rbft *rbftImpl[T, Constraint]) verifySignedViewChange(vc *consensus.ViewCh
 	if !ok {
 		return fmt.Errorf("invalid node %d not in router", replicaID)
 	}
-	return rbft.external.Verify(node.AccountAddress, vc.Signature, hash)
+	return rbft.external.Verify(node.P2PNodeID, vc.Signature, hash)
 }
 
 func (rbft *rbftImpl[T, Constraint]) calculateViewChangeHash(vc *consensus.ViewChange) ([]byte, error) {
@@ -953,7 +953,7 @@ func (rbft *rbftImpl[T, Constraint]) verifySignedNewView(nv *consensus.NewView) 
 	if !ok {
 		return nil, fmt.Errorf("invalid node %d not in router", nv.GetReplicaId())
 	}
-	return hash, rbft.external.Verify(node.AccountAddress, nv.Signature, hash)
+	return hash, rbft.external.Verify(node.P2PNodeID, nv.Signature, hash)
 }
 
 func (rbft *rbftImpl[T, Constraint]) calculateNewViewHash(nv *consensus.NewView) ([]byte, error) {
