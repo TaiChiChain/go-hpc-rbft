@@ -976,3 +976,48 @@ func (rbft *rbftImpl[T, Constraint]) calculateNewViewHash(nv *consensus.NewView)
 	hash := hasher.Sum(nil)
 	return hash, nil
 }
+
+// PersistEpochQuorumCheckpoint persists QuorumCheckpoint or epoch to database
+func PersistEpochQuorumCheckpoint(storeEpochStateFn func(key string, value []byte) error, c *consensus.QuorumCheckpoint) error {
+	key := fmt.Sprintf("%s%d", EpochStatePrefix, c.Checkpoint.Epoch)
+	raw, err := c.MarshalVTStrict()
+	if err != nil {
+		return fmt.Errorf("Persist epoch %d quorum chkpt failed with marshal err: %s ", c.Checkpoint.Epoch, err)
+
+	}
+
+	if err = storeEpochStateFn(key, raw); err != nil {
+		return fmt.Errorf("persist epoch %d quorum chkpt failed with err: %s ", c.Checkpoint.Epoch, err)
+	}
+
+	// update latest epoch index
+	data := make([]byte, 8)
+	binary.BigEndian.PutUint64(data, c.Checkpoint.Epoch)
+	if err = storeEpochStateFn(EpochIndexKey, data); err != nil {
+		return fmt.Errorf("persist epoch index: %d failed with err: %s ", c.Checkpoint.Epoch, err)
+	}
+
+	return nil
+}
+
+func GetLatestEpochQuorumCheckpoint(getEpochStateFn func(key []byte) []byte) uint64 {
+	idxVal := getEpochStateFn([]byte("epoch." + EpochIndexKey))
+	if len(idxVal) == 0 {
+		return 0
+	}
+	return binary.BigEndian.Uint64(idxVal)
+}
+
+func GetEpochQuorumCheckpoint(getEpochStateFn func(key []byte) []byte, epoch uint64) (*consensus.QuorumCheckpoint, error) {
+	key := fmt.Sprintf("%s%d", EpochStatePrefix, epoch)
+
+	raw := getEpochStateFn([]byte("epoch." + key))
+	if len(raw) == 0 {
+		return nil, fmt.Errorf("epoch %d quorum checkpoint not found", epoch)
+	}
+	c := &consensus.QuorumCheckpoint{}
+	if err := c.UnmarshalVT(raw); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal epoch %d quorum chkpt:%s", epoch, err)
+	}
+	return c, nil
+}
