@@ -18,10 +18,13 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
+	"math"
+	"math/big"
 
 	"golang.org/x/crypto/sha3"
 
 	"github.com/axiomesh/axiom-kit/types"
+	eth_types "github.com/ethereum/go-ethereum/core/types"
 )
 
 var _ types.RbftTransaction = (*FltTransaction)(nil)
@@ -119,6 +122,10 @@ func (m *FltTransaction) RbftGetFrom() string {
 	return string(m.From)
 }
 
+func (m *FltTransaction) RbftGetTo() string {
+	return string(m.To)
+}
+
 func (m *FltTransaction) RbftGetTimeStamp() int64 {
 	return m.Timestamp
 }
@@ -146,4 +153,24 @@ func (m *FltTransaction) RbftIsConfigTx() bool {
 
 func (m *FltTransaction) RbftGetSize() int {
 	return m.SizeVT()
+}
+
+func (m *FltTransaction) RbftGetGasPrice() *big.Int {
+	return new(big.Int).SetUint64(math.MaxUint64)
+}
+
+func (m *FltTransaction) RbftGetGasLimit() uint64 {
+	return 10
+}
+
+func (m *FltTransaction) RbftGetGasFeeCap() *big.Int {
+	return big.NewInt(0)
+}
+
+func (m *FltTransaction) RbftGetValue() *big.Int {
+	return big.NewInt(0)
+}
+
+func (m *FltTransaction) RbftGetAccessList() eth_types.AccessList {
+	return nil
 }

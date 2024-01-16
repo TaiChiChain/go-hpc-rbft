@@ -3,7 +3,8 @@ module github.com/axiomesh/axiom-bft
 go 1.20
 
 require (
-	github.com/axiomesh/axiom-kit v0.0.3-0.20231220062524-2aaf8a5417a7
+	github.com/axiomesh/axiom-kit v0.0.3-0.20240117083453-f38bab992be0
+	github.com/ethereum/go-ethereum v1.12.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.16.0
 	github.com/samber/lo v1.38.1
@@ -27,7 +28,6 @@ require (
 	github.com/cockroachdb/redact v1.1.5 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.2.0 // indirect
-	github.com/ethereum/go-ethereum v1.12.0 // indirect
 	github.com/getsentry/sentry-go v0.22.0 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/holiman/uint256 v1.2.3 // indirect
