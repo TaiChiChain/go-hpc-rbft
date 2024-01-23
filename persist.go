@@ -496,7 +496,7 @@ func (rbft *rbftImpl[T, Constraint]) restoreView() {
 	if err == nil {
 		nv := &consensus.NewView{}
 		err = nv.UnmarshalVT(raw)
-		if err == nil {
+		if err == nil && nv.View != 0 {
 			rbft.logger.Debugf("Replica %d restore view %d", rbft.chainConfig.SelfID, nv.View)
 			rbft.vcMgr.latestNewView = nv
 			// restore ValidatorDynamicInfo
