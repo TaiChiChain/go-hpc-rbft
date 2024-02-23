@@ -19,9 +19,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/axiomesh/axiom-kit/txpool"
+
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/types"
-	"github.com/axiomesh/axiom-kit/txpool"
 )
 
 // executor manages exec related params
@@ -302,7 +303,7 @@ func (rbft *rbftImpl[T, Constraint]) handleCoreRbftEvent(e *LocalEvent) consensu
 		// restart batch timer when generate a batch
 		rbft.restartBatchTimer()
 		// has no pending request, it means no tx match the condition of generate batch, restart no tx batch timer
-		if rbft.config.GenesisEpochInfo.ConsensusParams.EnableTimedGenEmptyBlock && !rbft.batchMgr.noTxBatchTimerActive {
+		if rbft.chainConfig.EpochInfo.ConsensusParams.EnableTimedGenEmptyBlock && !rbft.batchMgr.noTxBatchTimerActive {
 			rbft.startNoTxBatchTimer()
 		}
 		return nil
