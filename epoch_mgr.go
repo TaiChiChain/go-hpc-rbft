@@ -172,6 +172,11 @@ func (rbft *rbftImpl[T, Constraint]) turnIntoEpoch() {
 	// set the latest epoch
 	rbft.updateEpochInfo(newEpoch)
 
+	// start a timer to generate empty block if it's enabled
+	if rbft.chainConfig.EpochInfo.ConsensusParams.EnableTimedGenEmptyBlock && !rbft.batchMgr.noTxBatchTimerActive {
+		rbft.startNoTxBatchTimer()
+	}
+
 	// initial view 0 in new epoch.
 	rbft.persistNewView(initialNewView, true)
 	rbft.logger.Infof("Replica %d persist view=%d after epoch change", rbft.chainConfig.SelfID, rbft.chainConfig.View)
