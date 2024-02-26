@@ -265,9 +265,9 @@ func (rbft *rbftImpl[T, Constraint]) handleCoreRbftEvent(e *LocalEvent) consensu
 		if rbft.batchMgr.requestPool.HasPendingRequestInPool() {
 			rbft.logger.Debugf("Primary %d batch timer expired, try to create a batch", rbft.chainConfig.SelfID)
 
-			rbft.stopNoTxBatchTimer()
 			// call requestPool module to generate a tx batch
 			if rbft.inPrimaryTerm() {
+				rbft.stopNoTxBatchTimer()
 				now := time.Now().UnixNano()
 				interval := time.Duration(now - rbft.batchMgr.lastBatchTime).Seconds()
 
@@ -297,18 +297,20 @@ func (rbft *rbftImpl[T, Constraint]) handleCoreRbftEvent(e *LocalEvent) consensu
 					rbft.batchMgr.lastBatchTime = now
 					rbft.postBatches([]*txpool.RequestHashBatch[T, Constraint]{batch})
 				}
+				// has no pending request, it means no tx match the condition of generate batch, restart no tx batch timer
+				if rbft.chainConfig.EpochInfo.ConsensusParams.EnableTimedGenEmptyBlock && !rbft.batchMgr.noTxBatchTimerActive && !rbft.batchMgr.requestPool.HasPendingRequestInPool() {
+					rbft.startNoTxBatchTimer()
+				}
 			}
 		}
 
 		// restart batch timer when generate a batch
 		rbft.restartBatchTimer()
-		// has no pending request, it means no tx match the condition of generate batch, restart no tx batch timer
-		if rbft.chainConfig.EpochInfo.ConsensusParams.EnableTimedGenEmptyBlock && !rbft.batchMgr.noTxBatchTimerActive {
-			rbft.startNoTxBatchTimer()
-		}
+
 		return nil
 
 	case CoreNoTxBatchTimerEvent:
+		rbft.stopNoTxBatchTimer()
 		if !rbft.chainConfig.isValidator() {
 			rbft.logger.Debugf("Replica %d is not validator, not process CoreNoTxBatchTimerEvent",
 				rbft.chainConfig.SelfID)
@@ -317,33 +319,27 @@ func (rbft *rbftImpl[T, Constraint]) handleCoreRbftEvent(e *LocalEvent) consensu
 
 		if !rbft.isNormal() {
 			rbft.logger.Debugf("Replica %d is in abnormal, not try to create a no-tx batch", rbft.chainConfig.SelfID)
-			rbft.stopNoTxBatchTimer()
 			return nil
 		}
 		if !rbft.isPrimary(rbft.chainConfig.SelfID) {
 			rbft.logger.Debugf("Replica %d is not primary, not try to create a no-tx batch", rbft.chainConfig.SelfID)
-			rbft.stopNoTxBatchTimer()
 			return nil
 		}
 		if !rbft.chainConfig.EpochInfo.ConsensusParams.EnableTimedGenEmptyBlock {
 			rbft.logger.Debugf("Replica %d is not support generate no-tx batch", rbft.chainConfig.SelfID)
-			rbft.stopNoTxBatchTimer()
 			return nil
 		}
 
 		if rbft.atomicIn(InConfChange) {
 			rbft.logger.Debugf("Replica %d is processing a config transaction, cannot generate no-tx batches", rbft.chainConfig.SelfID)
-			rbft.restartNoTxBatchTimer()
 			return nil
 		}
 
 		if len(rbft.batchMgr.cacheBatch) > 0 || rbft.batchMgr.requestPool.HasPendingRequestInPool() {
 			rbft.logger.Warningf("txpool is not empty, cannot generate no-tx batches", rbft.chainConfig.SelfID)
-			rbft.stopNoTxBatchTimer()
 			return nil
 		}
 		rbft.logger.Debugf("Primary %d no-tx batch timer expired, try to create a no-tx batch", rbft.chainConfig.SelfID)
-		rbft.stopNoTxBatchTimer()
 
 		// call requestPool module to generate a tx batch
 		if rbft.inPrimaryTerm() {
