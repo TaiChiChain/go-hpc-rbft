@@ -291,7 +291,16 @@ message EpochChange {
     // The slice of quorum checkpoints
     QuorumCheckpoint checkpoint = 1;
     // Help remote node sync from validators
-    repeated string validators = 2;
+    QuorumValidators validators = 2;
     // local node's quorum height
     uint64 low_watermark = 3;
+}
+
+message QuorumValidators {
+    repeated QuorumValidator validators = 1;
+}
+
+message QuorumValidator {
+    uint64 id = 1;
+    string peerId = 2;
 }

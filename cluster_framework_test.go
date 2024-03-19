@@ -559,14 +559,17 @@ func (ext *testExternal[T, Constraint]) SendFilterEvent(informType types.InformT
 			Signatures: signatures,
 		}
 
-		validator := make([]string, len(peerSet))
+		validator := make([]*consensus.QuorumValidator, len(peerSet))
 		for i, p := range peerSet {
-			validator[i] = p.P2PNodeID
+			validator[i] = &consensus.QuorumValidator{
+				Id:     p.ID,
+				PeerId: p.P2PNodeID,
+			}
 		}
 
 		epochChange := &consensus.EpochChange{
 			Checkpoint: quorumCheckpoint,
-			Validators: validator,
+			Validators: &consensus.QuorumValidators{Validators: validator},
 		}
 
 		if quorumCheckpoint.NeedUpdateEpoch() {
