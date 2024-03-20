@@ -81,12 +81,20 @@ func (rbft *rbftImpl[T, Constraint]) beyondRange(n uint64) bool {
 	return n > rbft.chainConfig.H+rbft.chainConfig.L || n > rbft.chainConfig.EpochInfo.StartBlock+rbft.chainConfig.EpochInfo.EpochPeriod-1
 }
 
-// inPrimaryTerm check is in primary term, only true can generate batch and send prePrepare
+// inPrimaryTerm check is in primary term, only true can send prePrepare
 func (rbft *rbftImpl[T, Constraint]) inPrimaryTerm() bool {
 	if !rbft.chainConfig.isProposerElectionTypeWRF() {
 		return rbft.batchMgr.seqNo < rbft.chainConfig.EpochInfo.StartBlock+rbft.chainConfig.EpochInfo.EpochPeriod-1
 	}
 	return rbft.batchMgr.seqNo < rbft.chainConfig.H+rbft.chainConfig.EpochInfo.ConsensusParams.CheckpointPeriod
+}
+
+// nextSeqNoInPrimaryTerm check is in primary term, only true can generate batch
+func (rbft *rbftImpl[T, Constraint]) nextSeqNoInPrimaryTerm() bool {
+	if !rbft.chainConfig.isProposerElectionTypeWRF() {
+		return rbft.batchMgr.seqNo+1 < rbft.chainConfig.EpochInfo.StartBlock+rbft.chainConfig.EpochInfo.EpochPeriod-1
+	}
+	return rbft.batchMgr.seqNo+1 < rbft.chainConfig.H+rbft.chainConfig.EpochInfo.ConsensusParams.CheckpointPeriod
 }
 
 // cleanAllBatchAndCert cleans all outstandingReqBatches and committedCert
