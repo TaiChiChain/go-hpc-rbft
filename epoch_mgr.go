@@ -399,11 +399,14 @@ func (em *epochManager) pagingGetEpochChangeProof(startEpoch, endEpoch, pageLimi
 			return nil, err
 		}
 
-		validators := make([]string, len(info.ValidatorSet))
+		validators := make([]*consensus.QuorumValidator, len(info.ValidatorSet))
 		for i, nodeInfo := range info.ValidatorSet {
-			validators[i] = nodeInfo.P2PNodeID
+			validators[i] = &consensus.QuorumValidator{
+				Id:     nodeInfo.ID,
+				PeerId: nodeInfo.P2PNodeID,
+			}
 		}
-		epochChanges = append(epochChanges, &consensus.EpochChange{Checkpoint: cp, Validators: validators})
+		epochChanges = append(epochChanges, &consensus.EpochChange{Checkpoint: cp, Validators: &consensus.QuorumValidators{Validators: validators}})
 	}
 
 	return &consensus.EpochChangeProof{

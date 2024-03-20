@@ -199,8 +199,8 @@ func (rbft *rbftImpl[T, Constraint]) handleNotifyGenBatchEvent() consensusEvent 
 		return nil
 	}
 
-	if !rbft.isPrimary(rbft.chainConfig.SelfID) {
-		rbft.logger.Debugf("Replica %d is not primary, ignore post batch signal", rbft.chainConfig.SelfID)
+	if !rbft.isPrimary(rbft.chainConfig.SelfID) || !rbft.nextSeqNoInPrimaryTerm() {
+		rbft.logger.Debugf("Replica %d is not in primary term, ignore post batch signal", rbft.chainConfig.SelfID)
 		return nil
 	}
 	rbft.stopBatchTimer()
