@@ -543,8 +543,11 @@ func (rbft *rbftImpl[T, Constraint]) getStatus() (status NodeStatus) {
 		status.Status = StateTransferring
 	case rbft.atomicIn(Pending):
 		status.Status = Pending
-	default:
+	case rbft.in(Normal):
 		status.Status = Normal
+	default:
+		// status is not equal to Normal
+		status.Status = 0
 	}
 
 	return
