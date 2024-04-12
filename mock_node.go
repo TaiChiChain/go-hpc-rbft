@@ -42,6 +42,49 @@ func (m *MockNode[T, Constraint]) EXPECT() *MockNodeMockRecorder[T, Constraint] 
 	return m.recorder
 }
 
+// ISGOMOCK indicates that this struct is a gomock mock.
+func (m *MockNode[T, Constraint]) ISGOMOCK() struct{} {
+	return struct{}{}
+}
+
+// ArchiveMode mocks base method.
+func (m *MockNode[T, Constraint]) ArchiveMode() bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ArchiveMode")
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// ArchiveMode indicates an expected call of ArchiveMode.
+func (mr *MockNodeMockRecorder[T, Constraint]) ArchiveMode() *MockNodeArchiveModeCall[T, Constraint] {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ArchiveMode", reflect.TypeOf((*MockNode[T, Constraint])(nil).ArchiveMode))
+	return &MockNodeArchiveModeCall[T, Constraint]{Call: call}
+}
+
+// MockNodeArchiveModeCall wrap *gomock.Call
+type MockNodeArchiveModeCall[T any, Constraint types0.TXConstraint[T]] struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockNodeArchiveModeCall[T, Constraint]) Return(arg0 bool) *MockNodeArchiveModeCall[T, Constraint] {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockNodeArchiveModeCall[T, Constraint]) Do(f func() bool) *MockNodeArchiveModeCall[T, Constraint] {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockNodeArchiveModeCall[T, Constraint]) DoAndReturn(f func() bool) *MockNodeArchiveModeCall[T, Constraint] {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // GetLowWatermark mocks base method.
 func (m *MockNode[T, Constraint]) GetLowWatermark() uint64 {
 	m.ctrl.T.Helper()
@@ -51,31 +94,31 @@ func (m *MockNode[T, Constraint]) GetLowWatermark() uint64 {
 }
 
 // GetLowWatermark indicates an expected call of GetLowWatermark.
-func (mr *MockNodeMockRecorder[T, Constraint]) GetLowWatermark() *NodeGetLowWatermarkCall[T, Constraint] {
+func (mr *MockNodeMockRecorder[T, Constraint]) GetLowWatermark() *MockNodeGetLowWatermarkCall[T, Constraint] {
 	mr.mock.ctrl.T.Helper()
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLowWatermark", reflect.TypeOf((*MockNode[T, Constraint])(nil).GetLowWatermark))
-	return &NodeGetLowWatermarkCall[T, Constraint]{Call: call}
+	return &MockNodeGetLowWatermarkCall[T, Constraint]{Call: call}
 }
 
-// NodeGetLowWatermarkCall wrap *gomock.Call
-type NodeGetLowWatermarkCall[T any, Constraint types0.TXConstraint[T]] struct {
+// MockNodeGetLowWatermarkCall wrap *gomock.Call
+type MockNodeGetLowWatermarkCall[T any, Constraint types0.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *NodeGetLowWatermarkCall[T, Constraint]) Return(arg0 uint64) *NodeGetLowWatermarkCall[T, Constraint] {
+func (c *MockNodeGetLowWatermarkCall[T, Constraint]) Return(arg0 uint64) *MockNodeGetLowWatermarkCall[T, Constraint] {
 	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *NodeGetLowWatermarkCall[T, Constraint]) Do(f func() uint64) *NodeGetLowWatermarkCall[T, Constraint] {
+func (c *MockNodeGetLowWatermarkCall[T, Constraint]) Do(f func() uint64) *MockNodeGetLowWatermarkCall[T, Constraint] {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *NodeGetLowWatermarkCall[T, Constraint]) DoAndReturn(f func() uint64) *NodeGetLowWatermarkCall[T, Constraint] {
+func (c *MockNodeGetLowWatermarkCall[T, Constraint]) DoAndReturn(f func() uint64) *MockNodeGetLowWatermarkCall[T, Constraint] {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -89,31 +132,31 @@ func (m *MockNode[T, Constraint]) GetUncommittedTransactions(maxsize uint64) []*
 }
 
 // GetUncommittedTransactions indicates an expected call of GetUncommittedTransactions.
-func (mr *MockNodeMockRecorder[T, Constraint]) GetUncommittedTransactions(maxsize any) *NodeGetUncommittedTransactionsCall[T, Constraint] {
+func (mr *MockNodeMockRecorder[T, Constraint]) GetUncommittedTransactions(maxsize any) *MockNodeGetUncommittedTransactionsCall[T, Constraint] {
 	mr.mock.ctrl.T.Helper()
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUncommittedTransactions", reflect.TypeOf((*MockNode[T, Constraint])(nil).GetUncommittedTransactions), maxsize)
-	return &NodeGetUncommittedTransactionsCall[T, Constraint]{Call: call}
+	return &MockNodeGetUncommittedTransactionsCall[T, Constraint]{Call: call}
 }
 
-// NodeGetUncommittedTransactionsCall wrap *gomock.Call
-type NodeGetUncommittedTransactionsCall[T any, Constraint types0.TXConstraint[T]] struct {
+// MockNodeGetUncommittedTransactionsCall wrap *gomock.Call
+type MockNodeGetUncommittedTransactionsCall[T any, Constraint types0.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *NodeGetUncommittedTransactionsCall[T, Constraint]) Return(arg0 []*T) *NodeGetUncommittedTransactionsCall[T, Constraint] {
+func (c *MockNodeGetUncommittedTransactionsCall[T, Constraint]) Return(arg0 []*T) *MockNodeGetUncommittedTransactionsCall[T, Constraint] {
 	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *NodeGetUncommittedTransactionsCall[T, Constraint]) Do(f func(uint64) []*T) *NodeGetUncommittedTransactionsCall[T, Constraint] {
+func (c *MockNodeGetUncommittedTransactionsCall[T, Constraint]) Do(f func(uint64) []*T) *MockNodeGetUncommittedTransactionsCall[T, Constraint] {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *NodeGetUncommittedTransactionsCall[T, Constraint]) DoAndReturn(f func(uint64) []*T) *NodeGetUncommittedTransactionsCall[T, Constraint] {
+func (c *MockNodeGetUncommittedTransactionsCall[T, Constraint]) DoAndReturn(f func(uint64) []*T) *MockNodeGetUncommittedTransactionsCall[T, Constraint] {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -127,69 +170,31 @@ func (m *MockNode[T, Constraint]) Init() error {
 }
 
 // Init indicates an expected call of Init.
-func (mr *MockNodeMockRecorder[T, Constraint]) Init() *NodeInitCall[T, Constraint] {
+func (mr *MockNodeMockRecorder[T, Constraint]) Init() *MockNodeInitCall[T, Constraint] {
 	mr.mock.ctrl.T.Helper()
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Init", reflect.TypeOf((*MockNode[T, Constraint])(nil).Init))
-	return &NodeInitCall[T, Constraint]{Call: call}
+	return &MockNodeInitCall[T, Constraint]{Call: call}
 }
 
-// NodeInitCall wrap *gomock.Call
-type NodeInitCall[T any, Constraint types0.TXConstraint[T]] struct {
+// MockNodeInitCall wrap *gomock.Call
+type MockNodeInitCall[T any, Constraint types0.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *NodeInitCall[T, Constraint]) Return(arg0 error) *NodeInitCall[T, Constraint] {
+func (c *MockNodeInitCall[T, Constraint]) Return(arg0 error) *MockNodeInitCall[T, Constraint] {
 	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *NodeInitCall[T, Constraint]) Do(f func() error) *NodeInitCall[T, Constraint] {
+func (c *MockNodeInitCall[T, Constraint]) Do(f func() error) *MockNodeInitCall[T, Constraint] {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *NodeInitCall[T, Constraint]) DoAndReturn(f func() error) *NodeInitCall[T, Constraint] {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// Propose mocks base method.
-func (m *MockNode[T, Constraint]) Propose(requests []*T, local bool) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Propose", requests, local)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Propose indicates an expected call of Propose.
-func (mr *MockNodeMockRecorder[T, Constraint]) Propose(requests, local any) *NodeProposeCall[T, Constraint] {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Propose", reflect.TypeOf((*MockNode[T, Constraint])(nil).Propose), requests, local)
-	return &NodeProposeCall[T, Constraint]{Call: call}
-}
-
-// NodeProposeCall wrap *gomock.Call
-type NodeProposeCall[T any, Constraint types0.TXConstraint[T]] struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *NodeProposeCall[T, Constraint]) Return(arg0 error) *NodeProposeCall[T, Constraint] {
-	c.Call = c.Call.Return(arg0)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *NodeProposeCall[T, Constraint]) Do(f func([]*T, bool) error) *NodeProposeCall[T, Constraint] {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *NodeProposeCall[T, Constraint]) DoAndReturn(f func([]*T, bool) error) *NodeProposeCall[T, Constraint] {
+func (c *MockNodeInitCall[T, Constraint]) DoAndReturn(f func() error) *MockNodeInitCall[T, Constraint] {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -201,31 +206,31 @@ func (m *MockNode[T, Constraint]) ReportExecuted(state *types.ServiceState) {
 }
 
 // ReportExecuted indicates an expected call of ReportExecuted.
-func (mr *MockNodeMockRecorder[T, Constraint]) ReportExecuted(state any) *NodeReportExecutedCall[T, Constraint] {
+func (mr *MockNodeMockRecorder[T, Constraint]) ReportExecuted(state any) *MockNodeReportExecutedCall[T, Constraint] {
 	mr.mock.ctrl.T.Helper()
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReportExecuted", reflect.TypeOf((*MockNode[T, Constraint])(nil).ReportExecuted), state)
-	return &NodeReportExecutedCall[T, Constraint]{Call: call}
+	return &MockNodeReportExecutedCall[T, Constraint]{Call: call}
 }
 
-// NodeReportExecutedCall wrap *gomock.Call
-type NodeReportExecutedCall[T any, Constraint types0.TXConstraint[T]] struct {
+// MockNodeReportExecutedCall wrap *gomock.Call
+type MockNodeReportExecutedCall[T any, Constraint types0.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *NodeReportExecutedCall[T, Constraint]) Return() *NodeReportExecutedCall[T, Constraint] {
+func (c *MockNodeReportExecutedCall[T, Constraint]) Return() *MockNodeReportExecutedCall[T, Constraint] {
 	c.Call = c.Call.Return()
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *NodeReportExecutedCall[T, Constraint]) Do(f func(*types.ServiceState)) *NodeReportExecutedCall[T, Constraint] {
+func (c *MockNodeReportExecutedCall[T, Constraint]) Do(f func(*types.ServiceState)) *MockNodeReportExecutedCall[T, Constraint] {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *NodeReportExecutedCall[T, Constraint]) DoAndReturn(f func(*types.ServiceState)) *NodeReportExecutedCall[T, Constraint] {
+func (c *MockNodeReportExecutedCall[T, Constraint]) DoAndReturn(f func(*types.ServiceState)) *MockNodeReportExecutedCall[T, Constraint] {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -237,31 +242,31 @@ func (m *MockNode[T, Constraint]) ReportStateUpdated(state *types.ServiceSyncSta
 }
 
 // ReportStateUpdated indicates an expected call of ReportStateUpdated.
-func (mr *MockNodeMockRecorder[T, Constraint]) ReportStateUpdated(state any) *NodeReportStateUpdatedCall[T, Constraint] {
+func (mr *MockNodeMockRecorder[T, Constraint]) ReportStateUpdated(state any) *MockNodeReportStateUpdatedCall[T, Constraint] {
 	mr.mock.ctrl.T.Helper()
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReportStateUpdated", reflect.TypeOf((*MockNode[T, Constraint])(nil).ReportStateUpdated), state)
-	return &NodeReportStateUpdatedCall[T, Constraint]{Call: call}
+	return &MockNodeReportStateUpdatedCall[T, Constraint]{Call: call}
 }
 
-// NodeReportStateUpdatedCall wrap *gomock.Call
-type NodeReportStateUpdatedCall[T any, Constraint types0.TXConstraint[T]] struct {
+// MockNodeReportStateUpdatedCall wrap *gomock.Call
+type MockNodeReportStateUpdatedCall[T any, Constraint types0.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *NodeReportStateUpdatedCall[T, Constraint]) Return() *NodeReportStateUpdatedCall[T, Constraint] {
+func (c *MockNodeReportStateUpdatedCall[T, Constraint]) Return() *MockNodeReportStateUpdatedCall[T, Constraint] {
 	c.Call = c.Call.Return()
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *NodeReportStateUpdatedCall[T, Constraint]) Do(f func(*types.ServiceSyncState)) *NodeReportStateUpdatedCall[T, Constraint] {
+func (c *MockNodeReportStateUpdatedCall[T, Constraint]) Do(f func(*types.ServiceSyncState)) *MockNodeReportStateUpdatedCall[T, Constraint] {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *NodeReportStateUpdatedCall[T, Constraint]) DoAndReturn(f func(*types.ServiceSyncState)) *NodeReportStateUpdatedCall[T, Constraint] {
+func (c *MockNodeReportStateUpdatedCall[T, Constraint]) DoAndReturn(f func(*types.ServiceSyncState)) *MockNodeReportStateUpdatedCall[T, Constraint] {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -275,31 +280,31 @@ func (m *MockNode[T, Constraint]) Start() error {
 }
 
 // Start indicates an expected call of Start.
-func (mr *MockNodeMockRecorder[T, Constraint]) Start() *NodeStartCall[T, Constraint] {
+func (mr *MockNodeMockRecorder[T, Constraint]) Start() *MockNodeStartCall[T, Constraint] {
 	mr.mock.ctrl.T.Helper()
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Start", reflect.TypeOf((*MockNode[T, Constraint])(nil).Start))
-	return &NodeStartCall[T, Constraint]{Call: call}
+	return &MockNodeStartCall[T, Constraint]{Call: call}
 }
 
-// NodeStartCall wrap *gomock.Call
-type NodeStartCall[T any, Constraint types0.TXConstraint[T]] struct {
+// MockNodeStartCall wrap *gomock.Call
+type MockNodeStartCall[T any, Constraint types0.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *NodeStartCall[T, Constraint]) Return(arg0 error) *NodeStartCall[T, Constraint] {
+func (c *MockNodeStartCall[T, Constraint]) Return(arg0 error) *MockNodeStartCall[T, Constraint] {
 	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *NodeStartCall[T, Constraint]) Do(f func() error) *NodeStartCall[T, Constraint] {
+func (c *MockNodeStartCall[T, Constraint]) Do(f func() error) *MockNodeStartCall[T, Constraint] {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *NodeStartCall[T, Constraint]) DoAndReturn(f func() error) *NodeStartCall[T, Constraint] {
+func (c *MockNodeStartCall[T, Constraint]) DoAndReturn(f func() error) *MockNodeStartCall[T, Constraint] {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -313,31 +318,31 @@ func (m *MockNode[T, Constraint]) Status() NodeStatus {
 }
 
 // Status indicates an expected call of Status.
-func (mr *MockNodeMockRecorder[T, Constraint]) Status() *NodeStatusCall[T, Constraint] {
+func (mr *MockNodeMockRecorder[T, Constraint]) Status() *MockNodeStatusCall[T, Constraint] {
 	mr.mock.ctrl.T.Helper()
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Status", reflect.TypeOf((*MockNode[T, Constraint])(nil).Status))
-	return &NodeStatusCall[T, Constraint]{Call: call}
+	return &MockNodeStatusCall[T, Constraint]{Call: call}
 }
 
-// NodeStatusCall wrap *gomock.Call
-type NodeStatusCall[T any, Constraint types0.TXConstraint[T]] struct {
+// MockNodeStatusCall wrap *gomock.Call
+type MockNodeStatusCall[T any, Constraint types0.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *NodeStatusCall[T, Constraint]) Return(arg0 NodeStatus) *NodeStatusCall[T, Constraint] {
+func (c *MockNodeStatusCall[T, Constraint]) Return(arg0 NodeStatus) *MockNodeStatusCall[T, Constraint] {
 	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *NodeStatusCall[T, Constraint]) Do(f func() NodeStatus) *NodeStatusCall[T, Constraint] {
+func (c *MockNodeStatusCall[T, Constraint]) Do(f func() NodeStatus) *MockNodeStatusCall[T, Constraint] {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *NodeStatusCall[T, Constraint]) DoAndReturn(f func() NodeStatus) *NodeStatusCall[T, Constraint] {
+func (c *MockNodeStatusCall[T, Constraint]) DoAndReturn(f func() NodeStatus) *MockNodeStatusCall[T, Constraint] {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -349,130 +354,67 @@ func (m *MockNode[T, Constraint]) Step(ctx context.Context, msg *consensus.Conse
 }
 
 // Step indicates an expected call of Step.
-func (mr *MockNodeMockRecorder[T, Constraint]) Step(ctx, msg any) *NodeStepCall[T, Constraint] {
+func (mr *MockNodeMockRecorder[T, Constraint]) Step(ctx, msg any) *MockNodeStepCall[T, Constraint] {
 	mr.mock.ctrl.T.Helper()
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Step", reflect.TypeOf((*MockNode[T, Constraint])(nil).Step), ctx, msg)
-	return &NodeStepCall[T, Constraint]{Call: call}
+	return &MockNodeStepCall[T, Constraint]{Call: call}
 }
 
-// NodeStepCall wrap *gomock.Call
-type NodeStepCall[T any, Constraint types0.TXConstraint[T]] struct {
+// MockNodeStepCall wrap *gomock.Call
+type MockNodeStepCall[T any, Constraint types0.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *NodeStepCall[T, Constraint]) Return() *NodeStepCall[T, Constraint] {
+func (c *MockNodeStepCall[T, Constraint]) Return() *MockNodeStepCall[T, Constraint] {
 	c.Call = c.Call.Return()
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *NodeStepCall[T, Constraint]) Do(f func(context.Context, *consensus.ConsensusMessage)) *NodeStepCall[T, Constraint] {
+func (c *MockNodeStepCall[T, Constraint]) Do(f func(context.Context, *consensus.ConsensusMessage)) *MockNodeStepCall[T, Constraint] {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *NodeStepCall[T, Constraint]) DoAndReturn(f func(context.Context, *consensus.ConsensusMessage)) *NodeStepCall[T, Constraint] {
+func (c *MockNodeStepCall[T, Constraint]) DoAndReturn(f func(context.Context, *consensus.ConsensusMessage)) *MockNodeStepCall[T, Constraint] {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
 
 // Stop mocks base method.
-func (m *MockNode[T, Constraint]) Stop() []*T {
+func (m *MockNode[T, Constraint]) Stop() {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Stop")
-	ret0, _ := ret[0].([]*T)
-	return ret0
+	m.ctrl.Call(m, "Stop")
 }
 
 // Stop indicates an expected call of Stop.
-func (mr *MockNodeMockRecorder[T, Constraint]) Stop() *NodeStopCall[T, Constraint] {
+func (mr *MockNodeMockRecorder[T, Constraint]) Stop() *MockNodeStopCall[T, Constraint] {
 	mr.mock.ctrl.T.Helper()
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Stop", reflect.TypeOf((*MockNode[T, Constraint])(nil).Stop))
-	return &NodeStopCall[T, Constraint]{Call: call}
+	return &MockNodeStopCall[T, Constraint]{Call: call}
 }
 
-// NodeStopCall wrap *gomock.Call
-type NodeStopCall[T any, Constraint types0.TXConstraint[T]] struct {
+// MockNodeStopCall wrap *gomock.Call
+type MockNodeStopCall[T any, Constraint types0.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *NodeStopCall[T, Constraint]) Return(arg0 []*T) *NodeStopCall[T, Constraint] {
-	c.Call = c.Call.Return(arg0)
+func (c *MockNodeStopCall[T, Constraint]) Return() *MockNodeStopCall[T, Constraint] {
+	c.Call = c.Call.Return()
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *NodeStopCall[T, Constraint]) Do(f func() []*T) *NodeStopCall[T, Constraint] {
+func (c *MockNodeStopCall[T, Constraint]) Do(f func()) *MockNodeStopCall[T, Constraint] {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *NodeStopCall[T, Constraint]) DoAndReturn(f func() []*T) *NodeStopCall[T, Constraint] {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// MockExternal is a mock of External interface.
-type MockExternal[T any, Constraint types0.TXConstraint[T]] struct {
-	ctrl     *gomock.Controller
-	recorder *MockExternalMockRecorder[T, Constraint]
-}
-
-// MockExternalMockRecorder is the mock recorder for MockExternal.
-type MockExternalMockRecorder[T any, Constraint types0.TXConstraint[T]] struct {
-	mock *MockExternal[T, Constraint]
-}
-
-// NewMockExternal creates a new mock instance.
-func NewMockExternal[T any, Constraint types0.TXConstraint[T]](ctrl *gomock.Controller) *MockExternal[T, Constraint] {
-	mock := &MockExternal[T, Constraint]{ctrl: ctrl}
-	mock.recorder = &MockExternalMockRecorder[T, Constraint]{mock}
-	return mock
-}
-
-// EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockExternal[T, Constraint]) EXPECT() *MockExternalMockRecorder[T, Constraint] {
-	return m.recorder
-}
-
-// GetLowWatermark mocks base method.
-func (m *MockExternal[T, Constraint]) GetLowWatermark() uint64 {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetLowWatermark")
-	ret0, _ := ret[0].(uint64)
-	return ret0
-}
-
-// GetLowWatermark indicates an expected call of GetLowWatermark.
-func (mr *MockExternalMockRecorder[T, Constraint]) GetLowWatermark() *ExternalGetLowWatermarkCall[T, Constraint] {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLowWatermark", reflect.TypeOf((*MockExternal[T, Constraint])(nil).GetLowWatermark))
-	return &ExternalGetLowWatermarkCall[T, Constraint]{Call: call}
-}
-
-// ExternalGetLowWatermarkCall wrap *gomock.Call
-type ExternalGetLowWatermarkCall[T any, Constraint types0.TXConstraint[T]] struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *ExternalGetLowWatermarkCall[T, Constraint]) Return(arg0 uint64) *ExternalGetLowWatermarkCall[T, Constraint] {
-	c.Call = c.Call.Return(arg0)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *ExternalGetLowWatermarkCall[T, Constraint]) Do(f func() uint64) *ExternalGetLowWatermarkCall[T, Constraint] {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *ExternalGetLowWatermarkCall[T, Constraint]) DoAndReturn(f func() uint64) *ExternalGetLowWatermarkCall[T, Constraint] {
+func (c *MockNodeStopCall[T, Constraint]) DoAndReturn(f func()) *MockNodeStopCall[T, Constraint] {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -500,6 +442,11 @@ func (m *MockServiceInbound) EXPECT() *MockServiceInboundMockRecorder {
 	return m.recorder
 }
 
+// ISGOMOCK indicates that this struct is a gomock mock.
+func (m *MockServiceInbound) ISGOMOCK() struct{} {
+	return struct{}{}
+}
+
 // ReportExecuted mocks base method.
 func (m *MockServiceInbound) ReportExecuted(state *types.ServiceState) {
 	m.ctrl.T.Helper()
@@ -507,31 +454,31 @@ func (m *MockServiceInbound) ReportExecuted(state *types.ServiceState) {
 }
 
 // ReportExecuted indicates an expected call of ReportExecuted.
-func (mr *MockServiceInboundMockRecorder) ReportExecuted(state any) *ServiceInboundReportExecutedCall {
+func (mr *MockServiceInboundMockRecorder) ReportExecuted(state any) *MockServiceInboundReportExecutedCall {
 	mr.mock.ctrl.T.Helper()
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReportExecuted", reflect.TypeOf((*MockServiceInbound)(nil).ReportExecuted), state)
-	return &ServiceInboundReportExecutedCall{Call: call}
+	return &MockServiceInboundReportExecutedCall{Call: call}
 }
 
-// ServiceInboundReportExecutedCall wrap *gomock.Call
-type ServiceInboundReportExecutedCall struct {
+// MockServiceInboundReportExecutedCall wrap *gomock.Call
+type MockServiceInboundReportExecutedCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *ServiceInboundReportExecutedCall) Return() *ServiceInboundReportExecutedCall {
+func (c *MockServiceInboundReportExecutedCall) Return() *MockServiceInboundReportExecutedCall {
 	c.Call = c.Call.Return()
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *ServiceInboundReportExecutedCall) Do(f func(*types.ServiceState)) *ServiceInboundReportExecutedCall {
+func (c *MockServiceInboundReportExecutedCall) Do(f func(*types.ServiceState)) *MockServiceInboundReportExecutedCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *ServiceInboundReportExecutedCall) DoAndReturn(f func(*types.ServiceState)) *ServiceInboundReportExecutedCall {
+func (c *MockServiceInboundReportExecutedCall) DoAndReturn(f func(*types.ServiceState)) *MockServiceInboundReportExecutedCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -543,31 +490,393 @@ func (m *MockServiceInbound) ReportStateUpdated(state *types.ServiceSyncState) {
 }
 
 // ReportStateUpdated indicates an expected call of ReportStateUpdated.
-func (mr *MockServiceInboundMockRecorder) ReportStateUpdated(state any) *ServiceInboundReportStateUpdatedCall {
+func (mr *MockServiceInboundMockRecorder) ReportStateUpdated(state any) *MockServiceInboundReportStateUpdatedCall {
 	mr.mock.ctrl.T.Helper()
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReportStateUpdated", reflect.TypeOf((*MockServiceInbound)(nil).ReportStateUpdated), state)
-	return &ServiceInboundReportStateUpdatedCall{Call: call}
+	return &MockServiceInboundReportStateUpdatedCall{Call: call}
 }
 
-// ServiceInboundReportStateUpdatedCall wrap *gomock.Call
-type ServiceInboundReportStateUpdatedCall struct {
+// MockServiceInboundReportStateUpdatedCall wrap *gomock.Call
+type MockServiceInboundReportStateUpdatedCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *ServiceInboundReportStateUpdatedCall) Return() *ServiceInboundReportStateUpdatedCall {
+func (c *MockServiceInboundReportStateUpdatedCall) Return() *MockServiceInboundReportStateUpdatedCall {
 	c.Call = c.Call.Return()
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *ServiceInboundReportStateUpdatedCall) Do(f func(*types.ServiceSyncState)) *ServiceInboundReportStateUpdatedCall {
+func (c *MockServiceInboundReportStateUpdatedCall) Do(f func(*types.ServiceSyncState)) *MockServiceInboundReportStateUpdatedCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *ServiceInboundReportStateUpdatedCall) DoAndReturn(f func(*types.ServiceSyncState)) *ServiceInboundReportStateUpdatedCall {
+func (c *MockServiceInboundReportStateUpdatedCall) DoAndReturn(f func(*types.ServiceSyncState)) *MockServiceInboundReportStateUpdatedCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// MockInboundNode is a mock of InboundNode interface.
+type MockInboundNode struct {
+	ctrl     *gomock.Controller
+	recorder *MockInboundNodeMockRecorder
+}
+
+// MockInboundNodeMockRecorder is the mock recorder for MockInboundNode.
+type MockInboundNodeMockRecorder struct {
+	mock *MockInboundNode
+}
+
+// NewMockInboundNode creates a new mock instance.
+func NewMockInboundNode(ctrl *gomock.Controller) *MockInboundNode {
+	mock := &MockInboundNode{ctrl: ctrl}
+	mock.recorder = &MockInboundNodeMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockInboundNode) EXPECT() *MockInboundNodeMockRecorder {
+	return m.recorder
+}
+
+// ISGOMOCK indicates that this struct is a gomock mock.
+func (m *MockInboundNode) ISGOMOCK() struct{} {
+	return struct{}{}
+}
+
+// ArchiveMode mocks base method.
+func (m *MockInboundNode) ArchiveMode() bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ArchiveMode")
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// ArchiveMode indicates an expected call of ArchiveMode.
+func (mr *MockInboundNodeMockRecorder) ArchiveMode() *MockInboundNodeArchiveModeCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ArchiveMode", reflect.TypeOf((*MockInboundNode)(nil).ArchiveMode))
+	return &MockInboundNodeArchiveModeCall{Call: call}
+}
+
+// MockInboundNodeArchiveModeCall wrap *gomock.Call
+type MockInboundNodeArchiveModeCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockInboundNodeArchiveModeCall) Return(arg0 bool) *MockInboundNodeArchiveModeCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockInboundNodeArchiveModeCall) Do(f func() bool) *MockInboundNodeArchiveModeCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockInboundNodeArchiveModeCall) DoAndReturn(f func() bool) *MockInboundNodeArchiveModeCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// GetLowWatermark mocks base method.
+func (m *MockInboundNode) GetLowWatermark() uint64 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetLowWatermark")
+	ret0, _ := ret[0].(uint64)
+	return ret0
+}
+
+// GetLowWatermark indicates an expected call of GetLowWatermark.
+func (mr *MockInboundNodeMockRecorder) GetLowWatermark() *MockInboundNodeGetLowWatermarkCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLowWatermark", reflect.TypeOf((*MockInboundNode)(nil).GetLowWatermark))
+	return &MockInboundNodeGetLowWatermarkCall{Call: call}
+}
+
+// MockInboundNodeGetLowWatermarkCall wrap *gomock.Call
+type MockInboundNodeGetLowWatermarkCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockInboundNodeGetLowWatermarkCall) Return(arg0 uint64) *MockInboundNodeGetLowWatermarkCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockInboundNodeGetLowWatermarkCall) Do(f func() uint64) *MockInboundNodeGetLowWatermarkCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockInboundNodeGetLowWatermarkCall) DoAndReturn(f func() uint64) *MockInboundNodeGetLowWatermarkCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// Init mocks base method.
+func (m *MockInboundNode) Init() error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Init")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Init indicates an expected call of Init.
+func (mr *MockInboundNodeMockRecorder) Init() *MockInboundNodeInitCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Init", reflect.TypeOf((*MockInboundNode)(nil).Init))
+	return &MockInboundNodeInitCall{Call: call}
+}
+
+// MockInboundNodeInitCall wrap *gomock.Call
+type MockInboundNodeInitCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockInboundNodeInitCall) Return(arg0 error) *MockInboundNodeInitCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockInboundNodeInitCall) Do(f func() error) *MockInboundNodeInitCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockInboundNodeInitCall) DoAndReturn(f func() error) *MockInboundNodeInitCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// ReportExecuted mocks base method.
+func (m *MockInboundNode) ReportExecuted(state *types.ServiceState) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "ReportExecuted", state)
+}
+
+// ReportExecuted indicates an expected call of ReportExecuted.
+func (mr *MockInboundNodeMockRecorder) ReportExecuted(state any) *MockInboundNodeReportExecutedCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReportExecuted", reflect.TypeOf((*MockInboundNode)(nil).ReportExecuted), state)
+	return &MockInboundNodeReportExecutedCall{Call: call}
+}
+
+// MockInboundNodeReportExecutedCall wrap *gomock.Call
+type MockInboundNodeReportExecutedCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockInboundNodeReportExecutedCall) Return() *MockInboundNodeReportExecutedCall {
+	c.Call = c.Call.Return()
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockInboundNodeReportExecutedCall) Do(f func(*types.ServiceState)) *MockInboundNodeReportExecutedCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockInboundNodeReportExecutedCall) DoAndReturn(f func(*types.ServiceState)) *MockInboundNodeReportExecutedCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// ReportStateUpdated mocks base method.
+func (m *MockInboundNode) ReportStateUpdated(state *types.ServiceSyncState) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "ReportStateUpdated", state)
+}
+
+// ReportStateUpdated indicates an expected call of ReportStateUpdated.
+func (mr *MockInboundNodeMockRecorder) ReportStateUpdated(state any) *MockInboundNodeReportStateUpdatedCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReportStateUpdated", reflect.TypeOf((*MockInboundNode)(nil).ReportStateUpdated), state)
+	return &MockInboundNodeReportStateUpdatedCall{Call: call}
+}
+
+// MockInboundNodeReportStateUpdatedCall wrap *gomock.Call
+type MockInboundNodeReportStateUpdatedCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockInboundNodeReportStateUpdatedCall) Return() *MockInboundNodeReportStateUpdatedCall {
+	c.Call = c.Call.Return()
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockInboundNodeReportStateUpdatedCall) Do(f func(*types.ServiceSyncState)) *MockInboundNodeReportStateUpdatedCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockInboundNodeReportStateUpdatedCall) DoAndReturn(f func(*types.ServiceSyncState)) *MockInboundNodeReportStateUpdatedCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// Start mocks base method.
+func (m *MockInboundNode) Start() error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Start")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Start indicates an expected call of Start.
+func (mr *MockInboundNodeMockRecorder) Start() *MockInboundNodeStartCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Start", reflect.TypeOf((*MockInboundNode)(nil).Start))
+	return &MockInboundNodeStartCall{Call: call}
+}
+
+// MockInboundNodeStartCall wrap *gomock.Call
+type MockInboundNodeStartCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockInboundNodeStartCall) Return(arg0 error) *MockInboundNodeStartCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockInboundNodeStartCall) Do(f func() error) *MockInboundNodeStartCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockInboundNodeStartCall) DoAndReturn(f func() error) *MockInboundNodeStartCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// Status mocks base method.
+func (m *MockInboundNode) Status() NodeStatus {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Status")
+	ret0, _ := ret[0].(NodeStatus)
+	return ret0
+}
+
+// Status indicates an expected call of Status.
+func (mr *MockInboundNodeMockRecorder) Status() *MockInboundNodeStatusCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Status", reflect.TypeOf((*MockInboundNode)(nil).Status))
+	return &MockInboundNodeStatusCall{Call: call}
+}
+
+// MockInboundNodeStatusCall wrap *gomock.Call
+type MockInboundNodeStatusCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockInboundNodeStatusCall) Return(arg0 NodeStatus) *MockInboundNodeStatusCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockInboundNodeStatusCall) Do(f func() NodeStatus) *MockInboundNodeStatusCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockInboundNodeStatusCall) DoAndReturn(f func() NodeStatus) *MockInboundNodeStatusCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// Step mocks base method.
+func (m *MockInboundNode) Step(ctx context.Context, msg *consensus.ConsensusMessage) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "Step", ctx, msg)
+}
+
+// Step indicates an expected call of Step.
+func (mr *MockInboundNodeMockRecorder) Step(ctx, msg any) *MockInboundNodeStepCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Step", reflect.TypeOf((*MockInboundNode)(nil).Step), ctx, msg)
+	return &MockInboundNodeStepCall{Call: call}
+}
+
+// MockInboundNodeStepCall wrap *gomock.Call
+type MockInboundNodeStepCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockInboundNodeStepCall) Return() *MockInboundNodeStepCall {
+	c.Call = c.Call.Return()
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockInboundNodeStepCall) Do(f func(context.Context, *consensus.ConsensusMessage)) *MockInboundNodeStepCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockInboundNodeStepCall) DoAndReturn(f func(context.Context, *consensus.ConsensusMessage)) *MockInboundNodeStepCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// Stop mocks base method.
+func (m *MockInboundNode) Stop() {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "Stop")
+}
+
+// Stop indicates an expected call of Stop.
+func (mr *MockInboundNodeMockRecorder) Stop() *MockInboundNodeStopCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Stop", reflect.TypeOf((*MockInboundNode)(nil).Stop))
+	return &MockInboundNodeStopCall{Call: call}
+}
+
+// MockInboundNodeStopCall wrap *gomock.Call
+type MockInboundNodeStopCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockInboundNodeStopCall) Return() *MockInboundNodeStopCall {
+	c.Call = c.Call.Return()
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockInboundNodeStopCall) Do(f func()) *MockInboundNodeStopCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockInboundNodeStopCall) DoAndReturn(f func()) *MockInboundNodeStopCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

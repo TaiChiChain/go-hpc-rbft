@@ -3,7 +3,7 @@ module github.com/axiomesh/axiom-bft
 go 1.20
 
 require (
-	github.com/axiomesh/axiom-kit v0.0.3-0.20240511111426-0c64cf298940
+	github.com/axiomesh/axiom-kit v0.0.3-0.20240514061514-4806bfc8e3a0
 	github.com/ethereum/go-ethereum v1.13.14
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.16.0

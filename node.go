@@ -29,37 +29,10 @@ import (
 //
 //go:generate mockgen -destination ./mock_node.go -package rbft -source ./node.go -typed
 type Node[T any, Constraint types2.TXConstraint[T]] interface {
-	// Init a RBFT node state.
-	Init() error
-
-	// Start starts a RBFT node instance.
-	Start() error
-
-	// Stop performs any necessary termination of the Node.
-	Stop() []*T
-
-	// Propose proposes requests to RBFT core, requests are ensured to be eventually
-	// submitted to all non-fault nodes unless current node crash down.
-	Propose(requests []*T, local bool) error
-
-	// Step advances the state machine using the given message.
-	Step(ctx context.Context, msg *consensus.ConsensusMessage)
-
-	// Status returns the current node status of the RBFT state machine.
-	Status() NodeStatus
+	InboundNode
 
 	// GetUncommittedTransactions returns uncommitted txs
 	GetUncommittedTransactions(maxsize uint64) []*T
-
-	// ServiceInbound receives and records modifications from application service.
-	ServiceInbound
-
-	External[T, Constraint]
-}
-
-type External[T any, Constraint types2.TXConstraint[T]] interface {
-	// GetLowWatermark return the low watermark of txpool
-	GetLowWatermark() uint64
 }
 
 // ServiceInbound receives and records modifications from application service which includes two events:
@@ -80,6 +53,29 @@ type ServiceInbound interface {
 	// Users must ReportStateUpdated after RBFT core invoked StateUpdate request no matter this request was
 	// finished successfully or not, otherwise, RBFT core will enter abnormal status infinitely.
 	ReportStateUpdated(state *types.ServiceSyncState)
+}
+
+type InboundNode interface {
+	// ServiceInbound receives and records modifications from application service.
+	ServiceInbound
+
+	Init() error
+	// Start starts a node instance.
+	Start() error
+
+	// Stop starts a node instance.
+	Stop()
+
+	// Step advances the state machine using the given message.
+	Step(ctx context.Context, msg *consensus.ConsensusMessage)
+
+	// Status returns the current node status of the node state machine.
+	Status() NodeStatus
+
+	// GetLowWatermark return the low watermark of txpool
+	GetLowWatermark() uint64
+
+	ArchiveMode() bool
 }
 
 // node implements the Node interface and track application service synchronously to help RBFT core
@@ -137,26 +133,13 @@ func (n *node[T, Constraint]) Start() error {
 }
 
 // Stop stops a Node instance.
-func (n *node[T, Constraint]) Stop() []*T {
+func (n *node[T, Constraint]) Stop() {
 	// stop RBFT core.
-	remainTxs := n.rbft.stop()
+	n.rbft.stop()
 
 	n.stateLock.Lock()
 	n.currentState = nil
 	n.stateLock.Unlock()
-
-	return remainTxs
-}
-
-// Propose proposes requests to RBFT core, requests are ensured to be eventually
-// submitted to all non-fault nodes unless current node crash down.
-func (n *node[T, Constraint]) Propose(requests []*T, local bool) error {
-	n.rbft.postRequests(&RequestSet[T, Constraint]{
-		Requests: requests,
-		Local:    local,
-	})
-
-	return nil
 }
 
 // Step advances the state machine using the given message.
@@ -172,6 +155,7 @@ func (n *node[T, Constraint]) ReportExecuted(state *types.ServiceState) {
 	if n.currentState == nil {
 		n.logger.Noticef("Init service state with: %s", state)
 		n.currentState = state
+		n.currentState.MetaState.BatchDigest = n.rbft.storeMgr.seqMap[state.MetaState.Height]
 		n.stateLock.Unlock()
 		return
 	}
@@ -183,6 +167,7 @@ func (n *node[T, Constraint]) ReportExecuted(state *types.ServiceState) {
 	}
 	n.logger.Debugf("Update service state: %s", state)
 	n.currentState = state
+	n.currentState.MetaState.BatchDigest = n.rbft.storeMgr.seqMap[state.MetaState.Height]
 	n.stateLock.Unlock()
 
 	// a config transaction executed or checkpoint, send state to checkpoint channel
@@ -200,8 +185,9 @@ func (n *node[T, Constraint]) ReportStateUpdated(state *types.ServiceSyncState) 
 			"larger than current state, received: %+v, current state: %+v", state, n.currentState)
 	}
 	n.currentState = &state.ServiceState
+	n.currentState.MetaState.BatchDigest = n.rbft.storeMgr.highStateTarget.checkpointSet[0].Checkpoint.ExecuteState.BatchDigest
 	n.stateLock.Unlock()
-
+	n.logger.Infof("Update current service state: %v", n.currentState)
 	n.rbft.reportStateUpdated(state)
 }
 
@@ -234,6 +220,10 @@ func (n *node[T, Constraint]) GetLowWatermark() uint64 {
 	n.rbft.postMsg(localEvent)
 
 	return <-getWatermarkReq.ch
+}
+
+func (n *node[T, Constraint]) ArchiveMode() bool {
+	return false
 }
 
 func (n *node[T, Constraint]) NotifyGenBatch(_ int) {

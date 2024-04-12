@@ -268,7 +268,13 @@ func (rbft *rbftImpl[T, Constraint]) initSyncState() consensusEvent {
 		return nil
 	}
 
-	signedCheckpoint, sErr := rbft.generateSignedCheckpoint(state, isConfigBatch(state.MetaState.Height, rbft.chainConfig.EpochInfo), false)
+	batchDigest, ok := rbft.storeMgr.seqMap[state.MetaState.Height]
+	if !ok {
+		rbft.logger.Warningf("Replica %d has a nil batch digest in state height %d", rbft.chainConfig.SelfID, state.MetaState.Height)
+		batchDigest = ""
+	}
+
+	signedCheckpoint, sErr := rbft.generateSignedCheckpoint(state, batchDigest, isConfigBatch(state.MetaState.Height, rbft.chainConfig.EpochInfo), false)
 	if sErr != nil {
 		rbft.logger.Errorf("Replica %d generate checkpoint error: %s", rbft.chainConfig.SelfID, sErr)
 		rbft.stopNamespace()
@@ -284,7 +290,7 @@ func (rbft *rbftImpl[T, Constraint]) initSyncState() consensusEvent {
 }
 
 func (rbft *rbftImpl[T, Constraint]) recvSyncState(sync *consensus.SyncState) consensusEvent {
-	rbft.logger.Debugf("Replica %d received sync state from replica %d", rbft.chainConfig.SelfID, sync.ReplicaId)
+	rbft.logger.Infof("Replica %d received sync state from replica %d", rbft.chainConfig.SelfID, sync.ReplicaId)
 
 	if !rbft.isNormal() {
 		rbft.logger.Debugf("Replica %d is in abnormal, don't send sync state response", rbft.chainConfig.SelfID)
@@ -297,7 +303,17 @@ func (rbft *rbftImpl[T, Constraint]) recvSyncState(sync *consensus.SyncState) co
 		rbft.logger.Warningf("Replica %d has a nil state", rbft.chainConfig.SelfID)
 		return nil
 	}
-	signedCheckpoint, sErr := rbft.generateSignedCheckpoint(state, isConfigBatch(state.MetaState.Height, rbft.chainConfig.EpochInfo), false)
+
+	batchDigest := state.MetaState.BatchDigest
+	if batchDigest == "" {
+		ckpt, exist := rbft.storeMgr.localCheckpoints[state.MetaState.Height]
+		if exist {
+			batchDigest = ckpt.Checkpoint.ExecuteState.BatchDigest
+		} else {
+			rbft.logger.Warningf("Replica %d has a nil batch digest in state height %d", rbft.chainConfig.SelfID, state.MetaState.Height)
+		}
+	}
+	signedCheckpoint, sErr := rbft.generateSignedCheckpoint(state, batchDigest, isConfigBatch(state.MetaState.Height, rbft.chainConfig.EpochInfo), false)
 	if sErr != nil {
 		rbft.logger.Errorf("Replica %d generate checkpoint error: %s", rbft.chainConfig.SelfID, sErr)
 		rbft.stopNamespace()

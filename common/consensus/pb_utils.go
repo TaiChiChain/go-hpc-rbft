@@ -49,6 +49,10 @@ func (m *Checkpoint) Digest() string {
 	return m.GetExecuteState().GetDigest()
 }
 
+func (m *Checkpoint) BatchDigest() string {
+	return m.GetExecuteState().GetBatchDigest()
+}
+
 // SetDigest set digest to checkpoint.
 func (m *Checkpoint) SetDigest(digest string) {
 	if m == nil {
@@ -71,7 +75,7 @@ func (m *Checkpoint) Pretty() string {
 	if m == nil {
 		return "NIL"
 	}
-	return fmt.Sprintf("{epoch: %d,  height: %d, hash: %s}", m.GetEpoch(), m.Height(), m.Digest())
+	return fmt.Sprintf("{epoch: %d,  height: %d, hash: %s, batchDigest: %s}", m.GetEpoch(), m.Height(), m.Digest(), m.BatchDigest())
 }
 
 // Equals compares two checkpoint instance and returns whether they are equal
@@ -245,4 +249,11 @@ func ValidatorDynamicInfoEqual(a []*NodeDynamicInfo, b []*NodeDynamicInfo) bool 
 		}
 	}
 	return true
+}
+
+var ConsensusMsgWhiteList = map[Type]bool{
+	Type_FETCH_MISSING_REQUEST: true,
+	Type_FETCH_CHECKPOINT:      true,
+	Type_FETCH_BATCH_REQUEST:   true,
+	Type_SYNC_STATE:            true,
 }

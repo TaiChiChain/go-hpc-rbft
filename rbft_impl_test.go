@@ -246,10 +246,10 @@ func TestRBFT_getStatus(t *testing.T) {
 	assert.Equal(t, InConfChange, int(status.Status))
 	rbfts[0].atomicOff(InConfChange)
 
-	rbfts[0].atomicOn(inEpochSyncing)
+	rbfts[0].atomicOn(InEpochSyncing)
 	status = rbfts[0].getStatus()
 	assert.Equal(t, InConfChange, int(status.Status))
-	rbfts[0].atomicOff(inEpochSyncing)
+	rbfts[0].atomicOff(InEpochSyncing)
 
 	rbfts[0].on(Normal)
 	status = rbfts[0].getStatus()
@@ -348,7 +348,7 @@ func TestRBFT_start_cache_message(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, false, rbfts[0].atomicIn(Pending))
 
-	rbfts[0].atomicOn(inEpochSyncing)
+	rbfts[0].atomicOn(InEpochSyncing)
 	correctMsg := &consensus.ConsensusMessage{
 		From:  2,
 		Epoch: 1,
@@ -536,7 +536,12 @@ func TestRBFT_recvFetchMissingResponse(t *testing.T) {
 
 	err = rbfts[0].recvFetchMissingRequest(context.TODO(), fetch)
 	assert.Nil(t, err)
-	assert.Nil(t, nodes[0].unicastMessageCache)
+	assert.Equal(t, consensus.Type_FETCH_MISSING_RESPONSE, nodes[0].unicastMessageCache.Type)
+	msg := nodes[0].unicastMessageCache.ConsensusMessage
+	resp := &consensus.FetchMissingResponse{}
+	err = resp.UnmarshalVT(msg.Payload)
+	assert.Nil(t, err)
+	assert.Equal(t, consensus.FetchMissingResponse_Failure, resp.Status)
 
 	rbfts[0].storeMgr.batchStore[fetch.BatchDigest] = &RequestBatch[consensus.FltTransaction, *consensus.FltTransaction]{
 		RequestHashList: []string{txHash},
