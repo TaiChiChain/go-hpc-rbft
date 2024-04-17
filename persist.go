@@ -467,16 +467,16 @@ func (rbft *rbftImpl[T, Constraint]) persistNewView(nv *consensus.NewView, isRec
 	}
 
 	if nv.View != 0 {
-		rbft.chainConfig.ValidatorDynamicInfoMap = lo.SliceToMap(nv.ValidatorDynamicInfo, func(v *consensus.NodeDynamicInfo) (uint64, *NodeDynamicInfo) {
-			return v.Id, &NodeDynamicInfo{
+		rbft.chainConfig.ValidatorDynamicInfoMap = lo.SliceToMap(nv.ValidatorDynamicInfo, func(v *consensus.NodeDynamicInfo) (uint64, *ValidatorInfo) {
+			return v.Id, &ValidatorInfo{
 				ID:                             v.Id,
 				ConsensusVotingPower:           v.ConsensusVotingPower,
 				ConsensusVotingPowerReduced:    v.ConsensusVotingPowerReduced,
 				ConsensusVotingPowerReduceView: v.ConsensusVotingPowerReduceView,
 			}
 		})
-		rbft.chainConfig.LastStableValidatorDynamicInfoMap = lo.SliceToMap(nv.ValidatorDynamicInfo, func(v *consensus.NodeDynamicInfo) (uint64, *NodeDynamicInfo) {
-			return v.Id, &NodeDynamicInfo{
+		rbft.chainConfig.LastStableValidatorDynamicInfoMap = lo.SliceToMap(nv.ValidatorDynamicInfo, func(v *consensus.NodeDynamicInfo) (uint64, *ValidatorInfo) {
+			return v.Id, &ValidatorInfo{
 				ID:                             v.Id,
 				ConsensusVotingPower:           v.ConsensusVotingPower,
 				ConsensusVotingPowerReduced:    v.ConsensusVotingPowerReduced,
@@ -501,16 +501,16 @@ func (rbft *rbftImpl[T, Constraint]) restoreView() {
 			rbft.logger.Debugf("Replica %d restore view %d", rbft.chainConfig.SelfID, nv.View)
 			rbft.vcMgr.latestNewView = nv
 			// restore ValidatorDynamicInfo
-			rbft.chainConfig.ValidatorDynamicInfoMap = lo.SliceToMap(nv.ValidatorDynamicInfo, func(v *consensus.NodeDynamicInfo) (uint64, *NodeDynamicInfo) {
-				return v.Id, &NodeDynamicInfo{
+			rbft.chainConfig.ValidatorDynamicInfoMap = lo.SliceToMap(nv.ValidatorDynamicInfo, func(v *consensus.NodeDynamicInfo) (uint64, *ValidatorInfo) {
+				return v.Id, &ValidatorInfo{
 					ID:                             v.Id,
 					ConsensusVotingPower:           v.ConsensusVotingPower,
 					ConsensusVotingPowerReduced:    v.ConsensusVotingPowerReduced,
 					ConsensusVotingPowerReduceView: v.ConsensusVotingPowerReduceView,
 				}
 			})
-			rbft.chainConfig.LastStableValidatorDynamicInfoMap = lo.SliceToMap(nv.ValidatorDynamicInfo, func(v *consensus.NodeDynamicInfo) (uint64, *NodeDynamicInfo) {
-				return v.Id, &NodeDynamicInfo{
+			rbft.chainConfig.LastStableValidatorDynamicInfoMap = lo.SliceToMap(nv.ValidatorDynamicInfo, func(v *consensus.NodeDynamicInfo) (uint64, *ValidatorInfo) {
+				return v.Id, &ValidatorInfo{
 					ID:                             v.Id,
 					ConsensusVotingPower:           v.ConsensusVotingPower,
 					ConsensusVotingPowerReduced:    v.ConsensusVotingPowerReduced,
@@ -587,7 +587,12 @@ func (rbft *rbftImpl[T, Constraint]) restoreState() error {
 
 	rbft.restoreEpochInfo()
 
-	if err := rbft.chainConfig.updateDerivedData(); err != nil {
+	validatorSet, err := rbft.external.GetValidatorSet()
+	if err != nil {
+		rbft.logger.Debugf("Replica %d failed to get current validator set from ledger: %v, will use genesis validator set", rbft.chainConfig.SelfID, err)
+		return err
+	}
+	if err := rbft.chainConfig.updateDerivedData(validatorSet); err != nil {
 		return err
 	}
 	rbft.batchMgr.setSeqNo(rbft.exec.lastExec)

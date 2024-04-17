@@ -51,31 +51,31 @@ func (m *MockStorage) DelState(key string) error {
 }
 
 // DelState indicates an expected call of DelState.
-func (mr *MockStorageMockRecorder) DelState(key any) *StorageDelStateCall {
+func (mr *MockStorageMockRecorder) DelState(key any) *MockStorageDelStateCall {
 	mr.mock.ctrl.T.Helper()
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DelState", reflect.TypeOf((*MockStorage)(nil).DelState), key)
-	return &StorageDelStateCall{Call: call}
+	return &MockStorageDelStateCall{Call: call}
 }
 
-// StorageDelStateCall wrap *gomock.Call
-type StorageDelStateCall struct {
+// MockStorageDelStateCall wrap *gomock.Call
+type MockStorageDelStateCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *StorageDelStateCall) Return(arg0 error) *StorageDelStateCall {
+func (c *MockStorageDelStateCall) Return(arg0 error) *MockStorageDelStateCall {
 	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *StorageDelStateCall) Do(f func(string) error) *StorageDelStateCall {
+func (c *MockStorageDelStateCall) Do(f func(string) error) *MockStorageDelStateCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *StorageDelStateCall) DoAndReturn(f func(string) error) *StorageDelStateCall {
+func (c *MockStorageDelStateCall) DoAndReturn(f func(string) error) *MockStorageDelStateCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -90,31 +90,31 @@ func (m *MockStorage) ReadState(key string) ([]byte, error) {
 }
 
 // ReadState indicates an expected call of ReadState.
-func (mr *MockStorageMockRecorder) ReadState(key any) *StorageReadStateCall {
+func (mr *MockStorageMockRecorder) ReadState(key any) *MockStorageReadStateCall {
 	mr.mock.ctrl.T.Helper()
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadState", reflect.TypeOf((*MockStorage)(nil).ReadState), key)
-	return &StorageReadStateCall{Call: call}
+	return &MockStorageReadStateCall{Call: call}
 }
 
-// StorageReadStateCall wrap *gomock.Call
-type StorageReadStateCall struct {
+// MockStorageReadStateCall wrap *gomock.Call
+type MockStorageReadStateCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *StorageReadStateCall) Return(arg0 []byte, arg1 error) *StorageReadStateCall {
+func (c *MockStorageReadStateCall) Return(arg0 []byte, arg1 error) *MockStorageReadStateCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *StorageReadStateCall) Do(f func(string) ([]byte, error)) *StorageReadStateCall {
+func (c *MockStorageReadStateCall) Do(f func(string) ([]byte, error)) *MockStorageReadStateCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *StorageReadStateCall) DoAndReturn(f func(string) ([]byte, error)) *StorageReadStateCall {
+func (c *MockStorageReadStateCall) DoAndReturn(f func(string) ([]byte, error)) *MockStorageReadStateCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -129,31 +129,31 @@ func (m *MockStorage) ReadStateSet(key string) (map[string][]byte, error) {
 }
 
 // ReadStateSet indicates an expected call of ReadStateSet.
-func (mr *MockStorageMockRecorder) ReadStateSet(key any) *StorageReadStateSetCall {
+func (mr *MockStorageMockRecorder) ReadStateSet(key any) *MockStorageReadStateSetCall {
 	mr.mock.ctrl.T.Helper()
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadStateSet", reflect.TypeOf((*MockStorage)(nil).ReadStateSet), key)
-	return &StorageReadStateSetCall{Call: call}
+	return &MockStorageReadStateSetCall{Call: call}
 }
 
-// StorageReadStateSetCall wrap *gomock.Call
-type StorageReadStateSetCall struct {
+// MockStorageReadStateSetCall wrap *gomock.Call
+type MockStorageReadStateSetCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *StorageReadStateSetCall) Return(arg0 map[string][]byte, arg1 error) *StorageReadStateSetCall {
+func (c *MockStorageReadStateSetCall) Return(arg0 map[string][]byte, arg1 error) *MockStorageReadStateSetCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *StorageReadStateSetCall) Do(f func(string) (map[string][]byte, error)) *StorageReadStateSetCall {
+func (c *MockStorageReadStateSetCall) Do(f func(string) (map[string][]byte, error)) *MockStorageReadStateSetCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *StorageReadStateSetCall) DoAndReturn(f func(string) (map[string][]byte, error)) *StorageReadStateSetCall {
+func (c *MockStorageReadStateSetCall) DoAndReturn(f func(string) (map[string][]byte, error)) *MockStorageReadStateSetCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -167,31 +167,31 @@ func (m *MockStorage) StoreState(key string, value []byte) error {
 }
 
 // StoreState indicates an expected call of StoreState.
-func (mr *MockStorageMockRecorder) StoreState(key, value any) *StorageStoreStateCall {
+func (mr *MockStorageMockRecorder) StoreState(key, value any) *MockStorageStoreStateCall {
 	mr.mock.ctrl.T.Helper()
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StoreState", reflect.TypeOf((*MockStorage)(nil).StoreState), key, value)
-	return &StorageStoreStateCall{Call: call}
+	return &MockStorageStoreStateCall{Call: call}
 }
 
-// StorageStoreStateCall wrap *gomock.Call
-type StorageStoreStateCall struct {
+// MockStorageStoreStateCall wrap *gomock.Call
+type MockStorageStoreStateCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *StorageStoreStateCall) Return(arg0 error) *StorageStoreStateCall {
+func (c *MockStorageStoreStateCall) Return(arg0 error) *MockStorageStoreStateCall {
 	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *StorageStoreStateCall) Do(f func(string, []byte) error) *StorageStoreStateCall {
+func (c *MockStorageStoreStateCall) Do(f func(string, []byte) error) *MockStorageStoreStateCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *StorageStoreStateCall) DoAndReturn(f func(string, []byte) error) *StorageStoreStateCall {
+func (c *MockStorageStoreStateCall) DoAndReturn(f func(string, []byte) error) *MockStorageStoreStateCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -228,31 +228,31 @@ func (m *MockNetwork) Broadcast(ctx context.Context, msg *consensus.ConsensusMes
 }
 
 // Broadcast indicates an expected call of Broadcast.
-func (mr *MockNetworkMockRecorder) Broadcast(ctx, msg any) *NetworkBroadcastCall {
+func (mr *MockNetworkMockRecorder) Broadcast(ctx, msg any) *MockNetworkBroadcastCall {
 	mr.mock.ctrl.T.Helper()
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Broadcast", reflect.TypeOf((*MockNetwork)(nil).Broadcast), ctx, msg)
-	return &NetworkBroadcastCall{Call: call}
+	return &MockNetworkBroadcastCall{Call: call}
 }
 
-// NetworkBroadcastCall wrap *gomock.Call
-type NetworkBroadcastCall struct {
+// MockNetworkBroadcastCall wrap *gomock.Call
+type MockNetworkBroadcastCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *NetworkBroadcastCall) Return(arg0 error) *NetworkBroadcastCall {
+func (c *MockNetworkBroadcastCall) Return(arg0 error) *MockNetworkBroadcastCall {
 	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *NetworkBroadcastCall) Do(f func(context.Context, *consensus.ConsensusMessage) error) *NetworkBroadcastCall {
+func (c *MockNetworkBroadcastCall) Do(f func(context.Context, *consensus.ConsensusMessage) error) *MockNetworkBroadcastCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *NetworkBroadcastCall) DoAndReturn(f func(context.Context, *consensus.ConsensusMessage) error) *NetworkBroadcastCall {
+func (c *MockNetworkBroadcastCall) DoAndReturn(f func(context.Context, *consensus.ConsensusMessage) error) *MockNetworkBroadcastCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -266,31 +266,31 @@ func (m *MockNetwork) Unicast(ctx context.Context, msg *consensus.ConsensusMessa
 }
 
 // Unicast indicates an expected call of Unicast.
-func (mr *MockNetworkMockRecorder) Unicast(ctx, msg, to any) *NetworkUnicastCall {
+func (mr *MockNetworkMockRecorder) Unicast(ctx, msg, to any) *MockNetworkUnicastCall {
 	mr.mock.ctrl.T.Helper()
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Unicast", reflect.TypeOf((*MockNetwork)(nil).Unicast), ctx, msg, to)
-	return &NetworkUnicastCall{Call: call}
+	return &MockNetworkUnicastCall{Call: call}
 }
 
-// NetworkUnicastCall wrap *gomock.Call
-type NetworkUnicastCall struct {
+// MockNetworkUnicastCall wrap *gomock.Call
+type MockNetworkUnicastCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *NetworkUnicastCall) Return(arg0 error) *NetworkUnicastCall {
+func (c *MockNetworkUnicastCall) Return(arg0 error) *MockNetworkUnicastCall {
 	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *NetworkUnicastCall) Do(f func(context.Context, *consensus.ConsensusMessage, string) error) *NetworkUnicastCall {
+func (c *MockNetworkUnicastCall) Do(f func(context.Context, *consensus.ConsensusMessage, string) error) *MockNetworkUnicastCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *NetworkUnicastCall) DoAndReturn(f func(context.Context, *consensus.ConsensusMessage, string) error) *NetworkUnicastCall {
+func (c *MockNetworkUnicastCall) DoAndReturn(f func(context.Context, *consensus.ConsensusMessage, string) error) *MockNetworkUnicastCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -328,69 +328,69 @@ func (m *MockCrypto) Sign(msg []byte) ([]byte, error) {
 }
 
 // Sign indicates an expected call of Sign.
-func (mr *MockCryptoMockRecorder) Sign(msg any) *CryptoSignCall {
+func (mr *MockCryptoMockRecorder) Sign(msg any) *MockCryptoSignCall {
 	mr.mock.ctrl.T.Helper()
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Sign", reflect.TypeOf((*MockCrypto)(nil).Sign), msg)
-	return &CryptoSignCall{Call: call}
+	return &MockCryptoSignCall{Call: call}
 }
 
-// CryptoSignCall wrap *gomock.Call
-type CryptoSignCall struct {
+// MockCryptoSignCall wrap *gomock.Call
+type MockCryptoSignCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *CryptoSignCall) Return(arg0 []byte, arg1 error) *CryptoSignCall {
+func (c *MockCryptoSignCall) Return(arg0 []byte, arg1 error) *MockCryptoSignCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *CryptoSignCall) Do(f func([]byte) ([]byte, error)) *CryptoSignCall {
+func (c *MockCryptoSignCall) Do(f func([]byte) ([]byte, error)) *MockCryptoSignCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *CryptoSignCall) DoAndReturn(f func([]byte) ([]byte, error)) *CryptoSignCall {
+func (c *MockCryptoSignCall) DoAndReturn(f func([]byte) ([]byte, error)) *MockCryptoSignCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
 
 // Verify mocks base method.
-func (m *MockCrypto) Verify(peerHash string, signature, msg []byte) error {
+func (m *MockCrypto) Verify(nodeID uint64, signature, msg []byte) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Verify", peerHash, signature, msg)
+	ret := m.ctrl.Call(m, "Verify", nodeID, signature, msg)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Verify indicates an expected call of Verify.
-func (mr *MockCryptoMockRecorder) Verify(peerHash, signature, msg any) *CryptoVerifyCall {
+func (mr *MockCryptoMockRecorder) Verify(nodeID, signature, msg any) *MockCryptoVerifyCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Verify", reflect.TypeOf((*MockCrypto)(nil).Verify), peerHash, signature, msg)
-	return &CryptoVerifyCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Verify", reflect.TypeOf((*MockCrypto)(nil).Verify), nodeID, signature, msg)
+	return &MockCryptoVerifyCall{Call: call}
 }
 
-// CryptoVerifyCall wrap *gomock.Call
-type CryptoVerifyCall struct {
+// MockCryptoVerifyCall wrap *gomock.Call
+type MockCryptoVerifyCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *CryptoVerifyCall) Return(arg0 error) *CryptoVerifyCall {
+func (c *MockCryptoVerifyCall) Return(arg0 error) *MockCryptoVerifyCall {
 	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *CryptoVerifyCall) Do(f func(string, []byte, []byte) error) *CryptoVerifyCall {
+func (c *MockCryptoVerifyCall) Do(f func(uint64, []byte, []byte) error) *MockCryptoVerifyCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *CryptoVerifyCall) DoAndReturn(f func(string, []byte, []byte) error) *CryptoVerifyCall {
+func (c *MockCryptoVerifyCall) DoAndReturn(f func(uint64, []byte, []byte) error) *MockCryptoVerifyCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -419,37 +419,37 @@ func (m *MockServiceOutbound[T, Constraint]) EXPECT() *MockServiceOutboundMockRe
 }
 
 // Execute mocks base method.
-func (m *MockServiceOutbound[T, Constraint]) Execute(txs []*T, localList []bool, seqNo uint64, timestamp int64, proposerAccount string, proposerNodeID uint64) {
+func (m *MockServiceOutbound[T, Constraint]) Execute(txs []*T, localList []bool, seqNo uint64, timestamp int64, proposerNodeID uint64) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Execute", txs, localList, seqNo, timestamp, proposerAccount, proposerNodeID)
+	m.ctrl.Call(m, "Execute", txs, localList, seqNo, timestamp, proposerNodeID)
 }
 
 // Execute indicates an expected call of Execute.
-func (mr *MockServiceOutboundMockRecorder[T, Constraint]) Execute(txs, localList, seqNo, timestamp, proposerAccount, proposerNodeID any) *ServiceOutboundExecuteCall[T, Constraint] {
+func (mr *MockServiceOutboundMockRecorder[T, Constraint]) Execute(txs, localList, seqNo, timestamp, proposerNodeID any) *MockServiceOutboundExecuteCall[T, Constraint] {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Execute", reflect.TypeOf((*MockServiceOutbound[T, Constraint])(nil).Execute), txs, localList, seqNo, timestamp, proposerAccount, proposerNodeID)
-	return &ServiceOutboundExecuteCall[T, Constraint]{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Execute", reflect.TypeOf((*MockServiceOutbound[T, Constraint])(nil).Execute), txs, localList, seqNo, timestamp, proposerNodeID)
+	return &MockServiceOutboundExecuteCall[T, Constraint]{Call: call}
 }
 
-// ServiceOutboundExecuteCall wrap *gomock.Call
-type ServiceOutboundExecuteCall[T any, Constraint types0.TXConstraint[T]] struct {
+// MockServiceOutboundExecuteCall wrap *gomock.Call
+type MockServiceOutboundExecuteCall[T any, Constraint types0.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *ServiceOutboundExecuteCall[T, Constraint]) Return() *ServiceOutboundExecuteCall[T, Constraint] {
+func (c *MockServiceOutboundExecuteCall[T, Constraint]) Return() *MockServiceOutboundExecuteCall[T, Constraint] {
 	c.Call = c.Call.Return()
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *ServiceOutboundExecuteCall[T, Constraint]) Do(f func([]*T, []bool, uint64, int64, string, uint64)) *ServiceOutboundExecuteCall[T, Constraint] {
+func (c *MockServiceOutboundExecuteCall[T, Constraint]) Do(f func([]*T, []bool, uint64, int64, uint64)) *MockServiceOutboundExecuteCall[T, Constraint] {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *ServiceOutboundExecuteCall[T, Constraint]) DoAndReturn(f func([]*T, []bool, uint64, int64, string, uint64)) *ServiceOutboundExecuteCall[T, Constraint] {
+func (c *MockServiceOutboundExecuteCall[T, Constraint]) DoAndReturn(f func([]*T, []bool, uint64, int64, uint64)) *MockServiceOutboundExecuteCall[T, Constraint] {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -465,32 +465,32 @@ func (m *MockServiceOutbound[T, Constraint]) SendFilterEvent(informType types.In
 }
 
 // SendFilterEvent indicates an expected call of SendFilterEvent.
-func (mr *MockServiceOutboundMockRecorder[T, Constraint]) SendFilterEvent(informType any, message ...any) *ServiceOutboundSendFilterEventCall[T, Constraint] {
+func (mr *MockServiceOutboundMockRecorder[T, Constraint]) SendFilterEvent(informType any, message ...any) *MockServiceOutboundSendFilterEventCall[T, Constraint] {
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{informType}, message...)
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendFilterEvent", reflect.TypeOf((*MockServiceOutbound[T, Constraint])(nil).SendFilterEvent), varargs...)
-	return &ServiceOutboundSendFilterEventCall[T, Constraint]{Call: call}
+	return &MockServiceOutboundSendFilterEventCall[T, Constraint]{Call: call}
 }
 
-// ServiceOutboundSendFilterEventCall wrap *gomock.Call
-type ServiceOutboundSendFilterEventCall[T any, Constraint types0.TXConstraint[T]] struct {
+// MockServiceOutboundSendFilterEventCall wrap *gomock.Call
+type MockServiceOutboundSendFilterEventCall[T any, Constraint types0.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *ServiceOutboundSendFilterEventCall[T, Constraint]) Return() *ServiceOutboundSendFilterEventCall[T, Constraint] {
+func (c *MockServiceOutboundSendFilterEventCall[T, Constraint]) Return() *MockServiceOutboundSendFilterEventCall[T, Constraint] {
 	c.Call = c.Call.Return()
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *ServiceOutboundSendFilterEventCall[T, Constraint]) Do(f func(types.InformType, ...any)) *ServiceOutboundSendFilterEventCall[T, Constraint] {
+func (c *MockServiceOutboundSendFilterEventCall[T, Constraint]) Do(f func(types.InformType, ...any)) *MockServiceOutboundSendFilterEventCall[T, Constraint] {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *ServiceOutboundSendFilterEventCall[T, Constraint]) DoAndReturn(f func(types.InformType, ...any)) *ServiceOutboundSendFilterEventCall[T, Constraint] {
+func (c *MockServiceOutboundSendFilterEventCall[T, Constraint]) DoAndReturn(f func(types.InformType, ...any)) *MockServiceOutboundSendFilterEventCall[T, Constraint] {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -506,32 +506,32 @@ func (m *MockServiceOutbound[T, Constraint]) StateUpdate(localLowWatermark, seqN
 }
 
 // StateUpdate indicates an expected call of StateUpdate.
-func (mr *MockServiceOutboundMockRecorder[T, Constraint]) StateUpdate(localLowWatermark, seqNo, digest, checkpoints any, epochChanges ...any) *ServiceOutboundStateUpdateCall[T, Constraint] {
+func (mr *MockServiceOutboundMockRecorder[T, Constraint]) StateUpdate(localLowWatermark, seqNo, digest, checkpoints any, epochChanges ...any) *MockServiceOutboundStateUpdateCall[T, Constraint] {
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{localLowWatermark, seqNo, digest, checkpoints}, epochChanges...)
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StateUpdate", reflect.TypeOf((*MockServiceOutbound[T, Constraint])(nil).StateUpdate), varargs...)
-	return &ServiceOutboundStateUpdateCall[T, Constraint]{Call: call}
+	return &MockServiceOutboundStateUpdateCall[T, Constraint]{Call: call}
 }
 
-// ServiceOutboundStateUpdateCall wrap *gomock.Call
-type ServiceOutboundStateUpdateCall[T any, Constraint types0.TXConstraint[T]] struct {
+// MockServiceOutboundStateUpdateCall wrap *gomock.Call
+type MockServiceOutboundStateUpdateCall[T any, Constraint types0.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *ServiceOutboundStateUpdateCall[T, Constraint]) Return() *ServiceOutboundStateUpdateCall[T, Constraint] {
+func (c *MockServiceOutboundStateUpdateCall[T, Constraint]) Return() *MockServiceOutboundStateUpdateCall[T, Constraint] {
 	c.Call = c.Call.Return()
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *ServiceOutboundStateUpdateCall[T, Constraint]) Do(f func(uint64, uint64, string, []*consensus.SignedCheckpoint, ...*consensus.EpochChange)) *ServiceOutboundStateUpdateCall[T, Constraint] {
+func (c *MockServiceOutboundStateUpdateCall[T, Constraint]) Do(f func(uint64, uint64, string, []*consensus.SignedCheckpoint, ...*consensus.EpochChange)) *MockServiceOutboundStateUpdateCall[T, Constraint] {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *ServiceOutboundStateUpdateCall[T, Constraint]) DoAndReturn(f func(uint64, uint64, string, []*consensus.SignedCheckpoint, ...*consensus.EpochChange)) *ServiceOutboundStateUpdateCall[T, Constraint] {
+func (c *MockServiceOutboundStateUpdateCall[T, Constraint]) DoAndReturn(f func(uint64, uint64, string, []*consensus.SignedCheckpoint, ...*consensus.EpochChange)) *MockServiceOutboundStateUpdateCall[T, Constraint] {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -560,79 +560,79 @@ func (m *MockEpochService) EXPECT() *MockEpochServiceMockRecorder {
 }
 
 // GetCurrentEpochInfo mocks base method.
-func (m *MockEpochService) GetCurrentEpochInfo() (*EpochInfo, error) {
+func (m *MockEpochService) GetCurrentEpochInfo() (*types0.EpochInfo, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetCurrentEpochInfo")
-	ret0, _ := ret[0].(*EpochInfo)
+	ret0, _ := ret[0].(*types0.EpochInfo)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetCurrentEpochInfo indicates an expected call of GetCurrentEpochInfo.
-func (mr *MockEpochServiceMockRecorder) GetCurrentEpochInfo() *EpochServiceGetCurrentEpochInfoCall {
+func (mr *MockEpochServiceMockRecorder) GetCurrentEpochInfo() *MockEpochServiceGetCurrentEpochInfoCall {
 	mr.mock.ctrl.T.Helper()
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentEpochInfo", reflect.TypeOf((*MockEpochService)(nil).GetCurrentEpochInfo))
-	return &EpochServiceGetCurrentEpochInfoCall{Call: call}
+	return &MockEpochServiceGetCurrentEpochInfoCall{Call: call}
 }
 
-// EpochServiceGetCurrentEpochInfoCall wrap *gomock.Call
-type EpochServiceGetCurrentEpochInfoCall struct {
+// MockEpochServiceGetCurrentEpochInfoCall wrap *gomock.Call
+type MockEpochServiceGetCurrentEpochInfoCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *EpochServiceGetCurrentEpochInfoCall) Return(arg0 *EpochInfo, arg1 error) *EpochServiceGetCurrentEpochInfoCall {
+func (c *MockEpochServiceGetCurrentEpochInfoCall) Return(arg0 *types0.EpochInfo, arg1 error) *MockEpochServiceGetCurrentEpochInfoCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *EpochServiceGetCurrentEpochInfoCall) Do(f func() (*EpochInfo, error)) *EpochServiceGetCurrentEpochInfoCall {
+func (c *MockEpochServiceGetCurrentEpochInfoCall) Do(f func() (*types0.EpochInfo, error)) *MockEpochServiceGetCurrentEpochInfoCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *EpochServiceGetCurrentEpochInfoCall) DoAndReturn(f func() (*EpochInfo, error)) *EpochServiceGetCurrentEpochInfoCall {
+func (c *MockEpochServiceGetCurrentEpochInfoCall) DoAndReturn(f func() (*types0.EpochInfo, error)) *MockEpochServiceGetCurrentEpochInfoCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
 
 // GetEpochInfo mocks base method.
-func (m *MockEpochService) GetEpochInfo(epoch uint64) (*EpochInfo, error) {
+func (m *MockEpochService) GetEpochInfo(epoch uint64) (*types0.EpochInfo, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetEpochInfo", epoch)
-	ret0, _ := ret[0].(*EpochInfo)
+	ret0, _ := ret[0].(*types0.EpochInfo)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetEpochInfo indicates an expected call of GetEpochInfo.
-func (mr *MockEpochServiceMockRecorder) GetEpochInfo(epoch any) *EpochServiceGetEpochInfoCall {
+func (mr *MockEpochServiceMockRecorder) GetEpochInfo(epoch any) *MockEpochServiceGetEpochInfoCall {
 	mr.mock.ctrl.T.Helper()
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEpochInfo", reflect.TypeOf((*MockEpochService)(nil).GetEpochInfo), epoch)
-	return &EpochServiceGetEpochInfoCall{Call: call}
+	return &MockEpochServiceGetEpochInfoCall{Call: call}
 }
 
-// EpochServiceGetEpochInfoCall wrap *gomock.Call
-type EpochServiceGetEpochInfoCall struct {
+// MockEpochServiceGetEpochInfoCall wrap *gomock.Call
+type MockEpochServiceGetEpochInfoCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *EpochServiceGetEpochInfoCall) Return(arg0 *EpochInfo, arg1 error) *EpochServiceGetEpochInfoCall {
+func (c *MockEpochServiceGetEpochInfoCall) Return(arg0 *types0.EpochInfo, arg1 error) *MockEpochServiceGetEpochInfoCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *EpochServiceGetEpochInfoCall) Do(f func(uint64) (*EpochInfo, error)) *EpochServiceGetEpochInfoCall {
+func (c *MockEpochServiceGetEpochInfoCall) Do(f func(uint64) (*types0.EpochInfo, error)) *MockEpochServiceGetEpochInfoCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *EpochServiceGetEpochInfoCall) DoAndReturn(f func(uint64) (*EpochInfo, error)) *EpochServiceGetEpochInfoCall {
+func (c *MockEpochServiceGetEpochInfoCall) DoAndReturn(f func(uint64) (*types0.EpochInfo, error)) *MockEpochServiceGetEpochInfoCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -647,31 +647,31 @@ func (m *MockEpochService) ReadEpochState(key string) ([]byte, error) {
 }
 
 // ReadEpochState indicates an expected call of ReadEpochState.
-func (mr *MockEpochServiceMockRecorder) ReadEpochState(key any) *EpochServiceReadEpochStateCall {
+func (mr *MockEpochServiceMockRecorder) ReadEpochState(key any) *MockEpochServiceReadEpochStateCall {
 	mr.mock.ctrl.T.Helper()
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadEpochState", reflect.TypeOf((*MockEpochService)(nil).ReadEpochState), key)
-	return &EpochServiceReadEpochStateCall{Call: call}
+	return &MockEpochServiceReadEpochStateCall{Call: call}
 }
 
-// EpochServiceReadEpochStateCall wrap *gomock.Call
-type EpochServiceReadEpochStateCall struct {
+// MockEpochServiceReadEpochStateCall wrap *gomock.Call
+type MockEpochServiceReadEpochStateCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *EpochServiceReadEpochStateCall) Return(arg0 []byte, arg1 error) *EpochServiceReadEpochStateCall {
+func (c *MockEpochServiceReadEpochStateCall) Return(arg0 []byte, arg1 error) *MockEpochServiceReadEpochStateCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *EpochServiceReadEpochStateCall) Do(f func(string) ([]byte, error)) *EpochServiceReadEpochStateCall {
+func (c *MockEpochServiceReadEpochStateCall) Do(f func(string) ([]byte, error)) *MockEpochServiceReadEpochStateCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *EpochServiceReadEpochStateCall) DoAndReturn(f func(string) ([]byte, error)) *EpochServiceReadEpochStateCall {
+func (c *MockEpochServiceReadEpochStateCall) DoAndReturn(f func(string) ([]byte, error)) *MockEpochServiceReadEpochStateCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -685,31 +685,171 @@ func (m *MockEpochService) StoreEpochState(key string, value []byte) error {
 }
 
 // StoreEpochState indicates an expected call of StoreEpochState.
-func (mr *MockEpochServiceMockRecorder) StoreEpochState(key, value any) *EpochServiceStoreEpochStateCall {
+func (mr *MockEpochServiceMockRecorder) StoreEpochState(key, value any) *MockEpochServiceStoreEpochStateCall {
 	mr.mock.ctrl.T.Helper()
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StoreEpochState", reflect.TypeOf((*MockEpochService)(nil).StoreEpochState), key, value)
-	return &EpochServiceStoreEpochStateCall{Call: call}
+	return &MockEpochServiceStoreEpochStateCall{Call: call}
 }
 
-// EpochServiceStoreEpochStateCall wrap *gomock.Call
-type EpochServiceStoreEpochStateCall struct {
+// MockEpochServiceStoreEpochStateCall wrap *gomock.Call
+type MockEpochServiceStoreEpochStateCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *EpochServiceStoreEpochStateCall) Return(arg0 error) *EpochServiceStoreEpochStateCall {
+func (c *MockEpochServiceStoreEpochStateCall) Return(arg0 error) *MockEpochServiceStoreEpochStateCall {
 	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *EpochServiceStoreEpochStateCall) Do(f func(string, []byte) error) *EpochServiceStoreEpochStateCall {
+func (c *MockEpochServiceStoreEpochStateCall) Do(f func(string, []byte) error) *MockEpochServiceStoreEpochStateCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *EpochServiceStoreEpochStateCall) DoAndReturn(f func(string, []byte) error) *EpochServiceStoreEpochStateCall {
+func (c *MockEpochServiceStoreEpochStateCall) DoAndReturn(f func(string, []byte) error) *MockEpochServiceStoreEpochStateCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// MockNodeService is a mock of NodeService interface.
+type MockNodeService struct {
+	ctrl     *gomock.Controller
+	recorder *MockNodeServiceMockRecorder
+}
+
+// MockNodeServiceMockRecorder is the mock recorder for MockNodeService.
+type MockNodeServiceMockRecorder struct {
+	mock *MockNodeService
+}
+
+// NewMockNodeService creates a new mock instance.
+func NewMockNodeService(ctrl *gomock.Controller) *MockNodeService {
+	mock := &MockNodeService{ctrl: ctrl}
+	mock.recorder = &MockNodeServiceMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockNodeService) EXPECT() *MockNodeServiceMockRecorder {
+	return m.recorder
+}
+
+// GetNodeIDByP2PID mocks base method.
+func (m *MockNodeService) GetNodeIDByP2PID(p2pID string) (uint64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNodeIDByP2PID", p2pID)
+	ret0, _ := ret[0].(uint64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetNodeIDByP2PID indicates an expected call of GetNodeIDByP2PID.
+func (mr *MockNodeServiceMockRecorder) GetNodeIDByP2PID(p2pID any) *MockNodeServiceGetNodeIDByP2PIDCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNodeIDByP2PID", reflect.TypeOf((*MockNodeService)(nil).GetNodeIDByP2PID), p2pID)
+	return &MockNodeServiceGetNodeIDByP2PIDCall{Call: call}
+}
+
+// MockNodeServiceGetNodeIDByP2PIDCall wrap *gomock.Call
+type MockNodeServiceGetNodeIDByP2PIDCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockNodeServiceGetNodeIDByP2PIDCall) Return(arg0 uint64, arg1 error) *MockNodeServiceGetNodeIDByP2PIDCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockNodeServiceGetNodeIDByP2PIDCall) Do(f func(string) (uint64, error)) *MockNodeServiceGetNodeIDByP2PIDCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockNodeServiceGetNodeIDByP2PIDCall) DoAndReturn(f func(string) (uint64, error)) *MockNodeServiceGetNodeIDByP2PIDCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// GetNodeInfo mocks base method.
+func (m *MockNodeService) GetNodeInfo(nodeID uint64) (*NodeInfo, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNodeInfo", nodeID)
+	ret0, _ := ret[0].(*NodeInfo)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetNodeInfo indicates an expected call of GetNodeInfo.
+func (mr *MockNodeServiceMockRecorder) GetNodeInfo(nodeID any) *MockNodeServiceGetNodeInfoCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNodeInfo", reflect.TypeOf((*MockNodeService)(nil).GetNodeInfo), nodeID)
+	return &MockNodeServiceGetNodeInfoCall{Call: call}
+}
+
+// MockNodeServiceGetNodeInfoCall wrap *gomock.Call
+type MockNodeServiceGetNodeInfoCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockNodeServiceGetNodeInfoCall) Return(arg0 *NodeInfo, arg1 error) *MockNodeServiceGetNodeInfoCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockNodeServiceGetNodeInfoCall) Do(f func(uint64) (*NodeInfo, error)) *MockNodeServiceGetNodeInfoCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockNodeServiceGetNodeInfoCall) DoAndReturn(f func(uint64) (*NodeInfo, error)) *MockNodeServiceGetNodeInfoCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// GetValidatorSet mocks base method.
+func (m *MockNodeService) GetValidatorSet() (map[uint64]int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetValidatorSet")
+	ret0, _ := ret[0].(map[uint64]int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetValidatorSet indicates an expected call of GetValidatorSet.
+func (mr *MockNodeServiceMockRecorder) GetValidatorSet() *MockNodeServiceGetValidatorSetCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetValidatorSet", reflect.TypeOf((*MockNodeService)(nil).GetValidatorSet))
+	return &MockNodeServiceGetValidatorSetCall{Call: call}
+}
+
+// MockNodeServiceGetValidatorSetCall wrap *gomock.Call
+type MockNodeServiceGetValidatorSetCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockNodeServiceGetValidatorSetCall) Return(arg0 map[uint64]int64, arg1 error) *MockNodeServiceGetValidatorSetCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockNodeServiceGetValidatorSetCall) Do(f func() (map[uint64]int64, error)) *MockNodeServiceGetValidatorSetCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockNodeServiceGetValidatorSetCall) DoAndReturn(f func() (map[uint64]int64, error)) *MockNodeServiceGetValidatorSetCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -747,31 +887,31 @@ func (m *MockLedger) GetBlockMeta(num uint64) (*types.BlockMeta, error) {
 }
 
 // GetBlockMeta indicates an expected call of GetBlockMeta.
-func (mr *MockLedgerMockRecorder) GetBlockMeta(num any) *LedgerGetBlockMetaCall {
+func (mr *MockLedgerMockRecorder) GetBlockMeta(num any) *MockLedgerGetBlockMetaCall {
 	mr.mock.ctrl.T.Helper()
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockMeta", reflect.TypeOf((*MockLedger)(nil).GetBlockMeta), num)
-	return &LedgerGetBlockMetaCall{Call: call}
+	return &MockLedgerGetBlockMetaCall{Call: call}
 }
 
-// LedgerGetBlockMetaCall wrap *gomock.Call
-type LedgerGetBlockMetaCall struct {
+// MockLedgerGetBlockMetaCall wrap *gomock.Call
+type MockLedgerGetBlockMetaCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *LedgerGetBlockMetaCall) Return(arg0 *types.BlockMeta, arg1 error) *LedgerGetBlockMetaCall {
+func (c *MockLedgerGetBlockMetaCall) Return(arg0 *types.BlockMeta, arg1 error) *MockLedgerGetBlockMetaCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *LedgerGetBlockMetaCall) Do(f func(uint64) (*types.BlockMeta, error)) *LedgerGetBlockMetaCall {
+func (c *MockLedgerGetBlockMetaCall) Do(f func(uint64) (*types.BlockMeta, error)) *MockLedgerGetBlockMetaCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *LedgerGetBlockMetaCall) DoAndReturn(f func(uint64) (*types.BlockMeta, error)) *LedgerGetBlockMetaCall {
+func (c *MockLedgerGetBlockMetaCall) DoAndReturn(f func(uint64) (*types.BlockMeta, error)) *MockLedgerGetBlockMetaCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -808,31 +948,31 @@ func (m *MockExternalStack[T, Constraint]) Broadcast(ctx context.Context, msg *c
 }
 
 // Broadcast indicates an expected call of Broadcast.
-func (mr *MockExternalStackMockRecorder[T, Constraint]) Broadcast(ctx, msg any) *ExternalStackBroadcastCall[T, Constraint] {
+func (mr *MockExternalStackMockRecorder[T, Constraint]) Broadcast(ctx, msg any) *MockExternalStackBroadcastCall[T, Constraint] {
 	mr.mock.ctrl.T.Helper()
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Broadcast", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).Broadcast), ctx, msg)
-	return &ExternalStackBroadcastCall[T, Constraint]{Call: call}
+	return &MockExternalStackBroadcastCall[T, Constraint]{Call: call}
 }
 
-// ExternalStackBroadcastCall wrap *gomock.Call
-type ExternalStackBroadcastCall[T any, Constraint types0.TXConstraint[T]] struct {
+// MockExternalStackBroadcastCall wrap *gomock.Call
+type MockExternalStackBroadcastCall[T any, Constraint types0.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *ExternalStackBroadcastCall[T, Constraint]) Return(arg0 error) *ExternalStackBroadcastCall[T, Constraint] {
+func (c *MockExternalStackBroadcastCall[T, Constraint]) Return(arg0 error) *MockExternalStackBroadcastCall[T, Constraint] {
 	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *ExternalStackBroadcastCall[T, Constraint]) Do(f func(context.Context, *consensus.ConsensusMessage) error) *ExternalStackBroadcastCall[T, Constraint] {
+func (c *MockExternalStackBroadcastCall[T, Constraint]) Do(f func(context.Context, *consensus.ConsensusMessage) error) *MockExternalStackBroadcastCall[T, Constraint] {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *ExternalStackBroadcastCall[T, Constraint]) DoAndReturn(f func(context.Context, *consensus.ConsensusMessage) error) *ExternalStackBroadcastCall[T, Constraint] {
+func (c *MockExternalStackBroadcastCall[T, Constraint]) DoAndReturn(f func(context.Context, *consensus.ConsensusMessage) error) *MockExternalStackBroadcastCall[T, Constraint] {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -846,67 +986,67 @@ func (m *MockExternalStack[T, Constraint]) DelState(key string) error {
 }
 
 // DelState indicates an expected call of DelState.
-func (mr *MockExternalStackMockRecorder[T, Constraint]) DelState(key any) *ExternalStackDelStateCall[T, Constraint] {
+func (mr *MockExternalStackMockRecorder[T, Constraint]) DelState(key any) *MockExternalStackDelStateCall[T, Constraint] {
 	mr.mock.ctrl.T.Helper()
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DelState", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).DelState), key)
-	return &ExternalStackDelStateCall[T, Constraint]{Call: call}
+	return &MockExternalStackDelStateCall[T, Constraint]{Call: call}
 }
 
-// ExternalStackDelStateCall wrap *gomock.Call
-type ExternalStackDelStateCall[T any, Constraint types0.TXConstraint[T]] struct {
+// MockExternalStackDelStateCall wrap *gomock.Call
+type MockExternalStackDelStateCall[T any, Constraint types0.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *ExternalStackDelStateCall[T, Constraint]) Return(arg0 error) *ExternalStackDelStateCall[T, Constraint] {
+func (c *MockExternalStackDelStateCall[T, Constraint]) Return(arg0 error) *MockExternalStackDelStateCall[T, Constraint] {
 	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *ExternalStackDelStateCall[T, Constraint]) Do(f func(string) error) *ExternalStackDelStateCall[T, Constraint] {
+func (c *MockExternalStackDelStateCall[T, Constraint]) Do(f func(string) error) *MockExternalStackDelStateCall[T, Constraint] {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *ExternalStackDelStateCall[T, Constraint]) DoAndReturn(f func(string) error) *ExternalStackDelStateCall[T, Constraint] {
+func (c *MockExternalStackDelStateCall[T, Constraint]) DoAndReturn(f func(string) error) *MockExternalStackDelStateCall[T, Constraint] {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
 
 // Execute mocks base method.
-func (m *MockExternalStack[T, Constraint]) Execute(txs []*T, localList []bool, seqNo uint64, timestamp int64, proposerAccount string, proposerNodeID uint64) {
+func (m *MockExternalStack[T, Constraint]) Execute(txs []*T, localList []bool, seqNo uint64, timestamp int64, proposerNodeID uint64) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Execute", txs, localList, seqNo, timestamp, proposerAccount, proposerNodeID)
+	m.ctrl.Call(m, "Execute", txs, localList, seqNo, timestamp, proposerNodeID)
 }
 
 // Execute indicates an expected call of Execute.
-func (mr *MockExternalStackMockRecorder[T, Constraint]) Execute(txs, localList, seqNo, timestamp, proposerAccount, proposerNodeID any) *ExternalStackExecuteCall[T, Constraint] {
+func (mr *MockExternalStackMockRecorder[T, Constraint]) Execute(txs, localList, seqNo, timestamp, proposerNodeID any) *MockExternalStackExecuteCall[T, Constraint] {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Execute", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).Execute), txs, localList, seqNo, timestamp, proposerAccount, proposerNodeID)
-	return &ExternalStackExecuteCall[T, Constraint]{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Execute", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).Execute), txs, localList, seqNo, timestamp, proposerNodeID)
+	return &MockExternalStackExecuteCall[T, Constraint]{Call: call}
 }
 
-// ExternalStackExecuteCall wrap *gomock.Call
-type ExternalStackExecuteCall[T any, Constraint types0.TXConstraint[T]] struct {
+// MockExternalStackExecuteCall wrap *gomock.Call
+type MockExternalStackExecuteCall[T any, Constraint types0.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *ExternalStackExecuteCall[T, Constraint]) Return() *ExternalStackExecuteCall[T, Constraint] {
+func (c *MockExternalStackExecuteCall[T, Constraint]) Return() *MockExternalStackExecuteCall[T, Constraint] {
 	c.Call = c.Call.Return()
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *ExternalStackExecuteCall[T, Constraint]) Do(f func([]*T, []bool, uint64, int64, string, uint64)) *ExternalStackExecuteCall[T, Constraint] {
+func (c *MockExternalStackExecuteCall[T, Constraint]) Do(f func([]*T, []bool, uint64, int64, uint64)) *MockExternalStackExecuteCall[T, Constraint] {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *ExternalStackExecuteCall[T, Constraint]) DoAndReturn(f func([]*T, []bool, uint64, int64, string, uint64)) *ExternalStackExecuteCall[T, Constraint] {
+func (c *MockExternalStackExecuteCall[T, Constraint]) DoAndReturn(f func([]*T, []bool, uint64, int64, uint64)) *MockExternalStackExecuteCall[T, Constraint] {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -921,109 +1061,226 @@ func (m *MockExternalStack[T, Constraint]) GetBlockMeta(num uint64) (*types.Bloc
 }
 
 // GetBlockMeta indicates an expected call of GetBlockMeta.
-func (mr *MockExternalStackMockRecorder[T, Constraint]) GetBlockMeta(num any) *ExternalStackGetBlockMetaCall[T, Constraint] {
+func (mr *MockExternalStackMockRecorder[T, Constraint]) GetBlockMeta(num any) *MockExternalStackGetBlockMetaCall[T, Constraint] {
 	mr.mock.ctrl.T.Helper()
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockMeta", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).GetBlockMeta), num)
-	return &ExternalStackGetBlockMetaCall[T, Constraint]{Call: call}
+	return &MockExternalStackGetBlockMetaCall[T, Constraint]{Call: call}
 }
 
-// ExternalStackGetBlockMetaCall wrap *gomock.Call
-type ExternalStackGetBlockMetaCall[T any, Constraint types0.TXConstraint[T]] struct {
+// MockExternalStackGetBlockMetaCall wrap *gomock.Call
+type MockExternalStackGetBlockMetaCall[T any, Constraint types0.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *ExternalStackGetBlockMetaCall[T, Constraint]) Return(arg0 *types.BlockMeta, arg1 error) *ExternalStackGetBlockMetaCall[T, Constraint] {
+func (c *MockExternalStackGetBlockMetaCall[T, Constraint]) Return(arg0 *types.BlockMeta, arg1 error) *MockExternalStackGetBlockMetaCall[T, Constraint] {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *ExternalStackGetBlockMetaCall[T, Constraint]) Do(f func(uint64) (*types.BlockMeta, error)) *ExternalStackGetBlockMetaCall[T, Constraint] {
+func (c *MockExternalStackGetBlockMetaCall[T, Constraint]) Do(f func(uint64) (*types.BlockMeta, error)) *MockExternalStackGetBlockMetaCall[T, Constraint] {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *ExternalStackGetBlockMetaCall[T, Constraint]) DoAndReturn(f func(uint64) (*types.BlockMeta, error)) *ExternalStackGetBlockMetaCall[T, Constraint] {
+func (c *MockExternalStackGetBlockMetaCall[T, Constraint]) DoAndReturn(f func(uint64) (*types.BlockMeta, error)) *MockExternalStackGetBlockMetaCall[T, Constraint] {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
 
 // GetCurrentEpochInfo mocks base method.
-func (m *MockExternalStack[T, Constraint]) GetCurrentEpochInfo() (*EpochInfo, error) {
+func (m *MockExternalStack[T, Constraint]) GetCurrentEpochInfo() (*types0.EpochInfo, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetCurrentEpochInfo")
-	ret0, _ := ret[0].(*EpochInfo)
+	ret0, _ := ret[0].(*types0.EpochInfo)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetCurrentEpochInfo indicates an expected call of GetCurrentEpochInfo.
-func (mr *MockExternalStackMockRecorder[T, Constraint]) GetCurrentEpochInfo() *ExternalStackGetCurrentEpochInfoCall[T, Constraint] {
+func (mr *MockExternalStackMockRecorder[T, Constraint]) GetCurrentEpochInfo() *MockExternalStackGetCurrentEpochInfoCall[T, Constraint] {
 	mr.mock.ctrl.T.Helper()
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentEpochInfo", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).GetCurrentEpochInfo))
-	return &ExternalStackGetCurrentEpochInfoCall[T, Constraint]{Call: call}
+	return &MockExternalStackGetCurrentEpochInfoCall[T, Constraint]{Call: call}
 }
 
-// ExternalStackGetCurrentEpochInfoCall wrap *gomock.Call
-type ExternalStackGetCurrentEpochInfoCall[T any, Constraint types0.TXConstraint[T]] struct {
+// MockExternalStackGetCurrentEpochInfoCall wrap *gomock.Call
+type MockExternalStackGetCurrentEpochInfoCall[T any, Constraint types0.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *ExternalStackGetCurrentEpochInfoCall[T, Constraint]) Return(arg0 *EpochInfo, arg1 error) *ExternalStackGetCurrentEpochInfoCall[T, Constraint] {
+func (c *MockExternalStackGetCurrentEpochInfoCall[T, Constraint]) Return(arg0 *types0.EpochInfo, arg1 error) *MockExternalStackGetCurrentEpochInfoCall[T, Constraint] {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *ExternalStackGetCurrentEpochInfoCall[T, Constraint]) Do(f func() (*EpochInfo, error)) *ExternalStackGetCurrentEpochInfoCall[T, Constraint] {
+func (c *MockExternalStackGetCurrentEpochInfoCall[T, Constraint]) Do(f func() (*types0.EpochInfo, error)) *MockExternalStackGetCurrentEpochInfoCall[T, Constraint] {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *ExternalStackGetCurrentEpochInfoCall[T, Constraint]) DoAndReturn(f func() (*EpochInfo, error)) *ExternalStackGetCurrentEpochInfoCall[T, Constraint] {
+func (c *MockExternalStackGetCurrentEpochInfoCall[T, Constraint]) DoAndReturn(f func() (*types0.EpochInfo, error)) *MockExternalStackGetCurrentEpochInfoCall[T, Constraint] {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
 
 // GetEpochInfo mocks base method.
-func (m *MockExternalStack[T, Constraint]) GetEpochInfo(epoch uint64) (*EpochInfo, error) {
+func (m *MockExternalStack[T, Constraint]) GetEpochInfo(epoch uint64) (*types0.EpochInfo, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetEpochInfo", epoch)
-	ret0, _ := ret[0].(*EpochInfo)
+	ret0, _ := ret[0].(*types0.EpochInfo)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetEpochInfo indicates an expected call of GetEpochInfo.
-func (mr *MockExternalStackMockRecorder[T, Constraint]) GetEpochInfo(epoch any) *ExternalStackGetEpochInfoCall[T, Constraint] {
+func (mr *MockExternalStackMockRecorder[T, Constraint]) GetEpochInfo(epoch any) *MockExternalStackGetEpochInfoCall[T, Constraint] {
 	mr.mock.ctrl.T.Helper()
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEpochInfo", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).GetEpochInfo), epoch)
-	return &ExternalStackGetEpochInfoCall[T, Constraint]{Call: call}
+	return &MockExternalStackGetEpochInfoCall[T, Constraint]{Call: call}
 }
 
-// ExternalStackGetEpochInfoCall wrap *gomock.Call
-type ExternalStackGetEpochInfoCall[T any, Constraint types0.TXConstraint[T]] struct {
+// MockExternalStackGetEpochInfoCall wrap *gomock.Call
+type MockExternalStackGetEpochInfoCall[T any, Constraint types0.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *ExternalStackGetEpochInfoCall[T, Constraint]) Return(arg0 *EpochInfo, arg1 error) *ExternalStackGetEpochInfoCall[T, Constraint] {
+func (c *MockExternalStackGetEpochInfoCall[T, Constraint]) Return(arg0 *types0.EpochInfo, arg1 error) *MockExternalStackGetEpochInfoCall[T, Constraint] {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *ExternalStackGetEpochInfoCall[T, Constraint]) Do(f func(uint64) (*EpochInfo, error)) *ExternalStackGetEpochInfoCall[T, Constraint] {
+func (c *MockExternalStackGetEpochInfoCall[T, Constraint]) Do(f func(uint64) (*types0.EpochInfo, error)) *MockExternalStackGetEpochInfoCall[T, Constraint] {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *ExternalStackGetEpochInfoCall[T, Constraint]) DoAndReturn(f func(uint64) (*EpochInfo, error)) *ExternalStackGetEpochInfoCall[T, Constraint] {
+func (c *MockExternalStackGetEpochInfoCall[T, Constraint]) DoAndReturn(f func(uint64) (*types0.EpochInfo, error)) *MockExternalStackGetEpochInfoCall[T, Constraint] {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// GetNodeIDByP2PID mocks base method.
+func (m *MockExternalStack[T, Constraint]) GetNodeIDByP2PID(p2pID string) (uint64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNodeIDByP2PID", p2pID)
+	ret0, _ := ret[0].(uint64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetNodeIDByP2PID indicates an expected call of GetNodeIDByP2PID.
+func (mr *MockExternalStackMockRecorder[T, Constraint]) GetNodeIDByP2PID(p2pID any) *MockExternalStackGetNodeIDByP2PIDCall[T, Constraint] {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNodeIDByP2PID", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).GetNodeIDByP2PID), p2pID)
+	return &MockExternalStackGetNodeIDByP2PIDCall[T, Constraint]{Call: call}
+}
+
+// MockExternalStackGetNodeIDByP2PIDCall wrap *gomock.Call
+type MockExternalStackGetNodeIDByP2PIDCall[T any, Constraint types0.TXConstraint[T]] struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockExternalStackGetNodeIDByP2PIDCall[T, Constraint]) Return(arg0 uint64, arg1 error) *MockExternalStackGetNodeIDByP2PIDCall[T, Constraint] {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockExternalStackGetNodeIDByP2PIDCall[T, Constraint]) Do(f func(string) (uint64, error)) *MockExternalStackGetNodeIDByP2PIDCall[T, Constraint] {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockExternalStackGetNodeIDByP2PIDCall[T, Constraint]) DoAndReturn(f func(string) (uint64, error)) *MockExternalStackGetNodeIDByP2PIDCall[T, Constraint] {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// GetNodeInfo mocks base method.
+func (m *MockExternalStack[T, Constraint]) GetNodeInfo(nodeID uint64) (*NodeInfo, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNodeInfo", nodeID)
+	ret0, _ := ret[0].(*NodeInfo)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetNodeInfo indicates an expected call of GetNodeInfo.
+func (mr *MockExternalStackMockRecorder[T, Constraint]) GetNodeInfo(nodeID any) *MockExternalStackGetNodeInfoCall[T, Constraint] {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNodeInfo", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).GetNodeInfo), nodeID)
+	return &MockExternalStackGetNodeInfoCall[T, Constraint]{Call: call}
+}
+
+// MockExternalStackGetNodeInfoCall wrap *gomock.Call
+type MockExternalStackGetNodeInfoCall[T any, Constraint types0.TXConstraint[T]] struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockExternalStackGetNodeInfoCall[T, Constraint]) Return(arg0 *NodeInfo, arg1 error) *MockExternalStackGetNodeInfoCall[T, Constraint] {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockExternalStackGetNodeInfoCall[T, Constraint]) Do(f func(uint64) (*NodeInfo, error)) *MockExternalStackGetNodeInfoCall[T, Constraint] {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockExternalStackGetNodeInfoCall[T, Constraint]) DoAndReturn(f func(uint64) (*NodeInfo, error)) *MockExternalStackGetNodeInfoCall[T, Constraint] {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// GetValidatorSet mocks base method.
+func (m *MockExternalStack[T, Constraint]) GetValidatorSet() (map[uint64]int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetValidatorSet")
+	ret0, _ := ret[0].(map[uint64]int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetValidatorSet indicates an expected call of GetValidatorSet.
+func (mr *MockExternalStackMockRecorder[T, Constraint]) GetValidatorSet() *MockExternalStackGetValidatorSetCall[T, Constraint] {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetValidatorSet", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).GetValidatorSet))
+	return &MockExternalStackGetValidatorSetCall[T, Constraint]{Call: call}
+}
+
+// MockExternalStackGetValidatorSetCall wrap *gomock.Call
+type MockExternalStackGetValidatorSetCall[T any, Constraint types0.TXConstraint[T]] struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockExternalStackGetValidatorSetCall[T, Constraint]) Return(arg0 map[uint64]int64, arg1 error) *MockExternalStackGetValidatorSetCall[T, Constraint] {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockExternalStackGetValidatorSetCall[T, Constraint]) Do(f func() (map[uint64]int64, error)) *MockExternalStackGetValidatorSetCall[T, Constraint] {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockExternalStackGetValidatorSetCall[T, Constraint]) DoAndReturn(f func() (map[uint64]int64, error)) *MockExternalStackGetValidatorSetCall[T, Constraint] {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -1038,31 +1295,31 @@ func (m *MockExternalStack[T, Constraint]) ReadEpochState(key string) ([]byte, e
 }
 
 // ReadEpochState indicates an expected call of ReadEpochState.
-func (mr *MockExternalStackMockRecorder[T, Constraint]) ReadEpochState(key any) *ExternalStackReadEpochStateCall[T, Constraint] {
+func (mr *MockExternalStackMockRecorder[T, Constraint]) ReadEpochState(key any) *MockExternalStackReadEpochStateCall[T, Constraint] {
 	mr.mock.ctrl.T.Helper()
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadEpochState", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).ReadEpochState), key)
-	return &ExternalStackReadEpochStateCall[T, Constraint]{Call: call}
+	return &MockExternalStackReadEpochStateCall[T, Constraint]{Call: call}
 }
 
-// ExternalStackReadEpochStateCall wrap *gomock.Call
-type ExternalStackReadEpochStateCall[T any, Constraint types0.TXConstraint[T]] struct {
+// MockExternalStackReadEpochStateCall wrap *gomock.Call
+type MockExternalStackReadEpochStateCall[T any, Constraint types0.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *ExternalStackReadEpochStateCall[T, Constraint]) Return(arg0 []byte, arg1 error) *ExternalStackReadEpochStateCall[T, Constraint] {
+func (c *MockExternalStackReadEpochStateCall[T, Constraint]) Return(arg0 []byte, arg1 error) *MockExternalStackReadEpochStateCall[T, Constraint] {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *ExternalStackReadEpochStateCall[T, Constraint]) Do(f func(string) ([]byte, error)) *ExternalStackReadEpochStateCall[T, Constraint] {
+func (c *MockExternalStackReadEpochStateCall[T, Constraint]) Do(f func(string) ([]byte, error)) *MockExternalStackReadEpochStateCall[T, Constraint] {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *ExternalStackReadEpochStateCall[T, Constraint]) DoAndReturn(f func(string) ([]byte, error)) *ExternalStackReadEpochStateCall[T, Constraint] {
+func (c *MockExternalStackReadEpochStateCall[T, Constraint]) DoAndReturn(f func(string) ([]byte, error)) *MockExternalStackReadEpochStateCall[T, Constraint] {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -1077,31 +1334,31 @@ func (m *MockExternalStack[T, Constraint]) ReadState(key string) ([]byte, error)
 }
 
 // ReadState indicates an expected call of ReadState.
-func (mr *MockExternalStackMockRecorder[T, Constraint]) ReadState(key any) *ExternalStackReadStateCall[T, Constraint] {
+func (mr *MockExternalStackMockRecorder[T, Constraint]) ReadState(key any) *MockExternalStackReadStateCall[T, Constraint] {
 	mr.mock.ctrl.T.Helper()
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadState", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).ReadState), key)
-	return &ExternalStackReadStateCall[T, Constraint]{Call: call}
+	return &MockExternalStackReadStateCall[T, Constraint]{Call: call}
 }
 
-// ExternalStackReadStateCall wrap *gomock.Call
-type ExternalStackReadStateCall[T any, Constraint types0.TXConstraint[T]] struct {
+// MockExternalStackReadStateCall wrap *gomock.Call
+type MockExternalStackReadStateCall[T any, Constraint types0.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *ExternalStackReadStateCall[T, Constraint]) Return(arg0 []byte, arg1 error) *ExternalStackReadStateCall[T, Constraint] {
+func (c *MockExternalStackReadStateCall[T, Constraint]) Return(arg0 []byte, arg1 error) *MockExternalStackReadStateCall[T, Constraint] {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *ExternalStackReadStateCall[T, Constraint]) Do(f func(string) ([]byte, error)) *ExternalStackReadStateCall[T, Constraint] {
+func (c *MockExternalStackReadStateCall[T, Constraint]) Do(f func(string) ([]byte, error)) *MockExternalStackReadStateCall[T, Constraint] {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *ExternalStackReadStateCall[T, Constraint]) DoAndReturn(f func(string) ([]byte, error)) *ExternalStackReadStateCall[T, Constraint] {
+func (c *MockExternalStackReadStateCall[T, Constraint]) DoAndReturn(f func(string) ([]byte, error)) *MockExternalStackReadStateCall[T, Constraint] {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -1116,31 +1373,31 @@ func (m *MockExternalStack[T, Constraint]) ReadStateSet(key string) (map[string]
 }
 
 // ReadStateSet indicates an expected call of ReadStateSet.
-func (mr *MockExternalStackMockRecorder[T, Constraint]) ReadStateSet(key any) *ExternalStackReadStateSetCall[T, Constraint] {
+func (mr *MockExternalStackMockRecorder[T, Constraint]) ReadStateSet(key any) *MockExternalStackReadStateSetCall[T, Constraint] {
 	mr.mock.ctrl.T.Helper()
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadStateSet", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).ReadStateSet), key)
-	return &ExternalStackReadStateSetCall[T, Constraint]{Call: call}
+	return &MockExternalStackReadStateSetCall[T, Constraint]{Call: call}
 }
 
-// ExternalStackReadStateSetCall wrap *gomock.Call
-type ExternalStackReadStateSetCall[T any, Constraint types0.TXConstraint[T]] struct {
+// MockExternalStackReadStateSetCall wrap *gomock.Call
+type MockExternalStackReadStateSetCall[T any, Constraint types0.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *ExternalStackReadStateSetCall[T, Constraint]) Return(arg0 map[string][]byte, arg1 error) *ExternalStackReadStateSetCall[T, Constraint] {
+func (c *MockExternalStackReadStateSetCall[T, Constraint]) Return(arg0 map[string][]byte, arg1 error) *MockExternalStackReadStateSetCall[T, Constraint] {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *ExternalStackReadStateSetCall[T, Constraint]) Do(f func(string) (map[string][]byte, error)) *ExternalStackReadStateSetCall[T, Constraint] {
+func (c *MockExternalStackReadStateSetCall[T, Constraint]) Do(f func(string) (map[string][]byte, error)) *MockExternalStackReadStateSetCall[T, Constraint] {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *ExternalStackReadStateSetCall[T, Constraint]) DoAndReturn(f func(string) (map[string][]byte, error)) *ExternalStackReadStateSetCall[T, Constraint] {
+func (c *MockExternalStackReadStateSetCall[T, Constraint]) DoAndReturn(f func(string) (map[string][]byte, error)) *MockExternalStackReadStateSetCall[T, Constraint] {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -1156,32 +1413,32 @@ func (m *MockExternalStack[T, Constraint]) SendFilterEvent(informType types.Info
 }
 
 // SendFilterEvent indicates an expected call of SendFilterEvent.
-func (mr *MockExternalStackMockRecorder[T, Constraint]) SendFilterEvent(informType any, message ...any) *ExternalStackSendFilterEventCall[T, Constraint] {
+func (mr *MockExternalStackMockRecorder[T, Constraint]) SendFilterEvent(informType any, message ...any) *MockExternalStackSendFilterEventCall[T, Constraint] {
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{informType}, message...)
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendFilterEvent", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).SendFilterEvent), varargs...)
-	return &ExternalStackSendFilterEventCall[T, Constraint]{Call: call}
+	return &MockExternalStackSendFilterEventCall[T, Constraint]{Call: call}
 }
 
-// ExternalStackSendFilterEventCall wrap *gomock.Call
-type ExternalStackSendFilterEventCall[T any, Constraint types0.TXConstraint[T]] struct {
+// MockExternalStackSendFilterEventCall wrap *gomock.Call
+type MockExternalStackSendFilterEventCall[T any, Constraint types0.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *ExternalStackSendFilterEventCall[T, Constraint]) Return() *ExternalStackSendFilterEventCall[T, Constraint] {
+func (c *MockExternalStackSendFilterEventCall[T, Constraint]) Return() *MockExternalStackSendFilterEventCall[T, Constraint] {
 	c.Call = c.Call.Return()
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *ExternalStackSendFilterEventCall[T, Constraint]) Do(f func(types.InformType, ...any)) *ExternalStackSendFilterEventCall[T, Constraint] {
+func (c *MockExternalStackSendFilterEventCall[T, Constraint]) Do(f func(types.InformType, ...any)) *MockExternalStackSendFilterEventCall[T, Constraint] {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *ExternalStackSendFilterEventCall[T, Constraint]) DoAndReturn(f func(types.InformType, ...any)) *ExternalStackSendFilterEventCall[T, Constraint] {
+func (c *MockExternalStackSendFilterEventCall[T, Constraint]) DoAndReturn(f func(types.InformType, ...any)) *MockExternalStackSendFilterEventCall[T, Constraint] {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -1196,31 +1453,31 @@ func (m *MockExternalStack[T, Constraint]) Sign(msg []byte) ([]byte, error) {
 }
 
 // Sign indicates an expected call of Sign.
-func (mr *MockExternalStackMockRecorder[T, Constraint]) Sign(msg any) *ExternalStackSignCall[T, Constraint] {
+func (mr *MockExternalStackMockRecorder[T, Constraint]) Sign(msg any) *MockExternalStackSignCall[T, Constraint] {
 	mr.mock.ctrl.T.Helper()
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Sign", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).Sign), msg)
-	return &ExternalStackSignCall[T, Constraint]{Call: call}
+	return &MockExternalStackSignCall[T, Constraint]{Call: call}
 }
 
-// ExternalStackSignCall wrap *gomock.Call
-type ExternalStackSignCall[T any, Constraint types0.TXConstraint[T]] struct {
+// MockExternalStackSignCall wrap *gomock.Call
+type MockExternalStackSignCall[T any, Constraint types0.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *ExternalStackSignCall[T, Constraint]) Return(arg0 []byte, arg1 error) *ExternalStackSignCall[T, Constraint] {
+func (c *MockExternalStackSignCall[T, Constraint]) Return(arg0 []byte, arg1 error) *MockExternalStackSignCall[T, Constraint] {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *ExternalStackSignCall[T, Constraint]) Do(f func([]byte) ([]byte, error)) *ExternalStackSignCall[T, Constraint] {
+func (c *MockExternalStackSignCall[T, Constraint]) Do(f func([]byte) ([]byte, error)) *MockExternalStackSignCall[T, Constraint] {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *ExternalStackSignCall[T, Constraint]) DoAndReturn(f func([]byte) ([]byte, error)) *ExternalStackSignCall[T, Constraint] {
+func (c *MockExternalStackSignCall[T, Constraint]) DoAndReturn(f func([]byte) ([]byte, error)) *MockExternalStackSignCall[T, Constraint] {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -1236,32 +1493,32 @@ func (m *MockExternalStack[T, Constraint]) StateUpdate(localLowWatermark, seqNo 
 }
 
 // StateUpdate indicates an expected call of StateUpdate.
-func (mr *MockExternalStackMockRecorder[T, Constraint]) StateUpdate(localLowWatermark, seqNo, digest, checkpoints any, epochChanges ...any) *ExternalStackStateUpdateCall[T, Constraint] {
+func (mr *MockExternalStackMockRecorder[T, Constraint]) StateUpdate(localLowWatermark, seqNo, digest, checkpoints any, epochChanges ...any) *MockExternalStackStateUpdateCall[T, Constraint] {
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{localLowWatermark, seqNo, digest, checkpoints}, epochChanges...)
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StateUpdate", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).StateUpdate), varargs...)
-	return &ExternalStackStateUpdateCall[T, Constraint]{Call: call}
+	return &MockExternalStackStateUpdateCall[T, Constraint]{Call: call}
 }
 
-// ExternalStackStateUpdateCall wrap *gomock.Call
-type ExternalStackStateUpdateCall[T any, Constraint types0.TXConstraint[T]] struct {
+// MockExternalStackStateUpdateCall wrap *gomock.Call
+type MockExternalStackStateUpdateCall[T any, Constraint types0.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *ExternalStackStateUpdateCall[T, Constraint]) Return() *ExternalStackStateUpdateCall[T, Constraint] {
+func (c *MockExternalStackStateUpdateCall[T, Constraint]) Return() *MockExternalStackStateUpdateCall[T, Constraint] {
 	c.Call = c.Call.Return()
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *ExternalStackStateUpdateCall[T, Constraint]) Do(f func(uint64, uint64, string, []*consensus.SignedCheckpoint, ...*consensus.EpochChange)) *ExternalStackStateUpdateCall[T, Constraint] {
+func (c *MockExternalStackStateUpdateCall[T, Constraint]) Do(f func(uint64, uint64, string, []*consensus.SignedCheckpoint, ...*consensus.EpochChange)) *MockExternalStackStateUpdateCall[T, Constraint] {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *ExternalStackStateUpdateCall[T, Constraint]) DoAndReturn(f func(uint64, uint64, string, []*consensus.SignedCheckpoint, ...*consensus.EpochChange)) *ExternalStackStateUpdateCall[T, Constraint] {
+func (c *MockExternalStackStateUpdateCall[T, Constraint]) DoAndReturn(f func(uint64, uint64, string, []*consensus.SignedCheckpoint, ...*consensus.EpochChange)) *MockExternalStackStateUpdateCall[T, Constraint] {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -1275,31 +1532,31 @@ func (m *MockExternalStack[T, Constraint]) StoreEpochState(key string, value []b
 }
 
 // StoreEpochState indicates an expected call of StoreEpochState.
-func (mr *MockExternalStackMockRecorder[T, Constraint]) StoreEpochState(key, value any) *ExternalStackStoreEpochStateCall[T, Constraint] {
+func (mr *MockExternalStackMockRecorder[T, Constraint]) StoreEpochState(key, value any) *MockExternalStackStoreEpochStateCall[T, Constraint] {
 	mr.mock.ctrl.T.Helper()
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StoreEpochState", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).StoreEpochState), key, value)
-	return &ExternalStackStoreEpochStateCall[T, Constraint]{Call: call}
+	return &MockExternalStackStoreEpochStateCall[T, Constraint]{Call: call}
 }
 
-// ExternalStackStoreEpochStateCall wrap *gomock.Call
-type ExternalStackStoreEpochStateCall[T any, Constraint types0.TXConstraint[T]] struct {
+// MockExternalStackStoreEpochStateCall wrap *gomock.Call
+type MockExternalStackStoreEpochStateCall[T any, Constraint types0.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *ExternalStackStoreEpochStateCall[T, Constraint]) Return(arg0 error) *ExternalStackStoreEpochStateCall[T, Constraint] {
+func (c *MockExternalStackStoreEpochStateCall[T, Constraint]) Return(arg0 error) *MockExternalStackStoreEpochStateCall[T, Constraint] {
 	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *ExternalStackStoreEpochStateCall[T, Constraint]) Do(f func(string, []byte) error) *ExternalStackStoreEpochStateCall[T, Constraint] {
+func (c *MockExternalStackStoreEpochStateCall[T, Constraint]) Do(f func(string, []byte) error) *MockExternalStackStoreEpochStateCall[T, Constraint] {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *ExternalStackStoreEpochStateCall[T, Constraint]) DoAndReturn(f func(string, []byte) error) *ExternalStackStoreEpochStateCall[T, Constraint] {
+func (c *MockExternalStackStoreEpochStateCall[T, Constraint]) DoAndReturn(f func(string, []byte) error) *MockExternalStackStoreEpochStateCall[T, Constraint] {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -1313,31 +1570,31 @@ func (m *MockExternalStack[T, Constraint]) StoreState(key string, value []byte) 
 }
 
 // StoreState indicates an expected call of StoreState.
-func (mr *MockExternalStackMockRecorder[T, Constraint]) StoreState(key, value any) *ExternalStackStoreStateCall[T, Constraint] {
+func (mr *MockExternalStackMockRecorder[T, Constraint]) StoreState(key, value any) *MockExternalStackStoreStateCall[T, Constraint] {
 	mr.mock.ctrl.T.Helper()
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StoreState", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).StoreState), key, value)
-	return &ExternalStackStoreStateCall[T, Constraint]{Call: call}
+	return &MockExternalStackStoreStateCall[T, Constraint]{Call: call}
 }
 
-// ExternalStackStoreStateCall wrap *gomock.Call
-type ExternalStackStoreStateCall[T any, Constraint types0.TXConstraint[T]] struct {
+// MockExternalStackStoreStateCall wrap *gomock.Call
+type MockExternalStackStoreStateCall[T any, Constraint types0.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *ExternalStackStoreStateCall[T, Constraint]) Return(arg0 error) *ExternalStackStoreStateCall[T, Constraint] {
+func (c *MockExternalStackStoreStateCall[T, Constraint]) Return(arg0 error) *MockExternalStackStoreStateCall[T, Constraint] {
 	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *ExternalStackStoreStateCall[T, Constraint]) Do(f func(string, []byte) error) *ExternalStackStoreStateCall[T, Constraint] {
+func (c *MockExternalStackStoreStateCall[T, Constraint]) Do(f func(string, []byte) error) *MockExternalStackStoreStateCall[T, Constraint] {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *ExternalStackStoreStateCall[T, Constraint]) DoAndReturn(f func(string, []byte) error) *ExternalStackStoreStateCall[T, Constraint] {
+func (c *MockExternalStackStoreStateCall[T, Constraint]) DoAndReturn(f func(string, []byte) error) *MockExternalStackStoreStateCall[T, Constraint] {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -1351,69 +1608,69 @@ func (m *MockExternalStack[T, Constraint]) Unicast(ctx context.Context, msg *con
 }
 
 // Unicast indicates an expected call of Unicast.
-func (mr *MockExternalStackMockRecorder[T, Constraint]) Unicast(ctx, msg, to any) *ExternalStackUnicastCall[T, Constraint] {
+func (mr *MockExternalStackMockRecorder[T, Constraint]) Unicast(ctx, msg, to any) *MockExternalStackUnicastCall[T, Constraint] {
 	mr.mock.ctrl.T.Helper()
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Unicast", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).Unicast), ctx, msg, to)
-	return &ExternalStackUnicastCall[T, Constraint]{Call: call}
+	return &MockExternalStackUnicastCall[T, Constraint]{Call: call}
 }
 
-// ExternalStackUnicastCall wrap *gomock.Call
-type ExternalStackUnicastCall[T any, Constraint types0.TXConstraint[T]] struct {
+// MockExternalStackUnicastCall wrap *gomock.Call
+type MockExternalStackUnicastCall[T any, Constraint types0.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *ExternalStackUnicastCall[T, Constraint]) Return(arg0 error) *ExternalStackUnicastCall[T, Constraint] {
+func (c *MockExternalStackUnicastCall[T, Constraint]) Return(arg0 error) *MockExternalStackUnicastCall[T, Constraint] {
 	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *ExternalStackUnicastCall[T, Constraint]) Do(f func(context.Context, *consensus.ConsensusMessage, string) error) *ExternalStackUnicastCall[T, Constraint] {
+func (c *MockExternalStackUnicastCall[T, Constraint]) Do(f func(context.Context, *consensus.ConsensusMessage, string) error) *MockExternalStackUnicastCall[T, Constraint] {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *ExternalStackUnicastCall[T, Constraint]) DoAndReturn(f func(context.Context, *consensus.ConsensusMessage, string) error) *ExternalStackUnicastCall[T, Constraint] {
+func (c *MockExternalStackUnicastCall[T, Constraint]) DoAndReturn(f func(context.Context, *consensus.ConsensusMessage, string) error) *MockExternalStackUnicastCall[T, Constraint] {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
 
 // Verify mocks base method.
-func (m *MockExternalStack[T, Constraint]) Verify(peerHash string, signature, msg []byte) error {
+func (m *MockExternalStack[T, Constraint]) Verify(nodeID uint64, signature, msg []byte) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Verify", peerHash, signature, msg)
+	ret := m.ctrl.Call(m, "Verify", nodeID, signature, msg)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Verify indicates an expected call of Verify.
-func (mr *MockExternalStackMockRecorder[T, Constraint]) Verify(peerHash, signature, msg any) *ExternalStackVerifyCall[T, Constraint] {
+func (mr *MockExternalStackMockRecorder[T, Constraint]) Verify(nodeID, signature, msg any) *MockExternalStackVerifyCall[T, Constraint] {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Verify", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).Verify), peerHash, signature, msg)
-	return &ExternalStackVerifyCall[T, Constraint]{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Verify", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).Verify), nodeID, signature, msg)
+	return &MockExternalStackVerifyCall[T, Constraint]{Call: call}
 }
 
-// ExternalStackVerifyCall wrap *gomock.Call
-type ExternalStackVerifyCall[T any, Constraint types0.TXConstraint[T]] struct {
+// MockExternalStackVerifyCall wrap *gomock.Call
+type MockExternalStackVerifyCall[T any, Constraint types0.TXConstraint[T]] struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *ExternalStackVerifyCall[T, Constraint]) Return(arg0 error) *ExternalStackVerifyCall[T, Constraint] {
+func (c *MockExternalStackVerifyCall[T, Constraint]) Return(arg0 error) *MockExternalStackVerifyCall[T, Constraint] {
 	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *ExternalStackVerifyCall[T, Constraint]) Do(f func(string, []byte, []byte) error) *ExternalStackVerifyCall[T, Constraint] {
+func (c *MockExternalStackVerifyCall[T, Constraint]) Do(f func(uint64, []byte, []byte) error) *MockExternalStackVerifyCall[T, Constraint] {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *ExternalStackVerifyCall[T, Constraint]) DoAndReturn(f func(string, []byte, []byte) error) *ExternalStackVerifyCall[T, Constraint] {
+func (c *MockExternalStackVerifyCall[T, Constraint]) DoAndReturn(f func(uint64, []byte, []byte) error) *MockExternalStackVerifyCall[T, Constraint] {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

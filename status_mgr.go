@@ -16,6 +16,8 @@ package rbft
 
 import (
 	"sync/atomic"
+
+	"github.com/axiomesh/axiom-kit/types"
 )
 
 // StatusType defines the RBFT internal status.
@@ -48,7 +50,7 @@ const (
 type NodeStatus struct {
 	ID        uint64
 	View      uint64
-	EpochInfo *EpochInfo
+	EpochInfo *types.EpochInfo
 	H         uint64
 	Status    StatusType
 }

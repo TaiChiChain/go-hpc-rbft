@@ -86,9 +86,9 @@ func (m *peerManager) unicastByP2PID(ctx context.Context, msg *consensus.Consens
 }
 
 func (m *peerManager) unicast(ctx context.Context, msg *consensus.ConsensusMessage, to uint64) {
-	n, ok := m.chainConfig.NodeInfoMap[to]
-	if !ok {
-		m.logger.Errorf("Unicast to %d failed: not found node", to)
+	n, err := m.chainConfig.getNodeInfo(to)
+	if err != nil {
+		m.logger.Errorf("Unicast to %d failed: %v", to, err)
 		return
 	}
 

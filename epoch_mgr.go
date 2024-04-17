@@ -11,6 +11,7 @@ import (
 	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/types"
+	kittypes "github.com/axiomesh/axiom-kit/types"
 )
 
 // MaxNumEpochEndingCheckpoint is max checkpoints allowed include in EpochChangeProof
@@ -160,6 +161,13 @@ func (rbft *rbftImpl[T, Constraint]) turnIntoEpoch() {
 		return
 	}
 
+	newValidatorSet, err := rbft.external.GetValidatorSet()
+	if err != nil {
+		rbft.logger.Errorf("Replica %d failed to get new validator set from ledger: %v", rbft.chainConfig.SelfID, err)
+		rbft.stopNamespace()
+		return
+	}
+
 	// re-init vc manager and recovery manager as all caches related to view should
 	// be reset in new epoch.
 	// NOTE!!! all cert caches in storeManager will be clear in move watermark after
@@ -170,7 +178,7 @@ func (rbft *rbftImpl[T, Constraint]) turnIntoEpoch() {
 	rbft.recoveryMgr = newRecoveryMgr(rbft.config)
 
 	// set the latest epoch
-	rbft.updateEpochInfo(newEpoch)
+	rbft.updateEpochInfo(newEpoch, newValidatorSet)
 
 	// start a timer to generate empty block if it's enabled
 	if rbft.chainConfig.EpochInfo.ConsensusParams.EnableTimedGenEmptyBlock && !rbft.batchMgr.noTxBatchTimerActive {
@@ -205,19 +213,25 @@ func (rbft *rbftImpl[T, Constraint]) turnIntoEpoch() {
 }
 
 // setEpoch sets the epoch with the epochLock.
-func (rbft *rbftImpl[T, Constraint]) updateEpochInfo(epochInfo *EpochInfo) {
+func (rbft *rbftImpl[T, Constraint]) updateEpochInfo(epochInfo *kittypes.EpochInfo, newValidatorSet map[uint64]int64) {
 	rbft.epochLock.Lock()
-	oldRole := rbft.chainConfig.SelfRole
+	oldRole := "validator"
+	if rbft.chainConfig.isValidator() {
+		oldRole = "candidate"
+	}
 	rbft.chainConfig.EpochInfo = epochInfo
 	rbft.epochMgr.epoch = epochInfo.Epoch
-	if err := rbft.chainConfig.updateDerivedData(); err != nil {
+	if err := rbft.chainConfig.updateDerivedData(newValidatorSet); err != nil {
 		rbft.logger.Criticalf("Replica %d failed to check epoch info for epoch %d from ledger: %v", rbft.chainConfig.SelfID, epochInfo.Epoch, err)
 		return
 	}
 	rbft.chainConfig.ResetRecentBlockNum(rbft.config.LastServiceState.MetaState.Height)
-	newRole := rbft.chainConfig.SelfRole
+	newRole := "validator"
+	if rbft.chainConfig.isValidator() {
+		newRole = "candidate"
+	}
 	if oldRole != newRole {
-		rbft.logger.Infof("Replica %d change role from %s to %s", rbft.chainConfig.SelfID, oldRole.String(), newRole.String())
+		rbft.logger.Infof("Replica %d change role from %s to %s", rbft.chainConfig.SelfID, oldRole, newRole)
 	}
 	rbft.epochLock.Unlock()
 	rbft.metrics.epochGauge.Set(float64(epochInfo.Epoch))
@@ -393,17 +407,12 @@ func (em *epochManager) pagingGetEpochChangeProof(startEpoch, endEpoch, pageLimi
 			em.logger.Warningf("Cannot find epoch change for epoch %d", epoch)
 			return nil, err
 		}
-		info, err := em.epochService.GetEpochInfo(epoch)
-		if err != nil {
-			em.logger.Warningf("Cannot find history epoch info for epoch %d", epoch)
-			return nil, err
-		}
 
-		validators := make([]*consensus.QuorumValidator, len(info.ValidatorSet))
-		for i, nodeInfo := range info.ValidatorSet {
+		validators := make([]*consensus.QuorumValidator, len(cp.ValidatorSet))
+		for i, nodeInfo := range cp.ValidatorSet {
 			validators[i] = &consensus.QuorumValidator{
-				Id:     nodeInfo.ID,
-				PeerId: nodeInfo.P2PNodeID,
+				Id:     nodeInfo.Id,
+				PeerId: nodeInfo.P2PId,
 			}
 		}
 		epochChanges = append(epochChanges, &consensus.EpochChange{Checkpoint: cp, Validators: &consensus.QuorumValidators{Validators: validators}})

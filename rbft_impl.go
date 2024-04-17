@@ -31,13 +31,13 @@ import (
 	"github.com/axiomesh/axiom-bft/common/metrics"
 	"github.com/axiomesh/axiom-bft/types"
 	"github.com/axiomesh/axiom-kit/txpool"
-	types2 "github.com/axiomesh/axiom-kit/types"
+	kittypes "github.com/axiomesh/axiom-kit/types"
 )
 
 // Config contains the parameters to start a RAFT instance.
 type Config struct {
 	// Genesis for test
-	GenesisEpochInfo *EpochInfo
+	GenesisEpochInfo *kittypes.EpochInfo
 
 	GenesisBlockDigest string
 
@@ -115,7 +115,7 @@ type Config struct {
 }
 
 // rbftImpl is the core struct of RBFT service, which handles all functions about consensus.
-type rbftImpl[T any, Constraint types2.TXConstraint[T]] struct {
+type rbftImpl[T any, Constraint kittypes.TXConstraint[T]] struct {
 	node        *node[T, Constraint]
 	chainConfig *ChainConfig
 	external    ExternalStack[T, Constraint] // manage interaction with application layer
@@ -159,16 +159,7 @@ type rbftImpl[T any, Constraint types2.TXConstraint[T]] struct {
 var once sync.Once
 
 // newRBFT init the RBFT instance
-func newRBFT[T any, Constraint types2.TXConstraint[T]](c Config, external ExternalStack[T, Constraint], requestPool txpool.TxPool[T, Constraint], isTest bool) (*rbftImpl[T, Constraint], error) {
-	err := c.GenesisEpochInfo.Check()
-	if err != nil {
-		return nil, err
-	}
-	if !isTest {
-		if c.GenesisEpochInfo.Epoch != 1 || c.GenesisEpochInfo.StartBlock != 1 {
-			return nil, fmt.Errorf("epoch info error: genesis epoch and start_block must be 1, but get epoch: %d, start_block: %d", c.GenesisEpochInfo.Epoch, c.GenesisEpochInfo.StartBlock)
-		}
-	}
+func newRBFT[T any, Constraint kittypes.TXConstraint[T]](c Config, external ExternalStack[T, Constraint], requestPool txpool.TxPool[T, Constraint], isTest bool) (*rbftImpl[T, Constraint], error) {
 	if c.CommittedBlockCacheNumber == 0 {
 		if !isTest {
 			c.CommittedBlockCacheNumber = 10
@@ -185,14 +176,18 @@ func newRBFT[T any, Constraint types2.TXConstraint[T]](c Config, external Extern
 		recvC = make(chan consensusEvent, 1024)
 	}
 	chainConfig := &ChainConfig{
-		EpochInfo:        nil,
-		EpochDerivedData: EpochDerivedData{},
+		EpochInfo: nil,
+		EpochDerivedData: EpochDerivedData{
+			nodeInfoMap: make(map[uint64]NodeInfo),
+		},
 		DynamicChainConfig: DynamicChainConfig{
 			H:                           c.GenesisEpochInfo.StartBlock,
 			RecentBlockProcessorTracker: NewBlockProcessorTracker(external.GetBlockMeta),
 		},
-		SelfP2PNodeID: c.SelfP2PNodeID,
-		logger:        c.Logger,
+		SelfP2PNodeID:    c.SelfP2PNodeID,
+		logger:           c.Logger,
+		getNodeInfoFn:    external.GetNodeInfo,
+		getNodeIDByP2PID: external.GetNodeIDByP2PID,
 	}
 	rbft := &rbftImpl[T, Constraint]{
 		chainConfig:          chainConfig,
@@ -210,6 +205,7 @@ func newRBFT[T any, Constraint types2.TXConstraint[T]](c Config, external Extern
 		isTest:               isTest,
 	}
 
+	var err error
 	// new metrics instance
 	rbft.metrics, err = newRBFTMetrics(c.MetricsProv)
 	if err != nil {
@@ -247,9 +243,6 @@ func newRBFT[T any, Constraint types2.TXConstraint[T]](c Config, external Extern
 
 	// use GenesisEpochInfo as default
 	rbft.chainConfig.EpochInfo = c.GenesisEpochInfo
-	if err := rbft.chainConfig.updateDerivedData(); err != nil {
-		return nil, err
-	}
 	return rbft, nil
 }
 
@@ -407,7 +400,7 @@ func (rbft *rbftImpl[T, Constraint]) step(ctx context.Context, msg *consensus.Co
 				return
 			}
 			// don't cache vc from unknown author
-			if _, ok := rbft.chainConfig.NodeInfoMap[msg.From]; !ok {
+			if _, err := rbft.chainConfig.getNodeInfo(msg.From); err != nil {
 				rbft.logger.Errorf("Replica %d received message from unknown node %d, ignore it in "+
 					"pending status", rbft.chainConfig.SelfID, msg.From)
 				return
@@ -597,7 +590,7 @@ func (rbft *rbftImpl[T, Constraint]) checkEventCanProcessWhenWaitCheckpoint(even
 
 func (rbft *rbftImpl[T, Constraint]) checkMsgCanAccept(msgType consensus.Type, msgFrom uint64) bool {
 	if rbft.chainConfig.isValidator() {
-		if rbft.chainConfig.NodeRoleMap[msgFrom] != NodeRoleValidator {
+		if !rbft.chainConfig.CheckValidator(msgFrom) {
 			if _, ok := validatorAcceptMsgsFromNonValidator[msgType]; !ok {
 				rbft.logger.Debugf("Replica %d not accept msg[%s] from non-validator %d",
 					rbft.chainConfig.SelfID, msgType.String(), msgFrom)
@@ -1646,16 +1639,9 @@ func (rbft *rbftImpl[T, Constraint]) commitPendingBlocks() {
 				rbft.softRestartBatchTimer()
 			}
 
-			var proposerAccount string
 			var proposerNodeID uint64
 			if cert != nil && cert.prePrepare != nil {
-				proposer, ok := rbft.chainConfig.NodeInfoMap[cert.prePrepare.HashBatch.Proposer]
-				if ok {
-					proposerAccount = proposer.AccountAddress
-					proposerNodeID = proposer.ID
-				} else {
-					rbft.logger.Warningf("Replica %d did not find the proposer in the epoch", rbft.chainConfig.SelfID)
-				}
+				proposerNodeID = cert.prePrepare.HashBatch.Proposer
 			}
 
 			// The code will not execute to this point，
@@ -1668,7 +1654,7 @@ func (rbft *rbftImpl[T, Constraint]) commitPendingBlocks() {
 				rbft.logger.Noticef("======== Replica %d Call execute a no-nop, epoch=%d/view=%d/seqNo=%d",
 					rbft.chainConfig.SelfID, rbft.chainConfig.EpochInfo.Epoch, idx.v, idx.n)
 
-				rbft.external.Execute(txList, localList, idx.n, 0, proposerAccount, proposerNodeID)
+				rbft.external.Execute(txList, localList, idx.n, 0, proposerNodeID)
 			} else {
 				// find batch in batchStore rather than outstandingBatch as after viewChange
 				// we may clear outstandingBatch and save all batches in batchStore.
@@ -1686,7 +1672,7 @@ func (rbft *rbftImpl[T, Constraint]) commitPendingBlocks() {
 				rbft.metrics.batchToCommitDuration.Observe(batchToCommit)
 				rbft.logger.Noticef("======== Replica %d Call execute, epoch=%d/view=%d/seqNo=%d/txCount=%d/digest=%s",
 					rbft.chainConfig.SelfID, rbft.chainConfig.EpochInfo.Epoch, idx.v, idx.n, len(txList), idx.d)
-				rbft.external.Execute(txList, localList, idx.n, cert.prePrepare.HashBatch.Timestamp, proposerAccount, proposerNodeID)
+				rbft.external.Execute(txList, localList, idx.n, cert.prePrepare.HashBatch.Timestamp, proposerNodeID)
 			}
 			delete(rbft.storeMgr.outstandingReqBatches, idx.d)
 			rbft.metrics.outstandingBatchesGauge.Set(float64(len(rbft.storeMgr.outstandingReqBatches)))

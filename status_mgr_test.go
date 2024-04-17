@@ -11,10 +11,10 @@ import (
 	"github.com/axiomesh/axiom-bft/common/metrics/disabled"
 	"github.com/axiomesh/axiom-bft/types"
 	"github.com/axiomesh/axiom-kit/txpool/mock_txpool"
-	types2 "github.com/axiomesh/axiom-kit/types"
+	kittypes "github.com/axiomesh/axiom-kit/types"
 )
 
-func newTestStatusNode[T any, Constraint types2.TXConstraint[T]](ctrl *gomock.Controller) *rbftImpl[T, Constraint] {
+func newTestStatusNode[T any, Constraint kittypes.TXConstraint[T]](ctrl *gomock.Controller) *rbftImpl[T, Constraint] {
 	log := common.NewSimpleLogger()
 	external := NewMockMinimalExternal[T, Constraint](ctrl)
 	conf := Config{
@@ -23,16 +23,11 @@ func newTestStatusNode[T any, Constraint types2.TXConstraint[T]](ctrl *gomock.Co
 			Epoch:     1,
 		},
 		SelfP2PNodeID: "node1",
-		GenesisEpochInfo: &EpochInfo{
-			Version:                   1,
-			Epoch:                     1,
-			EpochPeriod:               1000,
-			CandidateSet:              []NodeInfo{},
-			ValidatorSet:              peerSet,
-			StartBlock:                1,
-			P2PBootstrapNodeAddresses: []string{"1"},
-			ConsensusParams: ConsensusParams{
-				ValidatorElectionType:         ValidatorElectionTypeWRF,
+		GenesisEpochInfo: &kittypes.EpochInfo{
+			Epoch:       1,
+			EpochPeriod: 1000,
+			StartBlock:  1,
+			ConsensusParams: kittypes.ConsensusParams{
 				ProposerElectionType:          ProposerElectionTypeAbnormalRotation,
 				CheckpointPeriod:              10,
 				HighWatermarkCheckpointPeriod: 4,
@@ -48,7 +43,7 @@ func newTestStatusNode[T any, Constraint types2.TXConstraint[T]](ctrl *gomock.Co
 		DelFlag:     make(chan bool),
 	}
 
-	external.EXPECT().GetEpochInfo(gomock.Any()).DoAndReturn(func(u uint64) (*EpochInfo, error) {
+	external.EXPECT().GetEpochInfo(gomock.Any()).DoAndReturn(func(u uint64) (*kittypes.EpochInfo, error) {
 		return conf.GenesisEpochInfo, nil
 	}).AnyTimes()
 

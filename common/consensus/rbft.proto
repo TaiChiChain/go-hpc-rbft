@@ -272,6 +272,11 @@ message SignedCheckpoint {
     bytes signature = 3;
 }
 
+message ValidatorInfo {
+    uint64 id = 1;
+    string p2p_id = 2;
+}
+
 // QuorumCheckpoint contains the actual checkpoint with signatures
 // by different quorum validators
 message QuorumCheckpoint {
@@ -279,6 +284,7 @@ message QuorumCheckpoint {
     Checkpoint checkpoint = 1;
     // Signatures is the aggregated signature for checkpoint.
     map<uint64, bytes> signatures = 2;
+    map<uint64, ValidatorInfo> validator_set = 3;
 }
 
 // EpochChangeProof is a slice of checkpoints with contiguous increasing epoch numbers
