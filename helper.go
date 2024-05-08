@@ -89,14 +89,6 @@ func (rbft *rbftImpl[T, Constraint]) inPrimaryTerm() bool {
 	return rbft.batchMgr.seqNo < rbft.chainConfig.H+rbft.chainConfig.EpochInfo.ConsensusParams.CheckpointPeriod
 }
 
-// nextSeqNoInPrimaryTerm check is in primary term, only true can generate batch
-func (rbft *rbftImpl[T, Constraint]) nextSeqNoInPrimaryTerm() bool {
-	if !rbft.chainConfig.isProposerElectionTypeWRF() {
-		return rbft.batchMgr.seqNo+1 < rbft.chainConfig.EpochInfo.StartBlock+rbft.chainConfig.EpochInfo.EpochPeriod-1
-	}
-	return rbft.batchMgr.seqNo+1 < rbft.chainConfig.H+rbft.chainConfig.EpochInfo.ConsensusParams.CheckpointPeriod
-}
-
 // cleanAllBatchAndCert cleans all outstandingReqBatches and committedCert
 func (rbft *rbftImpl[T, Constraint]) cleanOutstandingAndCert() {
 	rbft.storeMgr.outstandingReqBatches = make(map[string]*RequestBatch[T, Constraint])
