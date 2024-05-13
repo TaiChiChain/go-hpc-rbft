@@ -413,16 +413,19 @@ func (rbft *rbftImpl[T, Constraint]) primaryResubmitTransactions() {
 
 		// if primary has transactions in requestPool, generate batches of the transactions
 		for rbft.batchMgr.requestPool.HasPendingRequestInPool() {
-			// if not test, must generate a full txs batch
-			if !rbft.isTest && !rbft.batchMgr.requestPool.PendingRequestsNumberIsReady() {
-				break
-			}
 			if !rbft.isNormal() {
 				rbft.logger.Debugf("Primary %d is in abnormal, reject resubmit", rbft.chainConfig.SelfID)
 				return
 			}
 
 			if rbft.inPrimaryTerm() {
+				// if not test, must generate a full txs batch
+				if !rbft.isTest && !rbft.batchMgr.requestPool.PendingRequestsNumberIsReady() {
+					// we need to reply signal to requestPool for replying next batch signal
+					rbft.logger.Debugf("Primary %d is in primary term, but pending requests number is not ready, reply batch signal", rbft.chainConfig.SelfID)
+					rbft.batchMgr.requestPool.ReplyBatchSignal()
+					break
+				}
 				var (
 					batch *txpool.RequestHashBatch[T, Constraint]
 					err   error
@@ -438,6 +441,9 @@ func (rbft *rbftImpl[T, Constraint]) primaryResubmitTransactions() {
 					if err != nil {
 						rbft.logger.Debugf("Primary %d failed to generate a batch, err: %v", rbft.chainConfig.SelfID, err)
 						return
+					}
+					if batch == nil {
+						rbft.batchMgr.requestPool.ReplyBatchSignal()
 					}
 				}
 

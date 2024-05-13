@@ -2604,6 +2604,13 @@ func (rbft *rbftImpl[T, Constraint]) recvStateUpdatedEvent(ss *types.ServiceSync
 			return rbft.sendViewChange()
 		}
 
+		checkpoint := rbft.storeMgr.highStateTarget.checkpointSet[0].Checkpoint
+		if checkpoint != nil && checkpoint.ViewChange != nil && checkpoint.ViewChange.Basis != nil && checkpoint.ViewChange.Basis.View != rbft.chainConfig.View {
+			// quorum checkpoint view is not same with current view, send view change to update new view
+			rbft.logger.Debugf("Replica %d send view-change after sync chain because of missing highStateTarget's new view ", rbft.chainConfig.SelfID)
+			return rbft.initRecovery()
+		}
+
 		// check if we have new view for current view, if so(vc then sync chain), directly finish view change.
 		// if not(sync chain then vc), trigger recovery to find correct view-number
 		nv, ok := rbft.vcMgr.newViewStore[rbft.chainConfig.View]
