@@ -2456,7 +2456,7 @@ func (rbft *rbftImpl[T, Constraint]) tryStateTransfer() {
 
 	// attempts to synchronize state to a particular target, implicitly calls rollback if needed
 	rbft.metrics.stateUpdateCounter.Add(float64(1))
-	rbft.external.StateUpdate(rbft.chainConfig.H, target.metaState.Height, target.metaState.Digest, target.checkpointSet, target.epochChanges...)
+	go rbft.external.StateUpdate(rbft.chainConfig.H, target.metaState.Height, target.metaState.Digest, target.checkpointSet, target.epochChanges...)
 }
 
 // recvStateUpdatedEvent processes StateUpdatedMessage.
