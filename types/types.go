@@ -34,8 +34,9 @@ type ServiceSyncState struct {
 
 // MetaState is the basic info for block.
 type MetaState struct {
-	Height uint64
-	Digest string
+	Height      uint64
+	Digest      string
+	BatchDigest string
 }
 
 type BlockMeta struct {

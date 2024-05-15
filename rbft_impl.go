@@ -305,10 +305,6 @@ func (rbft *rbftImpl[T, Constraint]) init() error {
 
 // start initializes and starts the consensus service
 func (rbft *rbftImpl[T, Constraint]) start() error {
-	if err := rbft.init(); err != nil {
-		return err
-	}
-
 	// exit pending status after start rbft to avoid missing consensus messages from other nodes.
 	rbft.atomicOff(Pending)
 	rbft.metrics.statusGaugePending.Set(0)
@@ -439,7 +435,7 @@ func (rbft *rbftImpl[T, Constraint]) step(ctx context.Context, msg *consensus.Co
 	}
 
 	// block consensus progress until sync to epoch change height.
-	if rbft.atomicIn(inEpochSyncing) {
+	if rbft.atomicIn(InEpochSyncing) {
 		rbft.logger.Debugf("Replica %d is in epoch syncing status, reject consensus messages", rbft.chainConfig.SelfID)
 		return
 	}
@@ -533,7 +529,7 @@ func (rbft *rbftImpl[T, Constraint]) getStatus() (status NodeStatus) {
 	switch {
 	case rbft.atomicIn(InConfChange):
 		status.Status = InConfChange
-	case rbft.atomicIn(inEpochSyncing):
+	case rbft.atomicIn(InEpochSyncing):
 		status.Status = InConfChange
 	case rbft.atomicIn(InRecovery):
 		status.Status = InRecovery
@@ -659,7 +655,7 @@ func (rbft *rbftImpl[T, Constraint]) processEvent(ee consensusEvent) consensusEv
 func (rbft *rbftImpl[T, Constraint]) consensusMessageFilter(ctx context.Context, originEvent consensusEvent, msg *consensus.ConsensusMessage) consensusEvent {
 	// A node in different epoch or in epoch sync will reject normal consensus messages, except:
 	// EpochChangeRequest and EpochChangeProof.
-	if msg.Epoch != rbft.chainConfig.EpochInfo.Epoch {
+	if msg.Epoch != rbft.chainConfig.EpochInfo.Epoch && !consensus.ConsensusMsgWhiteList[msg.Type] {
 		if msg.Epoch > rbft.epochMgr.epoch {
 			if !rbft.checkEventCanProcessWhenWaitCheckpoint(cannotProcessEventWhenWaitCheckpoint, originEvent) {
 				return nil
@@ -823,7 +819,7 @@ func (rbft *rbftImpl[T, Constraint]) recvNullRequest(msg *consensus.NullRequest)
 //	// }
 //
 //	// if current node is in abnormal, add normal txs into txPool without generate batches.
-//	if !rbft.isNormal() || rbft.in(SkipInProgress) || rbft.in(InRecovery) || rbft.in(inEpochSyncing) || rbft.in(waitCheckpointBatchExecute) {
+//	if !rbft.isNormal() || rbft.in(SkipInProgress) || rbft.in(InRecovery) || rbft.in(InEpochSyncing) || rbft.in(waitCheckpointBatchExecute) {
 //		_, completionMissingBatchHashes := rbft.batchMgr.requestPool.AddNewRequests(req.Requests, false, req.Local, false, false)
 //		var completionMissingBatchIdxs []msgID
 //		for _, batchHash := range completionMissingBatchHashes {
@@ -1085,6 +1081,8 @@ func (rbft *rbftImpl[T, Constraint]) sendPrePrepare(seqNo uint64, digest string,
 
 	// set primary's seqNo to current batch seqNo
 	rbft.batchMgr.setSeqNo(seqNo)
+
+	rbft.storeMgr.seqMap[preprepare.SequenceNumber] = preprepare.BatchDigest
 
 	// exit sync state as primary is ready to process requests.
 	rbft.exitSyncState()
@@ -1487,12 +1485,12 @@ func (rbft *rbftImpl[T, Constraint]) recvFetchMissingRequest(ctx context.Context
 			if i >= batchLen || batch.RequestHashList[i] != hash {
 				rbft.logger.Errorf("Primary %d finds mismatch requests hash when return "+
 					"fetch missing requests", rbft.chainConfig.SelfID)
-				return nil
+				return rbft.unicastFailedFetchMissingResponse(ctx, fetch)
 			}
 			requests[i], err = Constraint(batch.RequestList[i]).RbftMarshal()
 			if err != nil {
 				rbft.logger.Errorf("Tx marshal Error: %s", err)
-				return nil
+				return rbft.unicastFailedFetchMissingResponse(ctx, fetch)
 			}
 		}
 	} else {
@@ -1501,18 +1499,19 @@ func (rbft *rbftImpl[T, Constraint]) recvFetchMissingRequest(ctx context.Context
 		if err != nil {
 			rbft.logger.Warningf("Primary %d cannot find the digest %s, missing tx hashes: %+v, err: %s",
 				rbft.chainConfig.SelfID, fetch.BatchDigest, fetch.MissingRequestHashes, err)
-			return nil
+			return rbft.unicastFailedFetchMissingResponse(ctx, fetch)
 		}
 		for i, tx := range missingTxs {
 			requests[i], err = Constraint(tx).RbftMarshal()
 			if err != nil {
 				rbft.logger.Errorf("Tx marshal Error: %s", err)
-				return nil
+				return rbft.unicastFailedFetchMissingResponse(ctx, fetch)
 			}
 		}
 	}
 
 	re := &consensus.FetchMissingResponse{
+		Status:               consensus.FetchMissingResponse_Success,
 		View:                 fetch.View,
 		SequenceNumber:       fetch.SequenceNumber,
 		BatchDigest:          fetch.BatchDigest,
@@ -1533,6 +1532,24 @@ func (rbft *rbftImpl[T, Constraint]) recvFetchMissingRequest(ctx context.Context
 	rbft.metrics.returnFetchMissingTxsCounter.With("node", strconv.Itoa(int(fetch.ReplicaId))).Add(float64(1))
 	rbft.peerMgr.unicast(ctx, consensusMsg, fetch.ReplicaId)
 
+	return nil
+}
+
+func (rbft *rbftImpl[T, Constraint]) unicastFailedFetchMissingResponse(ctx context.Context, fetch *consensus.FetchMissingRequest) error {
+	re := &consensus.FetchMissingResponse{
+		Status: consensus.FetchMissingResponse_Failure,
+	}
+	payload, err := re.MarshalVTStrict()
+	if err != nil {
+		rbft.logger.Errorf("ConsensusMessage_FetchMissingResponse Marshal Error: %s", err)
+		return err
+	}
+	consensusMsg := &consensus.ConsensusMessage{
+		Type:    consensus.Type_FETCH_MISSING_RESPONSE,
+		Payload: payload,
+	}
+	rbft.metrics.returnFetchMissingTxsCounter.With("node", strconv.Itoa(int(fetch.ReplicaId))).Add(float64(1))
+	rbft.peerMgr.unicast(ctx, consensusMsg, fetch.ReplicaId)
 	return nil
 }
 
@@ -1641,6 +1658,8 @@ func (rbft *rbftImpl[T, Constraint]) commitPendingBlocks() {
 				}
 			}
 
+			// The code will not execute to this point，
+			// because even if an empty block occurs, it will still generate a batch of empty transaction list
 			if idx.d == "" {
 				txList := make([]*T, 0)
 				localList := make([]bool, 0)
@@ -1879,11 +1898,16 @@ func (rbft *rbftImpl[T, Constraint]) recvCheckpointBlockExecutedEvent(state *typ
 func (rbft *rbftImpl[T, Constraint]) checkpoint(state *types.ServiceState, isConfig bool) {
 	digest := state.MetaState.Digest
 	seqNo := state.MetaState.Height
+	batchDigest, ok := rbft.storeMgr.seqMap[seqNo]
+	if !ok {
+		rbft.logger.Noticef("Replica %d missing batch digest for checkpoint %d", rbft.chainConfig.SelfID, seqNo)
+		return
+	}
 
-	rbft.logger.Infof("Replica %d sending checkpoint for view=%d/seqNo=%d and digest=%s",
-		rbft.chainConfig.SelfID, rbft.chainConfig.View, seqNo, digest)
+	rbft.logger.Infof("Replica %d sending checkpoint for view=%d/seqNo=%d/batchDigest=%s and digest=%s",
+		rbft.chainConfig.SelfID, rbft.chainConfig.View, seqNo, batchDigest, digest)
 
-	signedCheckpoint, err := rbft.generateSignedCheckpoint(state, isConfig, true)
+	signedCheckpoint, err := rbft.generateSignedCheckpoint(state, batchDigest, isConfig, true)
 	if err != nil {
 		rbft.logger.Errorf("Replica %d generate signed checkpoint error: %s", rbft.chainConfig.SelfID, err)
 		rbft.stopNamespace()
@@ -1891,7 +1915,7 @@ func (rbft *rbftImpl[T, Constraint]) checkpoint(state *types.ServiceState, isCon
 	}
 
 	rbft.storeMgr.saveCheckpoint(seqNo, signedCheckpoint)
-	rbft.persistCheckpoint(seqNo, []byte(digest))
+	rbft.persistCheckpoint(seqNo, digest, batchDigest)
 
 	if isConfig {
 		// use fetchCheckpointTimer to fetch the missing config checkpoint
@@ -2456,7 +2480,7 @@ func (rbft *rbftImpl[T, Constraint]) tryStateTransfer() {
 
 	// attempts to synchronize state to a particular target, implicitly calls rollback if needed
 	rbft.metrics.stateUpdateCounter.Add(float64(1))
-	rbft.external.StateUpdate(rbft.chainConfig.H, target.metaState.Height, target.metaState.Digest, target.checkpointSet, target.epochChanges...)
+	go rbft.external.StateUpdate(rbft.chainConfig.H, target.metaState.Height, target.metaState.Digest, target.checkpointSet, target.epochChanges...)
 }
 
 // recvStateUpdatedEvent processes StateUpdatedMessage.
@@ -2489,7 +2513,8 @@ func (rbft *rbftImpl[T, Constraint]) recvStateUpdatedEvent(ss *types.ServiceSync
 			rbft.tryStateTransfer()
 		} else {
 			rbft.logger.Debugf("Replica %d state updated, lastExec = %d, seqNo = %d, accept epoch proof for %d", rbft.chainConfig.SelfID, rbft.exec.lastExec, seqNo, ss.Epoch)
-			if ec, ok := rbft.epochMgr.epochProofCache[ss.Epoch]; ok {
+			if ec, ok := rbft.epochMgr.epochProofCache[ss.Epoch-1]; ok {
+				rbft.logger.Debugf("Replica %d persist epoch proof for %d, height:%d, hash:%s", rbft.chainConfig.SelfID, ss.Epoch-1, ec.GetCheckpoint().Checkpoint.Height(), ec.GetCheckpoint().Checkpoint.Digest())
 				rbft.epochMgr.persistEpochQuorumCheckpoint(ec.GetCheckpoint())
 			}
 		}
@@ -2506,20 +2531,11 @@ func (rbft *rbftImpl[T, Constraint]) recvStateUpdatedEvent(ss *types.ServiceSync
 	rbft.chainConfig.ResetRecentBlockNum(seqNo)
 	if ss.EpochChanged || epochChanged {
 		rbft.logger.Debugf("Replica %d accept epoch proof for %d", rbft.chainConfig.SelfID, ss.Epoch)
-		if ec, ok := rbft.epochMgr.epochProofCache[ss.Epoch]; ok {
+		if ec, ok := rbft.epochMgr.epochProofCache[ss.Epoch-1]; ok {
+			rbft.logger.Debugf("Replica %d persist epoch proof for %d, height:%d, hash:%s", rbft.chainConfig.SelfID, ss.Epoch-1, ec.GetCheckpoint().Checkpoint.Height(), ec.GetCheckpoint().Checkpoint.Digest())
 			rbft.epochMgr.persistEpochQuorumCheckpoint(ec.GetCheckpoint())
 		}
 	}
-
-	// 1. clear useless txs in txpool after state updated and saves txs which are not committed to ensure
-	// all received txs will be committed eventually.
-	// var saveBatches []string
-	// for batchDigest, batch := range rbft.storeMgr.batchStore {
-	//	if batch.SeqNo > seqNo {
-	//		saveBatches = append(saveBatches, batchDigest)
-	//	}
-	// }
-	// rbft.batchMgr.requestPool.Reset(saveBatches)
 
 	// 2. reset commit state after cut down block.
 	if seqNo < rbft.exec.lastExec {
@@ -2556,7 +2572,7 @@ func (rbft *rbftImpl[T, Constraint]) recvStateUpdatedEvent(ss *types.ServiceSync
 		rbft.logger.Infof("epoch changed from %d to %d", rbft.chainConfig.EpochInfo.Epoch, ss.Epoch)
 		rbft.turnIntoEpoch()
 		rbft.logger.Noticef("======== Replica %d updated epoch, epoch=%d.", rbft.chainConfig.SelfID, rbft.chainConfig.EpochInfo.Epoch)
-		rbft.atomicOff(inEpochSyncing)
+		rbft.atomicOff(InEpochSyncing)
 	}
 
 	// 5. sign and cache local checkpoint.
@@ -2585,7 +2601,7 @@ func (rbft *rbftImpl[T, Constraint]) recvStateUpdatedEvent(ss *types.ServiceSync
 		}
 		rbft.storeMgr.saveCheckpoint(seqNo, signedCheckpoint)
 		rbft.chainConfig.LastCheckpointExecBlockHash = digest
-		rbft.persistCheckpoint(seqNo, []byte(digest))
+		rbft.persistCheckpoint(seqNo, digest, checkpoint.ExecuteState.BatchDigest)
 		rbft.moveWatermarks(seqNo, epochChanged)
 	}
 

@@ -138,7 +138,7 @@ func (rbft *rbftImpl[T, Constraint]) dispatchMiscEvent(e *MiscEvent) consensusEv
 
 func (rbft *rbftImpl[T, Constraint]) handleNotifyFindNextBatchEvent(completionMissingBatchHashes []string) consensusEvent {
 	// if current node is in abnormal, add normal txs into txPool without generate batches.
-	if !rbft.isNormal() || rbft.in(SkipInProgress) || rbft.in(InRecovery) || rbft.in(inEpochSyncing) || rbft.in(waitCheckpointBatchExecute) {
+	if !rbft.isNormal() || rbft.in(SkipInProgress) || rbft.in(InRecovery) || rbft.in(InEpochSyncing) || rbft.in(waitCheckpointBatchExecute) {
 		var completionMissingBatchIdxs []msgID
 		for _, batchHash := range completionMissingBatchHashes {
 			idx, ok := rbft.storeMgr.missingBatchesInFetching[batchHash]
@@ -191,7 +191,7 @@ func (rbft *rbftImpl[T, Constraint]) handleNotifyFindNextBatchEvent(completionMi
 func (rbft *rbftImpl[T, Constraint]) handleNotifyGenBatchEvent() consensusEvent {
 	rbft.logger.Debugf("Replica %d notify generate batch event", rbft.chainConfig.SelfID)
 	// if current node is in abnormal, ignore generate batch signal
-	if !rbft.isNormal() || rbft.in(SkipInProgress) || rbft.in(InRecovery) || rbft.in(inEpochSyncing) || rbft.in(waitCheckpointBatchExecute) {
+	if !rbft.isNormal() || rbft.in(SkipInProgress) || rbft.in(InRecovery) || rbft.in(InEpochSyncing) || rbft.in(waitCheckpointBatchExecute) {
 		if !rbft.isNormal() {
 			rbft.logger.Warningf("Replica %d is in abnormal, ignore generate batch signal", rbft.chainConfig.SelfID)
 		} else {
@@ -654,25 +654,32 @@ func (rbft *rbftImpl[T, Constraint]) handleEpochMgrEvent(e *LocalEvent) consensu
 		quorumCheckpoint := proof.Last().Checkpoint
 		for _, ec := range proof.GetEpochChanges() {
 			// TODO: support restore
+			rbft.logger.Debugf("Replica %d sync epoch proof with epoch %d, height %d, hash %s", rbft.chainConfig.SelfID, ec.Checkpoint.Epoch(), ec.Checkpoint.Height(), ec.Checkpoint.Digest())
 			rbft.epochMgr.epochProofCache[ec.Checkpoint.Epoch()] = ec
 		}
 		rbft.logger.Noticef("Replica %d try epoch sync to height %d, epoch %d", rbft.chainConfig.SelfID,
 			quorumCheckpoint.Height(), quorumCheckpoint.NextEpoch())
 
-		// block consensus progress until sync to epoch change height.
-		rbft.atomicOn(inEpochSyncing)
 		target := &types.MetaState{
 			Height: quorumCheckpoint.Height(),
 			Digest: quorumCheckpoint.Digest(),
 		}
 		var checkpointSet []*consensus.SignedCheckpoint
-		for _, sig := range quorumCheckpoint.Signatures {
-			checkpointSet = append(checkpointSet, &consensus.SignedCheckpoint{
+		for id, sig := range quorumCheckpoint.Signatures {
+			signedCheckpoint := &consensus.SignedCheckpoint{
 				Checkpoint: quorumCheckpoint.Checkpoint,
 				Signature:  sig,
-			})
+				Author:     id,
+			}
+			if err := rbft.verifySignedCheckpoint(signedCheckpoint); err != nil {
+				rbft.logger.Errorf("Replica %d verify checkpoint error: %s", rbft.chainConfig.SelfID, err)
+				return nil
+			}
+			checkpointSet = append(checkpointSet, signedCheckpoint)
 		}
 
+		// block consensus progress until sync to epoch change height.
+		rbft.atomicOn(InEpochSyncing)
 		rbft.updateHighStateTarget(target, checkpointSet, proof.GetEpochChanges()...) // for new epoch
 		rbft.tryStateTransfer()
 

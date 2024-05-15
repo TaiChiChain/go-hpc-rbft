@@ -40,7 +40,7 @@ const (
 	NeedSyncState  // node need to sync state
 	SkipInProgress // node try to state update
 	byzantine      // byzantine
-	inEpochSyncing // in epoch syncing, used to block consensus progress until sync to epoch change height.
+	InEpochSyncing // in epoch syncing, used to block consensus progress until sync to epoch change height.
 	waitCheckpointBatchExecute
 )
 

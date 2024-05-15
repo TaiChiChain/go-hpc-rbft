@@ -738,7 +738,7 @@ func (rbft *rbftImpl[T, Constraint]) drainChannel(ch chan consensusEvent) ([]*T,
 }
 
 // generateSignedCheckpoint generates a signed checkpoint using given service state.
-func (rbft *rbftImpl[T, Constraint]) generateSignedCheckpoint(state *types.ServiceState, isConfig bool, isAfterCheckpoint bool) (*consensus.SignedCheckpoint, error) {
+func (rbft *rbftImpl[T, Constraint]) generateSignedCheckpoint(state *types.ServiceState, batchDigest string, isConfig bool, isAfterCheckpoint bool) (*consensus.SignedCheckpoint, error) {
 	signedCheckpoint := &consensus.SignedCheckpoint{
 		Author: rbft.chainConfig.SelfID,
 	}
@@ -746,8 +746,9 @@ func (rbft *rbftImpl[T, Constraint]) generateSignedCheckpoint(state *types.Servi
 	checkpoint := &consensus.Checkpoint{
 		Epoch: rbft.chainConfig.EpochInfo.Epoch,
 		ExecuteState: &consensus.Checkpoint_ExecuteState{
-			Height: state.MetaState.Height,
-			Digest: state.MetaState.Digest,
+			Height:      state.MetaState.Height,
+			Digest:      state.MetaState.Digest,
+			BatchDigest: batchDigest,
 		},
 	}
 	if rbft.chainConfig.isProposerElectionTypeWRF() {

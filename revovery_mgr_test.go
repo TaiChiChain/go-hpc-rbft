@@ -311,6 +311,7 @@ func TestRecovery_SyncStateToStateUpdate(t *testing.T) {
 	rbfts[3].node.currentState = &types.ServiceState{
 		MetaState: metaS,
 	}
+	rbfts[3].node.rbft.storeMgr.seqMap[metaS.Height] = rbfts[0].node.rbft.storeMgr.seqMap[metaS.Height]
 
 	syncEvent := &LocalEvent{
 		Service:   RecoveryService,
@@ -355,6 +356,11 @@ func TestRecovery_ReplicaSyncStateToRecovery(t *testing.T) {
 
 	rbfts[3].processEvent(syncEvent)
 	node4SyncStateReq := nodes[3].broadcastMessageCache
+	syncStateReq := &consensus.SyncState{}
+	err := syncStateReq.UnmarshalVT(node4SyncStateReq.Payload)
+	assert.Nil(t, err)
+	localHeight := rbfts[3].node.currentState.MetaState.Height
+	rbfts[3].node.rbft.storeMgr.seqMap[localHeight] = rbfts[0].node.rbft.storeMgr.seqMap[localHeight]
 	assert.Equal(t, consensus.Type_SYNC_STATE, node4SyncStateReq.Type)
 
 	syncStateResponse := make([]*consensusMessageWrapper, 4)
@@ -383,6 +389,9 @@ func TestRecovery_PrimarySyncStateToRecovery(t *testing.T) {
 		Service:   RecoveryService,
 		EventType: RecoverySyncStateRestartTimerEvent,
 	}
+
+	localHeight := rbfts[0].node.currentState.MetaState.Height
+	rbfts[0].node.rbft.storeMgr.seqMap[localHeight] = rbfts[0].node.rbft.storeMgr.seqMap[localHeight]
 
 	rbfts[0].processEvent(syncEvent)
 	node4SyncStateReq := nodes[0].broadcastMessageCache

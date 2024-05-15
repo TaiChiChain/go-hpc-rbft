@@ -43,16 +43,6 @@ func TestNode_Stop(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		for i := 1; i < 100; i++ {
-			tx1 := newTx()
-			tx2 := newTx()
-			_ = n.Propose([]*consensus.FltTransaction{tx1, tx2}, true)
-		}
-		wg.Done()
-	}()
-
-	wg.Add(1)
-	go func() {
-		for i := 1; i < 100; i++ {
 			con := &consensus.ConsensusMessage{}
 			n.Step(context.TODO(), con)
 		}
@@ -62,21 +52,6 @@ func TestNode_Stop(t *testing.T) {
 	wg.Wait()
 
 	assert.Nil(t, n.currentState)
-}
-
-func TestNode_Propose(t *testing.T) {
-	_, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
-	unlockCluster(rbfts)
-
-	n := rbfts[0].node
-	tx1 := newTx()
-	requestsTmp := &RequestSet[consensus.FltTransaction, *consensus.FltTransaction]{
-		Requests: []*consensus.FltTransaction{tx1},
-		Local:    true,
-	}
-	_ = n.Propose([]*consensus.FltTransaction{tx1}, true)
-	obj := <-n.rbft.recvChan
-	assert.Equal(t, requestsTmp, obj)
 }
 
 func TestNode_Step(t *testing.T) {
@@ -152,6 +127,20 @@ func TestNode_ReportExecuted(t *testing.T) {
 func TestNode_ReportStateUpdated(t *testing.T) {
 	_, rbfts := newBasicClusterInstance[consensus.FltTransaction, *consensus.FltTransaction]()
 	n := rbfts[0].node
+	checkpointSet := []*consensus.SignedCheckpoint{
+		{
+			Checkpoint: &consensus.Checkpoint{
+				ExecuteState: &consensus.Checkpoint_ExecuteState{
+					Height:      2,
+					Digest:      "state3",
+					BatchDigest: "digest",
+				},
+			},
+		},
+	}
+	n.rbft.storeMgr.highStateTarget = &stateUpdateTarget{
+		checkpointSet: checkpointSet,
+	}
 
 	state := &types.ServiceState{
 		MetaState: &types.MetaState{

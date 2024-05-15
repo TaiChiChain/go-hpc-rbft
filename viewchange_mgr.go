@@ -1868,6 +1868,7 @@ func (rbft *rbftImpl[T, Constraint]) processNewView(msgList []*consensus.VcPq) {
 		cert.prePrepare = prePrep
 		cert.prePrepareCtx = context.Background()
 		rbft.persistQSet(prePrep)
+		rbft.storeMgr.seqMap[n] = d
 		if metrics.EnableExpensive() {
 			cert.prePreparedTime = time.Now().UnixNano()
 			duration := time.Duration(cert.prePreparedTime - prePrep.HashBatch.Timestamp).Seconds()

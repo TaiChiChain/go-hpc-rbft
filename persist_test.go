@@ -296,10 +296,13 @@ func TestPersist_restoreState(t *testing.T) {
 
 	node, ext := newPersistTestReplica[consensus.FltTransaction, *consensus.FltTransaction](ctrl)
 
+	data1 := []byte("blockHash1,batchHash1")
+	data2 := []byte("blockHash2,batchHash2")
+	data3 := []byte("blockHash3,batchHash3")
 	ret := map[string][]byte{
-		"chkpt.1.wang": {24, 10},
-		"chkpt.2.wang": {24, 9},
-		"chkpt.3.wang": {24, 8},
+		"chkpt.1.wang": data1,
+		"chkpt.2.wang": data2,
+		"chkpt.3.wang": data3,
 	}
 
 	var buff = make([]byte, 8)

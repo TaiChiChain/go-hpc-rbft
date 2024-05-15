@@ -423,9 +423,10 @@ func (rbft *rbftImpl[T, Constraint]) persistDelBatch(digest string) {
 
 // persistCheckpoint persists checkpoint to database, which, key contains the seqNo of checkpoint, value is the
 // checkpoint ID
-func (rbft *rbftImpl[T, Constraint]) persistCheckpoint(seqNo uint64, id []byte) {
+func (rbft *rbftImpl[T, Constraint]) persistCheckpoint(seqNo uint64, digest, batchDigest string) {
 	key := fmt.Sprintf("chkpt.%d", seqNo)
-	err := rbft.storage.StoreState(key, id)
+	val := fmt.Sprintf("%s,%s", digest, batchDigest)
+	err := rbft.storage.StoreState(key, []byte(val))
 	if err != nil {
 		rbft.logger.Errorf("Persist chkpt failed with err: %s ", err)
 	}
@@ -602,13 +603,15 @@ func (rbft *rbftImpl[T, Constraint]) restoreState() error {
 			if _, err = fmt.Sscanf(key, "chkpt.%d", &seqNo); err != nil {
 				rbft.logger.Warningf("Replica %d could not restore checkpoint key %s", rbft.chainConfig.SelfID, key)
 			} else {
-				digest := string(id)
-				rbft.logger.Debugf("Replica %d found checkpoint %s for seqNo %d", rbft.chainConfig.SelfID, digest, seqNo)
+				val := string(id)
+				digest := strings.Split(val, ",")[0]
+				batchDigest := strings.Split(val, ",")[1]
+				rbft.logger.Debugf("Replica %d found checkpoint [Digest:%s, BatchDigest:%s] for seqNo %d", rbft.chainConfig.SelfID, digest, batchDigest, seqNo)
 				state := &types.ServiceState{
 					MetaState: &types.MetaState{Height: seqNo, Digest: digest},
 					Epoch:     rbft.chainConfig.EpochInfo.Epoch,
 				}
-				signedC, gErr := rbft.generateSignedCheckpoint(state, isConfigBatch(seqNo, rbft.chainConfig.EpochInfo), false)
+				signedC, gErr := rbft.generateSignedCheckpoint(state, batchDigest, isConfigBatch(seqNo, rbft.chainConfig.EpochInfo), false)
 				if gErr != nil {
 					return gErr
 				}
@@ -631,7 +634,8 @@ func (rbft *rbftImpl[T, Constraint]) restoreState() error {
 				},
 				Epoch: rbft.chainConfig.EpochInfo.Epoch,
 			}
-			lastCheckpoint, gErr := rbft.generateSignedCheckpoint(lastCheckpointState, isConfigBatch(lastCheckpointState.MetaState.Height, rbft.chainConfig.EpochInfo), false)
+			// it usually happens when restart node which delete consensus store
+			lastCheckpoint, gErr := rbft.generateSignedCheckpoint(lastCheckpointState, "", isConfigBatch(lastCheckpointState.MetaState.Height, rbft.chainConfig.EpochInfo), false)
 			if gErr != nil {
 				return gErr
 			}
@@ -647,7 +651,7 @@ func (rbft *rbftImpl[T, Constraint]) restoreState() error {
 				},
 				Epoch: rbft.config.GenesisEpochInfo.Epoch,
 			}
-			genesisCheckpoint, gErr := rbft.generateSignedCheckpoint(state, false, false)
+			genesisCheckpoint, gErr := rbft.generateSignedCheckpoint(state, "", false, false)
 			if gErr != nil {
 				return gErr
 			}

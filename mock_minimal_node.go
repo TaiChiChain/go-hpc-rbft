@@ -15,8 +15,9 @@ func NewMockMinimalNode[T any, Constraint types.TXConstraint[T]](ctrl *gomock.Co
 	mock := NewMockNode[T, Constraint](ctrl)
 	mock.EXPECT().Start().Return(nil).AnyTimes()
 	mock.EXPECT().Step(gomock.Any(), gomock.Any()).Return().AnyTimes()
-	mock.EXPECT().Stop().Return([]*T{}).AnyTimes()
+	mock.EXPECT().Stop().Return().AnyTimes()
 	mock.EXPECT().ReportExecuted(gomock.Any()).Return().AnyTimes()
 	mock.EXPECT().ReportStateUpdated(gomock.Any()).Return().AnyTimes()
+	mock.EXPECT().ArchiveMode().Return(false).AnyTimes()
 	return mock
 }

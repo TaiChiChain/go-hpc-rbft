@@ -569,6 +569,7 @@ func (m *FetchMissingResponse) CloneVT() *FetchMissingResponse {
 		View:           m.View,
 		SequenceNumber: m.SequenceNumber,
 		BatchDigest:    m.BatchDigest,
+		Status:         m.Status,
 	}
 	if rhs := m.MissingRequestHashes; rhs != nil {
 		tmpContainer := make(map[uint64]string, len(rhs))
@@ -765,8 +766,9 @@ func (m *Checkpoint_ExecuteState) CloneVT() *Checkpoint_ExecuteState {
 		return (*Checkpoint_ExecuteState)(nil)
 	}
 	r := &Checkpoint_ExecuteState{
-		Height: m.Height,
-		Digest: m.Digest,
+		Height:      m.Height,
+		Digest:      m.Digest,
+		BatchDigest: m.BatchDigest,
 	}
 	if len(m.unknownFields) > 0 {
 		r.unknownFields = make([]byte, len(m.unknownFields))
@@ -1735,6 +1737,9 @@ func (this *FetchMissingResponse) EqualVT(that *FetchMissingResponse) bool {
 			return false
 		}
 	}
+	if this.Status != that.Status {
+		return false
+	}
 	return string(this.unknownFields) == string(that.unknownFields)
 }
 
@@ -1985,6 +1990,9 @@ func (this *Checkpoint_ExecuteState) EqualVT(that *Checkpoint_ExecuteState) bool
 		return false
 	}
 	if this.Digest != that.Digest {
+		return false
+	}
+	if this.BatchDigest != that.BatchDigest {
 		return false
 	}
 	return string(this.unknownFields) == string(that.unknownFields)
@@ -3513,6 +3521,11 @@ func (m *FetchMissingResponse) MarshalToSizedBufferVT(dAtA []byte) (int, error) 
 		i -= len(m.unknownFields)
 		copy(dAtA[i:], m.unknownFields)
 	}
+	if m.Status != 0 {
+		i = encodeVarint(dAtA, i, uint64(m.Status))
+		i--
+		dAtA[i] = 0x38
+	}
 	if len(m.MissingRequests) > 0 {
 		for k := range m.MissingRequests {
 			v := m.MissingRequests[k]
@@ -3954,6 +3967,13 @@ func (m *Checkpoint_ExecuteState) MarshalToSizedBufferVT(dAtA []byte) (int, erro
 	if m.unknownFields != nil {
 		i -= len(m.unknownFields)
 		copy(dAtA[i:], m.unknownFields)
+	}
+	if len(m.BatchDigest) > 0 {
+		i -= len(m.BatchDigest)
+		copy(dAtA[i:], m.BatchDigest)
+		i = encodeVarint(dAtA, i, uint64(len(m.BatchDigest)))
+		i--
+		dAtA[i] = 0x1a
 	}
 	if len(m.Digest) > 0 {
 		i -= len(m.Digest)
@@ -5673,6 +5693,11 @@ func (m *FetchMissingResponse) MarshalToSizedBufferVTStrict(dAtA []byte) (int, e
 		i -= len(m.unknownFields)
 		copy(dAtA[i:], m.unknownFields)
 	}
+	if m.Status != 0 {
+		i = encodeVarint(dAtA, i, uint64(m.Status))
+		i--
+		dAtA[i] = 0x38
+	}
 	if len(m.MissingRequests) > 0 {
 		for k := range m.MissingRequests {
 			v := m.MissingRequests[k]
@@ -6114,6 +6139,13 @@ func (m *Checkpoint_ExecuteState) MarshalToSizedBufferVTStrict(dAtA []byte) (int
 	if m.unknownFields != nil {
 		i -= len(m.unknownFields)
 		copy(dAtA[i:], m.unknownFields)
+	}
+	if len(m.BatchDigest) > 0 {
+		i -= len(m.BatchDigest)
+		copy(dAtA[i:], m.BatchDigest)
+		i = encodeVarint(dAtA, i, uint64(len(m.BatchDigest)))
+		i--
+		dAtA[i] = 0x1a
 	}
 	if len(m.Digest) > 0 {
 		i -= len(m.Digest)
@@ -7081,6 +7113,9 @@ func (m *FetchMissingResponse) SizeVT() (n int) {
 			n += mapEntrySize + 1 + sov(uint64(mapEntrySize))
 		}
 	}
+	if m.Status != 0 {
+		n += 1 + sov(uint64(m.Status))
+	}
 	n += len(m.unknownFields)
 	return n
 }
@@ -7230,6 +7265,10 @@ func (m *Checkpoint_ExecuteState) SizeVT() (n int) {
 		n += 1 + sov(uint64(m.Height))
 	}
 	l = len(m.Digest)
+	if l > 0 {
+		n += 1 + l + sov(uint64(l))
+	}
+	l = len(m.BatchDigest)
 	if l > 0 {
 		n += 1 + l + sov(uint64(l))
 	}
@@ -10988,6 +11027,25 @@ func (m *FetchMissingResponse) UnmarshalVT(dAtA []byte) error {
 			}
 			m.MissingRequests[mapkey] = mapvalue
 			iNdEx = postIndex
+		case 7:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Status", wireType)
+			}
+			m.Status = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflow
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Status |= FetchMissingResponse_Status(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
 		default:
 			iNdEx = preIndex
 			skippy, err := skip(dAtA[iNdEx:])
@@ -11855,6 +11913,38 @@ func (m *Checkpoint_ExecuteState) UnmarshalVT(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.Digest = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field BatchDigest", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflow
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLength
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLength
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.BatchDigest = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

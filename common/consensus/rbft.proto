@@ -198,6 +198,11 @@ message FetchMissingResponse {
     string batch_digest = 4;
     map<uint64, string> missing_request_hashes = 5;
     map<uint64, bytes> missing_requests = 6;
+    enum Status {
+        Success = 0;
+        Failure = 1;
+    }
+    Status status = 7;
 }
 
 message FetchPQCRequest {
@@ -248,6 +253,7 @@ message Checkpoint {
     message ExecuteState {
         uint64 height = 1;
         string digest = 2;
+        string batch_digest = 3;
     }
     ExecuteState execute_state = 2;
 
