@@ -835,11 +835,7 @@ func (rbft *rbftImpl[T, Constraint]) signCheckpoint(checkpoint *consensus.Checkp
 // verifySignedCheckpoint returns whether given signedCheckpoint contains a valid signature.
 func (rbft *rbftImpl[T, Constraint]) verifySignedCheckpoint(signedCheckpoint *consensus.SignedCheckpoint) error {
 	msg := signedCheckpoint.Checkpoint.Hash()
-	fromNode, ok := rbft.chainConfig.NodeInfoMap[signedCheckpoint.GetAuthor()]
-	if !ok {
-		return fmt.Errorf("unknow author: %d", signedCheckpoint.GetAuthor())
-	}
-	return rbft.external.Verify(fromNode.P2PNodeID, signedCheckpoint.Signature, msg)
+	return rbft.external.Verify(signedCheckpoint.GetAuthor(), signedCheckpoint.Signature, msg)
 }
 
 // syncConfigCheckpoint posts config checkpoint out and wait for its completion synchronously.
@@ -853,6 +849,7 @@ func (rbft *rbftImpl[T, Constraint]) syncConfigCheckpoint(checkpointHeight uint6
 			Signatures: lo.SliceToMap(quorumCheckpoints, func(item *consensus.SignedCheckpoint) (uint64, []byte) {
 				return item.Author, item.Signature
 			}),
+			ValidatorSet: nil,
 		})
 		rbft.logger.Infof("Replica %d persist stable checkpoint for seqNo %d, epoch: %d", rbft.chainConfig.SelfID, checkpointHeight, quorumCheckpoints[0].Epoch())
 	}
@@ -903,11 +900,7 @@ func (rbft *rbftImpl[T, Constraint]) verifySignedViewChange(vc *consensus.ViewCh
 	if hErr != nil {
 		return hErr
 	}
-	node, ok := rbft.chainConfig.NodeInfoMap[replicaID]
-	if !ok {
-		return fmt.Errorf("invalid node %d not in router", replicaID)
-	}
-	return rbft.external.Verify(node.P2PNodeID, vc.Signature, hash)
+	return rbft.external.Verify(replicaID, vc.Signature, hash)
 }
 
 func (rbft *rbftImpl[T, Constraint]) calculateViewChangeHash(vc *consensus.ViewChange) ([]byte, error) {
@@ -950,11 +943,7 @@ func (rbft *rbftImpl[T, Constraint]) verifySignedNewView(nv *consensus.NewView) 
 	if nv.AutoTermUpdate {
 		from = nv.FromId
 	}
-	node, ok := rbft.chainConfig.NodeInfoMap[from]
-	if !ok {
-		return nil, fmt.Errorf("invalid node %d not in router", nv.GetReplicaId())
-	}
-	return hash, rbft.external.Verify(node.P2PNodeID, nv.Signature, hash)
+	return hash, rbft.external.Verify(from, nv.Signature, hash)
 }
 
 func (rbft *rbftImpl[T, Constraint]) calculateNewViewHash(nv *consensus.NewView) ([]byte, error) {
@@ -984,7 +973,6 @@ func PersistEpochQuorumCheckpoint(storeEpochStateFn func(key string, value []byt
 	raw, err := c.MarshalVTStrict()
 	if err != nil {
 		return fmt.Errorf("Persist epoch %d quorum chkpt failed with marshal err: %s ", c.Checkpoint.Epoch, err)
-
 	}
 
 	if err = storeEpochStateFn(key, raw); err != nil {

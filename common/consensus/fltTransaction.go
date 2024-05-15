@@ -24,7 +24,6 @@ import (
 	"golang.org/x/crypto/sha3"
 
 	"github.com/axiomesh/axiom-kit/types"
-	eth_types "github.com/ethereum/go-ethereum/core/types"
 )
 
 var _ types.RbftTransaction = (*FltTransaction)(nil)
@@ -171,6 +170,6 @@ func (m *FltTransaction) RbftGetValue() *big.Int {
 	return big.NewInt(0)
 }
 
-func (m *FltTransaction) RbftGetAccessList() eth_types.AccessList {
+func (m *FltTransaction) RbftGetAccessList() types.AccessList {
 	return nil
 }

@@ -17,10 +17,9 @@ package rbft
 import (
 	"context"
 
-	types2 "github.com/axiomesh/axiom-kit/types"
-
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/types"
+	kittypes "github.com/axiomesh/axiom-kit/types"
 )
 
 // Storage is an interface that should be implemented by the application using non-volatile
@@ -54,7 +53,7 @@ type Crypto interface {
 	Sign(msg []byte) ([]byte, error)
 
 	// Verify verifies signature signed with msg from given peerHash, return nil if verify successfully
-	Verify(peerHash string, signature []byte, msg []byte) error
+	Verify(nodeID uint64, signature []byte, msg []byte) error
 }
 
 // ServiceOutbound is the application service invoked by RBFT library which includes two core events:
@@ -66,10 +65,10 @@ type Crypto interface {
 //     seqNos, it's applications responsibility to implement a fast sync algorithm to ensure node
 //     can catch up as soon as possible. Applications should call ServiceInbound.ReportStateUpdated
 //     to inform RBFT library the latest service state after StateUpdate.
-type ServiceOutbound[T any, Constraint types2.TXConstraint[T]] interface {
+type ServiceOutbound[T any, Constraint kittypes.TXConstraint[T]] interface {
 	// Execute informs application layer to apply one batch with given request list and batch seqNo.
 	// Users can apply different batches asynchronously but ensure the order by seqNo.
-	Execute(txs []*T, localList []bool, seqNo uint64, timestamp int64, proposerAccount string, proposerNodeID uint64)
+	Execute(txs []*T, localList []bool, seqNo uint64, timestamp int64, proposerNodeID uint64)
 
 	// StateUpdate informs application layer to catch up to given seqNo with specified state digest.
 	// epochChanges should be provided when the sync request has a backwardness of epoch changes
@@ -82,10 +81,17 @@ type ServiceOutbound[T any, Constraint types2.TXConstraint[T]] interface {
 
 // EpochService provides service for epoch management.
 type EpochService interface {
-	GetCurrentEpochInfo() (*EpochInfo, error)
-	GetEpochInfo(epoch uint64) (*EpochInfo, error)
+	GetCurrentEpochInfo() (*kittypes.EpochInfo, error)
+	GetEpochInfo(epoch uint64) (*kittypes.EpochInfo, error)
 	StoreEpochState(key string, value []byte) error
 	ReadEpochState(key string) ([]byte, error)
+}
+
+// NodeService provides service for node management.
+type NodeService interface {
+	GetNodeInfo(nodeID uint64) (*NodeInfo, error)
+	GetNodeIDByP2PID(p2pID string) (uint64, error)
+	GetValidatorSet() (map[uint64]int64, error)
 }
 
 type Ledger interface {
@@ -95,11 +101,12 @@ type Ledger interface {
 // ExternalStack integrates all external interfaces which must be implemented by application users.
 //
 //go:generate mockgen -destination ./mock_external.go -package rbft -source ./external.go -typed
-type ExternalStack[T any, Constraint types2.TXConstraint[T]] interface {
+type ExternalStack[T any, Constraint kittypes.TXConstraint[T]] interface {
 	Storage
 	Network
 	Crypto
 	ServiceOutbound[T, Constraint]
 	EpochService
+	NodeService
 	Ledger
 }

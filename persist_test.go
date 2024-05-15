@@ -3,6 +3,8 @@ package rbft
 import (
 	"context"
 	"encoding/binary"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -15,27 +17,47 @@ import (
 	"github.com/axiomesh/axiom-bft/common/metrics/disabled"
 	"github.com/axiomesh/axiom-bft/types"
 	"github.com/axiomesh/axiom-kit/txpool/mock_txpool"
-	types2 "github.com/axiomesh/axiom-kit/types"
+	kittypes "github.com/axiomesh/axiom-kit/types"
 )
 
-func newPersistTestReplica[T any, Constraint types2.TXConstraint[T]](ctrl *gomock.Controller) (*node[T, Constraint], *MockExternalStack[T, Constraint]) {
+func newPersistTestReplica[T any, Constraint kittypes.TXConstraint[T]](ctrl *gomock.Controller) (*node[T, Constraint], *MockExternalStack[T, Constraint]) {
 	log := common.NewSimpleLogger()
 	ext := NewMockExternalStack[T, Constraint](ctrl)
 	ext.EXPECT().Sign(gomock.Any()).Return(nil, nil).AnyTimes()
 	ext.EXPECT().Verify(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	ext.EXPECT().GetNodeIDByP2PID(gomock.Any()).DoAndReturn(func(p2pID string) (uint64, error) {
+		nodeIDStr := strings.TrimPrefix(p2pID, "node")
+		if nodeIDStr == p2pID {
+			return 0, errors.New("invalid p2p id")
+		}
+		nodeID, err := strconv.Atoi(nodeIDStr)
+		if err != nil {
+			return 0, err
+		}
+		return uint64(nodeID), nil
+	}).AnyTimes()
 
+	ext.EXPECT().GetNodeInfo(gomock.Any()).DoAndReturn(func(nodeID uint64) (*NodeInfo, error) {
+		return &NodeInfo{
+			ID:        nodeID,
+			P2PNodeID: "node" + strconv.Itoa(int(nodeID+1)),
+		}, nil
+	}).AnyTimes()
+	ext.EXPECT().GetValidatorSet().DoAndReturn(func() (map[uint64]int64, error) {
+		return map[uint64]int64{
+			1: 1000,
+			2: 1000,
+			3: 1000,
+			4: 1000,
+		}, nil
+	}).AnyTimes()
 	conf := Config{
 		SelfP2PNodeID: "node2",
-		GenesisEpochInfo: &EpochInfo{
-			Version:                   1,
-			Epoch:                     1,
-			EpochPeriod:               1000,
-			CandidateSet:              []NodeInfo{},
-			ValidatorSet:              peerSet,
-			StartBlock:                1,
-			P2PBootstrapNodeAddresses: []string{"1"},
-			ConsensusParams: ConsensusParams{
-				ValidatorElectionType:         ValidatorElectionTypeWRF,
+		GenesisEpochInfo: &kittypes.EpochInfo{
+			Epoch:       1,
+			EpochPeriod: 1000,
+			StartBlock:  1,
+			ConsensusParams: kittypes.ConsensusParams{
 				ProposerElectionType:          ProposerElectionTypeAbnormalRotation,
 				CheckpointPeriod:              10,
 				HighWatermarkCheckpointPeriod: 4,
@@ -73,6 +95,14 @@ func newPersistTestReplica[T any, Constraint types2.TXConstraint[T]](ctrl *gomoc
 
 	node, err := newNode[T, Constraint](conf, ext, pool, true)
 	if err != nil {
+		panic(err)
+	}
+
+	validatorSet, err := node.rbft.external.GetValidatorSet()
+	if err != nil {
+		panic(err)
+	}
+	if err := node.rbft.chainConfig.updateDerivedData(validatorSet); err != nil {
 		panic(err)
 	}
 	return node, ext

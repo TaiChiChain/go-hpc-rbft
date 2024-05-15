@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -18,38 +19,37 @@ import (
 	"github.com/axiomesh/axiom-bft/common/metrics/disabled"
 	"github.com/axiomesh/axiom-bft/types"
 	"github.com/axiomesh/axiom-kit/txpool/mock_txpool"
-	types2 "github.com/axiomesh/axiom-kit/types"
+	kittypes "github.com/axiomesh/axiom-kit/types"
 )
 
 var peerSet = []NodeInfo{
 	{
-		ID:                   1,
-		AccountAddress:       "node1",
-		P2PNodeID:            "node1",
-		ConsensusVotingPower: 1000,
+		ID:        1,
+		P2PNodeID: "node1",
 	},
 	{
-		ID:                   2,
-		AccountAddress:       "node2",
-		P2PNodeID:            "node2",
-		ConsensusVotingPower: 1000,
+		ID:        2,
+		P2PNodeID: "node2",
 	},
 	{
-		ID:                   3,
-		AccountAddress:       "node3",
-		P2PNodeID:            "node3",
-		ConsensusVotingPower: 1000,
+		ID:        3,
+		P2PNodeID: "node3",
 	},
 	{
-		ID:                   4,
-		AccountAddress:       "node4",
-		P2PNodeID:            "node4",
-		ConsensusVotingPower: 1000,
+		ID:        4,
+		P2PNodeID: "node4",
 	},
 }
 
+var genesisValidatorSet = map[uint64]int64{
+	1: 1000,
+	2: 1000,
+	3: 1000,
+	4: 1000,
+}
+
 // testFramework contains the core structure of test framework instance.
-type testFramework[T any, Constraint types2.TXConstraint[T]] struct {
+type testFramework[T any, Constraint kittypes.TXConstraint[T]] struct {
 	N int
 
 	// Instance of nodes.
@@ -73,7 +73,7 @@ type testFramework[T any, Constraint types2.TXConstraint[T]] struct {
 }
 
 // testNode contains the parameters of one node instance.
-type testNode[T any, Constraint types2.TXConstraint[T]] struct {
+type testNode[T any, Constraint kittypes.TXConstraint[T]] struct {
 	Logger common.Logger
 
 	// Node is provided for application to contact wih RBFT core.
@@ -125,7 +125,7 @@ type testNode[T any, Constraint types2.TXConstraint[T]] struct {
 }
 
 // testExternal is the instance of External interface.
-type testExternal[T any, Constraint types2.TXConstraint[T]] struct {
+type testExternal[T any, Constraint kittypes.TXConstraint[T]] struct {
 	tf *testFramework[T, Constraint]
 
 	// testNode indicates which node the Service belongs to.
@@ -139,13 +139,6 @@ type testExternal[T any, Constraint types2.TXConstraint[T]] struct {
 
 	// config checkpoint record
 	configCheckpointRecord map[uint64]*consensus.EpochChange
-}
-
-func (ext *testExternal[T, Constraint]) GetBlockMeta(num uint64) (*types.BlockMeta, error) {
-	return &types.BlockMeta{
-		ProcessorNodeID: 0,
-		BlockNum:        num,
-	}, nil
 }
 
 // channelMsg is the form of data in cluster network.
@@ -163,16 +156,15 @@ type channelMsg struct {
 // init process
 // =============================================================================
 // newTestFramework init the testFramework instance
-func newTestFramework[T any, Constraint types2.TXConstraint[T]](account int) *testFramework[T, Constraint] {
+func newTestFramework[T any, Constraint kittypes.TXConstraint[T]](account int) *testFramework[T, Constraint] {
 	// Init PeerSet
 	var routers []*NodeInfo
 	for i := 0; i < account; i++ {
 		id := uint64(i + 1)
 		n := "node" + strconv.Itoa(i+1)
 		peer := &NodeInfo{
-			ID:                   id,
-			P2PNodeID:            n,
-			ConsensusVotingPower: 1,
+			ID:        id,
+			P2PNodeID: n,
 		}
 		routers = append(routers, peer)
 	}
@@ -215,16 +207,11 @@ func (tf *testFramework[T, Constraint]) newNodeConfig(
 	log common.Logger,
 	epoch uint64) Config {
 	return Config{
-		GenesisEpochInfo: &EpochInfo{
-			Version:                   1,
-			Epoch:                     epoch,
-			EpochPeriod:               1000,
-			CandidateSet:              []NodeInfo{},
-			ValidatorSet:              peerSet,
-			StartBlock:                0,
-			P2PBootstrapNodeAddresses: []string{"1"},
-			ConsensusParams: ConsensusParams{
-				ValidatorElectionType:         ValidatorElectionTypeWRF,
+		GenesisEpochInfo: &kittypes.EpochInfo{
+			Epoch:       epoch,
+			EpochPeriod: 1000,
+			StartBlock:  0,
+			ConsensusParams: kittypes.ConsensusParams{
 				ProposerElectionType:          ProposerElectionTypeAbnormalRotation,
 				CheckpointPeriod:              10,
 				HighWatermarkCheckpointPeriod: 4,
@@ -233,16 +220,6 @@ func (tf *testFramework[T, Constraint]) newNodeConfig(
 				NotActiveWeight:               1,
 				AbnormalNodeExcludeView:       10,
 				AgainProposeIntervalBlockInValidatorsNumPercentage: 1,
-			},
-			FinanceParams: FinanceParams{
-				GasLimit:              0x5f5e100,
-				MaxGasPrice:           10000000000000,
-				MinGasPrice:           1000000000000,
-				GasChangeRateValue:    1250,
-				GasChangeRateDecimals: 4,
-			},
-			MiscParams: MiscParams{
-				TxMaxSize: 10 * 32 * 1024,
 			},
 		},
 		SelfP2PNodeID: p2pNodeID,
@@ -446,12 +423,12 @@ func (ext *testExternal[T, Constraint]) Sign(msg []byte) ([]byte, error) {
 	return nil, nil
 }
 
-func (ext *testExternal[T, Constraint]) Verify(_ string, _ []byte, _ []byte) error {
+func (ext *testExternal[T, Constraint]) Verify(_ uint64, _ []byte, _ []byte) error {
 	return nil
 }
 
 // ServiceOutbound
-func (ext *testExternal[T, Constraint]) Execute(requests []*T, _ []bool, seqNo uint64, timestamp int64, _ string, _ uint64) {
+func (ext *testExternal[T, Constraint]) Execute(requests []*T, _ []bool, seqNo uint64, timestamp int64, _ uint64) {
 	var txHashList []string
 	for _, req := range requests {
 		txHash := Constraint(req).RbftGetTxHash()
@@ -582,11 +559,11 @@ func (ext *testExternal[T, Constraint]) SendFilterEvent(informType types.InformT
 }
 
 // TODO: supported epoch change
-func (ext *testExternal[T, Constraint]) GetCurrentEpochInfo() (*EpochInfo, error) {
+func (ext *testExternal[T, Constraint]) GetCurrentEpochInfo() (*kittypes.EpochInfo, error) {
 	return ext.testNode.n.config.GenesisEpochInfo, nil
 }
 
-func (ext *testExternal[T, Constraint]) GetEpochInfo(epoch uint64) (*EpochInfo, error) {
+func (ext *testExternal[T, Constraint]) GetEpochInfo(epoch uint64) (*kittypes.EpochInfo, error) {
 	return ext.testNode.n.config.GenesisEpochInfo, nil
 }
 
@@ -596,4 +573,40 @@ func (ext *testExternal[T, Constraint]) StoreEpochState(key string, value []byte
 
 func (ext *testExternal[T, Constraint]) ReadEpochState(key string) ([]byte, error) {
 	return nil, nil
+}
+
+func (ext *testExternal[T, Constraint]) GetNodeInfo(nodeID uint64) (*NodeInfo, error) {
+	if nodeID > uint64(len(ext.tf.TestNode)) {
+		return nil, errors.New("invalid node id")
+	}
+	return &NodeInfo{
+		ID:        nodeID,
+		P2PNodeID: "node" + strconv.Itoa(int(nodeID+1)),
+	}, nil
+}
+
+func (ext *testExternal[T, Constraint]) GetNodeIDByP2PID(p2pID string) (uint64, error) {
+	nodeIDStr := strings.TrimPrefix(p2pID, "node")
+	if nodeIDStr == p2pID {
+		return 0, errors.New("invalid p2p id")
+	}
+	nodeID, err := strconv.Atoi(nodeIDStr)
+	if err != nil {
+		return 0, err
+	}
+	if nodeID > len(ext.tf.TestNode) {
+		return 0, errors.New("invalid p2p id")
+	}
+	return uint64(nodeID), nil
+}
+
+func (ext *testExternal[T, Constraint]) GetValidatorSet() (map[uint64]int64, error) {
+	return genesisValidatorSet, nil
+}
+
+func (ext *testExternal[T, Constraint]) GetBlockMeta(num uint64) (*types.BlockMeta, error) {
+	return &types.BlockMeta{
+		ProcessorNodeID: 0,
+		BlockNum:        num,
+	}, nil
 }

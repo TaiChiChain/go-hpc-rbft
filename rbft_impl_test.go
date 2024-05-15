@@ -13,28 +13,23 @@ import (
 	"github.com/axiomesh/axiom-bft/common/metrics/disabled"
 	"github.com/axiomesh/axiom-bft/types"
 	"github.com/axiomesh/axiom-kit/txpool/mock_txpool"
-	types2 "github.com/axiomesh/axiom-kit/types"
+	kittypes "github.com/axiomesh/axiom-kit/types"
 )
 
 // ============================================
 // Basic Tools
 // ============================================
-func newMockRbft[T any, Constraint types2.TXConstraint[T]](t *testing.T, ctrl *gomock.Controller) *rbftImpl[T, Constraint] {
+func newMockRbft[T any, Constraint kittypes.TXConstraint[T]](t *testing.T, ctrl *gomock.Controller) *rbftImpl[T, Constraint] {
 	log := common.NewSimpleLogger()
 	external := NewMockMinimalExternal[T, Constraint](ctrl)
 
 	conf := Config{
 		SelfP2PNodeID: "node1",
-		GenesisEpochInfo: &EpochInfo{
-			Version:                   1,
-			Epoch:                     1,
-			EpochPeriod:               1000,
-			CandidateSet:              []NodeInfo{},
-			ValidatorSet:              peerSet,
-			StartBlock:                1,
-			P2PBootstrapNodeAddresses: []string{"1"},
-			ConsensusParams: ConsensusParams{
-				ValidatorElectionType:         ValidatorElectionTypeWRF,
+		GenesisEpochInfo: &kittypes.EpochInfo{
+			Epoch:       1,
+			EpochPeriod: 1000,
+			StartBlock:  1,
+			ConsensusParams: kittypes.ConsensusParams{
 				ProposerElectionType:          ProposerElectionTypeAbnormalRotation,
 				CheckpointPeriod:              10,
 				HighWatermarkCheckpointPeriod: 4,
@@ -66,7 +61,7 @@ func newMockRbft[T any, Constraint types2.TXConstraint[T]](t *testing.T, ctrl *g
 		DelFlag:     make(chan bool),
 	}
 
-	external.EXPECT().GetEpochInfo(gomock.Any()).DoAndReturn(func(u uint64) (*EpochInfo, error) {
+	external.EXPECT().GetEpochInfo(gomock.Any()).DoAndReturn(func(u uint64) (*kittypes.EpochInfo, error) {
 		return conf.GenesisEpochInfo, nil
 	}).AnyTimes()
 
@@ -90,15 +85,11 @@ func TestRBFT_newRBFT(t *testing.T) {
 		assert.Nil(t, nilElems)
 	}
 
-	// Nil Peers
-	rbft.config.GenesisEpochInfo.ValidatorSet = []NodeInfo{}
-	_, err = newRBFT(rbft.config, rbft.external, rbft.batchMgr.requestPool, true)
-	assert.Error(t, err)
-
 	// Is a New Node
-	rbft.config.GenesisEpochInfo.ValidatorSet = peerSet
 	rbft.config.SelfP2PNodeID = "node4"
 	rbft, _ = newRBFT(rbft.config, rbft.external, rbft.batchMgr.requestPool, true)
+	err = rbft.init()
+	assert.Nil(t, err)
 	assert.Equal(t, 4, rbft.chainConfig.N)
 }
 

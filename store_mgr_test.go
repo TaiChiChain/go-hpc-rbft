@@ -11,10 +11,10 @@ import (
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/common/metrics/disabled"
 	"github.com/axiomesh/axiom-bft/types"
-	types2 "github.com/axiomesh/axiom-kit/types"
+	kittypes "github.com/axiomesh/axiom-kit/types"
 )
 
-func newStorageTestNode[T any, Constraint types2.TXConstraint[T]](ctrl *gomock.Controller) (*storeManager[T, Constraint], Config) {
+func newStorageTestNode[T any, Constraint kittypes.TXConstraint[T]](ctrl *gomock.Controller) (*storeManager[T, Constraint], Config) {
 	log := common.NewSimpleLogger()
 
 	conf := Config{
@@ -23,16 +23,11 @@ func newStorageTestNode[T any, Constraint types2.TXConstraint[T]](ctrl *gomock.C
 			MetaState: &types.MetaState{},
 			Epoch:     1,
 		},
-		GenesisEpochInfo: &EpochInfo{
-			Version:                   1,
-			Epoch:                     1,
-			EpochPeriod:               1000,
-			CandidateSet:              []NodeInfo{},
-			ValidatorSet:              peerSet,
-			StartBlock:                1,
-			P2PBootstrapNodeAddresses: []string{},
-			ConsensusParams: ConsensusParams{
-				ValidatorElectionType:         ValidatorElectionTypeWRF,
+		GenesisEpochInfo: &kittypes.EpochInfo{
+			Epoch:       1,
+			EpochPeriod: 1000,
+			StartBlock:  1,
+			ConsensusParams: kittypes.ConsensusParams{
 				ProposerElectionType:          ProposerElectionTypeAbnormalRotation,
 				CheckpointPeriod:              10,
 				HighWatermarkCheckpointPeriod: 4,

@@ -8,15 +8,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
-	kit_types "github.com/axiomesh/axiom-kit/types"
-
 	"github.com/axiomesh/axiom-bft/common"
 	"github.com/axiomesh/axiom-bft/common/consensus"
 	"github.com/axiomesh/axiom-bft/common/metrics/disabled"
 	"github.com/axiomesh/axiom-bft/types"
+	kittypes "github.com/axiomesh/axiom-kit/types"
 )
 
-func newTestTimerMgr[T any, Constraint kit_types.TXConstraint[T]](ctrl *gomock.Controller) *timerManager {
+func newTestTimerMgr[T any, Constraint kittypes.TXConstraint[T]](ctrl *gomock.Controller) *timerManager {
 	log := common.NewSimpleLogger()
 	conf := Config{
 		LastServiceState: &types.ServiceState{
@@ -24,16 +23,11 @@ func newTestTimerMgr[T any, Constraint kit_types.TXConstraint[T]](ctrl *gomock.C
 			Epoch:     1,
 		},
 		SelfP2PNodeID: "node1",
-		GenesisEpochInfo: &EpochInfo{
-			Version:                   1,
-			Epoch:                     1,
-			EpochPeriod:               1000,
-			CandidateSet:              []NodeInfo{},
-			ValidatorSet:              peerSet,
-			StartBlock:                1,
-			P2PBootstrapNodeAddresses: []string{},
-			ConsensusParams: ConsensusParams{
-				ValidatorElectionType:         ValidatorElectionTypeWRF,
+		GenesisEpochInfo: &kittypes.EpochInfo{
+			Epoch:       1,
+			EpochPeriod: 1000,
+			StartBlock:  1,
+			ConsensusParams: kittypes.ConsensusParams{
 				ProposerElectionType:          ProposerElectionTypeAbnormalRotation,
 				CheckpointPeriod:              2,
 				HighWatermarkCheckpointPeriod: 2,

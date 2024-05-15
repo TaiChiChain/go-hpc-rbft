@@ -462,7 +462,7 @@ func (rbft *rbftImpl[T, Constraint]) primaryResubmitTransactions() {
 	}
 }
 
-func isConfigBatch(seqNo uint64, epochInfo *EpochInfo) bool {
+func isConfigBatch(seqNo uint64, epochInfo *types.EpochInfo) bool {
 	// when epoch change trigger
 	return seqNo == epochInfo.StartBlock+epochInfo.EpochPeriod-1
 }

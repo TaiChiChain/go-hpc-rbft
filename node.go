@@ -60,6 +60,7 @@ type InboundNode interface {
 	ServiceInbound
 
 	Init() error
+
 	// Start starts a node instance.
 	Start() error
 
