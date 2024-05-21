@@ -248,7 +248,7 @@ func (rbft *rbftImpl[T, Constraint]) initSyncState() consensusEvent {
 
 	// broadcast sync state message to others.
 	syncStateMsg := &consensus.SyncState{
-		ReplicaId: rbft.chainConfig.SelfID,
+		AuthorP2PNodeId: rbft.chainConfig.SelfP2PNodeID,
 	}
 	payload, err := syncStateMsg.MarshalVTStrict()
 	if err != nil {
@@ -290,7 +290,13 @@ func (rbft *rbftImpl[T, Constraint]) initSyncState() consensusEvent {
 }
 
 func (rbft *rbftImpl[T, Constraint]) recvSyncState(sync *consensus.SyncState) consensusEvent {
-	rbft.logger.Infof("Replica %d received sync state from replica %d", rbft.chainConfig.SelfID, sync.ReplicaId)
+	id, err := rbft.chainConfig.getNodeIDByP2PID(sync.AuthorP2PNodeId)
+	if err != nil {
+		rbft.logger.Warningf("Replica %d recv sync state from unknown p2p id %s", rbft.chainConfig.SelfID, sync.AuthorP2PNodeId)
+		return nil
+	} else {
+		rbft.logger.Infof("Replica %d received sync state from %s", rbft.chainConfig.SelfID, sync.AuthorP2PNodeId)
+	}
 
 	if !rbft.isNormal() {
 		rbft.logger.Debugf("Replica %d is in abnormal, don't send sync state response", rbft.chainConfig.SelfID)
@@ -335,9 +341,9 @@ func (rbft *rbftImpl[T, Constraint]) recvSyncState(sync *consensus.SyncState) co
 		Type:    consensus.Type_SYNC_STATE_RESPONSE,
 		Payload: payload,
 	}
-	rbft.peerMgr.unicast(context.TODO(), consensusMsg, sync.ReplicaId)
+	rbft.peerMgr.unicastByP2PID(context.TODO(), consensusMsg, sync.AuthorP2PNodeId)
 	rbft.logger.Debugf("Replica %d send sync state response to replica %d: view=%d, checkpoint=%s",
-		rbft.chainConfig.SelfID, sync.ReplicaId, rbft.chainConfig.View, signedCheckpoint.GetCheckpoint().Pretty())
+		rbft.chainConfig.SelfID, id, rbft.chainConfig.View, signedCheckpoint.GetCheckpoint().Pretty())
 	return nil
 }
 
