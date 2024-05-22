@@ -218,7 +218,7 @@ message FetchPQCResponse {
 }
 
 message SyncState {
-    uint64 replica_id = 1;
+    string author_p2p_node_id = 1;
 }
 
 message SyncStateResponse {
