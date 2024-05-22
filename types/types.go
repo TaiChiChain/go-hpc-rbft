@@ -42,6 +42,7 @@ type MetaState struct {
 type BlockMeta struct {
 	ProcessorNodeID uint64
 	BlockNum        uint64
+	BlockHash       string
 }
 
 // CheckpointState is the basic info for checkpoint.

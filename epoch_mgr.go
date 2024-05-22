@@ -225,7 +225,7 @@ func (rbft *rbftImpl[T, Constraint]) updateEpochInfo(epochInfo *kittypes.EpochIn
 		rbft.logger.Criticalf("Replica %d failed to check epoch info for epoch %d from ledger: %v", rbft.chainConfig.SelfID, epochInfo.Epoch, err)
 		return
 	}
-	rbft.chainConfig.ResetRecentBlockNum(rbft.config.LastServiceState.MetaState.Height)
+	rbft.chainConfig.ResetRecentBlockNum(rbft.chainConfig.LastCheckpointExecBlockHeight)
 	newRole := "validator"
 	if rbft.chainConfig.isValidator() {
 		newRole = "candidate"
