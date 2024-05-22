@@ -623,6 +623,7 @@ func (rbft *rbftImpl[T, Constraint]) restoreState() error {
 				rbft.storeMgr.saveCheckpoint(seqNo, signedC)
 				if seqNo > maxCheckpointSeqNo {
 					rbft.chainConfig.LastCheckpointExecBlockHash = digest
+					rbft.chainConfig.LastCheckpointExecBlockHeight = seqNo
 					maxCheckpointSeqNo = seqNo
 				}
 			}
@@ -631,22 +632,28 @@ func (rbft *rbftImpl[T, Constraint]) restoreState() error {
 		rbft.logger.Debugf("Replica %d could not restore checkpoints: %s", rbft.chainConfig.SelfID, err)
 		lastCheckpointBlockNumber := rbft.config.LastServiceState.MetaState.Height / rbft.config.GenesisEpochInfo.ConsensusParams.CheckpointPeriod * rbft.config.GenesisEpochInfo.ConsensusParams.CheckpointPeriod
 		if rbft.config.GenesisEpochInfo.StartBlock != rbft.config.LastServiceState.MetaState.Height && lastCheckpointBlockNumber != 0 {
+			blockMeta, err := rbft.external.GetBlockMeta(lastCheckpointBlockNumber)
+			if err != nil {
+				return errors.Errorf("failed to get block meta of last checkpoint block %d", lastCheckpointBlockNumber)
+			}
 			// find last checkpoint
 			lastCheckpointState := &types.ServiceState{
 				MetaState: &types.MetaState{
 					Height: lastCheckpointBlockNumber,
-					Digest: rbft.config.LastCheckpointBlockDigest,
+					Digest: blockMeta.BlockHash,
 				},
 				Epoch: rbft.chainConfig.EpochInfo.Epoch,
 			}
+
 			// it usually happens when restart node which delete consensus store
 			lastCheckpoint, gErr := rbft.generateSignedCheckpoint(lastCheckpointState, "", isConfigBatch(lastCheckpointState.MetaState.Height, rbft.chainConfig.EpochInfo), false)
 			if gErr != nil {
 				return gErr
 			}
-			rbft.chainConfig.LastCheckpointExecBlockHash = rbft.config.LastCheckpointBlockDigest
+			rbft.chainConfig.LastCheckpointExecBlockHash = lastCheckpointState.MetaState.Digest
+			rbft.chainConfig.LastCheckpointExecBlockHeight = lastCheckpointState.MetaState.Height
 			rbft.storeMgr.saveCheckpoint(lastCheckpointState.MetaState.Height, lastCheckpoint)
-			rbft.logger.Debugf("Replica %d construct last checkpoint %s for seqNo %d", rbft.chainConfig.SelfID, rbft.config.LastCheckpointBlockDigest, lastCheckpointBlockNumber)
+			rbft.logger.Debugf("Replica %d construct last checkpoint %s for seqNo %d", rbft.chainConfig.SelfID, lastCheckpointState.MetaState.Height, lastCheckpointBlockNumber)
 		} else {
 			// generate genesis checkpoint
 			state := &types.ServiceState{
@@ -661,6 +668,7 @@ func (rbft *rbftImpl[T, Constraint]) restoreState() error {
 				return gErr
 			}
 			rbft.chainConfig.LastCheckpointExecBlockHash = rbft.config.GenesisBlockDigest
+			rbft.chainConfig.LastCheckpointExecBlockHeight = rbft.config.GenesisEpochInfo.StartBlock
 			rbft.storeMgr.saveCheckpoint(state.MetaState.Height, genesisCheckpoint)
 			rbft.logger.Debugf("Replica %d construct genesis checkpoint %s for seqNo %d", rbft.chainConfig.SelfID, state.MetaState.Digest, state.MetaState.Height)
 		}

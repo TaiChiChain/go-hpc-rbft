@@ -22,6 +22,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/samber/lo"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -40,8 +41,6 @@ type Config struct {
 	GenesisEpochInfo *kittypes.EpochInfo
 
 	GenesisBlockDigest string
-
-	LastCheckpointBlockDigest string
 
 	SelfP2PNodeID string
 
@@ -258,7 +257,7 @@ func (rbft *rbftImpl[T, Constraint]) init() error {
 		rbft.logger.Errorf("Replica restore state failed: %s", rErr)
 		return rErr
 	}
-	rbft.chainConfig.ResetRecentBlockNum(rbft.config.LastServiceState.MetaState.Height)
+	rbft.chainConfig.ResetRecentBlockNum(rbft.chainConfig.LastCheckpointExecBlockHeight)
 
 	rbft.initTimers()
 	rbft.initStatus()
@@ -1771,10 +1770,6 @@ func (rbft *rbftImpl[T, Constraint]) findNextCommitBatch() (find bool, idx msgID
 func (rbft *rbftImpl[T, Constraint]) afterCommitBlock(idx msgID, isConfig bool, proposerNodeID uint64) {
 	rbft.logger.Debugf("Replica %d finished execution %d, trying next", rbft.chainConfig.SelfID, idx.n)
 	rbft.exec.setLastExec(idx.n)
-	rbft.chainConfig.RecentBlockProcessorTracker.AddBlock(types.BlockMeta{
-		ProcessorNodeID: proposerNodeID,
-		BlockNum:        idx.n,
-	})
 	delete(rbft.storeMgr.committedCert, idx)
 	// not checkpoint
 	if isConfig || rbft.exec.lastExec%rbft.chainConfig.EpochInfo.ConsensusParams.CheckpointPeriod == 0 {
@@ -2032,6 +2027,15 @@ func (rbft *rbftImpl[T, Constraint]) recvCheckpoint(signedCheckpoint *consensus.
 	}
 
 	rbft.chainConfig.LastCheckpointExecBlockHash = checkpointDigest
+	rbft.chainConfig.LastCheckpointExecBlockHeight = checkpointHeight
+	blockMeta, err := rbft.external.GetBlockMeta(checkpointHeight)
+	if err != nil {
+		return errors.Wrapf(err, "failed to get block meta %d after checkpoint", checkpointHeight)
+	}
+	rbft.chainConfig.RecentBlockProcessorTracker.AddBlock(types.BlockMeta{
+		ProcessorNodeID: blockMeta.ProcessorNodeID,
+		BlockNum:        checkpointHeight,
+	})
 	// the checkpoint is trigger by config batch
 	if signedCheckpoint.Checkpoint.NeedUpdateEpoch {
 		return rbft.finishConfigCheckpoint(checkpointHeight, checkpointDigest, matchingCheckpoints)
@@ -2093,52 +2097,65 @@ func (rbft *rbftImpl[T, Constraint]) finishNormalCheckpoint(checkpointHeight uin
 		localCheckpoint := rbft.storeMgr.localCheckpoints[checkpointHeight]
 
 		newView := rbft.chainConfig.View + 1
+		viewCounter := make(map[uint64]uint64)
 		qvc := &consensus.QuorumViewChange{
 			ViewChanges: make([]*consensus.ViewChange, 0, len(rbft.vcMgr.viewChangeStore)),
 		}
 		for _, ckp := range matchingCheckpoints {
 			if ckp.Checkpoint.ViewChange != nil {
-				if ckp.Checkpoint.ViewChange.Basis.View == newView {
-					qvc.ViewChanges = append(qvc.ViewChanges, ckp.Checkpoint.ViewChange)
-				}
+				qvc.ViewChanges = append(qvc.ViewChanges, ckp.Checkpoint.ViewChange)
+				viewCounter[ckp.Checkpoint.ViewChange.Basis.GetView()]++
 			}
 		}
-
-		validatorDynamicInfo, ok := rbft.selectValidatorDynamicInfo(qvc.ViewChanges)
-		if !ok {
-			rbft.logger.Errorf("Replica %d selectValidatorDynamicInfo failed after finishNormalCheckpoint", rbft.chainConfig.SelfID)
+		var mostView, mostViewCount uint64
+		for view, count := range viewCounter {
+			if count > mostViewCount {
+				mostView = view
+				mostViewCount = count
+			}
+		}
+		if mostViewCount < uint64(rbft.commonCaseQuorum()) {
+			rbft.logger.Errorf("Replica %d not found quorum stable view for normal checkpoint, expected view count: %v, view counter: %v", rbft.chainConfig.SelfID, uint64(rbft.commonCaseQuorum()), viewCounter)
 			return nil
 		}
-		// update view after checkpoint
-		// persist new view
-		nv := &consensus.NewView{
-			ReplicaId:     rbft.chainConfig.PrimaryID,
-			View:          newView,
-			ViewChangeSet: qvc,
-			QuorumCheckpoint: &consensus.QuorumCheckpoint{
-				Checkpoint: localCheckpoint.Checkpoint,
-				Signatures: lo.SliceToMap(matchingCheckpoints, func(item *consensus.SignedCheckpoint) (uint64, []byte) {
-					return item.Author, item.Signature
-				}),
-			},
-			FromId:               rbft.chainConfig.SelfID,
-			AutoTermUpdate:       true,
-			ValidatorDynamicInfo: validatorDynamicInfo,
-		}
-		sort.Slice(nv.ValidatorDynamicInfo, func(i, j int) bool {
-			return nv.ValidatorDynamicInfo[i].Id < nv.ValidatorDynamicInfo[j].Id
-		})
-		sig, sErr := rbft.signNewView(nv)
-		if sErr != nil {
-			rbft.logger.Warningf("Replica %d sign new view failed: %s", rbft.chainConfig.SelfID, sErr)
-			return nil
-		}
-		nv.Signature = sig
-		rbft.persistNewView(nv, true)
+		// if rbft.vcMgr.latestNewView.View >= mostView, has been processed in recvNewView, not need to process again
+		if rbft.vcMgr.latestNewView.View < mostView {
+			validatorDynamicInfo, ok := rbft.selectValidatorDynamicInfo(qvc.ViewChanges)
+			if !ok {
+				rbft.logger.Errorf("Replica %d selectValidatorDynamicInfo failed after finishNormalCheckpoint", rbft.chainConfig.SelfID)
+				return nil
+			}
+			// update view after checkpoint
+			// persist new view
+			nv := &consensus.NewView{
+				ReplicaId:     rbft.chainConfig.PrimaryID,
+				View:          newView,
+				ViewChangeSet: qvc,
+				QuorumCheckpoint: &consensus.QuorumCheckpoint{
+					Checkpoint: localCheckpoint.Checkpoint,
+					Signatures: lo.SliceToMap(matchingCheckpoints, func(item *consensus.SignedCheckpoint) (uint64, []byte) {
+						return item.Author, item.Signature
+					}),
+				},
+				FromId:               rbft.chainConfig.SelfID,
+				AutoTermUpdate:       true,
+				ValidatorDynamicInfo: validatorDynamicInfo,
+			}
+			sort.Slice(nv.ValidatorDynamicInfo, func(i, j int) bool {
+				return nv.ValidatorDynamicInfo[i].Id < nv.ValidatorDynamicInfo[j].Id
+			})
+			sig, sErr := rbft.signNewView(nv)
+			if sErr != nil {
+				rbft.logger.Warningf("Replica %d sign new view failed: %s", rbft.chainConfig.SelfID, sErr)
+				return nil
+			}
+			nv.Signature = sig
+			rbft.persistNewView(nv, true)
 
-		// Slave -> Primary： need update self seqNo(because only primary will update)
-		rbft.batchMgr.setSeqNo(checkpointHeight)
-		rbft.logger.Infof("Replica %d post stable checkpoint event for seqNo %d, update to new view: %d, new primary ID: %d,  epoch:%d, last checkpoint digest: %s", rbft.chainConfig.SelfID, rbft.chainConfig.H, rbft.chainConfig.View, rbft.chainConfig.PrimaryID, rbft.chainConfig.EpochInfo.Epoch, rbft.chainConfig.LastCheckpointExecBlockHash)
+			// Slave -> Primary： need update self seqNo(because only primary will update)
+			rbft.batchMgr.setSeqNo(checkpointHeight)
+			rbft.logger.Infof("Replica %d post stable checkpoint event for seqNo %d, update to new view: %d, new primary ID: %d,  epoch:%d, last checkpoint digest: %s", rbft.chainConfig.SelfID, rbft.chainConfig.H, rbft.chainConfig.View, rbft.chainConfig.PrimaryID, rbft.chainConfig.EpochInfo.Epoch, rbft.chainConfig.LastCheckpointExecBlockHash)
+		}
 	} else {
 		rbft.logger.Infof("Replica %d post stable checkpoint event for seqNo %d", rbft.chainConfig.SelfID, rbft.chainConfig.H)
 	}
@@ -2587,6 +2604,7 @@ func (rbft *rbftImpl[T, Constraint]) recvStateUpdatedEvent(ss *types.ServiceSync
 		}
 		rbft.storeMgr.saveCheckpoint(seqNo, signedCheckpoint)
 		rbft.chainConfig.LastCheckpointExecBlockHash = digest
+		rbft.chainConfig.LastCheckpointExecBlockHeight = seqNo
 		rbft.persistCheckpoint(seqNo, digest, checkpoint.ExecuteState.BatchDigest)
 		rbft.moveWatermarks(seqNo, epochChanged)
 	}

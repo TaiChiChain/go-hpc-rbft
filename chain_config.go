@@ -117,6 +117,8 @@ type DynamicChainConfig struct {
 	// last checkpoint block hash
 	LastCheckpointExecBlockHash string
 
+	LastCheckpointExecBlockHeight uint64
+
 	// Proposer node id of the current View period.
 	PrimaryID uint64
 
@@ -146,7 +148,7 @@ func NewBlockProcessorTracker(getBlockFunc func(uint64) (*types.BlockMeta, error
 	}
 }
 
-func (t *BlockProcessorTracker) ResetRecentBlockNum(epochStartBlockNum uint64, lastExecutedBlockNum uint64, recentBlockNum uint64) {
+func (t *BlockProcessorTracker) ResetRecentBlockNum(epochStartBlockNum uint64, lastCheckpointExecBlockHeight uint64, recentBlockNum uint64) {
 	oldBlockProcessors := make(map[uint64]*types.BlockMeta, len(t.BlockProcessors))
 	for _, oldBlockProcessor := range t.BlockProcessors {
 		if oldBlockProcessor != nil {
@@ -160,7 +162,7 @@ func (t *BlockProcessorTracker) ResetRecentBlockNum(epochStartBlockNum uint64, l
 	t.StartBlockNum = 0
 	t.EndBlockNum = 0
 	startBlockNum := epochStartBlockNum
-	endBlockNum := lastExecutedBlockNum
+	endBlockNum := lastCheckpointExecBlockHeight
 	if endBlockNum > epochStartBlockNum+recentBlockNum-1 {
 		startBlockNum = endBlockNum - recentBlockNum + 1
 	}
@@ -180,8 +182,8 @@ func (t *BlockProcessorTracker) ResetRecentBlockNum(epochStartBlockNum uint64, l
 	}
 }
 
-func (t *BlockProcessorTracker) AddBlock(blockProcessor types.BlockMeta) {
-	t.BlockProcessors[t.NextIdx] = &blockProcessor
+func (t *BlockProcessorTracker) AddBlock(lastCheckpointExecBlockMeta types.BlockMeta) {
+	t.BlockProcessors[t.NextIdx] = &lastCheckpointExecBlockMeta
 	blockProcessorIDSet := make(map[uint64]struct{})
 	for _, item := range t.BlockProcessors {
 		if item != nil {
@@ -191,8 +193,8 @@ func (t *BlockProcessorTracker) AddBlock(blockProcessor types.BlockMeta) {
 	t.BlockProcessorIDSet = blockProcessorIDSet
 	t.NextIdx = (t.NextIdx + 1) % t.RecentBlockNum
 	if t.StartBlockNum == 0 && t.EndBlockNum == 0 {
-		t.StartBlockNum = blockProcessor.BlockNum
-		t.EndBlockNum = blockProcessor.BlockNum
+		t.StartBlockNum = lastCheckpointExecBlockMeta.BlockNum
+		t.EndBlockNum = lastCheckpointExecBlockMeta.BlockNum
 	} else {
 		t.EndBlockNum++
 		if t.EndBlockNum-t.StartBlockNum == t.RecentBlockNum {
@@ -353,7 +355,7 @@ func (c *ChainConfig) validatorDynamicInfo() []ValidatorInfo {
 	return res
 }
 
-func (c *ChainConfig) ResetRecentBlockNum(lastExecutedBlockNum uint64) {
+func (c *ChainConfig) ResetRecentBlockNum(lastCheckpointExecBlockHeight uint64) {
 	validatorSetNum := uint64(len(c.ValidatorDynamicInfoMap))
 	recentBlockNum := validatorSetNum * c.EpochInfo.ConsensusParams.AgainProposeIntervalBlockInValidatorsNumPercentage / 100
 	if recentBlockNum == 0 {
@@ -361,7 +363,7 @@ func (c *ChainConfig) ResetRecentBlockNum(lastExecutedBlockNum uint64) {
 	} else if recentBlockNum == validatorSetNum {
 		recentBlockNum = validatorSetNum - 1
 	}
-	c.RecentBlockProcessorTracker.ResetRecentBlockNum(c.EpochInfo.StartBlock, lastExecutedBlockNum, recentBlockNum)
+	c.RecentBlockProcessorTracker.ResetRecentBlockNum(c.EpochInfo.StartBlock, lastCheckpointExecBlockHeight, recentBlockNum)
 }
 
 func (c *ChainConfig) CheckValidator(nodeID uint64) bool {
