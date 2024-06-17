@@ -44,6 +44,7 @@ const (
 	byzantine      // byzantine
 	InEpochSyncing // in epoch syncing, used to block consensus progress until sync to epoch change height.
 	waitCheckpointBatchExecute
+	waitCheckpointFinished
 )
 
 // NodeStatus reflects the internal consensus status.

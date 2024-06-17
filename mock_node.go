@@ -42,6 +42,11 @@ func (m *MockNode[T, Constraint]) EXPECT() *MockNodeMockRecorder[T, Constraint] 
 	return m.recorder
 }
 
+// ISGOMOCK indicates that this struct is a gomock mock.
+func (m *MockNode[T, Constraint]) ISGOMOCK() struct{} {
+	return struct{}{}
+}
+
 // ArchiveMode mocks base method.
 func (m *MockNode[T, Constraint]) ArchiveMode() bool {
 	m.ctrl.T.Helper()
@@ -437,6 +442,11 @@ func (m *MockServiceInbound) EXPECT() *MockServiceInboundMockRecorder {
 	return m.recorder
 }
 
+// ISGOMOCK indicates that this struct is a gomock mock.
+func (m *MockServiceInbound) ISGOMOCK() struct{} {
+	return struct{}{}
+}
+
 // ReportExecuted mocks base method.
 func (m *MockServiceInbound) ReportExecuted(state *types.ServiceState) {
 	m.ctrl.T.Helper()
@@ -530,6 +540,11 @@ func NewMockInboundNode(ctrl *gomock.Controller) *MockInboundNode {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockInboundNode) EXPECT() *MockInboundNodeMockRecorder {
 	return m.recorder
+}
+
+// ISGOMOCK indicates that this struct is a gomock mock.
+func (m *MockInboundNode) ISGOMOCK() struct{} {
+	return struct{}{}
 }
 
 // ArchiveMode mocks base method.

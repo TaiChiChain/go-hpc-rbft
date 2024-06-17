@@ -42,6 +42,11 @@ func (m *MockStorage) EXPECT() *MockStorageMockRecorder {
 	return m.recorder
 }
 
+// ISGOMOCK indicates that this struct is a gomock mock.
+func (m *MockStorage) ISGOMOCK() struct{} {
+	return struct{}{}
+}
+
 // DelState mocks base method.
 func (m *MockStorage) DelState(key string) error {
 	m.ctrl.T.Helper()
@@ -219,6 +224,11 @@ func (m *MockNetwork) EXPECT() *MockNetworkMockRecorder {
 	return m.recorder
 }
 
+// ISGOMOCK indicates that this struct is a gomock mock.
+func (m *MockNetwork) ISGOMOCK() struct{} {
+	return struct{}{}
+}
+
 // Broadcast mocks base method.
 func (m *MockNetwork) Broadcast(ctx context.Context, msg *consensus.ConsensusMessage) error {
 	m.ctrl.T.Helper()
@@ -316,6 +326,11 @@ func NewMockCrypto(ctrl *gomock.Controller) *MockCrypto {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockCrypto) EXPECT() *MockCryptoMockRecorder {
 	return m.recorder
+}
+
+// ISGOMOCK indicates that this struct is a gomock mock.
+func (m *MockCrypto) ISGOMOCK() struct{} {
+	return struct{}{}
 }
 
 // Sign mocks base method.
@@ -416,6 +431,11 @@ func NewMockServiceOutbound[T any, Constraint types0.TXConstraint[T]](ctrl *gomo
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockServiceOutbound[T, Constraint]) EXPECT() *MockServiceOutboundMockRecorder[T, Constraint] {
 	return m.recorder
+}
+
+// ISGOMOCK indicates that this struct is a gomock mock.
+func (m *MockServiceOutbound[T, Constraint]) ISGOMOCK() struct{} {
+	return struct{}{}
 }
 
 // Execute mocks base method.
@@ -557,6 +577,11 @@ func NewMockEpochService(ctrl *gomock.Controller) *MockEpochService {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockEpochService) EXPECT() *MockEpochServiceMockRecorder {
 	return m.recorder
+}
+
+// ISGOMOCK indicates that this struct is a gomock mock.
+func (m *MockEpochService) ISGOMOCK() struct{} {
+	return struct{}{}
 }
 
 // GetCurrentEpochInfo mocks base method.
@@ -737,6 +762,11 @@ func (m *MockNodeService) EXPECT() *MockNodeServiceMockRecorder {
 	return m.recorder
 }
 
+// ISGOMOCK indicates that this struct is a gomock mock.
+func (m *MockNodeService) ISGOMOCK() struct{} {
+	return struct{}{}
+}
+
 // GetNodeIDByP2PID mocks base method.
 func (m *MockNodeService) GetNodeIDByP2PID(p2pID string) (uint64, error) {
 	m.ctrl.T.Helper()
@@ -877,6 +907,11 @@ func (m *MockLedger) EXPECT() *MockLedgerMockRecorder {
 	return m.recorder
 }
 
+// ISGOMOCK indicates that this struct is a gomock mock.
+func (m *MockLedger) ISGOMOCK() struct{} {
+	return struct{}{}
+}
+
 // GetBlockMeta mocks base method.
 func (m *MockLedger) GetBlockMeta(num uint64) (*types.BlockMeta, error) {
 	m.ctrl.T.Helper()
@@ -937,6 +972,11 @@ func NewMockExternalStack[T any, Constraint types0.TXConstraint[T]](ctrl *gomock
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockExternalStack[T, Constraint]) EXPECT() *MockExternalStackMockRecorder[T, Constraint] {
 	return m.recorder
+}
+
+// ISGOMOCK indicates that this struct is a gomock mock.
+func (m *MockExternalStack[T, Constraint]) ISGOMOCK() struct{} {
+	return struct{}{}
 }
 
 // Broadcast mocks base method.
