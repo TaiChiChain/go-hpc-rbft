@@ -1828,6 +1828,9 @@ func (rbft *rbftImpl[T, Constraint]) recvCheckpointBlockExecutedEvent(state *typ
 			rbft.logger.Debugf("Call the checkpoint for config batch, seqNo=%d", rbft.exec.lastExec)
 			rbft.epochMgr.configBatchToCheck = state.MetaState
 			rbft.off(waitCheckpointBatchExecute)
+			if !rbft.isTest {
+				rbft.on(waitCheckpointFinished)
+			}
 			rbft.checkpoint(state, true)
 
 			rbft.startTimerIfOutstandingRequests()
@@ -1850,6 +1853,9 @@ func (rbft *rbftImpl[T, Constraint]) recvCheckpointBlockExecutedEvent(state *typ
 		if state.MetaState.Height == rbft.exec.lastExec {
 			rbft.logger.Debugf("Call the checkpoint for normal, seqNo=%d", rbft.exec.lastExec)
 			rbft.off(waitCheckpointBatchExecute)
+			if !rbft.isTest {
+				rbft.on(waitCheckpointFinished)
+			}
 			rbft.checkpoint(state, false)
 
 			rbft.startTimerIfOutstandingRequests()
@@ -1989,6 +1995,7 @@ func (rbft *rbftImpl[T, Constraint]) recvCheckpoint(signedCheckpoint *consensus.
 			rbft.logger.Debugf("Replica %d keep trying state transfer", rbft.chainConfig.SelfID)
 			return nil
 		}
+		rbft.off(waitCheckpointFinished)
 		// TODO(DH): do we need ?
 		rbft.initRecovery()
 		// try state transfer immediately when found lagging for the first time.
@@ -2036,6 +2043,7 @@ func (rbft *rbftImpl[T, Constraint]) recvCheckpoint(signedCheckpoint *consensus.
 		ProcessorNodeID: blockMeta.ProcessorNodeID,
 		BlockNum:        checkpointHeight,
 	})
+	rbft.off(waitCheckpointFinished)
 	// the checkpoint is trigger by config batch
 	if signedCheckpoint.Checkpoint.NeedUpdateEpoch {
 		return rbft.finishConfigCheckpoint(checkpointHeight, checkpointDigest, matchingCheckpoints)

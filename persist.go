@@ -483,7 +483,7 @@ func (rbft *rbftImpl[T, Constraint]) persistNewView(nv *consensus.NewView, isRec
 				ConsensusVotingPowerReduceView: v.ConsensusVotingPowerReduceView,
 			}
 		})
-		rbft.logger.Infof("Replica %d reset ValidatorDynamicInfo by newView-%d from %d, new ValidatorDynamicInfo: %v", rbft.chainConfig.SelfID, nv.View, nv.FromId, rbft.chainConfig.validatorDynamicInfo())
+		rbft.logger.Infof("Replica %d reset ValidatorDynamicInfo by newView-%d from %d, new ValidatorDynamicInfo: %v", rbft.chainConfig.SelfID, nv.View, nv.FromId, formatValidatorDynamicInfo(rbft.chainConfig.ValidatorDynamicInfoMap))
 		rbft.chainConfig.updatePrimaryID()
 	}
 

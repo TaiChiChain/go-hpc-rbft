@@ -533,6 +533,7 @@ func (rbft *rbftImpl[T, Constraint]) handleViewChangeEvent(e *LocalEvent) consen
 
 			// this means that after the block is executed, the node is terminated before the checkpoint logic
 			if rbft.chainConfig.H < rbft.config.LastServiceState.MetaState.Height {
+				rbft.logger.Infof("Replica %d is terminated before checkpoint, need to report checkpoint", rbft.chainConfig.SelfID)
 				//	try checkpoint
 				go rbft.reportCheckpoint(rbft.config.LastServiceState)
 			}
@@ -576,13 +577,17 @@ func (rbft *rbftImpl[T, Constraint]) handleViewChangeEvent(e *LocalEvent) consen
 			}
 		}
 
-		// check if epoch has been changed, if changed, trigger another round of view change
-		// after epoch change to find correct view-number
-		epochChanged := rbft.syncEpoch()
-		if epochChanged {
-			rbft.logger.Debugf("Replica %d sending view change again because of epoch change", rbft.chainConfig.SelfID)
-			// trigger another round of view change after epoch change to find correct view-number
-			return rbft.initRecovery()
+		// rbft.chainConfig.H < rbft.config.LastServiceState.MetaState.Height: this means that after the block is executed, the node is terminated before the checkpoint logic
+		// must wait for checkpoint
+		if rbft.chainConfig.H == rbft.config.LastServiceState.MetaState.Height || rbft.isTest {
+			// check if epoch has been changed, if changed, trigger another round of view change
+			// after epoch change to find correct view-number
+			epochChanged := rbft.syncEpoch()
+			if epochChanged {
+				rbft.logger.Debugf("Replica %d sending view change again because of epoch change", rbft.chainConfig.SelfID)
+				// trigger another round of view change after epoch change to find correct view-number
+				return rbft.initRecovery()
+			}
 		}
 
 		if rbft.isPrimary(rbft.chainConfig.SelfID) {

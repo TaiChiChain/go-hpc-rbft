@@ -305,8 +305,6 @@ func (c *ChainConfig) wrfCalPrimaryIDByView(v uint64, validatorDynamicInfoMap ma
 
 // primaryID returns the expected primary id with the given view v
 func (c *ChainConfig) calPrimaryIDByView(v uint64, validatorDynamicInfoMap map[uint64]*ValidatorInfo) uint64 {
-	validatorDynamicInfo := c.validatorDynamicInfo()
-
 	var primaryID uint64
 	switch c.EpochInfo.ConsensusParams.ProposerElectionType {
 	case ProposerElectionTypeWRF:
@@ -322,7 +320,7 @@ func (c *ChainConfig) calPrimaryIDByView(v uint64, validatorDynamicInfoMap map[u
 	sort.Slice(excludedNodes, func(i, j int) bool {
 		return excludedNodes[i] < excludedNodes[j]
 	})
-	c.logger.Debugf("calPrimaryIDByView, view: %d, primary id: %d, validatorDynamicInfo: %v, excludedNodes: %v", v, primaryID, validatorDynamicInfo, excludedNodes)
+	c.logger.Debugf("calPrimaryIDByView, primary id: %d, view: %d, validatorDynamicInfo: %v, excludedNodes: %v", primaryID, v, formatValidatorDynamicInfo(validatorDynamicInfoMap), excludedNodes)
 	return primaryID
 }
 
@@ -343,10 +341,11 @@ func binarySearch(nums []uint64, target uint64) int {
 
 func (c *ChainConfig) updatePrimaryID() {
 	c.PrimaryID = c.calPrimaryIDByView(c.View, c.ValidatorDynamicInfoMap)
+	c.logger.Debugf("updatePrimaryID to %d, view: %d, validatorDynamicInfo: %v", c.PrimaryID, c.View, formatValidatorDynamicInfo(c.ValidatorDynamicInfoMap))
 }
 
-func (c *ChainConfig) validatorDynamicInfo() []ValidatorInfo {
-	res := lo.MapToSlice(c.ValidatorDynamicInfoMap, func(id uint64, nodeInfo *ValidatorInfo) ValidatorInfo {
+func formatValidatorDynamicInfo(validatorDynamicInfoMap map[uint64]*ValidatorInfo) []ValidatorInfo {
+	res := lo.MapToSlice(validatorDynamicInfoMap, func(id uint64, nodeInfo *ValidatorInfo) ValidatorInfo {
 		return *nodeInfo
 	})
 	sort.Slice(res, func(i, j int) bool {

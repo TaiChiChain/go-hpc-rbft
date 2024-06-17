@@ -94,6 +94,10 @@ type newViewCert struct {
 func (rbft *rbftImpl[T, Constraint]) dispatchViewChangeMsg(e consensusEvent) consensusEvent {
 	switch et := e.(type) {
 	case *consensus.ViewChange:
+		if rbft.in(waitCheckpointFinished) {
+			rbft.logger.Infof("Replica %d is in state waitCheckpointFinished, not handle view change", rbft.chainConfig.SelfID)
+			return nil
+		}
 		return rbft.recvViewChange(et, false)
 	case *consensus.NewView:
 		return rbft.recvNewView(et)
@@ -289,6 +293,12 @@ func (rbft *rbftImpl[T, Constraint]) sendViewChange(status ...bool) consensusEve
 	recovery := false
 	if len(status) != 0 {
 		recovery = status[0]
+	}
+	if !recovery {
+		if rbft.in(waitCheckpointFinished) {
+			rbft.logger.Infof("Replica %d is in state waitCheckpointFinished, not sending view change", rbft.chainConfig.SelfID)
+			return nil
+		}
 	}
 
 	// reject view change when current node is in StateTransferring to avoid other (quorum-1) replicas
