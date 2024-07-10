@@ -5,7 +5,7 @@ go 1.20
 replace github.com/ethereum/go-ethereum v1.13.14 => github.com/axiomesh/go-ethereum v1.13.14-1
 
 require (
-	github.com/axiomesh/axiom-kit v0.0.3-0.20240515161023-3855dc438410
+	github.com/axiomesh/axiom-kit v0.0.3-0.20240710060804-1104045e67a2
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.16.0
 	github.com/samber/lo v1.38.1

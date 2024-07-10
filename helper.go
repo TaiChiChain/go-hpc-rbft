@@ -842,14 +842,23 @@ func (rbft *rbftImpl[T, Constraint]) verifySignedCheckpoint(signedCheckpoint *co
 func (rbft *rbftImpl[T, Constraint]) syncConfigCheckpoint(checkpointHeight uint64, quorumCheckpoints []*consensus.SignedCheckpoint) {
 	rbft.external.SendFilterEvent(types.InformTypeFilterStableCheckpoint, quorumCheckpoints)
 	rbft.epochMgr.configBatchToCheck = nil
-
+	validatorSet := lo.MapValues(rbft.chainConfig.ValidatorSet, func(_ int64, id uint64) *consensus.ValidatorInfo {
+		if nodeInfo, ok := rbft.chainConfig.nodeInfoMap[id]; ok {
+			return &consensus.ValidatorInfo{
+				Id:    id,
+				P2PId: nodeInfo.P2PNodeID,
+			}
+		}
+		rbft.logger.Errorf("Replica %d not found node info in nodeInfoMap with id %d", rbft.chainConfig.SelfID, id)
+		return nil
+	})
 	if len(quorumCheckpoints) != 0 {
 		rbft.epochMgr.persistEpochQuorumCheckpoint(&consensus.QuorumCheckpoint{
 			Checkpoint: quorumCheckpoints[0].Checkpoint,
 			Signatures: lo.SliceToMap(quorumCheckpoints, func(item *consensus.SignedCheckpoint) (uint64, []byte) {
 				return item.Author, item.Signature
 			}),
-			ValidatorSet: nil,
+			ValidatorSet: validatorSet,
 		})
 		rbft.logger.Infof("Replica %d persist stable checkpoint for seqNo %d, epoch: %d", rbft.chainConfig.SelfID, checkpointHeight, quorumCheckpoints[0].Epoch())
 	}

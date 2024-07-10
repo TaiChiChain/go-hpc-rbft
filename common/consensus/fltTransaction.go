@@ -173,3 +173,7 @@ func (m *FltTransaction) RbftGetValue() *big.Int {
 func (m *FltTransaction) RbftGetAccessList() types.AccessList {
 	return nil
 }
+
+func (m *FltTransaction) RbftClone() types.RbftTransaction {
+	return m.CloneVT()
+}
