@@ -843,7 +843,7 @@ func (rbft *rbftImpl[T, Constraint]) syncConfigCheckpoint(checkpointHeight uint6
 	rbft.external.SendFilterEvent(types.InformTypeFilterStableCheckpoint, quorumCheckpoints)
 	rbft.epochMgr.configBatchToCheck = nil
 	validatorSet := lo.MapValues(rbft.chainConfig.ValidatorSet, func(_ int64, id uint64) *consensus.ValidatorInfo {
-		if nodeInfo, ok := rbft.chainConfig.nodeInfoMap[id]; ok {
+		if nodeInfo, err := rbft.chainConfig.getNodeInfo(id); err == nil {
 			return &consensus.ValidatorInfo{
 				Id:    id,
 				P2PId: nodeInfo.P2PNodeID,
