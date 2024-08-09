@@ -1529,7 +1529,12 @@ func (rbft *rbftImpl[T, Constraint]) recvFetchMissingRequest(ctx context.Context
 
 func (rbft *rbftImpl[T, Constraint]) unicastFailedFetchMissingResponse(ctx context.Context, fetch *consensus.FetchMissingRequest) error {
 	re := &consensus.FetchMissingResponse{
-		Status: consensus.FetchMissingResponse_Failure,
+		Status:               consensus.FetchMissingResponse_Failure,
+		ReplicaId:            rbft.chainConfig.SelfID,
+		View:                 fetch.View,
+		SequenceNumber:       fetch.SequenceNumber,
+		BatchDigest:          fetch.BatchDigest,
+		MissingRequestHashes: fetch.MissingRequestHashes,
 	}
 	payload, err := re.MarshalVTStrict()
 	if err != nil {
