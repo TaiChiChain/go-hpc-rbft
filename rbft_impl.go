@@ -1058,6 +1058,15 @@ func (rbft *rbftImpl[T, Constraint]) sendPrePrepare(seqNo uint64, digest string,
 		rbft.metrics.batchToPrePrepared.Observe(duration)
 	}
 
+	var lastCheckpointTime int64
+
+	lastCheckpointTime = rbft.storeMgr.localCheckpoints[seqNo-1].Checkpoint.ViewChange.Timestamp
+
+	if lastCheckpointTime > 0 {
+		duration := time.Duration(reqBatch.Timestamp - lastCheckpointTime).Seconds()
+		rbft.metrics.lastCheckpointToNextPrimary.Observe(duration)
+	}
+
 	payload, err := preprepare.MarshalVTStrict()
 	if err != nil {
 		rbft.logger.Errorf("ConsensusMessage_PRE_PREPARE Marshal Error: %s", err)

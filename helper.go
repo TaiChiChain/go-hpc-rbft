@@ -21,6 +21,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math"
+	"time"
 
 	"github.com/samber/lo"
 	"golang.org/x/crypto/sha3"
@@ -785,8 +786,9 @@ func (rbft *rbftImpl[T, Constraint]) generateSignedCheckpoint(state *types.Servi
 		rbft.logger.Infof("Replica %d generate checkpoint's IfNotRecoverValidatorDynamicInfo: %v", rbft.chainConfig.SelfID, showSimpleValidatorDynamicInfo(vcBasis.IfNotRecoverValidatorDynamicInfo))
 
 		vc := &consensus.ViewChange{
-			Basis:    vcBasis,
-			Recovery: true,
+			Basis:     vcBasis,
+			Recovery:  true,
+			Timestamp: time.Now().UnixNano(),
 		}
 		sig, sErr := rbft.signViewChange(vc)
 		if sErr != nil {

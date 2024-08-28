@@ -135,6 +135,9 @@ type rbftMetrics struct {
 	// monitor the duration from batch to prePrepared
 	batchToPrePrepared metrics.Summary
 
+	// monitor the duration from last checkpoint to next primary post preprepare
+	lastCheckpointToNextPrimary metrics.Summary
+
 	// monitor the duration from prePrepared to prepared
 	prePreparedToPrepared metrics.Summary
 
@@ -545,6 +548,14 @@ func newRBFTMetrics(metricsProv metrics.Provider) (*rbftMetrics, error) {
 			Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
 		},
 	)
+
+	m.lastCheckpointToNextPrimary, err = metricsProv.NewSummary(
+		metrics.SummaryOpts{
+			Name:       "last_checkpoint_to_next_primary",
+			Help:       "interval from last checkpoint to next primary",
+			Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
+		},
+	)
 	if err != nil {
 		return m, err
 	}
@@ -670,5 +681,9 @@ func (rm *rbftMetrics) unregisterMetrics() {
 	}
 	if rm.preparedToCommitted != nil {
 		rm.preparedToCommitted.Unregister()
+	}
+
+	if rm.lastCheckpointToNextPrimary != nil {
+		rm.lastCheckpointToNextPrimary.Unregister()
 	}
 }
