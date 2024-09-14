@@ -145,3 +145,31 @@ type TagContentIPC struct {
 	Command string `json:"command"`         // ip command
 	Error   string `json:"error,omitempty"` // optionally processing error result
 }
+
+type RbftQuorumCheckpoint struct {
+	QuorumCheckpoint
+}
+
+func (q *RbftQuorumCheckpoint) Epoch() uint64 {
+	return q.QuorumCheckpoint.Epoch()
+}
+
+func (q *RbftQuorumCheckpoint) NextEpoch() uint64 {
+	return q.QuorumCheckpoint.NextEpoch()
+}
+
+func (q *RbftQuorumCheckpoint) Marshal() ([]byte, error) {
+	return q.MarshalVT()
+}
+
+func (q *RbftQuorumCheckpoint) Unmarshal(raw []byte) error {
+	return q.UnmarshalVT(raw)
+}
+
+func (q *RbftQuorumCheckpoint) GetStateDigest() string {
+	return q.Digest()
+}
+
+func (q *RbftQuorumCheckpoint) GetHeight() uint64 {
+	return q.Height()
+}

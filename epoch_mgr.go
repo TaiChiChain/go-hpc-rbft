@@ -2,7 +2,6 @@ package rbft
 
 import (
 	"context"
-	"encoding/binary"
 	"fmt"
 	"sync"
 
@@ -474,38 +473,21 @@ func (em *epochManager) verifyEpochChangeProof(proof *consensus.EpochChangeProof
 
 // persistEpochQuorumCheckpoint persists QuorumCheckpoint or epoch to database
 func (em *epochManager) persistEpochQuorumCheckpoint(c *consensus.QuorumCheckpoint) {
-	key := fmt.Sprintf("%s%d", EpochStatePrefix, c.Checkpoint.Epoch)
-	raw, err := c.MarshalVTStrict()
-	if err != nil {
-		em.logger.Errorf("Persist epoch %d quorum chkpt failed with marshal err: %s ", c.Checkpoint.Epoch, err)
-		return
-	}
-
-	if err = em.epochService.StoreEpochState(key, raw); err != nil {
-		em.logger.Errorf("Persist epoch %d quorum chkpt failed with err: %s ", c.Checkpoint.Epoch, err)
-	}
-
-	// update latest epoch index
-	data := make([]byte, 8)
-	binary.BigEndian.PutUint64(data, c.Checkpoint.Epoch)
-	indexKey := EpochIndexKey
-	if err = em.epochService.StoreEpochState(indexKey, data); err != nil {
-		em.logger.Errorf("Persist epoch index %d failed with err: %s ", c.Checkpoint.Epoch, err)
+	newEpoch := c.Checkpoint.Epoch + 1
+	if err := em.epochService.StoreEpochState(newEpoch, &consensus.RbftQuorumCheckpoint{QuorumCheckpoint: *c}); err != nil {
+		em.logger.Errorf("Persist epoch %d quorum chkpt failed with err: %s ", newEpoch, err)
 	}
 }
 
-// persistDelCheckpoint get QuorumCheckpoint with the given epoch
+// getEpochQuorumCheckpoint get QuorumCheckpoint with the given epoch
 func (em *epochManager) getEpochQuorumCheckpoint(epoch uint64) (*consensus.QuorumCheckpoint, error) {
-	key := fmt.Sprintf("%s%d", EpochStatePrefix, epoch)
-
-	raw, err := em.epochService.ReadEpochState(key)
+	res, err := em.epochService.ReadEpochState(epoch)
 	if err != nil {
-		return nil, errors.WithMessagef(err, "failed to read epoch %d quorum chkpt", epoch)
+		return nil, err
 	}
-	c := &consensus.QuorumCheckpoint{}
-	if err := c.UnmarshalVT(raw); err != nil {
-		return nil, errors.WithMessagef(err, "failed to unmarshal epoch %d quorum chkpt", epoch)
+	data, ok := res.(*consensus.RbftQuorumCheckpoint)
+	if !ok {
+		return nil, errors.New("invalid checkpoint type")
 	}
-
-	return c, nil
+	return &data.QuorumCheckpoint, nil
 }

@@ -567,11 +567,11 @@ func (ext *testExternal[T, Constraint]) GetEpochInfo(epoch uint64) (*kittypes.Ep
 	return ext.testNode.n.config.GenesisEpochInfo, nil
 }
 
-func (ext *testExternal[T, Constraint]) StoreEpochState(key string, value []byte) error {
+func (ext *testExternal[T, Constraint]) StoreEpochState(key uint64, value kittypes.QuorumCheckpoint) error {
 	return nil
 }
 
-func (ext *testExternal[T, Constraint]) ReadEpochState(key string) ([]byte, error) {
+func (ext *testExternal[T, Constraint]) ReadEpochState(key uint64) (kittypes.QuorumCheckpoint, error) {
 	return nil, nil
 }
 

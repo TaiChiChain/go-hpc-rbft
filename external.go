@@ -83,8 +83,8 @@ type ServiceOutbound[T any, Constraint kittypes.TXConstraint[T]] interface {
 type EpochService interface {
 	GetCurrentEpochInfo() (*kittypes.EpochInfo, error)
 	GetEpochInfo(epoch uint64) (*kittypes.EpochInfo, error)
-	StoreEpochState(key string, value []byte) error
-	ReadEpochState(key string) ([]byte, error)
+	StoreEpochState(epoch uint64, value kittypes.QuorumCheckpoint) error
+	ReadEpochState(epoch uint64) (kittypes.QuorumCheckpoint, error)
 }
 
 // NodeService provides service for node management.

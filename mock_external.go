@@ -663,18 +663,18 @@ func (c *MockEpochServiceGetEpochInfoCall) DoAndReturn(f func(uint64) (*types0.E
 }
 
 // ReadEpochState mocks base method.
-func (m *MockEpochService) ReadEpochState(key string) ([]byte, error) {
+func (m *MockEpochService) ReadEpochState(epoch uint64) (types0.QuorumCheckpoint, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ReadEpochState", key)
-	ret0, _ := ret[0].([]byte)
+	ret := m.ctrl.Call(m, "ReadEpochState", epoch)
+	ret0, _ := ret[0].(types0.QuorumCheckpoint)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ReadEpochState indicates an expected call of ReadEpochState.
-func (mr *MockEpochServiceMockRecorder) ReadEpochState(key any) *MockEpochServiceReadEpochStateCall {
+func (mr *MockEpochServiceMockRecorder) ReadEpochState(epoch any) *MockEpochServiceReadEpochStateCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadEpochState", reflect.TypeOf((*MockEpochService)(nil).ReadEpochState), key)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadEpochState", reflect.TypeOf((*MockEpochService)(nil).ReadEpochState), epoch)
 	return &MockEpochServiceReadEpochStateCall{Call: call}
 }
 
@@ -684,35 +684,35 @@ type MockEpochServiceReadEpochStateCall struct {
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockEpochServiceReadEpochStateCall) Return(arg0 []byte, arg1 error) *MockEpochServiceReadEpochStateCall {
+func (c *MockEpochServiceReadEpochStateCall) Return(arg0 types0.QuorumCheckpoint, arg1 error) *MockEpochServiceReadEpochStateCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockEpochServiceReadEpochStateCall) Do(f func(string) ([]byte, error)) *MockEpochServiceReadEpochStateCall {
+func (c *MockEpochServiceReadEpochStateCall) Do(f func(uint64) (types0.QuorumCheckpoint, error)) *MockEpochServiceReadEpochStateCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockEpochServiceReadEpochStateCall) DoAndReturn(f func(string) ([]byte, error)) *MockEpochServiceReadEpochStateCall {
+func (c *MockEpochServiceReadEpochStateCall) DoAndReturn(f func(uint64) (types0.QuorumCheckpoint, error)) *MockEpochServiceReadEpochStateCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
 
 // StoreEpochState mocks base method.
-func (m *MockEpochService) StoreEpochState(key string, value []byte) error {
+func (m *MockEpochService) StoreEpochState(epoch uint64, value types0.QuorumCheckpoint) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "StoreEpochState", key, value)
+	ret := m.ctrl.Call(m, "StoreEpochState", epoch, value)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // StoreEpochState indicates an expected call of StoreEpochState.
-func (mr *MockEpochServiceMockRecorder) StoreEpochState(key, value any) *MockEpochServiceStoreEpochStateCall {
+func (mr *MockEpochServiceMockRecorder) StoreEpochState(epoch, value any) *MockEpochServiceStoreEpochStateCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StoreEpochState", reflect.TypeOf((*MockEpochService)(nil).StoreEpochState), key, value)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StoreEpochState", reflect.TypeOf((*MockEpochService)(nil).StoreEpochState), epoch, value)
 	return &MockEpochServiceStoreEpochStateCall{Call: call}
 }
 
@@ -728,13 +728,13 @@ func (c *MockEpochServiceStoreEpochStateCall) Return(arg0 error) *MockEpochServi
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockEpochServiceStoreEpochStateCall) Do(f func(string, []byte) error) *MockEpochServiceStoreEpochStateCall {
+func (c *MockEpochServiceStoreEpochStateCall) Do(f func(uint64, types0.QuorumCheckpoint) error) *MockEpochServiceStoreEpochStateCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockEpochServiceStoreEpochStateCall) DoAndReturn(f func(string, []byte) error) *MockEpochServiceStoreEpochStateCall {
+func (c *MockEpochServiceStoreEpochStateCall) DoAndReturn(f func(uint64, types0.QuorumCheckpoint) error) *MockEpochServiceStoreEpochStateCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -1326,18 +1326,18 @@ func (c *MockExternalStackGetValidatorSetCall[T, Constraint]) DoAndReturn(f func
 }
 
 // ReadEpochState mocks base method.
-func (m *MockExternalStack[T, Constraint]) ReadEpochState(key string) ([]byte, error) {
+func (m *MockExternalStack[T, Constraint]) ReadEpochState(epoch uint64) (types0.QuorumCheckpoint, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ReadEpochState", key)
-	ret0, _ := ret[0].([]byte)
+	ret := m.ctrl.Call(m, "ReadEpochState", epoch)
+	ret0, _ := ret[0].(types0.QuorumCheckpoint)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ReadEpochState indicates an expected call of ReadEpochState.
-func (mr *MockExternalStackMockRecorder[T, Constraint]) ReadEpochState(key any) *MockExternalStackReadEpochStateCall[T, Constraint] {
+func (mr *MockExternalStackMockRecorder[T, Constraint]) ReadEpochState(epoch any) *MockExternalStackReadEpochStateCall[T, Constraint] {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadEpochState", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).ReadEpochState), key)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadEpochState", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).ReadEpochState), epoch)
 	return &MockExternalStackReadEpochStateCall[T, Constraint]{Call: call}
 }
 
@@ -1347,19 +1347,19 @@ type MockExternalStackReadEpochStateCall[T any, Constraint types0.TXConstraint[T
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockExternalStackReadEpochStateCall[T, Constraint]) Return(arg0 []byte, arg1 error) *MockExternalStackReadEpochStateCall[T, Constraint] {
+func (c *MockExternalStackReadEpochStateCall[T, Constraint]) Return(arg0 types0.QuorumCheckpoint, arg1 error) *MockExternalStackReadEpochStateCall[T, Constraint] {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockExternalStackReadEpochStateCall[T, Constraint]) Do(f func(string) ([]byte, error)) *MockExternalStackReadEpochStateCall[T, Constraint] {
+func (c *MockExternalStackReadEpochStateCall[T, Constraint]) Do(f func(uint64) (types0.QuorumCheckpoint, error)) *MockExternalStackReadEpochStateCall[T, Constraint] {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockExternalStackReadEpochStateCall[T, Constraint]) DoAndReturn(f func(string) ([]byte, error)) *MockExternalStackReadEpochStateCall[T, Constraint] {
+func (c *MockExternalStackReadEpochStateCall[T, Constraint]) DoAndReturn(f func(uint64) (types0.QuorumCheckpoint, error)) *MockExternalStackReadEpochStateCall[T, Constraint] {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -1564,17 +1564,17 @@ func (c *MockExternalStackStateUpdateCall[T, Constraint]) DoAndReturn(f func(uin
 }
 
 // StoreEpochState mocks base method.
-func (m *MockExternalStack[T, Constraint]) StoreEpochState(key string, value []byte) error {
+func (m *MockExternalStack[T, Constraint]) StoreEpochState(epoch uint64, value types0.QuorumCheckpoint) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "StoreEpochState", key, value)
+	ret := m.ctrl.Call(m, "StoreEpochState", epoch, value)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // StoreEpochState indicates an expected call of StoreEpochState.
-func (mr *MockExternalStackMockRecorder[T, Constraint]) StoreEpochState(key, value any) *MockExternalStackStoreEpochStateCall[T, Constraint] {
+func (mr *MockExternalStackMockRecorder[T, Constraint]) StoreEpochState(epoch, value any) *MockExternalStackStoreEpochStateCall[T, Constraint] {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StoreEpochState", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).StoreEpochState), key, value)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StoreEpochState", reflect.TypeOf((*MockExternalStack[T, Constraint])(nil).StoreEpochState), epoch, value)
 	return &MockExternalStackStoreEpochStateCall[T, Constraint]{Call: call}
 }
 
@@ -1590,13 +1590,13 @@ func (c *MockExternalStackStoreEpochStateCall[T, Constraint]) Return(arg0 error)
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockExternalStackStoreEpochStateCall[T, Constraint]) Do(f func(string, []byte) error) *MockExternalStackStoreEpochStateCall[T, Constraint] {
+func (c *MockExternalStackStoreEpochStateCall[T, Constraint]) Do(f func(uint64, types0.QuorumCheckpoint) error) *MockExternalStackStoreEpochStateCall[T, Constraint] {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockExternalStackStoreEpochStateCall[T, Constraint]) DoAndReturn(f func(string, []byte) error) *MockExternalStackStoreEpochStateCall[T, Constraint] {
+func (c *MockExternalStackStoreEpochStateCall[T, Constraint]) DoAndReturn(f func(uint64, types0.QuorumCheckpoint) error) *MockExternalStackStoreEpochStateCall[T, Constraint] {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
